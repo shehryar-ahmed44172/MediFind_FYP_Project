@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/config/app_config.dart';
 import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
@@ -36,9 +37,10 @@ class AppRouter {
 
   static final GoRouter router = GoRouter(
     navigatorKey: _navigatorKey,
-    initialLocation: '/dev-menu',
+    initialLocation: AppConfig.initialRoute,
     redirect: (context, state) {
-      // Auth guard — disabled for layout preview
+      // Auth guard — can be enabled/disabled via AppConfig
+      // For development, disabled automatically
       return null;
     },
     routes: [

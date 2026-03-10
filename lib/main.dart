@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'config/router.dart';
+import 'core/config/app_config.dart';
 import 'presentation/theme/app_theme.dart';
 
 void main() async {
@@ -24,7 +25,7 @@ class MediFindApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'MediFind',
-      debugShowCheckedModeBanner: false,
+      debugShowCheckedModeBanner: AppConfig.showDebugBanner,
       theme: AppTheme.lightTheme(),
       darkTheme: AppTheme.darkTheme(),
       themeMode: ThemeMode.light,

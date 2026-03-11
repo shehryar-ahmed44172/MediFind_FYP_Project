@@ -31,6 +31,33 @@
   - Dio HTTP client configuration
   - Database architecture
 
+### Backend Engineer's Guide
+- **[docs/architecture/BACKEND_ENGINEERS_GUIDE.md](docs/architecture/BACKEND_ENGINEERS_GUIDE.md)** ⭐ **NEW**
+  - Complete tech stack overview (Flutter, Dart, Riverpod, Dio, PostgreSQL, Redis, etc.)
+  - Database schema with all tables and relationships
+  - API endpoints documentation (17+ endpoints with examples)
+  - Authentication & security implementation
+  - WebSocket real-time communication setup
+  - Integration flow diagrams
+  - Backend services required (API, Database, Cache, WebSocket, File Storage, SMS, Email)
+  - Development guidelines and best practices
+
+### Implementation Plan & Guides
+- **[docs/architecture/IMPLEMENTATION_PLAN.md](docs/architecture/IMPLEMENTATION_PLAN.md)** ⭐ **NEW**
+  - Detailed checklist of all pending functionality
+  - Priority-ordered tasks for Modules 1-8
+  - Code examples and templates
+  - Backend integration endpoints
+  - Verification checklist before deployment
+  - Week-by-week implementation roadmap
+
+- **[docs/architecture/IMPLEMENTATION_STATUS.md](docs/architecture/IMPLEMENTATION_STATUS.md)** ⭐ **NEW - Current Status**
+  - What was implemented in Phase 1
+  - Which services exist and are ready
+  - Next steps for UI integration
+  - Code examples for wiring components
+  - Priority action items for next sessions
+
 ### Design System
 - **[docs/design/DESIGN_SYSTEM_AND_LAYOUT_GUIDE.md](docs/design/DESIGN_SYSTEM_AND_LAYOUT_GUIDE.md)**
   - UI/UX guidelines

@@ -5,9 +5,6 @@ import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 
-/// RegisterScreen handles new user creation.
-/// It collects user details, role (Patient, Responder, Caregiver),
-/// and specific accessibility settings if the user is a Patient.
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({Key? key}) : super(key: key);
 
@@ -16,28 +13,22 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  // Controllers for user input fields
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   
-  // Global key for form validation
   final _formKey = GlobalKey<FormState>();
   
-  // State variables for UI toggles
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
-  
-  // Default selections for dropdowns and chips
   String _selectedRole = 'PATIENT';
   String _selectedPatientType = 'NORMAL';
   bool _isLoading = false;
 
   @override
   void dispose() {
-    // Dispose controllers to free up memory when screen is destroyed
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
@@ -46,16 +37,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
-  /// Handles the registration form submission and API call
   Future<void> _register() async {
-    // Step 1: Validate all form fields
+    // form validation
     if (!_formKey.currentState!.validate()) return;
 
-    // Step 2: Show loading indicator
     setState(() => _isLoading = true);
 
     try {
-      // Step 3: Bundle user input into a params object
       final params = RegisterParams(
         fullName: _fullNameController.text.trim(),
         email: _emailController.text.trim(),
@@ -64,11 +52,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         role: _selectedRole,
       );
       
-      // Step 4: Call Riverpod provider to handle registration
+      // call api
       await ref.read(registerProvider(params).future);
 
       if (mounted) {
-        // Step 5: Show success message and navigate to Login
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Registration successful! Please log in.'),
@@ -76,10 +63,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        context.go('/login');
+        context.go('/login'); // go to login after success
       }
     } catch (e) {
-      // Handle any API or connection errors
+      // show error if registration fails
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -90,7 +77,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         );
       }
     } finally {
-      // Always stop the loading indicator
       if (mounted) setState(() => _isLoading = false);
     }
   }
@@ -98,6 +84,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Account'),
@@ -114,9 +101,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // ---------------------------------------------------------
-              // Header Section
-              // ---------------------------------------------------------
               Text(
                 'Join MediFind',
                 style: theme.textTheme.headlineMedium?.copyWith(
@@ -131,10 +115,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 32),
 
-              // ---------------------------------------------------------
-              // Personal Information Section
-              // ---------------------------------------------------------
-              // Full Name Input
+              // text fields
               TextFormField(
                 controller: _fullNameController,
                 textCapitalization: TextCapitalization.words,
@@ -146,7 +127,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Email Input
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -158,7 +138,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Phone Number Input
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -170,10 +149,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ---------------------------------------------------------
-              // Role & Accessibility Selection Section
-              // ---------------------------------------------------------
-              // Role Dropdown
+              // role dropdown
               DropdownButtonFormField<String>(
                 value: _selectedRole,
                 decoration: const InputDecoration(
@@ -191,7 +167,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Patient Type Selection (Dynamically shown only for PATIENT role)
+              // show patient types only if patient is selected
               if (_selectedRole == 'PATIENT') ...[
                 Text(
                   'Patient Type',
@@ -206,7 +182,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 
-                // Accessibility Chips Row
                 Row(
                   children: [
                     _PatientTypeChip(
@@ -236,7 +211,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
                 
-                // Dynamic description box for selected Patient Type
+                // description box
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -253,7 +228,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // Dynamic Role description hint
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -267,10 +241,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // ---------------------------------------------------------
-              // Security Section (Passwords)
-              // ---------------------------------------------------------
-              // Password Input
+              // password fields
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
@@ -289,7 +260,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Confirm Password Input
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
@@ -312,10 +282,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 24),
 
-              // ---------------------------------------------------------
-              // Action Buttons
-              // ---------------------------------------------------------
-              // Register Button
               ElevatedButton(
                 onPressed: _isLoading ? null : _register,
                 style: ElevatedButton.styleFrom(
@@ -335,7 +301,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Navigation to Login
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -349,9 +314,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
               const SizedBox(height: 32),
               
-              // ---------------------------------------------------------
-              // Development Tools (Mock Data Fillers)
-              // ---------------------------------------------------------
+              // dev buttons
               const Divider(),
               const SizedBox(height: 16),
               Text(
@@ -405,7 +368,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  // Helper functions for UI text and colors
   String _getRoleDescription(String role) {
     switch (role) {
       case 'PATIENT':
@@ -442,7 +404,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 }
 
-/// A custom widget used only for quick developer form filling
 class _MockFillButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;
@@ -466,10 +427,6 @@ class _MockFillButton extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Patient Type Chip widget (used on Register Screen)
-// ---------------------------------------------------------------------------
-/// A reusable chip widget to select accessibility features (Deaf/Blind/Normal)
 class _PatientTypeChip extends StatelessWidget {
   final String label;
   final IconData icon;

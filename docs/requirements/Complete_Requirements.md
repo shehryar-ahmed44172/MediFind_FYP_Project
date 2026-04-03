@@ -33,7 +33,6 @@ FR2.11: The system shall allow patients to delete or update uploaded reports.
 MODULE 3: Accessibility & User Interface Module
 FR3.1: The system shall provide accessibility modes for disabled users.
 FR3.2: Accessibility support shall include:
-Voice guidance for blind users
 Text-based interface for deaf users
 Large buttons for physically disabled users
 FR3.3: The system shall support high-contrast UI mode.

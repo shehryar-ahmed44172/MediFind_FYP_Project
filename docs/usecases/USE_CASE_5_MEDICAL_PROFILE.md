@@ -619,4 +619,4 @@ Resolution: Server version wins
 ✅ Caregiver limited view enforced
 ✅ Update history tracked
 ✅ Medical data encrypted
-✅ UI accessible to users with mobility/vision impairments
+✅ UI accessible to users with mobility impairments

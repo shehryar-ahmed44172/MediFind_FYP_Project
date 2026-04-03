@@ -18,7 +18,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  
   final _formKey = GlobalKey<FormState>();
+  
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   String _selectedRole = 'PATIENT';
@@ -36,6 +38,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   }
 
   Future<void> _register() async {
+    // form validation
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -48,6 +51,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         password: _passwordController.text,
         role: _selectedRole,
       );
+      
+      // call api
       await ref.read(registerProvider(params).future);
 
       if (mounted) {
@@ -58,9 +63,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        context.go('/login');
+        context.go('/login'); // go to login after success
       }
     } catch (e) {
+      // show error if registration fails
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -78,6 +84,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('Create Account'),
@@ -108,7 +115,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 32),
 
-              // Full Name
+              // text fields
               TextFormField(
                 controller: _fullNameController,
                 textCapitalization: TextCapitalization.words,
@@ -120,7 +127,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Email
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
@@ -132,7 +138,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Phone
               TextFormField(
                 controller: _phoneController,
                 keyboardType: TextInputType.phone,
@@ -144,7 +149,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Role
+              // role dropdown
               DropdownButtonFormField<String>(
                 value: _selectedRole,
                 decoration: const InputDecoration(
@@ -162,7 +167,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Patient Type Selection (only for PATIENT role)
+              // show patient types only if patient is selected
               if (_selectedRole == 'PATIENT') ...[
                 Text(
                   'Patient Type',
@@ -176,6 +181,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ?.copyWith(color: Colors.grey.shade600),
                 ),
                 const SizedBox(height: 12),
+                
                 Row(
                   children: [
                     _PatientTypeChip(
@@ -204,6 +210,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
+                
+                // description box
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -220,7 +228,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 const SizedBox(height: 16),
               ],
 
-              // Role description hint
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -234,7 +241,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Password
+              // password fields
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
@@ -253,7 +260,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Confirm Password
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
@@ -270,14 +276,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 validator: (value) {
                   if (value.isNullOrEmpty) return 'Confirm password is required';
-                  if (value != _passwordController.text)
-                    return 'Passwords do not match';
+                  if (value != _passwordController.text) return 'Passwords do not match';
                   return null;
                 },
               ),
               const SizedBox(height: 24),
 
-              // Register button
               ElevatedButton(
                 onPressed: _isLoading ? null : _register,
                 style: ElevatedButton.styleFrom(
@@ -309,7 +313,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
 
               const SizedBox(height: 32),
-              // Mock Registration Section (Dev only)
+              
+              // dev buttons
               const Divider(),
               const SizedBox(height: 16),
               Text(
@@ -422,9 +427,6 @@ class _MockFillButton extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Patient Type Chip widget (used on Register Screen)
-// ---------------------------------------------------------------------------
 class _PatientTypeChip extends StatelessWidget {
   final String label;
   final IconData icon;

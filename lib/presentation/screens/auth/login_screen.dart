@@ -5,6 +5,8 @@ import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 
+/// LoginScreen widget handles user authentication.
+/// It uses Riverpod for state management and GoRouter for navigation.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
@@ -13,40 +15,52 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
+  // Controllers for text input fields
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  
+  // Key to manage and validate the form state
   final _formKey = GlobalKey<FormState>();
-  bool _obscurePassword = true;
-  bool _isLoading = false;
+  
+  // UI state variables
+  bool _obscurePassword = true; // Toggles password visibility
+  bool _isLoading = false;      // Shows loading spinner during API calls
 
   @override
   void dispose() {
+    // Clean up controllers to prevent memory leaks when the screen is closed
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+  /// Handles the login process: validation, authentication, and routing
   Future<void> _login() async {
+    // Step 1: Validate form fields
     if (!_formKey.currentState!.validate()) return;
 
+    // Step 2: Show loading indicator
     setState(() => _isLoading = true);
 
     try {
+      // Step 3: Prepare login parameters
       final params = LoginParams(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
+      // Step 4: Call the authentication provider
       await ref.read(loginProvider(params).future);
 
       if (mounted) {
-        // Navigate to the correct home based on user role
+        // Step 5: Fetch user role and navigate to the correct dashboard
         final role = await ref.read(currentUserRoleProvider.future);
         if (mounted) {
           _navigateByRole(role);
         }
       }
     } catch (e) {
+      // Handle authentication errors and show a SnackBar to the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -57,10 +71,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     } finally {
+      // Hide loading indicator whether login succeeds or fails
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  /// Routes the user to their specific dashboard based on their account type
   void _navigateByRole(String? role) {
     switch (role?.toUpperCase()) {
       case 'RESPONDER':
@@ -70,13 +86,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/caregiver');
         break;
       default:
-        context.go('/home');
+        context.go('/home'); // Default route for Patients
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
@@ -88,7 +105,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 60),
 
-                // Logo / Title
+                // -----------------------------------------------------------
+                // Header Section: Logo & App Title
+                // -----------------------------------------------------------
                 Icon(Icons.local_hospital_rounded,
                     size: 72, color: theme.colorScheme.primary),
                 const SizedBox(height: 16),
@@ -110,7 +129,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // Email
+                // -----------------------------------------------------------
+                // Input Fields Section
+                // -----------------------------------------------------------
+                // Email Input
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -122,7 +144,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password
+                // Password Input
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -144,7 +166,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Forgot password
+                // Forgot Password Link
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -154,7 +176,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Login button
+                // -----------------------------------------------------------
+                // Action Buttons Section
+                // -----------------------------------------------------------
+                // Main Login Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _login,
                   style: ElevatedButton.styleFrom(
@@ -172,7 +197,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Register link
+                // Navigation to Registration
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -185,7 +210,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
 
                 const SizedBox(height: 32),
-                // Mock Credentials Section (Dev only)
+                
+                // -----------------------------------------------------------
+                // Mock Credentials Section (Development Only)
+                // -----------------------------------------------------------
                 const Divider(),
                 const SizedBox(height: 16),
                 Text(
@@ -229,6 +257,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 }
 
+/// A custom widget used only for quick developer login buttons
 class _MockLoginButton extends StatelessWidget {
   final String label;
   final VoidCallback onPressed;

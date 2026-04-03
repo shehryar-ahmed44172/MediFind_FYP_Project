@@ -1,7 +1,11 @@
+// Importing required Flutter materials and Riverpod for state management
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// Importing GoRouter for handling app navigation and routing
 import 'package:go_router/go_router.dart';
 import '../core/config/app_config.dart';
+
+// Importing all the necessary screens for different app modules
 import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
@@ -23,34 +27,38 @@ import '../presentation/screens/settings/accessibility_settings_screen.dart';
 import '../presentation/screens/debug/developer_menu_screen.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 
-
+// AppRouter class manages all the navigation paths within the app
 class AppRouter {
+  // Global key to access navigator state from anywhere
   static final _navigatorKey = GlobalKey<NavigatorState>();
 
   static GlobalKey<NavigatorState> get navigatorKey => _navigatorKey;
 
   static ProviderContainer? _container;
 
+  // Method to set the ProviderContainer for dependency injection
   static void setContainer(ProviderContainer container) {
     _container = container;
   }
 
+  // Main GoRouter configuration
   static final GoRouter router = GoRouter(
     navigatorKey: _navigatorKey,
-    initialLocation: AppConfig.initialRoute,
+    initialLocation: AppConfig.initialRoute, // Starting screen of the app
     redirect: (context, state) {
       // Auth guard — can be enabled/disabled via AppConfig
       // For development, disabled automatically
       return null;
     },
     routes: [
+      // Developer testing route
       GoRoute(
         path: '/dev-menu',
         name: 'dev-menu',
         builder: (context, state) => const DeveloperMenuScreen(),
       ),
       // -----------------------------------------------------------------------
-      // Auth Routes
+      // Auth Routes (Login, Register, Password Management)
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/login',
@@ -69,7 +77,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // Patient Routes
+      // Patient Routes (Main features for primary users)
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/home',
@@ -85,6 +93,7 @@ class AppRouter {
             path: 'sos-countdown',
             name: 'sos-countdown',
             builder: (context, state) {
+              // Extracting extra parameters for SOS screen safely
               final extra = state.extra as Map<String, dynamic>? ?? {};
               return SosCountdownScreen(
                 emergencyType: extra['emergencyType'] ?? 'OTHER',
@@ -140,7 +149,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // Responder Routes
+      // Responder Routes (For emergency responders)
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/responder',
@@ -163,7 +172,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // Caregiver Routes
+      // Caregiver Routes (For users assisting patients)
       // -----------------------------------------------------------------------
       GoRoute(
         path: '/caregiver',
@@ -180,6 +189,7 @@ class AppRouter {
         ],
       ),
     ],
+    // Error handling route if a user navigates to an unknown path
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Error')),
       body: Center(

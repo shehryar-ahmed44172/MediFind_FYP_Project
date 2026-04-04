@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../theme/app_theme.dart';
 
 class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
   const AccessibilitySettingsScreen({Key? key}) : super(key: key);
@@ -76,9 +77,9 @@ class _AccessibilitySettingsScreenState
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: theme.scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200),
+              boxShadow: AppShadows.neumorphicIn,
             ),
             child: const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +106,13 @@ class _AccessibilitySettingsScreenState
           ),
           const SizedBox(height: 24),
 
-          ElevatedButton(
+          Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: ElevatedButton(
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -116,11 +123,15 @@ class _AccessibilitySettingsScreenState
               );
             },
             style: ElevatedButton.styleFrom(
+              backgroundColor: theme.scaffoldBackgroundColor,
+              foregroundColor: theme.colorScheme.primary,
+              elevation: 0,
               padding: const EdgeInsets.symmetric(vertical: 16),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
             ),
             child: const Text('Save Settings', style: TextStyle(fontSize: 16)),
+            ),
           ),
         ],
       ),
@@ -166,10 +177,13 @@ class _AccessibilityTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
       child: SwitchListTile(
         secondary: Icon(icon,
             color:

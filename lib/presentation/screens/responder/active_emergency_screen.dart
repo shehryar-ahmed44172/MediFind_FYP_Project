@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../theme/app_theme.dart';
 
 class ActiveEmergencyScreen extends ConsumerStatefulWidget {
   const ActiveEmergencyScreen({Key? key}) : super(key: key);
@@ -39,11 +40,10 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         _statusSteps.indexWhere((s) => s['status'] == _currentStatus);
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Active Emergency'),
         centerTitle: true,
-        backgroundColor: Colors.green.shade700,
-        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -51,9 +51,12 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Patient Info Card
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.neumorphicOut,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -88,9 +91,9 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
             Container(
               height: 200,
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.shade200),
+                boxShadow: AppShadows.neumorphicIn,
               ),
               child: const Center(
                 child: Column(
@@ -110,9 +113,12 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
             const SizedBox(height: 16),
 
             // Status Timeline
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.neumorphicOut,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -169,9 +175,9 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: theme.scaffoldBackgroundColor,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.green.shade200),
+                  boxShadow: AppShadows.neumorphicIn,
                 ),
                 child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,

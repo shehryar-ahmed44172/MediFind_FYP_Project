@@ -9,13 +9,14 @@ This document contains useful PostgreSQL queries interacting with the schema def
 
 ### 1.1 Create a New User (Registration)
 ```sql
-INSERT INTO users (id, fullName, email, phoneNumber, role, profileImageUrl) 
+INSERT INTO users (id, fullName, email, phoneNumber, role, patientType, profileImageUrl) 
 VALUES (
     'usr_1234567890', 
     'John Doe', 
     'john.doe@example.com', 
     '+1234567890', 
     'PATIENT', 
+    'NORMAL',
     'https://example.com/avatar.jpg'
 ) RETURNING *;
 ```

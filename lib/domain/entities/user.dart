@@ -11,6 +11,11 @@ class User with _$User {
     required String email,
     required String phoneNumber,
     required String role,
+    String? patientType, // NORMAL, DEAF
+    String? organization, // For Responders
+    String? licenseNumber, // For Responders
+    String? responderType, // For Responders
+    String? vehicleType, // For Responders
     String? profileImageUrl,
     @Default(true) bool isActive,
     required DateTime createdAt,
@@ -28,6 +33,11 @@ class UserProfile with _$UserProfile {
     required String email,
     required String phoneNumber,
     required String role,
+    String? patientType,
+    String? organization,
+    String? licenseNumber,
+    String? responderType,
+    String? vehicleType,
     String? profileImageUrl,
     String? bio,
     String? address,
@@ -76,6 +86,11 @@ class RegisterRequest with _$RegisterRequest {
     required String phoneNumber,
     required String password,
     required String role,
+    String? patientType,
+    String? organization,
+    String? licenseNumber,
+    String? responderType,
+    String? vehicleType,
   }) = _RegisterRequest;
 
   factory RegisterRequest.fromJson(Map<String, dynamic> json) =>

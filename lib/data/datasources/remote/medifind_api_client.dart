@@ -82,23 +82,11 @@ class MediFindApiClient {
     }
   }
 
-  Future<AuthResponse> register(
-    String fullName,
-    String email,
-    String phoneNumber,
-    String password,
-    String role,
-  ) async {
+  Future<AuthResponse> register(RegisterRequest request) async {
     try {
       final response = await _dio.post(
         'auth/register',
-        data: {
-          'fullName': fullName,
-          'email': email,
-          'phoneNumber': phoneNumber,
-          'password': password,
-          'role': role,
-        },
+        data: request.toJson(),
       );
 
       if (response.statusCode == 201) {

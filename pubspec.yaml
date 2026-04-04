@@ -77,6 +77,9 @@ dependencies:
 
   # Intl (date formatting)
   intl: ^0.20.2
+  google_fonts: ^8.0.2
+  flutter_native_splash: ^2.4.7
+  image: ^4.8.0
 
 dev_dependencies:
   flutter_test:
@@ -108,10 +111,17 @@ flutter:
     - assets/sounds/
 
   fonts:
-    - family: Poppins
+    - family: Montserrat
       fonts:
-        - asset: assets/fonts/Poppins-Regular.ttf
-        - asset: assets/fonts/Poppins-Bold.ttf
+        - asset: assets/fonts/Montserrat-Regular.ttf
+        - asset: assets/fonts/Montserrat-Bold.ttf
           weight: 700
-        - asset: assets/fonts/Poppins-SemiBold.ttf
+        - asset: assets/fonts/Montserrat-SemiBold.ttf
           weight: 600
+
+flutter_native_splash:
+  color: "#FFFFFF"
+  image: "assets/logos/medifind_app_logo.png"
+  android_12:
+    image: "assets/logos/medifind_app_logo_padded.png"
+    color: "#FFFFFF"

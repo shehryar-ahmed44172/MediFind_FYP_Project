@@ -25,6 +25,15 @@ mixin _$User {
   String get email => throw _privateConstructorUsedError;
   String get phoneNumber => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
+  String? get patientType => throw _privateConstructorUsedError; // NORMAL, DEAF
+  String? get organization =>
+      throw _privateConstructorUsedError; // For Responders
+  String? get licenseNumber =>
+      throw _privateConstructorUsedError; // For Responders
+  String? get responderType =>
+      throw _privateConstructorUsedError; // For Responders
+  String? get vehicleType =>
+      throw _privateConstructorUsedError; // For Responders
   String? get profileImageUrl => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
@@ -46,6 +55,11 @@ abstract class $UserCopyWith<$Res> {
       String email,
       String phoneNumber,
       String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType,
       String? profileImageUrl,
       bool isActive,
       DateTime createdAt,
@@ -70,6 +84,11 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? email = null,
     Object? phoneNumber = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
     Object? profileImageUrl = freezed,
     Object? isActive = null,
     Object? createdAt = null,
@@ -96,6 +115,26 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -129,6 +168,11 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       String email,
       String phoneNumber,
       String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType,
       String? profileImageUrl,
       bool isActive,
       DateTime createdAt,
@@ -150,6 +194,11 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? email = null,
     Object? phoneNumber = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
     Object? profileImageUrl = freezed,
     Object? isActive = null,
     Object? createdAt = null,
@@ -176,6 +225,26 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -205,6 +274,11 @@ class _$UserImpl implements _User {
       required this.email,
       required this.phoneNumber,
       required this.role,
+      this.patientType,
+      this.organization,
+      this.licenseNumber,
+      this.responderType,
+      this.vehicleType,
       this.profileImageUrl,
       this.isActive = true,
       required this.createdAt,
@@ -224,6 +298,21 @@ class _$UserImpl implements _User {
   @override
   final String role;
   @override
+  final String? patientType;
+// NORMAL, DEAF
+  @override
+  final String? organization;
+// For Responders
+  @override
+  final String? licenseNumber;
+// For Responders
+  @override
+  final String? responderType;
+// For Responders
+  @override
+  final String? vehicleType;
+// For Responders
+  @override
   final String? profileImageUrl;
   @override
   @JsonKey()
@@ -235,7 +324,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -250,6 +339,16 @@ class _$UserImpl implements _User {
             (identical(other.phoneNumber, phoneNumber) ||
                 other.phoneNumber == phoneNumber) &&
             (identical(other.role, role) || other.role == role) &&
+            (identical(other.patientType, patientType) ||
+                other.patientType == patientType) &&
+            (identical(other.organization, organization) ||
+                other.organization == organization) &&
+            (identical(other.licenseNumber, licenseNumber) ||
+                other.licenseNumber == licenseNumber) &&
+            (identical(other.responderType, responderType) ||
+                other.responderType == responderType) &&
+            (identical(other.vehicleType, vehicleType) ||
+                other.vehicleType == vehicleType) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
                 other.profileImageUrl == profileImageUrl) &&
             (identical(other.isActive, isActive) ||
@@ -262,8 +361,22 @@ class _$UserImpl implements _User {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(runtimeType, id, fullName, email, phoneNumber,
-      role, profileImageUrl, isActive, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      fullName,
+      email,
+      phoneNumber,
+      role,
+      patientType,
+      organization,
+      licenseNumber,
+      responderType,
+      vehicleType,
+      profileImageUrl,
+      isActive,
+      createdAt,
+      updatedAt);
 
   @JsonKey(ignore: true)
   @override
@@ -286,6 +399,11 @@ abstract class _User implements User {
       required final String email,
       required final String phoneNumber,
       required final String role,
+      final String? patientType,
+      final String? organization,
+      final String? licenseNumber,
+      final String? responderType,
+      final String? vehicleType,
       final String? profileImageUrl,
       final bool isActive,
       required final DateTime createdAt,
@@ -304,6 +422,16 @@ abstract class _User implements User {
   @override
   String get role;
   @override
+  String? get patientType;
+  @override // NORMAL, DEAF
+  String? get organization;
+  @override // For Responders
+  String? get licenseNumber;
+  @override // For Responders
+  String? get responderType;
+  @override // For Responders
+  String? get vehicleType;
+  @override // For Responders
   String? get profileImageUrl;
   @override
   bool get isActive;
@@ -328,6 +456,11 @@ mixin _$UserProfile {
   String get email => throw _privateConstructorUsedError;
   String get phoneNumber => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
+  String? get patientType => throw _privateConstructorUsedError;
+  String? get organization => throw _privateConstructorUsedError;
+  String? get licenseNumber => throw _privateConstructorUsedError;
+  String? get responderType => throw _privateConstructorUsedError;
+  String? get vehicleType => throw _privateConstructorUsedError;
   String? get profileImageUrl => throw _privateConstructorUsedError;
   String? get bio => throw _privateConstructorUsedError;
   String? get address => throw _privateConstructorUsedError;
@@ -355,6 +488,11 @@ abstract class $UserProfileCopyWith<$Res> {
       String email,
       String phoneNumber,
       String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType,
       String? profileImageUrl,
       String? bio,
       String? address,
@@ -383,6 +521,11 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? email = null,
     Object? phoneNumber = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
     Object? address = freezed,
@@ -413,6 +556,26 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -463,6 +626,11 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String email,
       String phoneNumber,
       String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType,
       String? profileImageUrl,
       String? bio,
       String? address,
@@ -489,6 +657,11 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? email = null,
     Object? phoneNumber = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
     Object? address = freezed,
@@ -519,6 +692,26 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -564,6 +757,11 @@ class _$UserProfileImpl implements _UserProfile {
       required this.email,
       required this.phoneNumber,
       required this.role,
+      this.patientType,
+      this.organization,
+      this.licenseNumber,
+      this.responderType,
+      this.vehicleType,
       this.profileImageUrl,
       this.bio,
       this.address,
@@ -587,6 +785,16 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String role;
   @override
+  final String? patientType;
+  @override
+  final String? organization;
+  @override
+  final String? licenseNumber;
+  @override
+  final String? responderType;
+  @override
+  final String? vehicleType;
+  @override
   final String? profileImageUrl;
   @override
   final String? bio;
@@ -605,7 +813,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, lastUpdated: $lastUpdated)';
+    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -620,6 +828,16 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.phoneNumber, phoneNumber) ||
                 other.phoneNumber == phoneNumber) &&
             (identical(other.role, role) || other.role == role) &&
+            (identical(other.patientType, patientType) ||
+                other.patientType == patientType) &&
+            (identical(other.organization, organization) ||
+                other.organization == organization) &&
+            (identical(other.licenseNumber, licenseNumber) ||
+                other.licenseNumber == licenseNumber) &&
+            (identical(other.responderType, responderType) ||
+                other.responderType == responderType) &&
+            (identical(other.vehicleType, vehicleType) ||
+                other.vehicleType == vehicleType) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
                 other.profileImageUrl == profileImageUrl) &&
             (identical(other.bio, bio) || other.bio == bio) &&
@@ -641,6 +859,11 @@ class _$UserProfileImpl implements _UserProfile {
       email,
       phoneNumber,
       role,
+      patientType,
+      organization,
+      licenseNumber,
+      responderType,
+      vehicleType,
       profileImageUrl,
       bio,
       address,
@@ -671,6 +894,11 @@ abstract class _UserProfile implements UserProfile {
       required final String email,
       required final String phoneNumber,
       required final String role,
+      final String? patientType,
+      final String? organization,
+      final String? licenseNumber,
+      final String? responderType,
+      final String? vehicleType,
       final String? profileImageUrl,
       final String? bio,
       final String? address,
@@ -693,6 +921,16 @@ abstract class _UserProfile implements UserProfile {
   String get phoneNumber;
   @override
   String get role;
+  @override
+  String? get patientType;
+  @override
+  String? get organization;
+  @override
+  String? get licenseNumber;
+  @override
+  String? get responderType;
+  @override
+  String? get vehicleType;
   @override
   String? get profileImageUrl;
   @override
@@ -1124,6 +1362,11 @@ mixin _$RegisterRequest {
   String get phoneNumber => throw _privateConstructorUsedError;
   String get password => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
+  String? get patientType => throw _privateConstructorUsedError;
+  String? get organization => throw _privateConstructorUsedError;
+  String? get licenseNumber => throw _privateConstructorUsedError;
+  String? get responderType => throw _privateConstructorUsedError;
+  String? get vehicleType => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -1142,7 +1385,12 @@ abstract class $RegisterRequestCopyWith<$Res> {
       String email,
       String phoneNumber,
       String password,
-      String role});
+      String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType});
 }
 
 /// @nodoc
@@ -1163,6 +1411,11 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
   }) {
     return _then(_value.copyWith(
       fullName: null == fullName
@@ -1185,6 +1438,26 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -1202,7 +1475,12 @@ abstract class _$$RegisterRequestImplCopyWith<$Res>
       String email,
       String phoneNumber,
       String password,
-      String role});
+      String role,
+      String? patientType,
+      String? organization,
+      String? licenseNumber,
+      String? responderType,
+      String? vehicleType});
 }
 
 /// @nodoc
@@ -1221,6 +1499,11 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? patientType = freezed,
+    Object? organization = freezed,
+    Object? licenseNumber = freezed,
+    Object? responderType = freezed,
+    Object? vehicleType = freezed,
   }) {
     return _then(_$RegisterRequestImpl(
       fullName: null == fullName
@@ -1243,6 +1526,26 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      patientType: freezed == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      organization: freezed == organization
+          ? _value.organization
+          : organization // ignore: cast_nullable_to_non_nullable
+              as String?,
+      licenseNumber: freezed == licenseNumber
+          ? _value.licenseNumber
+          : licenseNumber // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderType: freezed == responderType
+          ? _value.responderType
+          : responderType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      vehicleType: freezed == vehicleType
+          ? _value.vehicleType
+          : vehicleType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -1255,7 +1558,12 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       required this.email,
       required this.phoneNumber,
       required this.password,
-      required this.role});
+      required this.role,
+      this.patientType,
+      this.organization,
+      this.licenseNumber,
+      this.responderType,
+      this.vehicleType});
 
   factory _$RegisterRequestImpl.fromJson(Map<String, dynamic> json) =>
       _$$RegisterRequestImplFromJson(json);
@@ -1270,10 +1578,20 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   final String password;
   @override
   final String role;
+  @override
+  final String? patientType;
+  @override
+  final String? organization;
+  @override
+  final String? licenseNumber;
+  @override
+  final String? responderType;
+  @override
+  final String? vehicleType;
 
   @override
   String toString() {
-    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role)';
+    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
   }
 
   @override
@@ -1288,13 +1606,33 @@ class _$RegisterRequestImpl implements _RegisterRequest {
                 other.phoneNumber == phoneNumber) &&
             (identical(other.password, password) ||
                 other.password == password) &&
-            (identical(other.role, role) || other.role == role));
+            (identical(other.role, role) || other.role == role) &&
+            (identical(other.patientType, patientType) ||
+                other.patientType == patientType) &&
+            (identical(other.organization, organization) ||
+                other.organization == organization) &&
+            (identical(other.licenseNumber, licenseNumber) ||
+                other.licenseNumber == licenseNumber) &&
+            (identical(other.responderType, responderType) ||
+                other.responderType == responderType) &&
+            (identical(other.vehicleType, vehicleType) ||
+                other.vehicleType == vehicleType));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, fullName, email, phoneNumber, password, role);
+  int get hashCode => Object.hash(
+      runtimeType,
+      fullName,
+      email,
+      phoneNumber,
+      password,
+      role,
+      patientType,
+      organization,
+      licenseNumber,
+      responderType,
+      vehicleType);
 
   @JsonKey(ignore: true)
   @override
@@ -1317,7 +1655,12 @@ abstract class _RegisterRequest implements RegisterRequest {
       required final String email,
       required final String phoneNumber,
       required final String password,
-      required final String role}) = _$RegisterRequestImpl;
+      required final String role,
+      final String? patientType,
+      final String? organization,
+      final String? licenseNumber,
+      final String? responderType,
+      final String? vehicleType}) = _$RegisterRequestImpl;
 
   factory _RegisterRequest.fromJson(Map<String, dynamic> json) =
       _$RegisterRequestImpl.fromJson;
@@ -1332,6 +1675,16 @@ abstract class _RegisterRequest implements RegisterRequest {
   String get password;
   @override
   String get role;
+  @override
+  String? get patientType;
+  @override
+  String? get organization;
+  @override
+  String? get licenseNumber;
+  @override
+  String? get responderType;
+  @override
+  String? get vehicleType;
   @override
   @JsonKey(ignore: true)
   _$$RegisterRequestImplCopyWith<_$RegisterRequestImpl> get copyWith =>

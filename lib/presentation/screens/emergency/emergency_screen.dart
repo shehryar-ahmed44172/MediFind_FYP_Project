@@ -7,6 +7,7 @@ import '../../../services/location/location_service.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({Key? key}) : super(key: key);
@@ -183,11 +184,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Emergency Alert'),
-        centerTitle: true,
-        backgroundColor: Colors.red.shade800,
-        foregroundColor: Colors.white,
       ),
-      backgroundColor: Colors.red.shade50,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -239,11 +236,10 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                       borderRadius: BorderRadius.circular(12),
                       color: isSelected
                           ? Colors.red.shade700
-                          : Colors.white,
-                      border: Border.all(
-                          color: isSelected
-                              ? Colors.red.shade700
-                              : Colors.red.shade200),
+                          : theme.scaffoldBackgroundColor,
+                      boxShadow: isSelected
+                          ? []
+                          : AppShadows.neumorphicOut,
                     ),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Row(
@@ -286,14 +282,12 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                   height: 180,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.red.shade700,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.6),
-                        spreadRadius: 12,
-                        blurRadius: 24,
-                      ),
-                    ],
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
+                    ),
+                    boxShadow: AppShadows.sosMassiveGlow,
                   ),
                   child: _isFetchingLocation
                       ? const Center(
@@ -324,17 +318,19 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
             const SizedBox(height: 32),
 
             // Additional info
-            TextField(
-              controller: _additionalInfoController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                labelText: 'Additional Information (optional)',
-                hintText: 'Describe your situation briefly...',
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(color: Colors.red.shade200),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.neumorphicIn,
+              ),
+              child: TextField(
+                controller: _additionalInfoController,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Additional Information (optional)',
+                  hintText: 'Describe your situation briefly...',
+                  fillColor: Colors.transparent,
                 ),
               ),
             ),

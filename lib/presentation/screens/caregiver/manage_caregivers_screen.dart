@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../theme/app_theme.dart';
 
 class ManageCaregiversScreen extends ConsumerStatefulWidget {
   const ManageCaregiversScreen({Key? key}) : super(key: key);
@@ -163,10 +164,13 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
               itemCount: _caregivers.length,
               itemBuilder: (ctx, i) {
                 final cg = _caregivers[i];
-                return Card(
+                return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppShadows.neumorphicOut,
+                  ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),
                     leading: CircleAvatar(

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
+import '../../theme/app_theme.dart';
 
 class ResponderHomeScreen extends ConsumerWidget {
   const ResponderHomeScreen({Key? key}) : super(key: key);
@@ -46,9 +47,9 @@ class ResponderHomeScreen extends ConsumerWidget {
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.green.shade200),
+                boxShadow: AppShadows.neumorphicOut,
               ),
               child: Row(
                 children: [
@@ -147,9 +148,13 @@ class _EmergencyRequestCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () => context.go('/responder/request/${request['id']}'),

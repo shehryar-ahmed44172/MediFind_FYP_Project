@@ -14,6 +14,11 @@ Stores user profile and account status.
 | `email` | `VARCHAR(100)` | `NOT NULL, UNIQUE` | Login email |
 | `phoneNumber` | `VARCHAR(20)` | `NOT NULL, UNIQUE` | Contact number |
 | `role` | `VARCHAR(20)` | `NOT NULL` | PATIENT, RESPONDER, CAREGIVER, ADMIN |
+| `patientType` | `VARCHAR(20)` | `NULL` | NORMAL, DEAF |
+| `organization` | `VARCHAR(100)` | `NULL` | For Responders |
+| `licenseNumber` | `VARCHAR(50)` | `NULL` | For Responders |
+| `responderType` | `VARCHAR(50)` | `NULL` | PARAMEDIC, DOCTOR, etc. |
+| `vehicleType` | `VARCHAR(30)` | `NULL` | AMBULANCE, PERSONAL, NONE |
 | `profileImageUrl` | `TEXT` | `NULL` | URL to avatar |
 | `isActive` | `BOOLEAN` | `DEFAULT TRUE` | Account status |
 | `createdAt` | `TIMESTAMP` | `DEFAULT NOW()` | Record creation time |
@@ -75,6 +80,11 @@ CREATE TABLE IF NOT EXISTS users (
     email VARCHAR(100) NOT NULL UNIQUE,
     phoneNumber VARCHAR(20) NOT NULL UNIQUE,
     role VARCHAR(20) NOT NULL,
+    patientType VARCHAR(20),
+    organization VARCHAR(100),
+    licenseNumber VARCHAR(50),
+    responderType VARCHAR(50),
+    vehicleType VARCHAR(30),
     profileImageUrl TEXT,
     isActive BOOLEAN NOT NULL DEFAULT TRUE,
     createdAt TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

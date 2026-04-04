@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 /// LoginScreen widget handles user authentication.
 /// It uses Riverpod for state management and GoRouter for navigation.
@@ -95,6 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final theme = Theme.of(context);
     
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -108,23 +110,39 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // -----------------------------------------------------------
                 // Header Section: Logo & App Title
                 // -----------------------------------------------------------
-                Icon(Icons.local_hospital_rounded,
-                    size: 72, color: theme.colorScheme.primary),
-                const SizedBox(height: 16),
-                Text(
-                  'MediFind',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Emergency Response App',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade600,
+                Semantics(
+                  header: true,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 24),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 20,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: Image.asset(
+                          'assets/logos/medifind_app_logo.png',
+                          height: 100,
+                          fit: BoxFit.contain,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Welcome back! Please login to continue.',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 48),
@@ -179,21 +197,50 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // -----------------------------------------------------------
                 // Action Buttons Section
                 // -----------------------------------------------------------
-                // Main Login Button
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _login,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
+                // Wrap login button in Neumorphic container
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: theme.colorScheme.primary.withOpacity(0.4),
+                        blurRadius: 12,
+                        offset: const Offset(4, 4),
+                      ),
+                      const BoxShadow(
+                        color: Colors.white,
+                        blurRadius: 10,
+                        offset: Offset(-4, -4),
+                      ),
+                    ],
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Login', style: TextStyle(fontSize: 16)),
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _login,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      backgroundColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text(
+                            'Login',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                  ),
                 ),
                 const SizedBox(height: 24),
 
@@ -203,80 +250,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     const Text("Don't have an account? "),
                     TextButton(
-                      onPressed: () => context.go('/register'),
+                      onPressed: () => context.go('/select-role'),
                       child: const Text('Register'),
                     ),
                   ],
                 ),
 
-                const SizedBox(height: 32),
-                
-                // -----------------------------------------------------------
-                // Mock Credentials Section (Development Only)
-                // -----------------------------------------------------------
-                const Divider(),
-                const SizedBox(height: 16),
-                Text(
-                  'Quick Login (Dev Only)',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.titleSmall?.copyWith(color: Colors.grey),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _MockLoginButton(
-                      label: 'Patient',
-                      onPressed: () {
-                        _emailController.text = 'patient@example.com';
-                        _passwordController.text = 'Password123!';
-                      },
-                    ),
-                    _MockLoginButton(
-                      label: 'Responder',
-                      onPressed: () {
-                        _emailController.text = 'responder@example.com';
-                        _passwordController.text = 'Password123!';
-                      },
-                    ),
-                    _MockLoginButton(
-                      label: 'Caregiver',
-                      onPressed: () {
-                        _emailController.text = 'caregiver@example.com';
-                        _passwordController.text = 'Password123!';
-                      },
-                    ),
-                  ],
-                ),
               ],
             ),
           ),
         ),
       ),
-    );
-  }
-}
-
-/// A custom widget used only for quick developer login buttons
-class _MockLoginButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onPressed;
-
-  const _MockLoginButton({
-    required this.label,
-    required this.onPressed,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        textStyle: const TextStyle(fontSize: 12),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-      child: Text(label),
     );
   }
 }

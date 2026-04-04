@@ -8,7 +8,9 @@ import '../core/config/app_config.dart';
 // Importing all the necessary screens for different app modules
 import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
+import '../presentation/screens/auth/role_selection_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
+import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/emergency/emergency_screen.dart';
 import '../presentation/screens/emergency/emergency_tracking_screen.dart';
@@ -24,7 +26,6 @@ import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
-import '../presentation/screens/debug/developer_menu_screen.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
@@ -51,11 +52,10 @@ class AppRouter {
       return null;
     },
     routes: [
-      // Developer testing route
       GoRoute(
-        path: '/dev-menu',
-        name: 'dev-menu',
-        builder: (context, state) => const DeveloperMenuScreen(),
+        path: '/splash',
+        name: 'splash',
+        builder: (context, state) => const SplashScreen(),
       ),
       // -----------------------------------------------------------------------
       // Auth Routes (Login, Register, Password Management)
@@ -66,9 +66,18 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
+        path: '/select-role',
+        name: 'select-role',
+        builder: (context, state) => const RoleSelectionScreen(),
+      ),
+      GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const RegisterScreen(),
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          final role = extra['role'] as String? ?? 'PATIENT';
+          return RegisterScreen(role: role);
+        },
       ),
       GoRoute(
         path: '/forgot-password',

@@ -21,6 +21,11 @@ The MediFind app uses **Room** (Android JetPack) as the local database. The data
 │ fullName (String)  │
 │ phoneNumber        │
 │ role (String)      │
+│ patientType        │
+│ organization       │
+│ licenseNumber      │
+│ responderType      │
+│ vehicleType        │
 │ profileImageUrl    │
 │ isActive (Boolean) │
 │ createdAt          │
@@ -73,6 +78,11 @@ CREATE TABLE users (
     email TEXT NOT NULL UNIQUE,
     phoneNumber TEXT NOT NULL UNIQUE,
     role TEXT NOT NULL,  -- PATIENT, RESPONDER, ADMIN, CAREGIVER
+    patientType TEXT,
+    organization TEXT,
+    licenseNumber TEXT,
+    responderType TEXT,
+    vehicleType TEXT,
     profileImageUrl TEXT,
     isActive BOOLEAN NOT NULL DEFAULT 1,
     createdAt TEXT NOT NULL
@@ -88,6 +98,11 @@ CREATE TABLE users (
 | email | String | UNIQUE, NOT NULL | Email address for login |
 | phoneNumber | String | UNIQUE, NOT NULL | Contact phone number |
 | role | String | NOT NULL | User role (enum as string) |
+| patientType | String | NULLABLE | NORMAL, DEAF |
+| organization | String | NULLABLE | For Responders |
+| licenseNumber | String | NULLABLE | For Responders |
+| responderType | String | NULLABLE | PARAMEDIC, DOCTOR, etc. |
+| vehicleType | String | NULLABLE | AMBULANCE, PERSONAL, NONE |
 | profileImageUrl | String | NULLABLE | URL to profile photo |
 | isActive | Boolean | NOT NULL, DEFAULT 1 | Account status |
 | createdAt | String | NOT NULL | ISO 8601 timestamp |
@@ -121,6 +136,11 @@ data class UserEntity(
     val email: String,
     val phoneNumber: String,
     val role: String,
+    val patientType: String?,
+    val organization: String?,
+    val licenseNumber: String?,
+    val responderType: String?,
+    val vehicleType: String?,
     val profileImageUrl: String?,
     val isActive: Boolean = true,
     val createdAt: String

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../theme/app_theme.dart';
 
 class CaregiverTrackingScreen extends ConsumerWidget {
   final String emergencyId;
@@ -8,12 +9,12 @@ class CaregiverTrackingScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Live Tracking'),
         centerTitle: true,
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -24,9 +25,9 @@ class CaregiverTrackingScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.orange.shade200),
+                boxShadow: AppShadows.neumorphicOut,
               ),
               child: const Row(
                 children: [
@@ -59,9 +60,9 @@ class CaregiverTrackingScreen extends ConsumerWidget {
             Container(
               height: 280,
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.blue.shade200),
+                boxShadow: AppShadows.neumorphicIn,
               ),
               child: const Center(
                 child: Column(
@@ -86,9 +87,12 @@ class CaregiverTrackingScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Info Cards
-            Card(
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16)),
+            Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: AppShadows.neumorphicOut,
+              ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
@@ -124,8 +128,9 @@ class CaregiverTrackingScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: theme.scaffoldBackgroundColor,
                 borderRadius: BorderRadius.circular(8),
+                boxShadow: AppShadows.neumorphicIn,
               ),
               child: const Row(
                 children: [

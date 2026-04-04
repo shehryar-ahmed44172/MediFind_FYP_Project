@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary colors
-  static const Color primary = Color(0xFF1E7E5E);
-  static const Color primaryLight = Color(0xFF4CAF9E);
-  static const Color primaryDark = Color(0xFF155F4A);
+  // Primary colors - Using slightly softer tones for Neumorphism
+  static const Color primary = Color(0xFF109DAF);
+  static const Color primaryLight = Color(0xFF4DB9C8);
+  static const Color primaryDark = Color(0xFF0C7886);
 
   // Secondary colors
-  static const Color secondary = Color(0xFF00BCD4);
-  static const Color secondaryLight = Color(0xFF4DD0E1);
-  static const Color secondaryDark = Color(0xFF0097A7);
+  static const Color secondary = Color(0xFF083368);
+  static const Color secondaryLight = Color(0xFF1E5691);
+  static const Color secondaryDark = Color(0xFF052145);
 
   // Accent colors
   static const Color accent = Color(0xFFFF6B6B);
@@ -36,124 +36,151 @@ class AppColors {
   static const Color grey800 = Color(0xFF424242);
   static const Color grey900 = Color(0xFF212121);
 
-  // Semantic colors
-  static const Color background = Color(0xFFFAFAFA);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFF5F5F5);
+  // Semantic colors - NEUMORPHIC BACKGROUND
+  static const Color background = Color(0xFFE0E5EC); // Neumorphic base
+  static const Color surface = Color(0xFFE0E5EC);
+  static const Color surfaceVariant = Color(0xFFD1D9E6);
   static const Color onBackground = Color(0xFF212121);
   static const Color onSurface = Color(0xFF212121);
   static const Color onPrimary = Color(0xFFFFFFFF);
   static const Color onSecondary = Color(0xFFFFFFFF);
+}
 
-  // Transparency
-  static const Color shadowColor = Color(0x1F000000);
-  static const Color scrimColor = Color(0x4D000000);
+class AppShadows {
+  // Neumorphic Outer Shadow (Pop out)
+  static List<BoxShadow> get neumorphicOut {
+    return [
+      BoxShadow(
+        color: Colors.white,
+        offset: const Offset(-5, -5),
+        blurRadius: 10,
+        spreadRadius: 1,
+      ),
+      BoxShadow(
+        color: const Color(0xFFA3B1C6).withOpacity(0.6),
+        offset: const Offset(5, 5),
+        blurRadius: 10,
+        spreadRadius: 1,
+      ),
+    ];
+  }
+
+  // Neumorphic Inner Shadow effect approximation (Pressed in)
+  // Note: True inner shadows are best achieved with custom painters or Container decorations,
+  // but we can use strong inverted shadows inside a clipped container.
+  static List<BoxShadow> get neumorphicIn {
+    return [
+      BoxShadow(
+        color: const Color(0xFFA3B1C6).withOpacity(0.8),
+        offset: const Offset(2, 2),
+        blurRadius: 3,
+        spreadRadius: -1,
+      ),
+      BoxShadow(
+        color: Colors.white,
+        offset: const Offset(-2, -2),
+        blurRadius: 3,
+        spreadRadius: -1,
+      ),
+    ];
+  }
+
+  // SOS specific massive shadow
+  static List<BoxShadow> get sosMassiveGlow {
+    return [
+      BoxShadow(
+        color: AppColors.error.withOpacity(0.4),
+        blurRadius: 30,
+        spreadRadius: 5,
+        offset: const Offset(5, 5),
+      ),
+      const BoxShadow(
+        color: Colors.white,
+        blurRadius: 30,
+        spreadRadius: 5,
+        offset: Offset(-5, -5),
+      ),
+    ];
+  }
 }
 
 class AppTextStyles {
+  // Same styles as before, just mapped correctly
   // Display styles
   static const TextStyle displayLarge = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 57,
     fontWeight: FontWeight.bold,
     letterSpacing: -0.25,
   );
 
   static const TextStyle displayMedium = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 45,
     fontWeight: FontWeight.bold,
   );
 
   static const TextStyle displaySmall = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 36,
     fontWeight: FontWeight.bold,
   );
 
   // Headline styles
   static const TextStyle headlineLarge = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 32,
     fontWeight: FontWeight.bold,
   );
 
   static const TextStyle headlineMedium = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 28,
     fontWeight: FontWeight.bold,
   );
 
   static const TextStyle headlineSmall = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 24,
     fontWeight: FontWeight.bold,
   );
 
   // Title styles
   static const TextStyle titleLarge = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 22,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.15,
   );
 
   static const TextStyle titleMedium = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 16,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.15,
   );
 
   static const TextStyle titleSmall = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 14,
     fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
   );
 
   // Body styles
   static const TextStyle bodyLarge = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 16,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.5,
   );
 
   static const TextStyle bodyMedium = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 14,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.25,
   );
 
   static const TextStyle bodySmall = TextStyle(
-    fontFamily: 'Poppins',
+    fontFamily: 'Montserrat',
     fontSize: 12,
     fontWeight: FontWeight.w400,
-    letterSpacing: 0.4,
-  );
-
-  // Label styles
-  static const TextStyle labelLarge = TextStyle(
-    fontFamily: 'Poppins',
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.1,
-  );
-
-  static const TextStyle labelMedium = TextStyle(
-    fontFamily: 'Poppins',
-    fontSize: 12,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
-  );
-
-  static const TextStyle labelSmall = TextStyle(
-    fontFamily: 'Poppins',
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    letterSpacing: 0.5,
   );
 }
 
@@ -162,7 +189,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
-      colorScheme: ColorScheme.light(
+      colorScheme: const ColorScheme.light(
         primary: AppColors.primary,
         secondary: AppColors.secondary,
         tertiary: AppColors.accent,
@@ -174,118 +201,30 @@ class AppTheme {
         onSecondary: AppColors.onSecondary,
       ),
       scaffoldBackgroundColor: AppColors.background,
-      appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.background, // Match neumorphic background
+        foregroundColor: AppColors.black,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: AppTextStyles.titleLarge.copyWith(
-          color: AppColors.white,
-        ),
-      ),
-      floatingActionButtonTheme: FloatingActionButtonThemeData(
-        backgroundColor: AppColors.primary,
-        foregroundColor: AppColors.white,
-        elevation: 8,
-      ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
-          foregroundColor: AppColors.white,
-          elevation: 4,
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          textStyle: AppTextStyles.labelLarge.copyWith(
-            color: AppColors.white,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          side: BorderSide(color: AppColors.primary, width: 1.5),
-          padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          textStyle: AppTextStyles.labelLarge.copyWith(
-            color: AppColors.primary,
-          ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      ),
-      textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(
-          foregroundColor: AppColors.primary,
-          textStyle: AppTextStyles.labelLarge.copyWith(
-            color: AppColors.primary,
-          ),
-        ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.grey100,
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        fillColor: AppColors.background,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        // By removing thick borders, neumorphic inner shadows usually wrap inputs, 
+        // we leave invisible borders for the container shadow to do the work.
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.grey300),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.grey300),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 2),
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.error),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.error, width: 2),
-        ),
-        labelStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.grey600,
-        ),
-        hintStyle: AppTextStyles.bodyMedium.copyWith(
-          color: AppColors.grey500,
-        ),
-        errorStyle: AppTextStyles.labelSmall.copyWith(
-          color: AppColors.error,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: AppColors.white,
-        elevation: 2,
-        margin: EdgeInsets.all(0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-      ),
-      dividerTheme: DividerThemeData(
-        color: AppColors.grey200,
-        thickness: 1,
-        space: 16,
-      ),
-      textTheme: TextTheme(
-        displayLarge: AppTextStyles.displayLarge,
-        displayMedium: AppTextStyles.displayMedium,
-        displaySmall: AppTextStyles.displaySmall,
-        headlineLarge: AppTextStyles.headlineLarge,
-        headlineMedium: AppTextStyles.headlineMedium,
-        headlineSmall: AppTextStyles.headlineSmall,
-        titleLarge: AppTextStyles.titleLarge,
-        titleMedium: AppTextStyles.titleMedium,
-        titleSmall: AppTextStyles.titleSmall,
-        bodyLarge: AppTextStyles.bodyLarge,
-        bodyMedium: AppTextStyles.bodyMedium,
-        bodySmall: AppTextStyles.bodySmall,
-        labelLarge: AppTextStyles.labelLarge,
-        labelMedium: AppTextStyles.labelMedium,
-        labelSmall: AppTextStyles.labelSmall,
       ),
     );
   }
@@ -294,19 +233,15 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
-      colorScheme: ColorScheme.dark(
+      colorScheme: const ColorScheme.dark(
         primary: AppColors.primaryLight,
         secondary: AppColors.secondaryLight,
-        tertiary: AppColors.accentLight,
-        error: AppColors.error,
         surface: AppColors.grey800,
       ),
       scaffoldBackgroundColor: AppColors.grey900,
-      appBarTheme: AppBarTheme(
-        backgroundColor: AppColors.grey800,
-        foregroundColor: AppColors.white,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.grey900,
         elevation: 0,
-        centerTitle: true,
       ),
     );
   }

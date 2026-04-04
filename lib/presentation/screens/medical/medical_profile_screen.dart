@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class MedicalProfileScreen extends ConsumerWidget {
   const MedicalProfileScreen({Key? key}) : super(key: key);
@@ -175,8 +176,12 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(

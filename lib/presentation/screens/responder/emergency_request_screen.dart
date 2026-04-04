@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
+import '../../theme/app_theme.dart';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -43,11 +44,10 @@ class _EmergencyRequestScreenState
     final theme = Theme.of(context);
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Emergency Request'),
         centerTitle: true,
-        backgroundColor: Colors.red.shade700,
-        foregroundColor: Colors.white,
       ),
       body: emergencyAsync.when(
         data: (emergency) => _buildContent(context, theme, emergency),
@@ -148,9 +148,12 @@ class _EmergencyRequestScreenState
           const SizedBox(height: 16),
 
           // Medical Profile Summary
-          Card(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
+          Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

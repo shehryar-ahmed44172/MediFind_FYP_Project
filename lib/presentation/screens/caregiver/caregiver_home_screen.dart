@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class CaregiverHomeScreen extends ConsumerWidget {
   const CaregiverHomeScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class CaregiverHomeScreen extends ConsumerWidget {
     final linkedPatients = <Map<String, dynamic>>[];
 
     return Scaffold(
+      backgroundColor: theme.scaffoldBackgroundColor,
       appBar: AppBar(
         title: Row(
           children: [
@@ -58,10 +60,28 @@ class CaregiverHomeScreen extends ConsumerWidget {
                 final patient = linkedPatients[i];
                 final hasActiveEmergency =
                     patient['hasActiveEmergency'] as bool? ?? false;
-                return Card(
+                return Container(
                   margin: const EdgeInsets.only(bottom: 12),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16)),
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: hasActiveEmergency
+                        ? [
+                            BoxShadow(
+                              color: Colors.red.withOpacity(0.3),
+                              blurRadius: 16,
+                              spreadRadius: 2,
+                              offset: const Offset(4, 4),
+                            ),
+                            const BoxShadow(
+                              color: Colors.white,
+                              blurRadius: 10,
+                              spreadRadius: -2,
+                              offset: Offset(-4, -4),
+                            ),
+                          ]
+                        : AppShadows.neumorphicOut,
+                  ),
                   child: ListTile(
                     contentPadding: const EdgeInsets.all(16),
                     leading: CircleAvatar(

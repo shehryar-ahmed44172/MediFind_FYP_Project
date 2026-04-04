@@ -3,6 +3,7 @@ import '../../data/datasources/local/local_data_source.dart';
 import '../../data/datasources/remote/medifind_api_client.dart';
 import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
+import '../../domain/entities/user.dart';
 import 'package:dio/dio.dart';
 
 // API Client Provider
@@ -73,15 +74,9 @@ final loginProvider =
 });
 
 final registerProvider =
-    FutureProvider.family<void, RegisterParams>((ref, params) async {
+    FutureProvider.family<void, RegisterRequest>((ref, request) async {
   final authRepo = await ref.watch(authRepositoryProvider.future);
-  await authRepo.register(
-    params.fullName,
-    params.email,
-    params.phoneNumber,
-    params.password,
-    params.role,
-  );
+  await authRepo.register(request);
 });
 
 final logoutProvider = FutureProvider<void>((ref) async {
@@ -109,20 +104,4 @@ class LoginParams {
   final String email;
   final String password;
   LoginParams({required this.email, required this.password});
-}
-
-class RegisterParams {
-  final String fullName;
-  final String email;
-  final String phoneNumber;
-  final String password;
-  final String role;
-
-  RegisterParams({
-    required this.fullName,
-    required this.email,
-    required this.phoneNumber,
-    required this.password,
-    required this.role,
-  });
 }

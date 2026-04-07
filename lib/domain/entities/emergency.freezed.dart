@@ -32,6 +32,8 @@ mixin _$Emergency {
   bool get voiceAlertGenerated => throw _privateConstructorUsedError;
   String? get additionalInfo => throw _privateConstructorUsedError;
   DateTime? get completedAt => throw _privateConstructorUsedError;
+  String get priority => throw _privateConstructorUsedError;
+  DateTime? get expiresAt => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -56,7 +58,9 @@ abstract class $EmergencyCopyWith<$Res> {
       String? responderId,
       bool voiceAlertGenerated,
       String? additionalInfo,
-      DateTime? completedAt});
+      DateTime? completedAt,
+      String priority,
+      DateTime? expiresAt});
 }
 
 /// @nodoc
@@ -84,6 +88,8 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
     Object? voiceAlertGenerated = null,
     Object? additionalInfo = freezed,
     Object? completedAt = freezed,
+    Object? priority = null,
+    Object? expiresAt = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -134,6 +140,14 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ) as $Val);
   }
 }
@@ -158,7 +172,9 @@ abstract class _$$EmergencyImplCopyWith<$Res>
       String? responderId,
       bool voiceAlertGenerated,
       String? additionalInfo,
-      DateTime? completedAt});
+      DateTime? completedAt,
+      String priority,
+      DateTime? expiresAt});
 }
 
 /// @nodoc
@@ -184,6 +200,8 @@ class __$$EmergencyImplCopyWithImpl<$Res>
     Object? voiceAlertGenerated = null,
     Object? additionalInfo = freezed,
     Object? completedAt = freezed,
+    Object? priority = null,
+    Object? expiresAt = freezed,
   }) {
     return _then(_$EmergencyImpl(
       id: null == id
@@ -234,6 +252,14 @@ class __$$EmergencyImplCopyWithImpl<$Res>
           ? _value.completedAt
           : completedAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
     ));
   }
 }
@@ -253,7 +279,9 @@ class _$EmergencyImpl implements _Emergency {
       this.responderId,
       this.voiceAlertGenerated = false,
       this.additionalInfo,
-      this.completedAt});
+      this.completedAt,
+      this.priority = 'NORMAL',
+      this.expiresAt});
 
   factory _$EmergencyImpl.fromJson(Map<String, dynamic> json) =>
       _$$EmergencyImplFromJson(json);
@@ -283,10 +311,15 @@ class _$EmergencyImpl implements _Emergency {
   final String? additionalInfo;
   @override
   final DateTime? completedAt;
+  @override
+  @JsonKey()
+  final String priority;
+  @override
+  final DateTime? expiresAt;
 
   @override
   String toString() {
-    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt)';
+    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt)';
   }
 
   @override
@@ -314,7 +347,11 @@ class _$EmergencyImpl implements _Emergency {
             (identical(other.additionalInfo, additionalInfo) ||
                 other.additionalInfo == additionalInfo) &&
             (identical(other.completedAt, completedAt) ||
-                other.completedAt == completedAt));
+                other.completedAt == completedAt) &&
+            (identical(other.priority, priority) ||
+                other.priority == priority) &&
+            (identical(other.expiresAt, expiresAt) ||
+                other.expiresAt == expiresAt));
   }
 
   @JsonKey(ignore: true)
@@ -332,7 +369,9 @@ class _$EmergencyImpl implements _Emergency {
       responderId,
       voiceAlertGenerated,
       additionalInfo,
-      completedAt);
+      completedAt,
+      priority,
+      expiresAt);
 
   @JsonKey(ignore: true)
   @override
@@ -361,7 +400,9 @@ abstract class _Emergency implements Emergency {
       final String? responderId,
       final bool voiceAlertGenerated,
       final String? additionalInfo,
-      final DateTime? completedAt}) = _$EmergencyImpl;
+      final DateTime? completedAt,
+      final String priority,
+      final DateTime? expiresAt}) = _$EmergencyImpl;
 
   factory _Emergency.fromJson(Map<String, dynamic> json) =
       _$EmergencyImpl.fromJson;
@@ -391,6 +432,10 @@ abstract class _Emergency implements Emergency {
   @override
   DateTime? get completedAt;
   @override
+  String get priority;
+  @override
+  DateTime? get expiresAt;
+  @override
   @JsonKey(ignore: true)
   _$$EmergencyImplCopyWith<_$EmergencyImpl> get copyWith =>
       throw _privateConstructorUsedError;
@@ -407,6 +452,7 @@ mixin _$CreateEmergencyRequest {
   double get latitude => throw _privateConstructorUsedError;
   double get longitude => throw _privateConstructorUsedError;
   String? get additionalInfo => throw _privateConstructorUsedError;
+  String get priority => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -424,7 +470,8 @@ abstract class $CreateEmergencyRequestCopyWith<$Res> {
       {String emergencyType,
       double latitude,
       double longitude,
-      String? additionalInfo});
+      String? additionalInfo,
+      String priority});
 }
 
 /// @nodoc
@@ -445,6 +492,7 @@ class _$CreateEmergencyRequestCopyWithImpl<$Res,
     Object? latitude = null,
     Object? longitude = null,
     Object? additionalInfo = freezed,
+    Object? priority = null,
   }) {
     return _then(_value.copyWith(
       emergencyType: null == emergencyType
@@ -463,6 +511,10 @@ class _$CreateEmergencyRequestCopyWithImpl<$Res,
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
               as String?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -480,7 +532,8 @@ abstract class _$$CreateEmergencyRequestImplCopyWith<$Res>
       {String emergencyType,
       double latitude,
       double longitude,
-      String? additionalInfo});
+      String? additionalInfo,
+      String priority});
 }
 
 /// @nodoc
@@ -500,6 +553,7 @@ class __$$CreateEmergencyRequestImplCopyWithImpl<$Res>
     Object? latitude = null,
     Object? longitude = null,
     Object? additionalInfo = freezed,
+    Object? priority = null,
   }) {
     return _then(_$CreateEmergencyRequestImpl(
       emergencyType: null == emergencyType
@@ -518,6 +572,10 @@ class __$$CreateEmergencyRequestImplCopyWithImpl<$Res>
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
               as String?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -529,7 +587,8 @@ class _$CreateEmergencyRequestImpl implements _CreateEmergencyRequest {
       {required this.emergencyType,
       required this.latitude,
       required this.longitude,
-      this.additionalInfo});
+      this.additionalInfo,
+      this.priority = 'NORMAL'});
 
   factory _$CreateEmergencyRequestImpl.fromJson(Map<String, dynamic> json) =>
       _$$CreateEmergencyRequestImplFromJson(json);
@@ -542,10 +601,13 @@ class _$CreateEmergencyRequestImpl implements _CreateEmergencyRequest {
   final double longitude;
   @override
   final String? additionalInfo;
+  @override
+  @JsonKey()
+  final String priority;
 
   @override
   String toString() {
-    return 'CreateEmergencyRequest(emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, additionalInfo: $additionalInfo)';
+    return 'CreateEmergencyRequest(emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, additionalInfo: $additionalInfo, priority: $priority)';
   }
 
   @override
@@ -560,13 +622,15 @@ class _$CreateEmergencyRequestImpl implements _CreateEmergencyRequest {
             (identical(other.longitude, longitude) ||
                 other.longitude == longitude) &&
             (identical(other.additionalInfo, additionalInfo) ||
-                other.additionalInfo == additionalInfo));
+                other.additionalInfo == additionalInfo) &&
+            (identical(other.priority, priority) ||
+                other.priority == priority));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(
-      runtimeType, emergencyType, latitude, longitude, additionalInfo);
+  int get hashCode => Object.hash(runtimeType, emergencyType, latitude,
+      longitude, additionalInfo, priority);
 
   @JsonKey(ignore: true)
   @override
@@ -588,7 +652,8 @@ abstract class _CreateEmergencyRequest implements CreateEmergencyRequest {
       {required final String emergencyType,
       required final double latitude,
       required final double longitude,
-      final String? additionalInfo}) = _$CreateEmergencyRequestImpl;
+      final String? additionalInfo,
+      final String priority}) = _$CreateEmergencyRequestImpl;
 
   factory _CreateEmergencyRequest.fromJson(Map<String, dynamic> json) =
       _$CreateEmergencyRequestImpl.fromJson;
@@ -601,6 +666,8 @@ abstract class _CreateEmergencyRequest implements CreateEmergencyRequest {
   double get longitude;
   @override
   String? get additionalInfo;
+  @override
+  String get priority;
   @override
   @JsonKey(ignore: true)
   _$$CreateEmergencyRequestImplCopyWith<_$CreateEmergencyRequestImpl>

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'dart:async';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -19,14 +21,45 @@ class _EmergencyRequestScreenState
   bool _isAccepting = false;
   bool _isRejecting = false;
   bool _isPlayingVoice = false;
+  int _countdown = 5;
+  Timer? _callTimer;
+
+  @override
+  void dispose() {
+    _callTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _makePhoneCall(String phoneNumber) async {
+    final Uri launchUri = Uri(
+      scheme: 'tel',
+      path: phoneNumber,
+    );
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
+  }
 
   Future<void> _accept() async {
     setState(() => _isAccepting = true);
     // TODO: Call acceptEmergencyProvider(widget.requestId)
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) {
-      context.go('/responder/active');
-    }
+    
+    // Start countdown for auto-call
+    _countdown = 5;
+    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) return;
+      setState(() {
+        if (_countdown > 1) {
+          _countdown--;
+        } else {
+          timer.cancel();
+          _makePhoneCall('+1234567890'); // Replace with actual patient number
+          if (mounted) {
+            context.go('/responder/active');
+          }
+        }
+      });
+    });
   }
 
   Future<void> _reject() async {
@@ -81,6 +114,7 @@ class _EmergencyRequestScreenState
       bloodGroup: 'Unknown',
       allergies: 'None listed',
       conditions: 'See medical profile',
+      priority: emergency?.priority ?? 'NORMAL',
     );
   }
 
@@ -93,6 +127,7 @@ class _EmergencyRequestScreenState
     required String bloodGroup,
     required String allergies,
     required String conditions,
+    String priority = 'NORMAL',
   }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -103,13 +138,26 @@ class _EmergencyRequestScreenState
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFB71C1C), Color(0xFFEF5350)],
+              gradient: LinearGradient(
+                colors: priority == 'HIGH'
+                    ? [const Color(0xFFb71c1c), const Color(0xFFd32f2f)]
+                    : [const Color(0xFFF57C00), const Color(0xFFFFB74D)],
               ),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Column(
               children: [
+                if (priority == 'HIGH')
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text('HIGH PRIORITY ESCALATION',
+                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ),
                 const Icon(Icons.emergency_rounded,
                     color: Colors.white, size: 48),
                 const SizedBox(height: 8),
@@ -215,11 +263,19 @@ class _EmergencyRequestScreenState
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isAccepting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: Colors.white)),
+                            const SizedBox(height: 8),
+                            Text('Calling patient in $_countdown...',
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 12)),
+                          ],
                         )
                       : const Text('Accept Emergency',
                           style: TextStyle(

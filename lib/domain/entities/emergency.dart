@@ -18,6 +18,8 @@ class Emergency with _$Emergency {
     @Default(false) bool voiceAlertGenerated,
     String? additionalInfo,
     DateTime? completedAt,
+    @Default('NORMAL') String priority,
+    DateTime? expiresAt,
   }) = _Emergency;
 
   factory Emergency.fromJson(Map<String, dynamic> json) =>
@@ -31,6 +33,7 @@ class CreateEmergencyRequest with _$CreateEmergencyRequest {
     required double latitude,
     required double longitude,
     String? additionalInfo,
+    @Default('NORMAL') String priority,
   }) = _CreateEmergencyRequest;
 
   factory CreateEmergencyRequest.fromJson(Map<String, dynamic> json) =>

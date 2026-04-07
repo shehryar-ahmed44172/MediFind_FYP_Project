@@ -140,6 +140,7 @@ class MediFindApiClient {
           'latitude': latitude,
           'longitude': longitude,
           'additionalInfo': additionalInfo,
+          'priority': 'NORMAL', // Default, backend can override
         },
       );
 
@@ -193,6 +194,36 @@ class MediFindApiClient {
 
       if (response.statusCode != 200) {
         throw NetworkException(message: 'Failed to update emergency status');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> acceptEmergency(String emergencyId, String responderId) async {
+    try {
+      final response = await _dio.post(
+        'emergencies/$emergencyId/accept',
+        data: {'responderId': responderId},
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to accept emergency');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> rejectEmergency(String emergencyId, String responderId) async {
+    try {
+      final response = await _dio.post(
+        'emergencies/$emergencyId/reject',
+        data: {'responderId': responderId},
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to reject emergency');
       }
     } on DioException catch (e) {
       throw _handleDioException(e);

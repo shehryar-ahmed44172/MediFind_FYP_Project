@@ -59,11 +59,13 @@ MODULE 5: Responder Management & Assignment Module
 FR5.1: The system shall allow responders to register accounts.
 FR5.2: The administrator shall verify responder identity before activation.
 FR5.3: The system shall identify the nearest available responders using GPS.
-FR5.4: The system shall notify only registered and available responders.
+FR5.4: The system shall notify up to 6 registered and available responders within a 10 km radius via FCM push notifications (custom UI modal).
 FR5.5: The responder shall accept or reject emergency requests.
-FR5.6: The system shall assign the first responder who accepts the request.
-FR5.7: The system shall automatically close the request for other responders once assigned.
-FR5.8: If no responder accepts within a defined time, the system shall escalate the request to the next nearest responders.
+FR5.6: The system shall assign the first responder who accepts the request and automatically trigger a voice call connection to the patient after 5 seconds.
+FR5.7: The system shall automatically close and cancel the request for other responders once assigned.
+FR5.8: If a responder rejects a request, it shall disappear for them but remain active for the other responders in the broadcasted batch.
+FR5.9: If no responder accepts within 5 minutes, the request shall explicitly expire and disappear.
+FR5.10: The system shall escalate the expired request to the next nearest batch of responders using a HIGH priority flag.
 
 MODULE 6: Voice Emergency Alert Module
 FR6.1: The system shall generate an automatic voice emergency message.

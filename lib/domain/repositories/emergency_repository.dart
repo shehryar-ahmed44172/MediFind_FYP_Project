@@ -16,6 +16,10 @@ abstract class EmergencyRepository {
   Future<void> updateEmergencyStatus(String emergencyId, String status);
   
   Future<void> assignResponder(String emergencyId, String responderId);
+
+  Future<void> acceptEmergency(String emergencyId, String responderId);
+
+  Future<void> rejectEmergency(String emergencyId, String responderId);
   
   Future<void> updateEmergencyLocation(
     String emergencyId,

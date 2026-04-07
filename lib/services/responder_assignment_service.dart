@@ -83,7 +83,7 @@ class ResponderAssignmentService {
   static int getBatchSize(EscalationLevel level) {
     switch (level) {
       case EscalationLevel.primary:
-        return 5;
+        return 6;
       case EscalationLevel.secondary:
         return 10;
       case EscalationLevel.tertiary:
@@ -92,17 +92,17 @@ class ResponderAssignmentService {
   }
 
   /// Get timeout duration before escalation
-  /// PRIMARY: 30 seconds to accept
-  /// SECONDARY: 25 seconds to accept
-  /// TERTIARY: 20 seconds to accept
+  /// PRIMARY: 5 minutes to accept
+  /// SECONDARY: 5 minutes to accept
+  /// TERTIARY: 2 minutes to accept
   static Duration getEscalationTimeout(EscalationLevel level) {
     switch (level) {
       case EscalationLevel.primary:
-        return Duration(seconds: 30);
+        return Duration(minutes: 5);
       case EscalationLevel.secondary:
-        return Duration(seconds: 25);
+        return Duration(minutes: 5);
       case EscalationLevel.tertiary:
-        return Duration(seconds: 20);
+        return Duration(minutes: 2);
     }
   }
 
@@ -113,9 +113,9 @@ class ResponderAssignmentService {
   }
 
   /// Check if responder is within service radius
-  /// Standard service radius: 15 km
+  /// Standard service radius: 10 km
   static bool isWithinServiceRadius(double distanceKm) {
-    const maxServiceRadius = 15.0;
+    const maxServiceRadius = 10.0;
     return distanceKm <= maxServiceRadius;
   }
 

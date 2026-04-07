@@ -22,6 +22,10 @@ _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
       completedAt: json['completedAt'] == null
           ? null
           : DateTime.parse(json['completedAt'] as String),
+      priority: json['priority'] as String? ?? 'NORMAL',
+      expiresAt: json['expiresAt'] == null
+          ? null
+          : DateTime.parse(json['expiresAt'] as String),
     );
 
 Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
@@ -38,6 +42,8 @@ Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
       'voiceAlertGenerated': instance.voiceAlertGenerated,
       'additionalInfo': instance.additionalInfo,
       'completedAt': instance.completedAt?.toIso8601String(),
+      'priority': instance.priority,
+      'expiresAt': instance.expiresAt?.toIso8601String(),
     };
 
 _$CreateEmergencyRequestImpl _$$CreateEmergencyRequestImplFromJson(
@@ -47,6 +53,7 @@ _$CreateEmergencyRequestImpl _$$CreateEmergencyRequestImplFromJson(
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
       additionalInfo: json['additionalInfo'] as String?,
+      priority: json['priority'] as String? ?? 'NORMAL',
     );
 
 Map<String, dynamic> _$$CreateEmergencyRequestImplToJson(
@@ -56,6 +63,7 @@ Map<String, dynamic> _$$CreateEmergencyRequestImplToJson(
       'latitude': instance.latitude,
       'longitude': instance.longitude,
       'additionalInfo': instance.additionalInfo,
+      'priority': instance.priority,
     };
 
 _$UpdateEmergencyStatusRequestImpl _$$UpdateEmergencyStatusRequestImplFromJson(

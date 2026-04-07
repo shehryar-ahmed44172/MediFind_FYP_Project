@@ -56,6 +56,19 @@ final updateEmergencyStatusProvider = FutureProvider.family<void, UpdateEmergenc
   ref.refresh(getEmergencyProvider(params.emergencyId));
 });
 
+// Accept emergency provider
+final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
+  final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
+  await emergencyRepo.acceptEmergency(params.emergencyId, params.responderId);
+  ref.refresh(getEmergencyProvider(params.emergencyId));
+});
+
+// Reject emergency provider
+final rejectEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
+  final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
+  await emergencyRepo.rejectEmergency(params.emergencyId, params.responderId);
+});
+
 // Parameters
 class CreateEmergencyParams {
   final String emergencyType;
@@ -78,5 +91,15 @@ class UpdateEmergencyStatusParams {
   UpdateEmergencyStatusParams({
     required this.emergencyId,
     required this.status,
+  });
+}
+
+class AcceptRejectParams {
+  final String emergencyId;
+  final String responderId;
+
+  AcceptRejectParams({
+    required this.emergencyId,
+    required this.responderId,
   });
 }

@@ -10,51 +10,28 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMixin {
+class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderStateMixin {
   late AnimationController _entranceController;
-  late AnimationController _floatingController;
-
   late Animation<double> _fadeAnimation;
-  late Animation<double> _scaleAnimation;
-  late Animation<Offset> _floatAnimation;
 
   @override
   void initState() {
     super.initState();
     
-    // 1. Entrance Formations
+    // Smooth elegant fade in for the loading elements (after native splash finishes)
     _entranceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: const Duration(milliseconds: 1200),
     );
     
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _entranceController, curve: Curves.easeInOut),
+      CurvedAnimation(parent: _entranceController, curve: Curves.easeIn),
     );
     
-    _scaleAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
-      CurvedAnimation(parent: _entranceController, curve: Curves.elasticOut),
-    );
-
-    // 2. Continuous Floating Formations
-    _floatingController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-
-    _floatAnimation = Tween<Offset>(
-      begin: const Offset(0, -0.05),
-      end: const Offset(0, 0.05),
-    ).animate(CurvedAnimation(
-      parent: _floatingController,
-      curve: Curves.easeInOutSine,
-    ));
-
-    // Execute sequence
     _entranceController.forward();
 
-    // Navigate to login after 3.5 seconds
-    Timer(const Duration(milliseconds: 3500), () {
+    // Navigate to login gracefully after 2.5 seconds
+    Timer(const Duration(milliseconds: 2500), () {
       if (mounted) {
         context.go('/login');
       }
@@ -64,7 +41,6 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
   @override
   void dispose() {
     _entranceController.dispose();
-    _floatingController.dispose();
     super.dispose();
   }
 
@@ -73,80 +49,49 @@ class _SplashScreenState extends State<SplashScreen> with TickerProviderStateMix
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      // Match the Native Splash screen color (White) for a perfectly invisible seamless transition
+      backgroundColor: Colors.white,
       body: Center(
-        child: FadeTransition(
-          opacity: _fadeAnimation,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // Logo bouncing/floating layout
-              SlideTransition(
-                position: _floatAnimation,
-                child: ScaleTransition(
-                  scale: _scaleAnimation,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 32),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(32),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 24,
-                          offset: const Offset(0, 12),
-                        ),
-                        // Neumorphic glow for aesthetics
-                        BoxShadow(
-                          color: theme.colorScheme.primary.withOpacity(0.15),
-                          blurRadius: 40,
-                          offset: const Offset(0, 20),
-                        ),
-                      ],
-                    ),
-                    child: Image.asset(
-                      'assets/logos/medifind_app_logo.png',
-                      width: 150,
-                      height: 150,
-                      fit: BoxFit.contain,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Logo standing cleanly on the white background, just like Native splash
+            Image.asset(
+              'assets/logos/medifind_app_logo.png',
+              width: 160,
+              height: 160,
+              fit: BoxFit.contain,
+            ),
+            const SizedBox(height: 60),
+            
+            // The loader gracefully fades in so it doesn't pop aggressively
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: CircularProgressIndicator(
+                      color: theme.colorScheme.primary,
+                      strokeWidth: 3,
                     ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 60),
-              
-              // Aesthetic Custom Neumorphic Loading Bar
-              Container(
-                width: 220,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.surface, // Background of the track
-                  borderRadius: BorderRadius.circular(12),
-                  // A subtle inner shadow effect to make it look carved inside the screen natively
-                  boxShadow: AppShadows.neumorphicIn,
-                ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: LinearProgressIndicator(
-                    color: theme.colorScheme.primary,
-                    backgroundColor: Colors.transparent, // Inherits Neumorphic background depth
-                    // Provide a slower visual for the loading bar
-                    minHeight: 8,
+                  const SizedBox(height: 24),
+                  Text(
+                    'Initializing Environment...',
+                    style: TextStyle(
+                      fontFamily: 'Montserrat',
+                      fontSize: 14,
+                      color: Colors.grey.shade500,
+                      letterSpacing: 1.5,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
+                ],
               ),
-              
-              const SizedBox(height: 16),
-              Text(
-                'Initializing Safely...',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey.shade600,
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

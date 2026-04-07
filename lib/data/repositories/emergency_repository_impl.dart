@@ -122,7 +122,24 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Future<void> assignResponder(String emergencyId, String responderId) async {
-    // API logic would go here
+    // Legacy method
+  }
+
+  @override
+  Future<void> acceptEmergency(String emergencyId, String responderId) async {
+    await apiClient.acceptEmergency(emergencyId, responderId);
+    final cached = await localDataSource.getEmergency(emergencyId);
+    if (cached != null) {
+      cached['responderId'] = responderId;
+      cached['status'] = 'RESPONDER_ASSIGNED';
+      await localDataSource.saveEmergency(cached);
+    }
+  }
+
+  @override
+  Future<void> rejectEmergency(String emergencyId, String responderId) async {
+    await apiClient.rejectEmergency(emergencyId, responderId);
+    // You could also remove it from local cache, so it doesn't show up
   }
 
   @override

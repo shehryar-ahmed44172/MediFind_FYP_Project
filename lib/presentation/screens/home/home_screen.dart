@@ -34,23 +34,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Header 
+                    // top bar
                     _buildHeader(theme),
                     const SizedBox(height: 24),
 
-                    // Medical Profile Snapshot
+                    // profile summary
                     _buildMedicalProfileSnapshot(theme),
                     const SizedBox(height: 32),
 
-                    // Massive SOS Button
+                    // main sos btn
                     _buildMassiveSOSButton(theme),
                     const SizedBox(height: 24),
 
-                    // Optional Med Report Attachment
+                    // attach report btn
                     _buildAttachReportOption(theme),
                     const SizedBox(height: 32),
 
-                    // Emergency Types Box Grid
+                    // grid for emergency types
                     _buildEmergencyTypes(theme),
                   ],
                 ),
@@ -85,7 +85,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
                 Text(
-                  'John Doe', // TODO: Hook up to auth provider
+                  'John Doe', // TODO: Hook up to auth provider later
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
@@ -239,7 +239,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildAttachReportOption(ThemeData theme) {
     return InkWell(
       onTap: () {
-        // Trigger report attachment immediately 
+        // trigger dialog later
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Attach Report dialog opened!')),
         );
@@ -308,9 +308,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final type = types[index];
             final color = type['color'] as Color;
             return InkWell(
-              onTap: () {
-                // Navigate or Select Type
-              },
+              onTap: () {},
               borderRadius: BorderRadius.circular(16),
               child: Container(
                 decoration: BoxDecoration(

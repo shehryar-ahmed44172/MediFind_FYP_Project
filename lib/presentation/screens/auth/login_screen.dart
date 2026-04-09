@@ -6,8 +6,6 @@ import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
-/// LoginScreen widget handles user authentication.
-/// It uses Riverpod for state management and GoRouter for navigation.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
 
@@ -16,52 +14,41 @@ class LoginScreen extends ConsumerStatefulWidget {
 }
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
-  // Controllers for text input fields
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
-  // Key to manage and validate the form state
   final _formKey = GlobalKey<FormState>();
   
-  // UI state variables
-  bool _obscurePassword = true; // Toggles password visibility
-  bool _isLoading = false;      // Shows loading spinner during API calls
+  bool _obscurePassword = true;
+  bool _isLoading = false;
 
   @override
   void dispose() {
-    // Clean up controllers to prevent memory leaks when the screen is closed
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
-  /// Handles the login process: validation, authentication, and routing
   Future<void> _login() async {
-    // Step 1: Validate form fields
     if (!_formKey.currentState!.validate()) return;
 
-    // Step 2: Show loading indicator
     setState(() => _isLoading = true);
 
     try {
-      // Step 3: Prepare login parameters
       final params = LoginParams(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      // Step 4: Call the authentication provider
+      // attempt login
       await ref.read(loginProvider(params).future);
 
       if (mounted) {
-        // Step 5: Fetch user role and navigate to the correct dashboard
         final role = await ref.read(currentUserRoleProvider.future);
         if (mounted) {
           _navigateByRole(role);
         }
       }
     } catch (e) {
-      // Handle authentication errors and show a SnackBar to the user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -72,12 +59,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     } finally {
-      // Hide loading indicator whether login succeeds or fails
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Routes the user to their specific dashboard based on their account type
+  // nav by role
   void _navigateByRole(String? role) {
     switch (role?.toUpperCase()) {
       case 'RESPONDER':
@@ -87,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/caregiver');
         break;
       default:
-        context.go('/home'); // Default route for Patients
+        context.go('/home'); 
     }
   }
 
@@ -107,9 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 const SizedBox(height: 60),
 
-                // -----------------------------------------------------------
-                // Header Section: Logo & App Title
-                // -----------------------------------------------------------
+                // header
                 Semantics(
                   header: true,
                   child: Column(
@@ -147,10 +131,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 48),
 
-                // -----------------------------------------------------------
-                // Input Fields Section
-                // -----------------------------------------------------------
-                // Email Input
+                // email field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -162,7 +143,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password Input
+                // pass field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -184,7 +165,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Forgot Password Link
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -194,10 +174,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // -----------------------------------------------------------
-                // Action Buttons Section
-                // -----------------------------------------------------------
-                // Wrap login button in Neumorphic container
+                // login btn with neumorphic effect
                 Container(
                   decoration: BoxDecoration(
                     color: theme.colorScheme.primary,
@@ -244,7 +221,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Navigation to Registration
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -255,7 +231,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   ],
                 ),
-
               ],
             ),
           ),

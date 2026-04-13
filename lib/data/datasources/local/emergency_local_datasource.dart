@@ -39,15 +39,14 @@ class EmergencyLocalDataSource {
     try {
       final data = {
         'id': emergency.id,
-        'patientId': emergency.patientId,
+        'userId': emergency.userId,
         'emergencyType': emergency.emergencyType,
         'status': emergency.status,
         'latitude': emergency.latitude,
         'longitude': emergency.longitude,
         'additionalInfo': emergency.additionalInfo,
         'createdAt': emergency.createdAt.toIso8601String(),
-        'resolvedAt': emergency.resolvedAt?.toIso8601String(),
-        'cancelledAt': emergency.cancelledAt?.toIso8601String(),
+        'updatedAt': emergency.updatedAt.toIso8601String(),
       };
 
       if (emergency.status == 'ACTIVE') {
@@ -62,8 +61,8 @@ class EmergencyLocalDataSource {
     }
   }
 
-  /// Get all emergencies for a patient from cache
-  Future<List<Emergency>> getPatientEmergencies(String patientId) async {
+  /// Get all emergencies for a user from cache
+  Future<List<Emergency>> getUserEmergencies(String userId) async {
     try {
       final emergencies = <Emergency>[];
 
@@ -71,7 +70,7 @@ class EmergencyLocalDataSource {
       final activeBox = await Hive.openBox<Map<dynamic, dynamic>>(_activeEmergenciesBox);
       for (final value in activeBox.values) {
         final emergency = Emergency.fromJson(Map<String, dynamic>.from(value));
-        if (emergency.patientId == patientId) {
+        if (emergency.userId == userId) {
           emergencies.add(emergency);
         }
       }
@@ -80,7 +79,7 @@ class EmergencyLocalDataSource {
       final historyBox = await Hive.openBox<Map<dynamic, dynamic>>(_emergencyHistoryBox);
       for (final value in historyBox.values) {
         final emergency = Emergency.fromJson(Map<String, dynamic>.from(value));
-        if (emergency.patientId == patientId) {
+        if (emergency.userId == userId) {
           emergencies.add(emergency);
         }
       }

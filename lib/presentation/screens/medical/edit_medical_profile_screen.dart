@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
+import '../../theme/app_theme.dart';
 
 class EditMedicalProfileScreen extends ConsumerStatefulWidget {
   const EditMedicalProfileScreen({Key? key}) : super(key: key);

@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../services/websocket/web_socket_service.dart';
+import '../../../services/websocket/web_socket_service.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;

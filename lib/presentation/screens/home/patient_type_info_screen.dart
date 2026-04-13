@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../theme/app_theme.dart';
 
 class PatientTypeInfoScreen extends StatelessWidget {
   /// Pass a patientType to highlight one category, or null to show all.
@@ -91,7 +92,7 @@ class PatientTypeInfoScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                Icon(Icons.info_outline, color: AppColors.primary, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(

@@ -29,7 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // Responder specific controllers
   final _organizationController = TextEditingController();
   final _licenseController = TextEditingController();
-  String _selectedResponderType = 'PARAMEDIC';
+  String _selectedResponderType = 'EMERGENCY_RESPONDER';
   String _selectedVehicleType = 'AMBULANCE';
 
   // Document uploads for Responder
@@ -95,6 +95,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         phoneNumber: _phoneController.text.trim(),
         password: _passwordController.text,
         role: widget.role,
+        cnic: _cnicController.text.trim(),
         patientType: widget.role == 'PATIENT' ? _selectedPatientType : null,
         organization:
             widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
@@ -336,29 +337,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   const SizedBox(height: 14),
 
-                  // Responder Type (full width, no overflow)
-                  DropdownButtonFormField<String>(
-                    value: _selectedResponderType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Responder Type',
-                      prefixIcon: Icon(Icons.medical_services_rounded),
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'PARAMEDIC', child: Text('Paramedic')),
-                      DropdownMenuItem(
-                          value: 'DOCTOR', child: Text('Doctor')),
-                      DropdownMenuItem(value: 'EMT', child: Text('EMT')),
-                      DropdownMenuItem(
-                          value: 'NURSE', child: Text('Nurse')),
-                    ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() => _selectedResponderType = v);
-                      }
-                    },
-                  ),
+                  // Responder Type is fixed to 'Emergency Responder' as per requirements
                   const SizedBox(height: 14),
 
                   // Vehicle Type (full width, Motorbike added)
@@ -374,9 +353,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           value: 'AMBULANCE', child: Text('Ambulance')),
                       DropdownMenuItem(
                           value: 'MOTORBIKE', child: Text('Motorbike')),
-                      DropdownMenuItem(
-                          value: 'PERSONAL', child: Text('Personal Vehicle')),
-                      DropdownMenuItem(value: 'NONE', child: Text('None')),
                     ],
                     onChanged: (v) {
                       if (v != null) {

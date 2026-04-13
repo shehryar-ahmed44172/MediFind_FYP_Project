@@ -144,24 +144,26 @@ class VoiceAlertService {
   String _buildMedicalSummaryText(MedicalProfile medical) {
     final buffer = StringBuffer('Patient Medical Summary. ');
 
-    if (medical.bloodGroup != null && medical.bloodGroup!.isNotEmpty) {
-      buffer.write('Blood group: ${medical.bloodGroup}. ');
+    if (medical.bloodType.isNotEmpty) {
+      buffer.write('Blood group: ${medical.bloodType}. ');
     }
 
-    if (medical.allergies != null && medical.allergies!.isNotEmpty) {
+    if (medical.allergies.isNotEmpty) {
       buffer.write('Allergies: ${medical.allergies.join(', ')}. ');
     }
 
-    if (medical.chronicDiseases != null && medical.chronicDiseases!.isNotEmpty) {
+    if (medical.chronicDiseases.isNotEmpty) {
       buffer.write('Chronic conditions: ${medical.chronicDiseases.join(', ')}. ');
     }
 
-    if (medical.medications != null && medical.medications!.isNotEmpty) {
-      buffer.write('Current medications: ${medical.medications.join(', ')}. ');
+    if (medical.medications.isNotEmpty) {
+      // Assuming medication names are needed
+      final medNames = medical.medications.map((m) => m.name).join(', ');
+      buffer.write('Current medications: $medNames. ');
     }
 
-    if (medical.disabilities != null && medical.disabilities!.isNotEmpty) {
-      buffer.write('Disabilities: ${medical.disabilities.join(', ')}');
+    if (medical.disabilityType != null && medical.disabilityType!.isNotEmpty) {
+      buffer.write('Disabilities: ${medical.disabilityType}');
     }
 
     return buffer.toString();

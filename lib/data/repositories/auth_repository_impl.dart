@@ -15,24 +15,31 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<AuthResponse> login(String email, String password) async {
     final response = await apiClient.login(email, password);
-    await localDataSource.saveAuthToken(response.token);
-    apiClient.setAuthToken(response.token);
+    await localDataSource.saveAuthToken(response.accessToken);
+    await localDataSource.saveRefreshToken(response.refreshToken);
+    await localDataSource.saveCurrentUserId(response.userId);
+    await localDataSource.saveCurrentUserRole(response.role);
+    apiClient.setAuthToken(response.accessToken);
     return response;
   }
 
   @override
   Future<AuthResponse> register(RegisterRequest request) async {
     final response = await apiClient.register(request);
-    await localDataSource.saveAuthToken(response.token);
-    apiClient.setAuthToken(response.token);
+    await localDataSource.saveAuthToken(response.accessToken);
+    await localDataSource.saveRefreshToken(response.refreshToken);
+    await localDataSource.saveCurrentUserId(response.userId);
+    await localDataSource.saveCurrentUserRole(response.role);
+    apiClient.setAuthToken(response.accessToken);
     return response;
   }
 
   @override
   Future<AuthResponse> refreshToken(String token) async {
     final response = await apiClient.refreshToken(token);
-    await localDataSource.saveAuthToken(response.token);
-    apiClient.setAuthToken(response.token);
+    await localDataSource.saveAuthToken(response.accessToken);
+    await localDataSource.saveRefreshToken(response.refreshToken);
+    apiClient.setAuthToken(response.accessToken);
     return response;
   }
 

@@ -89,22 +89,40 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
 
 _$AuthResponseImpl _$$AuthResponseImplFromJson(Map<String, dynamic> json) =>
     _$AuthResponseImpl(
+      accessToken: json['token'] as String,
+      refreshToken: json['refreshToken'] as String? ?? '',
+      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 3600,
       userId: json['userId'] as String,
       fullName: json['fullName'] as String,
       email: json['email'] as String,
       role: json['role'] as String,
-      token: json['token'] as String,
-      expiresIn: (json['expiresIn'] as num).toInt(),
     );
 
 Map<String, dynamic> _$$AuthResponseImplToJson(_$AuthResponseImpl instance) =>
     <String, dynamic>{
+      'token': instance.accessToken,
+      'refreshToken': instance.refreshToken,
+      'expiresIn': instance.expiresIn,
       'userId': instance.userId,
       'fullName': instance.fullName,
       'email': instance.email,
       'role': instance.role,
-      'token': instance.token,
-      'expiresIn': instance.expiresIn,
+    };
+
+_$AuthUserImpl _$$AuthUserImplFromJson(Map<String, dynamic> json) =>
+    _$AuthUserImpl(
+      id: json['userId'] as String,
+      email: json['email'] as String,
+      fullName: json['fullName'] as String,
+      role: json['role'] as String,
+    );
+
+Map<String, dynamic> _$$AuthUserImplToJson(_$AuthUserImpl instance) =>
+    <String, dynamic>{
+      'userId': instance.id,
+      'email': instance.email,
+      'fullName': instance.fullName,
+      'role': instance.role,
     };
 
 _$LoginRequestImpl _$$LoginRequestImplFromJson(Map<String, dynamic> json) =>
@@ -127,6 +145,7 @@ _$RegisterRequestImpl _$$RegisterRequestImplFromJson(
       phoneNumber: json['phoneNumber'] as String,
       password: json['password'] as String,
       role: json['role'] as String,
+      cnic: json['cnic'] as String?,
       patientType: json['patientType'] as String?,
       organization: json['organization'] as String?,
       licenseNumber: json['licenseNumber'] as String?,
@@ -142,6 +161,7 @@ Map<String, dynamic> _$$RegisterRequestImplToJson(
       'phoneNumber': instance.phoneNumber,
       'password': instance.password,
       'role': instance.role,
+      'cnic': instance.cnic,
       'patientType': instance.patientType,
       'organization': instance.organization,
       'licenseNumber': instance.licenseNumber,

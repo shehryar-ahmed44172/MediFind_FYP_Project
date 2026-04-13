@@ -7,7 +7,7 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'dart:math' as math;
-import '../../services/audio/voice_alert_service.dart';
+import '../../../services/audio/voice_alert_service.dart';
 
 class SosCountdownScreen extends ConsumerStatefulWidget {
   final String emergencyType;

@@ -42,6 +42,14 @@ class LocalDataSource {
     }
   }
 
+  Future<void> saveRefreshToken(String token) async {
+    try {
+      await _authBox.put('refresh_token', token);
+    } catch (e) {
+      throw DatabaseException(message: 'Failed to save refresh token', originalException: e);
+    }
+  }
+
   Future<String?> getAuthToken() async {
     try {
       return _authBox.get(AppConstants.jwtTokenKey);
@@ -50,11 +58,20 @@ class LocalDataSource {
     }
   }
 
+  Future<String?> getRefreshToken() async {
+    try {
+      return _authBox.get('refresh_token');
+    } catch (e) {
+      throw DatabaseException(message: 'Failed to retrieve refresh token', originalException: e);
+    }
+  }
+
   Future<void> clearAuthToken() async {
     try {
       await _authBox.delete(AppConstants.jwtTokenKey);
+      await _authBox.delete('refresh_token');
     } catch (e) {
-      throw DatabaseException(message: 'Failed to clear auth token', originalException: e);
+      throw DatabaseException(message: 'Failed to clear tokens', originalException: e);
     }
   }
 

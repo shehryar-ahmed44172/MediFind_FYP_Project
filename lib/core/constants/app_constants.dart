@@ -14,7 +14,7 @@ class AppConstants {
   static String get wsUrl => isDevelopment ? _devWsUrl : _prodWsUrl;
 
   static const String apiVersion = 'v1';
-  static const int apiTimeout = 30000; // 30 seconds
+  static const int apiTimeout = 60000; // Increased to 60 seconds for local dev
   static const String jwtTokenKey = 'auth_token';
   
   // Database

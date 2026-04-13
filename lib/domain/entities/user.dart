@@ -55,16 +55,30 @@ class UserProfile with _$UserProfile {
 @freezed
 class AuthResponse with _$AuthResponse {
   const factory AuthResponse({
+    @JsonKey(name: 'token') required String accessToken,
+    @Default('') String refreshToken, // Backend docs don't show this, adding default
+    @Default(3600) int expiresIn,
     required String userId,
     required String fullName,
     required String email,
     required String role,
-    required String token,
-    required int expiresIn,
   }) = _AuthResponse;
 
   factory AuthResponse.fromJson(Map<String, dynamic> json) =>
       _$AuthResponseFromJson(json);
+}
+
+@freezed
+class AuthUser with _$AuthUser {
+  const factory AuthUser({
+    @JsonKey(name: 'userId') required String id,
+    required String email,
+    required String fullName,
+    required String role,
+  }) = _AuthUser;
+
+  factory AuthUser.fromJson(Map<String, dynamic> json) =>
+      _$AuthUserFromJson(json);
 }
 
 @freezed
@@ -86,6 +100,7 @@ class RegisterRequest with _$RegisterRequest {
     required String phoneNumber,
     required String password,
     required String role,
+    String? cnic,
     String? patientType,
     String? organization,
     String? licenseNumber,

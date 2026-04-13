@@ -15,7 +15,7 @@ class EmergencyRemoteDataSource {
   /// API: POST /api/emergencies
   /// Automatically attaches medical profile if provided
   Future<Emergency> createEmergency({
-    required String patientId,
+    required String userId,
     required String emergencyType,
     required double latitude,
     required double longitude,
@@ -24,18 +24,18 @@ class EmergencyRemoteDataSource {
   }) async {
     try {
       final requestBody = {
-        'patientId': patientId,
+        'userId': userId,
         'emergencyType': emergencyType,
         'latitude': latitude,
         'longitude': longitude,
         'additionalInfo': additionalInfo ?? '',
         if (medicalProfile != null) ...{
           'medicalProfile': {
-            'bloodGroup': medicalProfile.bloodGroup,
-            'allergies': medicalProfile.allergies ?? [],
-            'chronicDiseases': medicalProfile.chronicDiseases ?? [],
-            'medications': medicalProfile.medications ?? [],
-            'disabilities': medicalProfile.disabilities ?? [],
+            'bloodType': medicalProfile.bloodType,
+            'allergies': medicalProfile.allergies,
+            'chronicDiseases': medicalProfile.chronicDiseases,
+            'medications': medicalProfile.medications.map((m) => m.toJson()).toList(),
+            'disabilityType': medicalProfile.disabilityType,
           }
         }
       };
@@ -92,14 +92,14 @@ class EmergencyRemoteDataSource {
     }
   }
 
-  /// Get all emergencies for a patient
-  /// API: GET /api/emergencies?userId={patientId}&limit=50&skip=0
-  Future<List<Emergency>> getPatientEmergencies(String patientId) async {
+  /// Get all emergencies for a user
+  /// API: GET /api/emergencies?userId={userId}&limit=50&skip=0
+  Future<List<Emergency>> getUserEmergencies(String userId) async {
     try {
       final response = await _dio.get(
         _baseUrl,
         queryParameters: {
-          'userId': patientId,
+          'userId': userId,
           'limit': 50,
           'skip': 0,
         },

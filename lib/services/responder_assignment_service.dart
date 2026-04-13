@@ -1,7 +1,7 @@
 /// Responder Assignment Service
 /// Handles responder discovery, notification, and escalation logic
 
-import 'dart:math' as math show sin, cos, sqrt, atan2, pi;
+import 'dart:math' as math show sin, cos, sqrt, atan2, pi, max;
 import 'package:geolocator/geolocator.dart';
 import '../domain/entities/emergency.dart';
 

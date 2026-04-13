@@ -959,12 +959,15 @@ AuthResponse _$AuthResponseFromJson(Map<String, dynamic> json) {
 
 /// @nodoc
 mixin _$AuthResponse {
+  @JsonKey(name: 'token')
+  String get accessToken => throw _privateConstructorUsedError;
+  String get refreshToken =>
+      throw _privateConstructorUsedError; // Backend docs don't show this, adding default
+  int get expiresIn => throw _privateConstructorUsedError;
   String get userId => throw _privateConstructorUsedError;
   String get fullName => throw _privateConstructorUsedError;
   String get email => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
-  String get token => throw _privateConstructorUsedError;
-  int get expiresIn => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -979,12 +982,13 @@ abstract class $AuthResponseCopyWith<$Res> {
       _$AuthResponseCopyWithImpl<$Res, AuthResponse>;
   @useResult
   $Res call(
-      {String userId,
+      {@JsonKey(name: 'token') String accessToken,
+      String refreshToken,
+      int expiresIn,
+      String userId,
       String fullName,
       String email,
-      String role,
-      String token,
-      int expiresIn});
+      String role});
 }
 
 /// @nodoc
@@ -1000,14 +1004,27 @@ class _$AuthResponseCopyWithImpl<$Res, $Val extends AuthResponse>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? accessToken = null,
+    Object? refreshToken = null,
+    Object? expiresIn = null,
     Object? userId = null,
     Object? fullName = null,
     Object? email = null,
     Object? role = null,
-    Object? token = null,
-    Object? expiresIn = null,
   }) {
     return _then(_value.copyWith(
+      accessToken: null == accessToken
+          ? _value.accessToken
+          : accessToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      refreshToken: null == refreshToken
+          ? _value.refreshToken
+          : refreshToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresIn: null == expiresIn
+          ? _value.expiresIn
+          : expiresIn // ignore: cast_nullable_to_non_nullable
+              as int,
       userId: null == userId
           ? _value.userId
           : userId // ignore: cast_nullable_to_non_nullable
@@ -1024,14 +1041,6 @@ class _$AuthResponseCopyWithImpl<$Res, $Val extends AuthResponse>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
-      token: null == token
-          ? _value.token
-          : token // ignore: cast_nullable_to_non_nullable
-              as String,
-      expiresIn: null == expiresIn
-          ? _value.expiresIn
-          : expiresIn // ignore: cast_nullable_to_non_nullable
-              as int,
     ) as $Val);
   }
 }
@@ -1045,12 +1054,13 @@ abstract class _$$AuthResponseImplCopyWith<$Res>
   @override
   @useResult
   $Res call(
-      {String userId,
+      {@JsonKey(name: 'token') String accessToken,
+      String refreshToken,
+      int expiresIn,
+      String userId,
       String fullName,
       String email,
-      String role,
-      String token,
-      int expiresIn});
+      String role});
 }
 
 /// @nodoc
@@ -1064,14 +1074,27 @@ class __$$AuthResponseImplCopyWithImpl<$Res>
   @pragma('vm:prefer-inline')
   @override
   $Res call({
+    Object? accessToken = null,
+    Object? refreshToken = null,
+    Object? expiresIn = null,
     Object? userId = null,
     Object? fullName = null,
     Object? email = null,
     Object? role = null,
-    Object? token = null,
-    Object? expiresIn = null,
   }) {
     return _then(_$AuthResponseImpl(
+      accessToken: null == accessToken
+          ? _value.accessToken
+          : accessToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      refreshToken: null == refreshToken
+          ? _value.refreshToken
+          : refreshToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresIn: null == expiresIn
+          ? _value.expiresIn
+          : expiresIn // ignore: cast_nullable_to_non_nullable
+              as int,
       userId: null == userId
           ? _value.userId
           : userId // ignore: cast_nullable_to_non_nullable
@@ -1088,14 +1111,6 @@ class __$$AuthResponseImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
-      token: null == token
-          ? _value.token
-          : token // ignore: cast_nullable_to_non_nullable
-              as String,
-      expiresIn: null == expiresIn
-          ? _value.expiresIn
-          : expiresIn // ignore: cast_nullable_to_non_nullable
-              as int,
     ));
   }
 }
@@ -1104,16 +1119,27 @@ class __$$AuthResponseImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$AuthResponseImpl implements _AuthResponse {
   const _$AuthResponseImpl(
-      {required this.userId,
+      {@JsonKey(name: 'token') required this.accessToken,
+      this.refreshToken = '',
+      this.expiresIn = 3600,
+      required this.userId,
       required this.fullName,
       required this.email,
-      required this.role,
-      required this.token,
-      required this.expiresIn});
+      required this.role});
 
   factory _$AuthResponseImpl.fromJson(Map<String, dynamic> json) =>
       _$$AuthResponseImplFromJson(json);
 
+  @override
+  @JsonKey(name: 'token')
+  final String accessToken;
+  @override
+  @JsonKey()
+  final String refreshToken;
+// Backend docs don't show this, adding default
+  @override
+  @JsonKey()
+  final int expiresIn;
   @override
   final String userId;
   @override
@@ -1122,14 +1148,10 @@ class _$AuthResponseImpl implements _AuthResponse {
   final String email;
   @override
   final String role;
-  @override
-  final String token;
-  @override
-  final int expiresIn;
 
   @override
   String toString() {
-    return 'AuthResponse(userId: $userId, fullName: $fullName, email: $email, role: $role, token: $token, expiresIn: $expiresIn)';
+    return 'AuthResponse(accessToken: $accessToken, refreshToken: $refreshToken, expiresIn: $expiresIn, userId: $userId, fullName: $fullName, email: $email, role: $role)';
   }
 
   @override
@@ -1137,20 +1159,23 @@ class _$AuthResponseImpl implements _AuthResponse {
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is _$AuthResponseImpl &&
+            (identical(other.accessToken, accessToken) ||
+                other.accessToken == accessToken) &&
+            (identical(other.refreshToken, refreshToken) ||
+                other.refreshToken == refreshToken) &&
+            (identical(other.expiresIn, expiresIn) ||
+                other.expiresIn == expiresIn) &&
             (identical(other.userId, userId) || other.userId == userId) &&
             (identical(other.fullName, fullName) ||
                 other.fullName == fullName) &&
             (identical(other.email, email) || other.email == email) &&
-            (identical(other.role, role) || other.role == role) &&
-            (identical(other.token, token) || other.token == token) &&
-            (identical(other.expiresIn, expiresIn) ||
-                other.expiresIn == expiresIn));
+            (identical(other.role, role) || other.role == role));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, userId, fullName, email, role, token, expiresIn);
+  int get hashCode => Object.hash(runtimeType, accessToken, refreshToken,
+      expiresIn, userId, fullName, email, role);
 
   @JsonKey(ignore: true)
   @override
@@ -1168,16 +1193,24 @@ class _$AuthResponseImpl implements _AuthResponse {
 
 abstract class _AuthResponse implements AuthResponse {
   const factory _AuthResponse(
-      {required final String userId,
+      {@JsonKey(name: 'token') required final String accessToken,
+      final String refreshToken,
+      final int expiresIn,
+      required final String userId,
       required final String fullName,
       required final String email,
-      required final String role,
-      required final String token,
-      required final int expiresIn}) = _$AuthResponseImpl;
+      required final String role}) = _$AuthResponseImpl;
 
   factory _AuthResponse.fromJson(Map<String, dynamic> json) =
       _$AuthResponseImpl.fromJson;
 
+  @override
+  @JsonKey(name: 'token')
+  String get accessToken;
+  @override
+  String get refreshToken;
+  @override // Backend docs don't show this, adding default
+  int get expiresIn;
   @override
   String get userId;
   @override
@@ -1187,12 +1220,211 @@ abstract class _AuthResponse implements AuthResponse {
   @override
   String get role;
   @override
-  String get token;
-  @override
-  int get expiresIn;
-  @override
   @JsonKey(ignore: true)
   _$$AuthResponseImplCopyWith<_$AuthResponseImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+AuthUser _$AuthUserFromJson(Map<String, dynamic> json) {
+  return _AuthUser.fromJson(json);
+}
+
+/// @nodoc
+mixin _$AuthUser {
+  @JsonKey(name: 'userId')
+  String get id => throw _privateConstructorUsedError;
+  String get email => throw _privateConstructorUsedError;
+  String get fullName => throw _privateConstructorUsedError;
+  String get role => throw _privateConstructorUsedError;
+
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+  @JsonKey(ignore: true)
+  $AuthUserCopyWith<AuthUser> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $AuthUserCopyWith<$Res> {
+  factory $AuthUserCopyWith(AuthUser value, $Res Function(AuthUser) then) =
+      _$AuthUserCopyWithImpl<$Res, AuthUser>;
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'userId') String id,
+      String email,
+      String fullName,
+      String role});
+}
+
+/// @nodoc
+class _$AuthUserCopyWithImpl<$Res, $Val extends AuthUser>
+    implements $AuthUserCopyWith<$Res> {
+  _$AuthUserCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? email = null,
+    Object? fullName = null,
+    Object? role = null,
+  }) {
+    return _then(_value.copyWith(
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      email: null == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String,
+      fullName: null == fullName
+          ? _value.fullName
+          : fullName // ignore: cast_nullable_to_non_nullable
+              as String,
+      role: null == role
+          ? _value.role
+          : role // ignore: cast_nullable_to_non_nullable
+              as String,
+    ) as $Val);
+  }
+}
+
+/// @nodoc
+abstract class _$$AuthUserImplCopyWith<$Res>
+    implements $AuthUserCopyWith<$Res> {
+  factory _$$AuthUserImplCopyWith(
+          _$AuthUserImpl value, $Res Function(_$AuthUserImpl) then) =
+      __$$AuthUserImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call(
+      {@JsonKey(name: 'userId') String id,
+      String email,
+      String fullName,
+      String role});
+}
+
+/// @nodoc
+class __$$AuthUserImplCopyWithImpl<$Res>
+    extends _$AuthUserCopyWithImpl<$Res, _$AuthUserImpl>
+    implements _$$AuthUserImplCopyWith<$Res> {
+  __$$AuthUserImplCopyWithImpl(
+      _$AuthUserImpl _value, $Res Function(_$AuthUserImpl) _then)
+      : super(_value, _then);
+
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? email = null,
+    Object? fullName = null,
+    Object? role = null,
+  }) {
+    return _then(_$AuthUserImpl(
+      id: null == id
+          ? _value.id
+          : id // ignore: cast_nullable_to_non_nullable
+              as String,
+      email: null == email
+          ? _value.email
+          : email // ignore: cast_nullable_to_non_nullable
+              as String,
+      fullName: null == fullName
+          ? _value.fullName
+          : fullName // ignore: cast_nullable_to_non_nullable
+              as String,
+      role: null == role
+          ? _value.role
+          : role // ignore: cast_nullable_to_non_nullable
+              as String,
+    ));
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$AuthUserImpl implements _AuthUser {
+  const _$AuthUserImpl(
+      {@JsonKey(name: 'userId') required this.id,
+      required this.email,
+      required this.fullName,
+      required this.role});
+
+  factory _$AuthUserImpl.fromJson(Map<String, dynamic> json) =>
+      _$$AuthUserImplFromJson(json);
+
+  @override
+  @JsonKey(name: 'userId')
+  final String id;
+  @override
+  final String email;
+  @override
+  final String fullName;
+  @override
+  final String role;
+
+  @override
+  String toString() {
+    return 'AuthUser(id: $id, email: $email, fullName: $fullName, role: $role)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$AuthUserImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.email, email) || other.email == email) &&
+            (identical(other.fullName, fullName) ||
+                other.fullName == fullName) &&
+            (identical(other.role, role) || other.role == role));
+  }
+
+  @JsonKey(ignore: true)
+  @override
+  int get hashCode => Object.hash(runtimeType, id, email, fullName, role);
+
+  @JsonKey(ignore: true)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$AuthUserImplCopyWith<_$AuthUserImpl> get copyWith =>
+      __$$AuthUserImplCopyWithImpl<_$AuthUserImpl>(this, _$identity);
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$AuthUserImplToJson(
+      this,
+    );
+  }
+}
+
+abstract class _AuthUser implements AuthUser {
+  const factory _AuthUser(
+      {@JsonKey(name: 'userId') required final String id,
+      required final String email,
+      required final String fullName,
+      required final String role}) = _$AuthUserImpl;
+
+  factory _AuthUser.fromJson(Map<String, dynamic> json) =
+      _$AuthUserImpl.fromJson;
+
+  @override
+  @JsonKey(name: 'userId')
+  String get id;
+  @override
+  String get email;
+  @override
+  String get fullName;
+  @override
+  String get role;
+  @override
+  @JsonKey(ignore: true)
+  _$$AuthUserImplCopyWith<_$AuthUserImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
 
@@ -1362,6 +1594,7 @@ mixin _$RegisterRequest {
   String get phoneNumber => throw _privateConstructorUsedError;
   String get password => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
+  String? get cnic => throw _privateConstructorUsedError;
   String? get patientType => throw _privateConstructorUsedError;
   String? get organization => throw _privateConstructorUsedError;
   String? get licenseNumber => throw _privateConstructorUsedError;
@@ -1386,6 +1619,7 @@ abstract class $RegisterRequestCopyWith<$Res> {
       String phoneNumber,
       String password,
       String role,
+      String? cnic,
       String? patientType,
       String? organization,
       String? licenseNumber,
@@ -1411,6 +1645,7 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? cnic = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
     Object? licenseNumber = freezed,
@@ -1438,6 +1673,10 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
       patientType: freezed == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
@@ -1476,6 +1715,7 @@ abstract class _$$RegisterRequestImplCopyWith<$Res>
       String phoneNumber,
       String password,
       String role,
+      String? cnic,
       String? patientType,
       String? organization,
       String? licenseNumber,
@@ -1499,6 +1739,7 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? cnic = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
     Object? licenseNumber = freezed,
@@ -1526,6 +1767,10 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
       patientType: freezed == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
@@ -1559,6 +1804,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       required this.phoneNumber,
       required this.password,
       required this.role,
+      this.cnic,
       this.patientType,
       this.organization,
       this.licenseNumber,
@@ -1579,6 +1825,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   @override
   final String role;
   @override
+  final String? cnic;
+  @override
   final String? patientType;
   @override
   final String? organization;
@@ -1591,7 +1839,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
 
   @override
   String toString() {
-    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
+    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, cnic: $cnic, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
   }
 
   @override
@@ -1607,6 +1855,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
             (identical(other.password, password) ||
                 other.password == password) &&
             (identical(other.role, role) || other.role == role) &&
+            (identical(other.cnic, cnic) || other.cnic == cnic) &&
             (identical(other.patientType, patientType) ||
                 other.patientType == patientType) &&
             (identical(other.organization, organization) ||
@@ -1628,6 +1877,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       phoneNumber,
       password,
       role,
+      cnic,
       patientType,
       organization,
       licenseNumber,
@@ -1656,6 +1906,7 @@ abstract class _RegisterRequest implements RegisterRequest {
       required final String phoneNumber,
       required final String password,
       required final String role,
+      final String? cnic,
       final String? patientType,
       final String? organization,
       final String? licenseNumber,
@@ -1675,6 +1926,8 @@ abstract class _RegisterRequest implements RegisterRequest {
   String get password;
   @override
   String get role;
+  @override
+  String? get cnic;
   @override
   String? get patientType;
   @override

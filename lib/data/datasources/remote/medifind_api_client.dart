@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import '/core/constants/app_constants.dart';
 import '/core/utils/exceptions.dart';
 import '/domain/entities/emergency.dart';
@@ -21,6 +22,15 @@ class MediFindApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+    );
+
+    // Add interceptor for logging
+    _dio.interceptors.add(
+      LogInterceptor(
+        requestBody: true,
+        responseBody: true,
+        logPrint: (obj) => debugPrint(obj.toString()),
+      ),
     );
 
     // Add interceptor for auth token
@@ -69,8 +79,9 @@ class MediFindApiClient {
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as Map<String, dynamic>;
-        _authToken = data['token'] as String;
-        return AuthResponse.fromJson(data);
+        final authResponse = AuthResponse.fromJson(data);
+        _authToken = authResponse.accessToken;
+        return authResponse;
       }
 
       throw NetworkException(
@@ -91,8 +102,14 @@ class MediFindApiClient {
 
       if (response.statusCode == 201) {
         final data = response.data['data'] as Map<String, dynamic>;
-        _authToken = data['token'] as String;
-        return AuthResponse.fromJson(data);
+        // Backend register returns only user object currently in services/auth.ts line 39
+        // But login returns accessToken/refreshToken. 
+        // If register returns accessToken/refreshToken, this works.
+        // Let's assume it returns the full AuthResponse for consistency, 
+        // or we'll need to login after register.
+        final authResponse = AuthResponse.fromJson(data);
+        _authToken = authResponse.accessToken;
+        return authResponse;
       }
 
       throw NetworkException(
@@ -107,14 +124,15 @@ class MediFindApiClient {
   Future<AuthResponse> refreshToken(String token) async {
     try {
       final response = await _dio.post(
-        'auth/refresh',
-        data: {'token': token},
+        'auth/refresh-token',
+        data: {'refreshToken': token},
       );
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as Map<String, dynamic>;
-        _authToken = data['token'] as String;
-        return AuthResponse.fromJson(data);
+        final authResponse = AuthResponse.fromJson(data);
+        _authToken = authResponse.accessToken;
+        return authResponse;
       }
 
       throw NetworkException(
@@ -170,7 +188,8 @@ class MediFindApiClient {
 
   Future<List<Emergency>> getUserEmergencies(String userId) async {
     try {
-      final response = await _dio.get('users/$userId/emergencies');
+      // Backend uses /api/emergencies for active or filtered list
+      final response = await _dio.get('emergencies');
 
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
@@ -187,6 +206,9 @@ class MediFindApiClient {
 
   Future<void> updateEmergencyStatus(String emergencyId, String status) async {
     try {
+      // Backend doesn't have a direct 'status' PATCH on emergencies. 
+      // Usually status is updated via accept/reject/cancel.
+      // If we need a general status update, we'll need a new route.
       final response = await _dio.patch(
         'emergencies/$emergencyId/status',
         data: {'status': status},
@@ -203,8 +225,7 @@ class MediFindApiClient {
   Future<void> acceptEmergency(String emergencyId, String responderId) async {
     try {
       final response = await _dio.post(
-        'emergencies/$emergencyId/accept',
-        data: {'responderId': responderId},
+        'responders/emergencies/$emergencyId/accept',
       );
 
       if (response.statusCode != 200) {
@@ -218,8 +239,7 @@ class MediFindApiClient {
   Future<void> rejectEmergency(String emergencyId, String responderId) async {
     try {
       final response = await _dio.post(
-        'emergencies/$emergencyId/reject',
-        data: {'responderId': responderId},
+        'responders/emergencies/$emergencyId/reject',
       );
 
       if (response.statusCode != 200) {
@@ -231,9 +251,12 @@ class MediFindApiClient {
   }
 
   // MEDICAL PROFILE ENDPOINTS
-  Future<MedicalProfile> getMedicalProfile(String userId) async {
+  Future<MedicalProfile> getMedicalProfile([String? userId]) async {
     try {
-      final response = await _dio.get('users/$userId/medical-profile');
+      // If userId is provided, get that user's profile (/api/medical-profile/:userId)
+      // otherwise get current user's profile (/api/medical-profile)
+      final path = userId != null ? 'medical-profile/$userId' : 'medical-profile';
+      final response = await _dio.get(path);
 
       if (response.statusCode == 200) {
         return MedicalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
@@ -245,18 +268,17 @@ class MediFindApiClient {
     }
   }
 
-  Future<MedicalProfile> updateMedicalProfile(
-    String userId,
-    String bloodType,
-    List<String> chronicDiseases,
-    List<String> allergies,
-    List<Map<String, dynamic>> medications,
-    List<Map<String, dynamic>> emergencyContacts,
+  Future<MedicalProfile> updateMedicalProfile({
+    required String bloodType,
+    required List<String> chronicDiseases,
+    required List<String> allergies,
+    required List<Map<String, dynamic>> medications,
+    required List<Map<String, dynamic>> emergencyContacts,
     String? medicalHistory,
-  ) async {
+  }) async {
     try {
       final response = await _dio.put(
-        'users/$userId/medical-profile',
+        'medical-profile',
         data: {
           'bloodType': bloodType,
           'chronicDiseases': chronicDiseases,
@@ -310,7 +332,7 @@ class MediFindApiClient {
     try {
       final response = await _dio.get(
         'users/search',
-        queryParameters: {'q': query},
+        queryParameters: {'query': query},
       );
 
       if (response.statusCode == 200) {
@@ -319,6 +341,103 @@ class MediFindApiClient {
       }
 
       throw NetworkException(message: 'Failed to search users');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // CAREGIVER ENDPOINTS
+  Future<void> linkCaregiver(String email, String relationship) async {
+    try {
+      final response = await _dio.post(
+        'caregivers/link',
+        data: {
+          'caregiverEmail': email,
+          'relationship': relationship,
+        },
+      );
+
+      if (response.statusCode != 201) {
+        throw NetworkException(message: 'Failed to link caregiver');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<List<dynamic>> getCaregiverLinks() async {
+    try {
+      final response = await _dio.get('caregivers');
+
+      if (response.statusCode == 200) {
+        return response.data['data'] as List;
+      }
+
+      throw NetworkException(message: 'Failed to fetch caregiver links');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> unlinkCaregiver(String caregiverId) async {
+    try {
+      final response = await _dio.delete('caregivers/$caregiverId');
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to unlink caregiver');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // PASSWORD ENDPOINTS
+  Future<void> forgotPassword(String email) async {
+    try {
+      final response = await _dio.post(
+        'password/forgot-password',
+        data: {'email': email},
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to request password reset');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> resetPassword(String token, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        'password/reset',
+        data: {
+          'token': token,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to reset password');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> changePassword(String oldPassword, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        'password/change-password',
+        data: {
+          'oldPassword': oldPassword,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to change password');
+      }
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

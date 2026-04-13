@@ -1,17 +1,30 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/datasources/local/medical_profile_local_datasource.dart';
+import '../../data/datasources/remote/medical_profile_remote_datasource.dart';
 import '../../data/repositories/medical_profile_repository_impl.dart';
 import '../../domain/entities/medical_profile.dart';
 import '../../domain/repositories/medical_profile_repository.dart';
 import 'auth_provider.dart';
+// Specialized data source providers
+final medicalProfileRemoteDataSourceProvider = Provider<MedicalProfileRemoteDataSource>((ref) {
+  final dio = ref.watch(dioProvider);
+  return MedicalProfileRemoteDataSource(dio);
+});
+
+final medicalProfileLocalDataSourceProvider = FutureProvider<MedicalProfileLocalDataSource>((ref) async {
+  final ds = MedicalProfileLocalDataSource();
+  await ds.init();
+  return ds;
+});
 
 // Medical profile repository provider
 final medicalProfileRepositoryProvider =
     FutureProvider<MedicalProfileRepository>((ref) async {
-  final apiClient = ref.watch(apiClientProvider);
-  final localDataSource = await ref.watch(localDataSourceProvider.future);
+  final remoteDs = ref.watch(medicalProfileRemoteDataSourceProvider);
+  final localDs = await ref.watch(medicalProfileLocalDataSourceProvider.future);
   return MedicalProfileRepositoryImpl(
-    apiClient: apiClient,
-    localDataSource: localDataSource,
+    remoteDataSource: remoteDs,
+    localDataSource: localDs,
   );
 });
 
@@ -34,13 +47,12 @@ final updateMedicalProfileProvider =
       .toList();
 
   await repo.updateMedicalProfile(
-    params.userId,
-    params.bloodType,
-    params.disabilityType,
-    params.allergies,
-    params.chronicDiseases,
-    medications,
-    params.additionalNotes,
+    bloodType: params.bloodType,
+    disabilityType: params.disabilityType,
+    allergies: params.allergies,
+    chronicDiseases: params.chronicDiseases,
+    medications: medications,
+    additionalNotes: params.additionalNotes,
   );
 
   // Invalidate cache so view screen refreshes

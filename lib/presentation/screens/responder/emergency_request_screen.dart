@@ -5,7 +5,8 @@ import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
-import '../../services/audio/voice_alert_service.dart';
+import '../../../services/audio/voice_alert_service.dart';
+import '../../providers/auth_provider.dart';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -45,7 +46,8 @@ class _EmergencyRequestScreenState
     setState(() => _isAccepting = true);
     
     try {
-      final responderId = await ref.read(currentUserIdProvider.future) ?? 'responder_generated_id';
+      final responderIdResult = await ref.read(currentUserIdProvider.future);
+      final responderId = responderIdResult ?? 'responder_generated_id';
       await ref.read(acceptEmergencyProvider(AcceptRejectParams(
         emergencyId: widget.requestId,
         responderId: responderId,
@@ -83,7 +85,8 @@ class _EmergencyRequestScreenState
   Future<void> _reject() async {
     setState(() => _isRejecting = true);
     try {
-      final responderId = await ref.read(currentUserIdProvider.future) ?? 'responder_generated_id';
+      final responderIdResult = await ref.read(currentUserIdProvider.future);
+      final responderId = responderIdResult ?? 'responder_generated_id';
       await ref.read(rejectEmergencyProvider(AcceptRejectParams(
         emergencyId: widget.requestId,
         responderId: responderId,
@@ -212,9 +215,13 @@ class _EmergencyRequestScreenState
               if (isCurrentlyPlaying) {
                  VoiceAlertService().stop();
               } else {
-                 VoiceAlertService().speakMessage(
-                   "Emergency Request! ${emergencyType.replaceAll('_', ' ')}. Distance: $distance. Patient: $patientName."
-                 );
+                 final message = "Emergency Alert: ${emergencyType.replaceAll('_', ' ')}. "
+                     "Patient: $patientName. "
+                     "Blood Group: $bloodGroup. "
+                     "Allergies: $allergies. "
+                     "Conditions: $conditions. "
+                     "Distance: $distance.";
+                 VoiceAlertService().speakMessage(message);
               }
             },
             icon: Icon(_isPlayingVoice

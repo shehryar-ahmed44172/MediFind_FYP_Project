@@ -12,6 +12,7 @@ import 'firebase_options.dart';
 import 'config/router.dart';
 import 'core/config/app_config.dart';
 import 'presentation/theme/app_theme.dart';
+import 'presentation/providers/accessibility_provider.dart';
 // Importing push notification service
 import 'services/notification/push_notification_service.dart';
 
@@ -37,29 +38,31 @@ void main() async {
 }
 
 // Root widget of the MediFind application
-class MediFindApp extends StatefulWidget {
+class MediFindApp extends ConsumerStatefulWidget {
   const MediFindApp({Key? key}) : super(key: key);
 
   @override
-  State<MediFindApp> createState() => _MediFindAppState();
+  ConsumerState<MediFindApp> createState() => _MediFindAppState();
 }
 
-class _MediFindAppState extends State<MediFindApp> {
+class _MediFindAppState extends ConsumerState<MediFindApp> {
   @override
   void initState() {
     super.initState();
     // Initialize Push Notifications and FCM Handlers after app mounts
-    PushNotificationService.initialize(context);
+    // Using Future.microtask to avoid using 'context' during init
+    Future.microtask(() => PushNotificationService.initialize(context));
   }
 
   @override
   Widget build(BuildContext context) {
+    final accessibilitySettings = ref.watch(accessibilityProvider);
+
     // Returning MaterialApp with routing capabilities configured
     return MaterialApp.router(
       title: 'MediFind', // Application title
       debugShowCheckedModeBanner: AppConfig.showDebugBanner, // Controls debug banner visibility
-      theme: AppTheme.lightTheme(),
-      darkTheme: AppTheme.darkTheme(),
+      theme: AppTheme.buildTheme(accessibilitySettings),
       themeMode: ThemeMode.light,
       routerConfig: AppRouter.router,
     );

@@ -1,97 +1,66 @@
-/// Medical Profile Remote Data Source
-/// Handles API communication for medical profile operations
-
 import 'package:dio/dio.dart';
 import '../../../domain/entities/medical_profile.dart';
+import '../../../core/utils/exceptions.dart';
+import 'medifind_api_client.dart';
 
 class MedicalProfileRemoteDataSource {
   final Dio _dio;
-  static const String _baseUrl = '/api/medical-profiles';
 
-  MedicalProfileRemoteDataSource({Dio? dio}) : _dio = dio ?? Dio();
+  MedicalProfileRemoteDataSource(this._dio);
 
-  /// Get medical profile for a user
-  /// API: GET /api/medical-profiles/{userId}
-  Future<MedicalProfile?> getMedicalProfile(String userId) async {
+  Future<MedicalProfile> getMedicalProfile([String? userId]) async {
     try {
-      final response = await _dio.get('$_baseUrl/$userId');
+      final path = userId != null ? 'medical-profile/$userId' : 'medical-profile';
+      final response = await _dio.get(path);
 
       if (response.statusCode == 200) {
-        final data = response.data['data'] as Map<String, dynamic>;
-        return MedicalProfile.fromJson(data);
+        return MedicalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
       }
 
-      if (response.statusCode == 404) {
-        return null; // Profile doesn't exist yet
-      }
-
-      throw Exception('Failed to fetch medical profile: ${response.statusCode}');
+      throw NetworkException(message: 'Failed to fetch medical profile');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
   }
 
-  /// Update or create medical profile
-  /// API: PUT /api/medical-profiles/{userId}
-  Future<MedicalProfile> updateMedicalProfile(
-    String userId,
-    MedicalProfile profile,
-  ) async {
+  Future<MedicalProfile> updateMedicalProfile({
+    required String bloodType,
+    String? disabilityType,
+    required List<String> chronicDiseases,
+    required List<String> allergies,
+    required List<Map<String, dynamic>> medications,
+    List<Map<String, dynamic>>? emergencyContacts,
+    String? additionalNotes,
+  }) async {
     try {
       final response = await _dio.put(
-        '$_baseUrl/$userId',
+        'medical-profile',
         data: {
-          'bloodGroup': profile.bloodGroup,
-          'allergies': profile.allergies ?? [],
-          'chronicDiseases': profile.chronicDiseases ?? [],
-          'medications': profile.medications ?? [],
-          'disabilities': profile.disabilities ?? [],
-          'emergencyContactName': profile.emergencyContactName,
-          'emergencyContactPhone': profile.emergencyContactPhone,
-          'medicalHistory': profile.medicalHistory,
+          'bloodType': bloodType,
+          'disabilityType': disabilityType,
+          'chronicDiseases': chronicDiseases,
+          'allergies': allergies,
+          'medications': medications,
+          'emergencyContacts': emergencyContacts ?? [],
+          'additionalNotes': additionalNotes,
         },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = response.data['data'] as Map<String, dynamic>;
-        return MedicalProfile.fromJson(data);
+      if (response.statusCode == 200) {
+        return MedicalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
       }
 
-      throw Exception(
-        'Failed to update medical profile: ${response.statusCode}',
-      );
+      throw NetworkException(message: 'Failed to update medical profile');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
   }
 
-  /// Delete medical profile
-  /// API: DELETE /api/medical-profiles/{userId}
-  Future<void> deleteMedicalProfile(String userId) async {
-    try {
-      final response = await _dio.delete('$_baseUrl/$userId');
-
-      if (response.statusCode != 200 && response.statusCode != 204) {
-        throw Exception(
-          'Failed to delete medical profile: ${response.statusCode}',
-        );
-      }
-    } on DioException catch (e) {
-      throw _handleDioException(e);
-    }
-  }
-
-  /// Handle Dio exceptions
-  Exception _handleDioException(DioException e) {
-    if (e.type == DioExceptionType.connectionTimeout) {
-      return Exception('Connection timeout while accessing medical profile');
-    }
-    if (e.type == DioExceptionType.receiveTimeout) {
-      return Exception('Server took too long to respond');
-    }
-    if (e.type == DioExceptionType.unknown) {
-      return Exception('Network error: ${e.message}');
-    }
-    return Exception('API Error: ${e.message}');
+  AppException _handleDioException(DioException e) {
+    final errorMessage = e.response?.data['error'] ?? 'Error occurred';
+    return NetworkException(
+      message: errorMessage,
+      originalException: e,
+    );
   }
 }

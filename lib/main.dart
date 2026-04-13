@@ -4,16 +4,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing Hive for efficient local database storage
 import 'package:hive_flutter/hive_flutter.dart';
+// Importing Firebase core and options
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 // Importing custom routing, configuration, and theme files for the project
 import 'config/router.dart';
 import 'core/config/app_config.dart';
 import 'presentation/theme/app_theme.dart';
+// Importing push notification service
+import 'services/notification/push_notification_service.dart';
 
 // The main entry point of the MediFind application
 void main() async {
   // Ensures that widget binding is initialized before running the app
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase First
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
 
   // Initialize Hive for local storage (Database setup)
   await Hive.initFlutter();
@@ -27,8 +37,20 @@ void main() async {
 }
 
 // Root widget of the MediFind application
-class MediFindApp extends StatelessWidget {
+class MediFindApp extends StatefulWidget {
   const MediFindApp({Key? key}) : super(key: key);
+
+  @override
+  State<MediFindApp> createState() => _MediFindAppState();
+}
+
+class _MediFindAppState extends State<MediFindApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize Push Notifications and FCM Handlers after app mounts
+    PushNotificationService.initialize(context);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -43,3 +65,4 @@ class MediFindApp extends StatelessWidget {
     );
   }
 }
+

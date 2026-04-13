@@ -87,11 +87,11 @@ class CaregiverHomeScreen extends ConsumerWidget {
                     leading: CircleAvatar(
                       backgroundColor: hasActiveEmergency
                           ? Colors.red.shade100
-                          : Colors.blue.shade100,
+                          : AppColors.primary.withOpacity(0.15),
                       child: Icon(Icons.person,
                           color: hasActiveEmergency
                               ? Colors.red
-                              : Colors.blue),
+                              : AppColors.primary),
                     ),
                     title: Text(patient['name'] ?? 'Patient',
                         style: const TextStyle(fontWeight: FontWeight.bold)),

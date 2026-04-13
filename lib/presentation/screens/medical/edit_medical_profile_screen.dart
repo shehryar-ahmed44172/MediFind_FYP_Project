@@ -206,7 +206,7 @@ class _EditMedicalProfileScreenState
             const SizedBox(height: 24),
 
             // Medications
-            _buildSectionHeader('Current Medications', Icons.medication_outlined, Colors.blue),
+            _buildSectionHeader('Current Medications', Icons.medication_outlined, AppColors.primary),
             const SizedBox(height: 8),
             TextFormField(
               controller: _medicationsController,

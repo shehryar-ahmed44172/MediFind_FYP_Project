@@ -7,6 +7,7 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'dart:math' as math;
+import '../../services/audio/voice_alert_service.dart';
 
 class SosCountdownScreen extends ConsumerStatefulWidget {
   final String emergencyType;
@@ -84,6 +85,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       );
 
       final emergency = await ref.read(createEmergencyProvider(params).future);
+      VoiceAlertService().speakMessage("Emergency triggered. Help is on the way.");
 
       if (mounted) {
         context.go('/home/emergency/${emergency.id}/tracking');
@@ -140,7 +142,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
             right: 0,
             height: MediaQuery.of(context).size.height * 0.4,
             child: Container(
-              color: Colors.blue.shade50, // Mock map color
+              color: AppColors.primaryLight.withOpacity(0.15), // Mock map color
               child: Stack(
                 children: [
                   // Fake map grid lines and markers
@@ -372,7 +374,7 @@ class _FakeMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.05)
+      ..color = AppColors.primary.withOpacity(0.05)
       ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
 
@@ -382,7 +384,7 @@ class _FakeMapPainter extends CustomPainter {
     canvas.drawLine(Offset(size.width * 0.2, size.height), Offset(size.width * 0.8, 0), paint);
     
     paint.strokeWidth = 4;
-    paint.color = Colors.blue.withOpacity(0.03);
+    paint.color = AppColors.primary.withOpacity(0.03);
     canvas.drawLine(Offset(0, size.height * 0.7), Offset(size.width, size.height * 0.7), paint);
     canvas.drawLine(Offset(size.width * 0.8, 0), Offset(size.width * 0.8, size.height), paint);
   }

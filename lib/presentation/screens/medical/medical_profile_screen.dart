@@ -114,7 +114,7 @@ class MedicalProfileScreen extends ConsumerWidget {
               _SectionCard(
                 title: 'Current Medications',
                 icon: Icons.medication_outlined,
-                iconColor: Colors.blue,
+                iconColor: AppColors.primary,
                 child: profile.medications.isEmpty
                     ? const Text('None', style: TextStyle(color: Colors.grey))
                     : Column(

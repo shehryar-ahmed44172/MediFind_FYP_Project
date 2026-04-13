@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  // Primary colors - Using slightly softer tones for Neumorphism
-  static const Color primary = Color(0xFF109DAF);
-  static const Color primaryLight = Color(0xFF4DB9C8);
-  static const Color primaryDark = Color(0xFF0C7886);
+  // Primary colors — MediFind Logo Teal Gradient
+  static const Color primary = Color(0xFF0E9AA7);       // Logo teal (medical cross)
+  static const Color primaryLight = Color(0xFF1CBBB4);   // Logo lighter teal (highlights)
+  static const Color primaryDark = Color(0xFF0A7E8C);    // Logo darker teal (shadow areas)
 
-  // Secondary colors
-  static const Color secondary = Color(0xFF083368);
-  static const Color secondaryLight = Color(0xFF1E5691);
-  static const Color secondaryDark = Color(0xFF052145);
+  // Secondary colors — Logo charcoal/navy text
+  static const Color secondary = Color(0xFF3D4F5F);      // Logo "medifind" text color  
+  static const Color secondaryLight = Color(0xFF5A7084);
+  static const Color secondaryDark = Color(0xFF2B3A47);
 
   // Accent colors
   static const Color accent = Color(0xFFFF6B6B);
@@ -44,6 +44,13 @@ class AppColors {
   static const Color onSurface = Color(0xFF212121);
   static const Color onPrimary = Color(0xFFFFFFFF);
   static const Color onSecondary = Color(0xFFFFFFFF);
+
+  // MediFind Logo Gradient (for gradient decorations)
+  static const List<Color> medifindGradient = [
+    Color(0xFF0A7E8C),  // dark teal
+    Color(0xFF0E9AA7),  // primary teal
+    Color(0xFF1CBBB4),  // light teal
+  ];
 }
 
 class AppShadows {

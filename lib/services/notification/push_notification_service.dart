@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../presentation/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
+import '../audio/voice_alert_service.dart';
 
 // Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -15,6 +16,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  static BuildContext? _currentDialogContext;
 
   static Future<void> initialize(BuildContext context) async {
     try {
@@ -37,8 +39,11 @@ class PushNotificationService {
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('Got a message whilst in the foreground!');
         
-        if (message.data['type'] == 'EMERGENCY_REQUEST') {
+        final type = message.data['type'];
+        if (type == 'EMERGENCY_REQUEST') {
           _showCustomEmergencyModal(context, message.data);
+        } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED') {
+          _dismissCurrentEmergencyModal();
         }
       });
 
@@ -61,13 +66,30 @@ class PushNotificationService {
     return await _firebaseMessaging.getToken();
   }
 
+  static void _dismissCurrentEmergencyModal() {
+    if (_currentDialogContext != null) {
+      if (Navigator.of(_currentDialogContext!).canPop()) {
+        Navigator.of(_currentDialogContext!).pop();
+      }
+      _currentDialogContext = null;
+    }
+  }
+
   static void _showCustomEmergencyModal(BuildContext context, Map<String, dynamic> data) {
+    // If another modal is somehow open, close it
+    _dismissCurrentEmergencyModal();
+
+    final emergencyType = data['emergencyType'] ?? 'Unknown Emergency';
+    final distance = data['distance'] ?? 'Calculating...';
+    
+    // Trigger Voice Alert
+    VoiceAlertService().speakMessage('Emergency Alert! ${emergencyType.replaceAll('_', ' ')} reported $distance away.');
+
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext dialogContext) {
-        final emergencyType = data['emergencyType'] ?? 'Unknown Emergency';
-        final distance = data['distance'] ?? 'Calculating...';
+        _currentDialogContext = dialogContext;
         final priority = data['priority'] ?? 'NORMAL';
         final requestId = data['emergencyId'] ?? '';
 
@@ -127,7 +149,10 @@ class PushNotificationService {
                   children: [
                     TextButton(
                       child: const Text('Dismiss', style: TextStyle(color: Colors.grey)),
-                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      onPressed: () {
+                        Navigator.of(dialogContext).pop();
+                        _currentDialogContext = null;
+                      },
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -137,6 +162,7 @@ class PushNotificationService {
                       child: const Text('View Details', style: TextStyle(color: Colors.white)),
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
+                        _currentDialogContext = null;
                         if (requestId.isNotEmpty) {
                           context.push('/responder/emergency/$requestId');
                         }

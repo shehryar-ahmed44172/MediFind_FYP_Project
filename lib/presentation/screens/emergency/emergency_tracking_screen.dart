@@ -3,15 +3,45 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../services/websocket/web_socket_service.dart';
 
-class EmergencyTrackingScreen extends ConsumerWidget {
+class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
   const EmergencyTrackingScreen({Key? key, required this.emergencyId}) : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EmergencyTrackingScreen> createState() => _EmergencyTrackingScreenState();
+}
+
+class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScreen> {
+  String _currentStatus = 'RESPONDER_ASSIGNED';
+  String _eta = 'calculating...';
+
+  @override
+  void initState() {
+    super.initState();
+    // Connect WebSocket when screen opens
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(webSocketStreamProvider);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Try to watch live emergency data, fallback to UI directly
-    final emergencyAsync = ref.watch(getEmergencyProvider(emergencyId));
+    final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
+    
+    // Listen for WebSocket events to update local state
+    ref.listen(webSocketStreamProvider, (previous, next) {
+      if (next.hasValue) {
+        final message = next.value!;
+        if (message.event == WebSocketEvent.etaUpdate) {
+          setState(() => _eta = message.data['eta']?.toString() ?? _eta);
+        } else if (message.event == WebSocketEvent.statusUpdate) {
+          setState(() => _currentStatus = message.data['status']?.toString() ?? _currentStatus);
+        }
+      }
+    });
 
     final theme = Theme.of(context);
 
@@ -33,7 +63,7 @@ class EmergencyTrackingScreen extends ConsumerWidget {
           child: CustomPaint(
             painter: _TrackingMapPainter(),
             child: Container(
-              color: Colors.blue.withOpacity(0.02),
+              color: AppColors.primary.withOpacity(0.02),
             ),
           ),
         ),
@@ -55,7 +85,7 @@ class EmergencyTrackingScreen extends ConsumerWidget {
         Positioned(
           top: MediaQuery.of(context).size.height * 0.55,
           left: MediaQuery.of(context).size.width * 0.6,
-          child: _buildMapPin(Icons.person_pin_circle_rounded, Colors.blue.shade700),
+          child: _buildMapPin(Icons.person_pin_circle_rounded, AppColors.primaryDark),
         ),
 
         // 4. Bottom Responder Details & Status Sheet (FR7.4, FR5.1-5.7 context)
@@ -102,7 +132,7 @@ class EmergencyTrackingScreen extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    '05 Min',
+                    _eta,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,
@@ -222,7 +252,7 @@ class EmergencyTrackingScreen extends ConsumerWidget {
                 // Action Buttons
                 Row(
                   children: [
-                    _buildActionButton(Icons.chat_bubble_rounded, Colors.blue),
+                    _buildActionButton(Icons.chat_bubble_rounded, AppColors.primary),
                     const SizedBox(width: 12),
                     _buildActionButton(Icons.phone_rounded, Colors.green),
                   ],
@@ -287,12 +317,15 @@ class EmergencyTrackingScreen extends ConsumerWidget {
   }
 
   Widget _buildStatusTimeline(ThemeData theme) {
+    final statusOrder = ['PENDING', 'RESPONDER_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'];
+    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, 4);
+
     return Column(
       children: [
-        _StatusTimelineItem(label: 'SOS Alert Sent', isDone: true, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Responder Assigned', isDone: true, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Ambulance En Route', isDone: false, isCurrent: true, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Arrived at Location', isDone: false, isLast: true, theme: theme),
+        _StatusTimelineItem(label: 'SOS Alert Sent', isDone: currentIndex >= 0, isLast: false, theme: theme),
+        _StatusTimelineItem(label: 'Responder Assigned', isDone: currentIndex >= 1, isLast: false, theme: theme),
+        _StatusTimelineItem(label: 'Ambulance En Route', isDone: currentIndex > 2, isCurrent: currentIndex == 2, isLast: false, theme: theme),
+        _StatusTimelineItem(label: 'Arrived at Location', isDone: currentIndex >= 3, isLast: true, theme: theme),
       ],
     );
   }
@@ -393,7 +426,7 @@ class _TrackingMapPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.blue.withOpacity(0.08)
+      ..color = AppColors.primary.withOpacity(0.08)
       ..strokeWidth = 14
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
@@ -407,7 +440,7 @@ class _TrackingMapPainter extends CustomPainter {
     canvas.drawPath(path, paint);
     
     paint.strokeWidth = 6;
-    paint.color = Colors.blue.withOpacity(0.04);
+    paint.color = AppColors.primary.withOpacity(0.04);
     canvas.drawLine(Offset(0, size.height * 0.3), Offset(size.width * 0.5, size.height * 0.3), paint);
     canvas.drawLine(Offset(size.width * 0.6, size.height * 0.8), Offset(size.width, size.height * 0.6), paint);
   }

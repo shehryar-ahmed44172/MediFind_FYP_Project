@@ -86,12 +86,12 @@ class _AccessibilitySettingsScreenState
               children: [
                 Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.blue),
+                    Icon(Icons.info_outline, color: AppColors.primary),
                     SizedBox(width: 8),
                     Text('Quick SOS Tip',
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: Colors.blue)),
+                            color: AppColors.primary)),
                   ],
                 ),
                 SizedBox(height: 8),

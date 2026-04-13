@@ -5,6 +5,7 @@ import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
+import '../../services/audio/voice_alert_service.dart';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -42,10 +43,27 @@ class _EmergencyRequestScreenState
 
   Future<void> _accept() async {
     setState(() => _isAccepting = true);
-    // TODO: Call acceptEmergencyProvider(widget.requestId)
+    
+    try {
+      final responderId = await ref.read(currentUserIdProvider.future) ?? 'responder_generated_id';
+      await ref.read(acceptEmergencyProvider(AcceptRejectParams(
+        emergencyId: widget.requestId,
+        responderId: responderId,
+      )).future);
+      
+      VoiceAlertService().speakMessage("Responder is on the way. Stay calm.");
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isAccepting = false);
+      }
+      return;
+    }
     
     // Start countdown for auto-call
-    _countdown = 5;
+    _countdown = 60;
     _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       setState(() {
@@ -53,7 +71,7 @@ class _EmergencyRequestScreenState
           _countdown--;
         } else {
           timer.cancel();
-          _makePhoneCall('+1234567890'); // Replace with actual patient number
+          _makePhoneCall('+1234567890'); // Uses url_launcher to open dialer. Note: For fully integrated VoIP (like InDrive), an SDK like Agora is typically required.
           if (mounted) {
             context.go('/responder/active');
           }
@@ -64,8 +82,16 @@ class _EmergencyRequestScreenState
 
   Future<void> _reject() async {
     setState(() => _isRejecting = true);
-    // TODO: Call rejectEmergencyProvider(widget.requestId)
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final responderId = await ref.read(currentUserIdProvider.future) ?? 'responder_generated_id';
+      await ref.read(rejectEmergencyProvider(AcceptRejectParams(
+        emergencyId: widget.requestId,
+        responderId: responderId,
+      )).future);
+    } catch (e) {
+      print('Reject error: $e');
+    }
+    
     if (mounted) {
       context.go('/responder');
     }
@@ -180,8 +206,16 @@ class _EmergencyRequestScreenState
           // Voice Alert Button
           OutlinedButton.icon(
             onPressed: () {
-              setState(() => _isPlayingVoice = !_isPlayingVoice);
-              // TODO: Wire to voice_alert_service.speak(...)
+              final isCurrentlyPlaying = _isPlayingVoice;
+              setState(() => _isPlayingVoice = !isCurrentlyPlaying);
+              
+              if (isCurrentlyPlaying) {
+                 VoiceAlertService().stop();
+              } else {
+                 VoiceAlertService().speakMessage(
+                   "Emergency Request! ${emergencyType.replaceAll('_', ' ')}. Distance: $distance. Patient: $patientName."
+                 );
+              }
             },
             icon: Icon(_isPlayingVoice
                 ? Icons.stop_circle_outlined
@@ -210,7 +244,7 @@ class _EmergencyRequestScreenState
                   const Row(
                     children: [
                       Icon(Icons.medical_information_outlined,
-                          color: Colors.blue),
+                          color: AppColors.primary),
                       SizedBox(width: 8),
                       Text('Patient Medical Summary',
                           style: TextStyle(

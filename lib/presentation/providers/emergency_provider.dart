@@ -3,7 +3,8 @@ import '../../data/repositories/emergency_repository_impl.dart';
 import '../../domain/entities/emergency.dart';
 import '../../domain/repositories/emergency_repository.dart';
 import 'auth_provider.dart';
-
+import '../../services/websocket/web_socket_service.dart';
+import '../../services/audio/voice_alert_service.dart';
 // Emergency Repository Provider
 final emergencyRepositoryProvider = FutureProvider<EmergencyRepository>((ref) async {
   final apiClient = ref.watch(apiClientProvider);
@@ -61,6 +62,9 @@ final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>(
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   await emergencyRepo.acceptEmergency(params.emergencyId, params.responderId);
   ref.refresh(getEmergencyProvider(params.emergencyId));
+  
+  // Voice Alert Notification
+  VoiceAlertService().speakMessage("Responder is on the way. Stay calm.");
 });
 
 // Reject emergency provider
@@ -103,3 +107,14 @@ class AcceptRejectParams {
     required this.responderId,
   });
 }
+
+// WebSocket Stream Provider for Real-Time Updates
+final webSocketStreamProvider = StreamProvider.autoDispose<WebSocketMessage>((ref) {
+  final wsService = WebSocketService.instance;
+  
+  ref.onDispose(() {
+    wsService.disconnect();
+  });
+  
+  return wsService.messageStream;
+});

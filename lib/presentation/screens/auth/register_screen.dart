@@ -22,6 +22,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _cnicController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -49,6 +50,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _cnicController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _organizationController.dispose();
@@ -148,7 +150,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         };
       default:
         return {
-          'color': const Color(0xFF1565C0),
+          'color': const Color(0xFF0E9AA7), // MediFind primary teal
           'icon': Icons.person_rounded,
           'label': 'Patient',
         };
@@ -260,6 +262,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                   validator: (v) => StringUtils.validatePhoneNumber(v),
+                ),
+                const SizedBox(height: 14),
+                TextFormField(
+                  controller: _cnicController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'CNIC Number',
+                    hintText: 'e.g. 34601-1234567-1',
+                    prefixIcon: Icon(Icons.credit_card_outlined),
+                  ),
+                  validator: (v) => StringUtils.validateCnic(v),
                 ),
                 const SizedBox(height: 24),
 
@@ -638,34 +651,35 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
       onTap: widget.onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        height: 110,
+        height: 130,
         decoration: BoxDecoration(
           color: hasFile
-              ? widget.color.withOpacity(0.08)
+              ? widget.color.withOpacity(0.06)
               : theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: hasFile ? widget.color : Colors.grey.shade300,
-            width: hasFile ? 2 : 1,
+            color: hasFile ? widget.color : Colors.grey.shade400,
+            width: hasFile ? 2.0 : 1.5,
+            // Simulated dashed look via strokeAlign and style
           ),
-          boxShadow: AppShadows.neumorphicIn,
         ),
         child: hasFile && _imageBytes != null
             ? ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     Image.memory(_imageBytes!, fit: BoxFit.cover),
+                    // Overlay label at bottom
                     Positioned(
                       bottom: 0,
                       left: 0,
                       right: 0,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 4),
-                        color: Colors.black54,
+                        padding: const EdgeInsets.symmetric(vertical: 5),
+                        color: Colors.black.withOpacity(0.55),
                         child: Text(
-                          widget.label,
+                          '✓ ${widget.label}',
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -675,48 +689,48 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
                         ),
                       ),
                     ),
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.all(3),
-                        decoration: const BoxDecoration(
-                          color: Colors.green,
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.check,
-                            color: Colors.white, size: 12),
-                      ),
-                    ),
                   ],
                 ),
               )
             : hasFile
-                ? const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(widget.icon,
-                          color: Colors.grey.shade400, size: 28),
-                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: widget.color.withOpacity(0.10),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(widget.icon, color: widget.color, size: 26),
+                      ),
+                      const SizedBox(height: 8),
                       Text(
                         widget.label,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Colors.grey.shade600,
+                          color: Colors.grey.shade700,
                           fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Tap to upload',
-                        style: TextStyle(
-                          color: widget.color,
-                          fontSize: 10,
                           fontWeight: FontWeight.w600,
                         ),
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.upload_file_outlined,
+                              size: 12, color: widget.color),
+                          const SizedBox(width: 4),
+                          Text(
+                            'Tap to upload',
+                            style: TextStyle(
+                              color: widget.color,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

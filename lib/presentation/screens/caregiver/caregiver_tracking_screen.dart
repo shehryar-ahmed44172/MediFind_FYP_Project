@@ -68,11 +68,11 @@ class CaregiverTrackingScreen extends ConsumerWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.map_outlined, size: 64, color: Colors.blue),
+                    Icon(Icons.map_outlined, size: 64, color: AppColors.primary),
                     SizedBox(height: 8),
                     Text('Live Map',
                         style: TextStyle(
-                            color: Colors.blue,
+                            color: AppColors.primary,
                             fontWeight: FontWeight.bold,
                             fontSize: 16)),
                     SizedBox(height: 4),
@@ -165,7 +165,7 @@ class _InfoTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Icon(icon, size: 18, color: Colors.blue),
+          Icon(icon, size: 18, color: AppColors.primary),
           const SizedBox(width: 8),
           Text('$label: ',
               style: const TextStyle(color: Colors.grey, fontSize: 13)),

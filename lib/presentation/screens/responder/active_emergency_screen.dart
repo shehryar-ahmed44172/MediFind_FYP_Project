@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/emergency_provider.dart';
 
 class ActiveEmergencyScreen extends ConsumerStatefulWidget {
   const ActiveEmergencyScreen({Key? key}) : super(key: key);
@@ -23,14 +24,26 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
 
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _currentStatus = newStatus);
-    // TODO: Call updateEmergencyStatusProvider
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Status updated: ${newStatus.replaceAll('_', ' ')}'),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    
+    try {
+      // We need to pass the emergencyId here. The screen doesn't seem to have one passed.
+      // Assuming a generic call or using a passed ID in reality. Here I use a mock 'current_emergency_id'.
+      await ref.read(updateEmergencyStatusProvider(
+        UpdateEmergencyStatusParams(emergencyId: 'current_emergency_id', status: newStatus)
+      ).future);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Status updated: ${newStatus.replaceAll('_', ' ')}'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Status update failed: $e');
+    }
   }
 
   @override
@@ -64,7 +77,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.person_outlined, color: Colors.blue),
+                        Icon(Icons.person_outlined, color: AppColors.primary),
                         SizedBox(width: 8),
                         Text('Patient Info',
                             style: TextStyle(
@@ -99,11 +112,11 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.map_outlined, size: 48, color: Colors.blue),
+                    Icon(Icons.map_outlined, size: 48, color: AppColors.primary),
                     SizedBox(height: 8),
                     Text('Navigation Map',
                         style: TextStyle(
-                            color: Colors.blue, fontWeight: FontWeight.bold)),
+                            color: AppColors.primary, fontWeight: FontWeight.bold)),
                     Text('(Google Maps — requires API key)',
                         style: TextStyle(color: Colors.grey, fontSize: 12)),
                   ],

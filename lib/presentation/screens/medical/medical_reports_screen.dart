@@ -114,14 +114,14 @@ class _MedicalReportsScreenState extends State<MedicalReportsScreen> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: AppColors.primary.shade50,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: AppColors.primary.shade200),
             ),
             child: Column(
               children: [
                 const Icon(Icons.upload_file_outlined,
-                    size: 40, color: Colors.blue),
+                    size: 40, color: AppColors.primary),
                 const SizedBox(height: 8),
                 const Text('Upload Medical Reports',
                     style:
@@ -204,7 +204,7 @@ class _MedicalReportsScreenState extends State<MedicalReportsScreen> {
                               errorBuilder: (_, __, ___) => const Icon(
                                   Icons.image_outlined,
                                   size: 40,
-                                  color: Colors.blue),
+                                  color: AppColors.primary),
                             ),
                           ),
                           title: Text(report.name,

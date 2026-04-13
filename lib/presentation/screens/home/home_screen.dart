@@ -152,7 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Container(width: 1, height: 40, color: Colors.grey.shade200),
               _buildProfileStat(theme, 'Allergies', 'Peanuts', Icons.warning_amber_rounded, Colors.orange),
               Container(width: 1, height: 40, color: Colors.grey.shade200),
-              _buildProfileStat(theme, 'Meds', '3 Active', Icons.medication_liquid_rounded, Colors.blue),
+              _buildProfileStat(theme, 'Meds', '3 Active', Icons.medication_liquid_rounded, AppColors.primary),
             ],
           ),
         ],
@@ -277,7 +277,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildEmergencyTypes(ThemeData theme) {
     final types = [
       {'title': 'Cardiac', 'icon': Icons.favorite_border_rounded, 'color': Colors.red},
-      {'title': 'Breathing', 'icon': Icons.air_rounded, 'color': Colors.blue},
+      {'title': 'Breathing', 'icon': Icons.air_rounded, 'color': AppColors.primary},
       {'title': 'Bleeding', 'icon': Icons.water_drop_outlined, 'color': Colors.redAccent},
       {'title': 'Burn', 'icon': Icons.local_fire_department_outlined, 'color': Colors.orange},
       {'title': 'Accident', 'icon': Icons.car_crash_outlined, 'color': Colors.amber},

@@ -110,6 +110,19 @@ class StringUtils {
     }
     return null;
   }
+
+  /// Validates Pakistan CNIC — accepts both plain 13 digits and XXXXX-XXXXXXX-X format
+  static String? validateCnic(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'CNIC is required';
+    }
+    // Strip hyphens for digit counting
+    final digits = value.replaceAll('-', '');
+    if (digits.length != 13 || !RegExp(r'^\d{13}$').hasMatch(digits)) {
+      return 'Enter a valid 13-digit CNIC (e.g. 3460X-XXXXXXX-X)';
+    }
+    return null;
+  }
 }
 
 /// Number utilities

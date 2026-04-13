@@ -1,7 +1,18 @@
 /// API and app configuration constants
 class AppConstants {
-  // API Configuration
-  static const String baseUrl = 'https://api.medifind.com/';
+  // Environment Flag
+  static const bool isDevelopment = true;
+  
+  // Base URLs (Android Emulator uses 10.0.2.2, iOS uses localhost)
+  static const String _devBaseUrl = 'http://10.0.2.2:3000/api/';
+  static const String _prodBaseUrl = 'https://api.medifind.com/api/';
+  static String get baseUrl => isDevelopment ? _devBaseUrl : _prodBaseUrl;
+
+  // WebSocket Configuration
+  static const String _devWsUrl = 'ws://10.0.2.2:3000/';
+  static const String _prodWsUrl = 'wss://api.medifind.com/';
+  static String get wsUrl => isDevelopment ? _devWsUrl : _prodWsUrl;
+
   static const String apiVersion = 'v1';
   static const int apiTimeout = 30000; // 30 seconds
   static const String jwtTokenKey = 'auth_token';

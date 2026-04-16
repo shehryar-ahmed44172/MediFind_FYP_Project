@@ -6,4 +6,6 @@ abstract class ConnectionRepository {
   Future<void> unlinkCaregiver(String caregiverId);
   Future<void> respondToInvitation(String invitationId, bool accept);
   Future<List<CaregiverConnection>> getPendingInvitations();
+  Future<List<CaregiverConnection>> getPatientsForCaregiverExtended();
+  Future<void> resendInvitation(String patientId);
 }

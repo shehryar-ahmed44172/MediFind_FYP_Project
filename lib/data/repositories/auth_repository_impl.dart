@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/local/local_data_source.dart';
@@ -11,6 +12,14 @@ class AuthRepositoryImpl implements AuthRepository {
     required this.apiClient,
     required this.localDataSource,
   });
+
+  /// Initialize the repository by loading stored token into the API client
+  Future<void> initialize() async {
+    final token = await localDataSource.getAuthToken();
+    if (token != null && token.isNotEmpty) {
+      apiClient.setAuthToken(token);
+    }
+  }
 
   @override
   Future<AuthResponse> login(String email, String password) async {
@@ -84,6 +93,42 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<User?> getUser(String userId) async {
-    return await apiClient.getUserProfile(userId);
+    final profile = await apiClient.getUserProfile(userId);
+    // Map UserProfile to User
+    return User(
+      id: profile.userId,
+      fullName: profile.fullName,
+      email: profile.email,
+      phoneNumber: profile.phoneNumber,
+      role: profile.role,
+      patientType: profile.patientType,
+      organization: profile.organization,
+      licenseNumber: profile.licenseNumber,
+      responderType: profile.responderType,
+      vehicleType: profile.vehicleType,
+      profileImageUrl: profile.profileImageUrl,
+      isActive: true,
+      createdAt: profile.lastUpdated ?? DateTime.now(),
+      updatedAt: profile.lastUpdated ?? DateTime.now(),
+    );
+  }
+  @override
+  Future<void> forgotPassword(String email) async {
+    await apiClient.forgotPassword(email);
+  }
+
+  @override
+  Future<void> resetPassword(String email, String token, String newPassword) async {
+    await apiClient.resetPassword(email, token, newPassword);
+  }
+
+  @override
+  Future<User> updateProfile(Map<String, dynamic> data) async {
+    return await apiClient.updateProfile(data);
+  }
+
+  @override
+  Future<User> uploadProfileImage(File imageFile) async {
+    return await apiClient.uploadProfileImage(imageFile);
   }
 }

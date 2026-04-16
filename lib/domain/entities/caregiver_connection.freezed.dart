@@ -34,6 +34,8 @@ mixin _$CaregiverConnection {
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   bool? get hasActiveEmergency => throw _privateConstructorUsedError;
   String? get activeEmergencyId => throw _privateConstructorUsedError;
+  int? get patientAge => throw _privateConstructorUsedError;
+  String? get bloodType => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -60,7 +62,9 @@ abstract class $CaregiverConnectionCopyWith<$Res> {
       DateTime? createdAt,
       DateTime? updatedAt,
       bool? hasActiveEmergency,
-      String? activeEmergencyId});
+      String? activeEmergencyId,
+      int? patientAge,
+      String? bloodType});
 }
 
 /// @nodoc
@@ -89,6 +93,8 @@ class _$CaregiverConnectionCopyWithImpl<$Res, $Val extends CaregiverConnection>
     Object? updatedAt = freezed,
     Object? hasActiveEmergency = freezed,
     Object? activeEmergencyId = freezed,
+    Object? patientAge = freezed,
+    Object? bloodType = freezed,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -143,6 +149,14 @@ class _$CaregiverConnectionCopyWithImpl<$Res, $Val extends CaregiverConnection>
           ? _value.activeEmergencyId
           : activeEmergencyId // ignore: cast_nullable_to_non_nullable
               as String?,
+      patientAge: freezed == patientAge
+          ? _value.patientAge
+          : patientAge // ignore: cast_nullable_to_non_nullable
+              as int?,
+      bloodType: freezed == bloodType
+          ? _value.bloodType
+          : bloodType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ) as $Val);
   }
 }
@@ -168,7 +182,9 @@ abstract class _$$CaregiverConnectionImplCopyWith<$Res>
       DateTime? createdAt,
       DateTime? updatedAt,
       bool? hasActiveEmergency,
-      String? activeEmergencyId});
+      String? activeEmergencyId,
+      int? patientAge,
+      String? bloodType});
 }
 
 /// @nodoc
@@ -195,6 +211,8 @@ class __$$CaregiverConnectionImplCopyWithImpl<$Res>
     Object? updatedAt = freezed,
     Object? hasActiveEmergency = freezed,
     Object? activeEmergencyId = freezed,
+    Object? patientAge = freezed,
+    Object? bloodType = freezed,
   }) {
     return _then(_$CaregiverConnectionImpl(
       id: null == id
@@ -249,6 +267,14 @@ class __$$CaregiverConnectionImplCopyWithImpl<$Res>
           ? _value.activeEmergencyId
           : activeEmergencyId // ignore: cast_nullable_to_non_nullable
               as String?,
+      patientAge: freezed == patientAge
+          ? _value.patientAge
+          : patientAge // ignore: cast_nullable_to_non_nullable
+              as int?,
+      bloodType: freezed == bloodType
+          ? _value.bloodType
+          : bloodType // ignore: cast_nullable_to_non_nullable
+              as String?,
     ));
   }
 }
@@ -269,7 +295,9 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
       this.createdAt,
       this.updatedAt,
       this.hasActiveEmergency,
-      this.activeEmergencyId});
+      this.activeEmergencyId,
+      this.patientAge,
+      this.bloodType});
 
   factory _$CaregiverConnectionImpl.fromJson(Map<String, dynamic> json) =>
       _$$CaregiverConnectionImplFromJson(json);
@@ -301,10 +329,14 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
   final bool? hasActiveEmergency;
   @override
   final String? activeEmergencyId;
+  @override
+  final int? patientAge;
+  @override
+  final String? bloodType;
 
   @override
   String toString() {
-    return 'CaregiverConnection(id: $id, patientId: $patientId, caregiverId: $caregiverId, patientName: $patientName, patientEmail: $patientEmail, caregiverName: $caregiverName, caregiverEmail: $caregiverEmail, relationship: $relationship, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, hasActiveEmergency: $hasActiveEmergency, activeEmergencyId: $activeEmergencyId)';
+    return 'CaregiverConnection(id: $id, patientId: $patientId, caregiverId: $caregiverId, patientName: $patientName, patientEmail: $patientEmail, caregiverName: $caregiverName, caregiverEmail: $caregiverEmail, relationship: $relationship, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, hasActiveEmergency: $hasActiveEmergency, activeEmergencyId: $activeEmergencyId, patientAge: $patientAge, bloodType: $bloodType)';
   }
 
   @override
@@ -335,7 +367,11 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
             (identical(other.hasActiveEmergency, hasActiveEmergency) ||
                 other.hasActiveEmergency == hasActiveEmergency) &&
             (identical(other.activeEmergencyId, activeEmergencyId) ||
-                other.activeEmergencyId == activeEmergencyId));
+                other.activeEmergencyId == activeEmergencyId) &&
+            (identical(other.patientAge, patientAge) ||
+                other.patientAge == patientAge) &&
+            (identical(other.bloodType, bloodType) ||
+                other.bloodType == bloodType));
   }
 
   @JsonKey(ignore: true)
@@ -354,7 +390,9 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
       createdAt,
       updatedAt,
       hasActiveEmergency,
-      activeEmergencyId);
+      activeEmergencyId,
+      patientAge,
+      bloodType);
 
   @JsonKey(ignore: true)
   @override
@@ -385,7 +423,9 @@ abstract class _CaregiverConnection implements CaregiverConnection {
       final DateTime? createdAt,
       final DateTime? updatedAt,
       final bool? hasActiveEmergency,
-      final String? activeEmergencyId}) = _$CaregiverConnectionImpl;
+      final String? activeEmergencyId,
+      final int? patientAge,
+      final String? bloodType}) = _$CaregiverConnectionImpl;
 
   factory _CaregiverConnection.fromJson(Map<String, dynamic> json) =
       _$CaregiverConnectionImpl.fromJson;
@@ -416,6 +456,10 @@ abstract class _CaregiverConnection implements CaregiverConnection {
   bool? get hasActiveEmergency;
   @override
   String? get activeEmergencyId;
+  @override
+  int? get patientAge;
+  @override
+  String? get bloodType;
   @override
   @JsonKey(ignore: true)
   _$$CaregiverConnectionImplCopyWith<_$CaregiverConnectionImpl> get copyWith =>

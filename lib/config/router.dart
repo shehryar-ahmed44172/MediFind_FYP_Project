@@ -16,6 +16,7 @@ import '../presentation/screens/emergency/emergency_screen.dart';
 import '../presentation/screens/emergency/emergency_tracking_screen.dart';
 import '../presentation/screens/emergency/sos_countdown_screen.dart';
 import '../presentation/screens/profile/user_profile_screen.dart';
+import '../presentation/screens/profile/edit_profile_screen.dart';
 import '../presentation/screens/medical/medical_profile_screen.dart';
 import '../presentation/screens/medical/edit_medical_profile_screen.dart';
 import '../presentation/screens/medical/medical_reports_screen.dart';
@@ -23,6 +24,9 @@ import '../presentation/screens/caregiver/manage_caregivers_screen.dart';
 import '../presentation/screens/caregiver/caregiver_home_screen.dart';
 import '../presentation/screens/caregiver/caregiver_tracking_screen.dart';
 import '../presentation/screens/caregiver/link_patient_screen.dart';
+import '../presentation/screens/caregiver/caregiver_map_screen.dart';
+import '../presentation/screens/caregiver/caregiver_history_screen.dart';
+import '../presentation/screens/caregiver/my_patients_screen.dart';
 import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
@@ -121,11 +125,6 @@ class AppRouter {
             ),
           ),
           GoRoute(
-            path: 'profile',
-            name: 'profile',
-            builder: (context, state) => const UserProfileScreen(),
-          ),
-          GoRoute(
             path: 'medical-profile',
             name: 'medical-profile',
             builder: (context, state) => const MedicalProfileScreen(),
@@ -202,6 +201,33 @@ class AppRouter {
             builder: (context, state) => CaregiverTrackingScreen(
               emergencyId: state.pathParameters['emergencyId']!,
             ),
+          ),
+          GoRoute(
+            path: 'maps',
+            name: 'caregiver-maps',
+            builder: (context, state) => const CaregiverMapScreen(),
+          ),
+          GoRoute(
+            path: 'history',
+            name: 'caregiver-history',
+            builder: (context, state) => const CaregiverHistoryScreen(),
+          ),
+          GoRoute(
+            path: 'my-patients',
+            name: 'caregiver-my-patients',
+            builder: (context, state) => const MyPatientsScreen(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const UserProfileScreen(),
+        routes: [
+          GoRoute(
+            path: 'edit',
+            name: 'edit-profile',
+            builder: (context, state) => const EditProfileScreen(),
           ),
         ],
       ),

@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '/core/constants/app_constants.dart';
@@ -116,6 +117,87 @@ class MediFindApiClient {
         message: response.data['error'] ?? 'Registration failed',
         code: response.data['code'],
       );
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> forgotPassword(String email) async {
+    try {
+      final response = await _dio.post(
+        'auth/forgot-password',
+        data: {'email': email},
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(
+          message: response.data['error'] ?? 'Request failed',
+          code: response.data['code'],
+        );
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> resetPassword(String email, String token, String newPassword) async {
+    try {
+      final response = await _dio.post(
+        'auth/reset-password',
+        data: {
+          'email': email,
+          'token': token,
+          'newPassword': newPassword,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(
+          message: response.data['error'] ?? 'Reset failed',
+          code: response.data['code'],
+        );
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<User> updateProfile(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.put(
+        'users/profile',
+        data: data,
+      );
+
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+
+      throw NetworkException(message: 'Failed to update profile');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<User> uploadProfileImage(File imageFile) async {
+    try {
+      final formData = FormData.fromMap({
+        'image': await MultipartFile.fromFile(
+          imageFile.path,
+          filename: imageFile.path.split('/').last,
+        ),
+      });
+
+      final response = await _dio.post(
+        'users/profile/image',
+        data: formData,
+      );
+
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+
+      throw NetworkException(message: 'Failed to upload profile image');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -497,6 +579,32 @@ class MediFindApiClient {
     }
   }
 
+  Future<List<dynamic>> getAllCaregiverLinks() async {
+    try {
+      final response = await _dio.get('caregivers/links/all');
+
+      if (response.statusCode == 200) {
+        return response.data['data'] as List;
+      }
+
+      throw NetworkException(message: 'Failed to fetch all patient links');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> resendInvitation(String patientId) async {
+    try {
+      final response = await _dio.post('caregivers/links/$patientId/resend');
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to resend invitation');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<void> unlinkCaregiver(String connectionId) async {
     try {
       final response = await _dio.delete('caregivers/$connectionId');
@@ -543,7 +651,7 @@ class MediFindApiClient {
   }
 
   // MEDICAL REPORT ENDPOINTS
-  Future<void> uploadReport(String emergencyId, String filePath) async {
+  Future<void> uploadEmergencyReport(String emergencyId, String filePath) async {
     try {
       final formData = FormData.fromMap({
         'report': await MultipartFile.fromFile(filePath),
@@ -562,7 +670,7 @@ class MediFindApiClient {
     }
   }
 
-  Future<List<dynamic>> getReports(String emergencyId) async {
+  Future<List<dynamic>> getEmergencyReports(String emergencyId) async {
     try {
       final response = await _dio.get('reports/$emergencyId');
       if (response.statusCode == 200) {
@@ -605,39 +713,6 @@ class MediFindApiClient {
     }
   }
 
-  // PASSWORD ENDPOINTS
-  Future<void> forgotPassword(String email) async {
-    try {
-      final response = await _dio.post(
-        'password/forgot-password',
-        data: {'email': email},
-      );
-
-      if (response.statusCode != 200) {
-        throw NetworkException(message: 'Failed to request password reset');
-      }
-    } on DioException catch (e) {
-      throw _handleDioException(e);
-    }
-  }
-
-  Future<void> resetPassword(String token, String newPassword) async {
-    try {
-      final response = await _dio.post(
-        'password/reset',
-        data: {
-          'token': token,
-          'newPassword': newPassword,
-        },
-      );
-
-      if (response.statusCode != 200) {
-        throw NetworkException(message: 'Failed to reset password');
-      }
-    } on DioException catch (e) {
-      throw _handleDioException(e);
-    }
-  }
 
   Future<void> changePassword(String oldPassword, String newPassword) async {
     try {

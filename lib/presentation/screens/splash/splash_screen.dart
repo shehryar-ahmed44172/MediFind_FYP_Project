@@ -57,9 +57,9 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           children: [
             // Logo standing cleanly on the white background, just like Native splash
             Image.asset(
-              'assets/logos/medifind_app_logo.png',
-              width: 160,
-              height: 160,
+              'assets/logos/Medifind_New_Logo-removebg-preview.png',
+              width: 180,
+              height: 180,
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 60),

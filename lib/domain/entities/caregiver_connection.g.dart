@@ -26,6 +26,8 @@ _$CaregiverConnectionImpl _$$CaregiverConnectionImplFromJson(
           : DateTime.parse(json['updatedAt'] as String),
       hasActiveEmergency: json['hasActiveEmergency'] as bool?,
       activeEmergencyId: json['activeEmergencyId'] as String?,
+      patientAge: (json['patientAge'] as num?)?.toInt(),
+      bloodType: json['bloodType'] as String?,
     );
 
 Map<String, dynamic> _$$CaregiverConnectionImplToJson(
@@ -44,4 +46,6 @@ Map<String, dynamic> _$$CaregiverConnectionImplToJson(
       'updatedAt': instance.updatedAt?.toIso8601String(),
       'hasActiveEmergency': instance.hasActiveEmergency,
       'activeEmergencyId': instance.activeEmergencyId,
+      'patientAge': instance.patientAge,
+      'bloodType': instance.bloodType,
     };

@@ -37,4 +37,17 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
         .map((json) => CaregiverConnection.fromJson(json as Map<String, dynamic>))
         .toList();
   }
+
+  @override
+  Future<List<CaregiverConnection>> getPatientsForCaregiverExtended() async {
+    final linksJson = await apiClient.getAllCaregiverLinks();
+    return linksJson
+        .map((json) => CaregiverConnection.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  @override
+  Future<void> resendInvitation(String patientId) async {
+    await apiClient.resendInvitation(patientId);
+  }
 }

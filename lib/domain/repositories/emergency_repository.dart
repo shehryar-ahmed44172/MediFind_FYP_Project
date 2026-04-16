@@ -1,4 +1,5 @@
 import '../entities/emergency.dart';
+import '../entities/user.dart';
 
 /// Abstract repository for emergency operations
 abstract class EmergencyRepository {

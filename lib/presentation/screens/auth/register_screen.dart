@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -273,6 +274,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     hintText: 'e.g. 34601-1234567-1',
                     prefixIcon: Icon(Icons.credit_card_outlined),
                   ),
+                  maxLength: 15,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _CnicFormatter(),
+                  ],
                   validator: (v) => StringUtils.validateCnic(v),
                 ),
                 const SizedBox(height: 24),
@@ -764,6 +770,37 @@ class _PatientTypeChip extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _CnicFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    var text = newValue.text;
+    
+    if (newValue.selection.baseOffset == 0) {
+      return newValue;
+    }
+
+    var buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      var nonHyphenCount = i + 1;
+      if (nonHyphenCount == 5 || nonHyphenCount == 12) {
+        if (i != text.length - 1) {
+          buffer.write('-');
+        }
+      }
+    }
+
+    var string = buffer.toString();
+    return newValue.copyWith(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }

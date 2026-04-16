@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:263293015933:android:3be5eceb1f85c6bf85de14",
+        "mobilesdk_app_id": "1:263293015933:android:5f3dc61a188aae1685de14",
         "android_client_info": {
-          "package_name": "com.medifind_mobile_application"
+          "package_name": "com.example.medifind_mobile_application"
         }
       },
       "oauth_client": [],

@@ -1,5 +1,7 @@
 import 'dart:async';
 import '../../domain/entities/emergency.dart';
+import '../../domain/entities/user.dart';
+
 import '../../domain/repositories/emergency_repository.dart';
 import '../datasources/local/local_data_source.dart';
 import '../datasources/remote/medifind_api_client.dart';

@@ -15,6 +15,8 @@ import 'presentation/theme/app_theme.dart';
 import 'presentation/providers/accessibility_provider.dart';
 // Importing push notification service
 import 'services/notification/push_notification_service.dart';
+import 'presentation/providers/auth_provider.dart';
+
 
 // The main entry point of the MediFind application
 void main() async {
@@ -50,19 +52,38 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
   void initState() {
     super.initState();
     // Initialize Push Notifications and FCM Handlers after app mounts
-    Future.microtask(() async {
+    _setupPushNotifications();
+  }
+
+  void _setupPushNotifications() async {
+    await Future.microtask(() async {
       await PushNotificationService.initialize(context);
-      // Fetch and sync the FCM token with the backend
+      
+      // Fetch the FCM token
       final token = await PushNotificationService.getToken();
       if (token != null) {
-        // We use ref.read to call the provider once without watching it
-        await ref.read(updateFcmTokenProvider(token).future);
+        print('\n\n======================================================');
+        print('🚀 YOUR FCM DEVICE TOKEN FOR BACKEND TESTING 🚀');
+        print(token);
+        print('======================================================\n\n');
       }
-      print('\n\n======================================================');
-      print('🚀 YOUR FCM DEVICE TOKEN FOR BACKEND TESTING 🚀');
-      print(token);
-      print('======================================================\n\n');
     });
+
+    // Listen for auth state changes to sync token on login
+    ref.listenManual(authStateProvider, (previous, next) async {
+      final isLoggedIn = next.value ?? false;
+      if (isLoggedIn) {
+        final token = await PushNotificationService.getToken();
+        if (token != null) {
+          try {
+            await ref.read(updateFcmTokenProvider(token).future);
+            debugPrint('✅ FCM Token synced successfully after login');
+          } catch (e) {
+            debugPrint('❌ Failed to sync FCM Token: $e');
+          }
+        }
+      }
+    }, fireImmediately: true);
   }
 
   @override

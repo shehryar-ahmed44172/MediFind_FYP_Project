@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../../domain/entities/emergency.dart';
+
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
 

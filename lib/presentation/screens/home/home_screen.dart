@@ -99,19 +99,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            shape: BoxShape.circle,
-            boxShadow: AppShadows.neumorphicOut,
+        InkWell(
+          onTap: () => _showNotifications(context, theme),
+          borderRadius: BorderRadius.circular(25),
+          child: Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              shape: BoxShape.circle,
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
           ),
-          child: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
         )
       ],
     );
   }
 
+  void _showNotifications(BuildContext context, ThemeData theme) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              children: [
+                Icon(Icons.notifications_active_outlined, color: theme.colorScheme.primary),
+                const SizedBox(width: 12),
+                Text(
+                  'Notifications',
+                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
+            const SizedBox(height: 32),
+            Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 16),
+            const Text(
+              'No new notifications',
+              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+            ),
+            const SizedBox(height: 32),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMedicalProfileSnapshot(ThemeData theme) {
     final userIdAsync = ref.watch(currentUserIdProvider);
 
     return userIdAsync.when(
@@ -262,95 +313,128 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAttachReportOption(ThemeData theme) {
-    return InkWell(
-      onTap: () {
-        // trigger dialog later
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Attach Report dialog opened!')),
-        );
-      },
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.primary.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: theme.colorScheme.primary.withOpacity(0.3),
-            width: 1.5,
-          ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.attachment_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 8),
-            Text(
-              'Attach Medical Report Script',
-              style: TextStyle(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go('/home/medical-reports'),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.note_add_outlined, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Medical Records',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Attach or view your reports',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildEmergencyTypes(ThemeData theme) {
-    final types = [
-      {'title': 'Cardiac', 'icon': Icons.favorite_border_rounded, 'color': Colors.red},
-      {'title': 'Breathing', 'icon': Icons.air_rounded, 'color': AppColors.primary},
-      {'title': 'Bleeding', 'icon': Icons.water_drop_outlined, 'color': Colors.redAccent},
-      {'title': 'Burn', 'icon': Icons.local_fire_department_outlined, 'color': Colors.orange},
-      {'title': 'Accident', 'icon': Icons.car_crash_outlined, 'color': Colors.amber},
-      {'title': 'Other', 'icon': Icons.more_horiz_rounded, 'color': Colors.grey},
+    final services = [
+      {'title': 'My Profile', 'icon': Icons.health_and_safety_outlined, 'color': Colors.blue, 'route': '/home/medical-profile'},
+      {'title': 'Reports', 'icon': Icons.assignment_outlined, 'color': Colors.orange, 'route': '/home/medical-reports'},
+      {'title': 'Caregivers', 'icon': Icons.people_outline_rounded, 'color': Colors.green, 'route': '/home/caregivers'},
+      {'title': 'Hospitals', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null},
+      {'title': 'Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null},
+      {'title': 'Patient Info', 'icon': Icons.info_outline_rounded, 'color': Colors.purple, 'route': '/home/patient-type-info'},
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Emergency Types',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Quick Services',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {}, 
+              child: const Text('See All', style: TextStyle(fontSize: 12)),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 3,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 1.1,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: 0.9,
           ),
-          itemCount: types.length,
+          itemCount: services.length,
           itemBuilder: (context, index) {
-            final type = types[index];
-            final color = type['color'] as Color;
+            final service = services[index];
+            final color = service['color'] as Color;
             return InkWell(
-              onTap: () {},
-              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                if (service['route'] != null) {
+                  context.go(service['route'] as String);
+                } else {
+                  _showFeatureComingSoon(context, service['title'] as String);
+                }
+              },
+              borderRadius: BorderRadius.circular(20),
               child: Container(
                 decoration: BoxDecoration(
                   color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(20),
                   boxShadow: AppShadows.neumorphicOut,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(type['icon'] as IconData, color: color, size: 28),
-                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(service['icon'] as IconData, color: color, size: 24),
+                    ),
+                    const SizedBox(height: 12),
                     Text(
-                      type['title'] as String,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey.shade800,
+                      service['title'] as String,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
                       ),
                     ),
                   ],
@@ -360,6 +444,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
         ),
       ],
+    );
+  }
+
+  void _showFeatureComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature feature coming soon!'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.indigo.shade700,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
     );
   }
 
@@ -397,7 +492,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       onTap: () {
         setState(() => _currentIndex = index);
         if (index == 1) context.go('/home/medical-reports');
-        if (index == 3) context.go('/home/profile');
+        if (index == 2) context.go('/home/caregivers'); // Link Alerts/Location to Caregivers for now
+        if (index == 3) context.push('/profile');
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -430,4 +526,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
+
+
 }

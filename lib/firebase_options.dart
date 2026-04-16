@@ -33,11 +33,11 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'apiKey',
-    appId: '1:1234567890:android:mock123',
-    messagingSenderId: '1234567890',
-    projectId: 'medifind-mock',
-    storageBucket: 'medifind-mock.appspot.com',
+    apiKey: 'AIzaSyDkuxR1il4EOCj1zHErGRFQKklSf8flri4',
+    appId: '1:263293015933:android:5f3dc61a188aae1685de14',
+    messagingSenderId: '263293015933',
+    projectId: 'medifind-fcm-helper',
+    storageBucket: 'medifind-fcm-helper.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(

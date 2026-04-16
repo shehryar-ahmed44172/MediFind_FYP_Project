@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../entities/user.dart';
 
 /// Abstract repository for authentication operations
@@ -13,4 +14,8 @@ abstract class AuthRepository {
   Future<User> getMe();
   Future<void> updateFcmToken(String token);
   Future<User?> getUser(String userId);
+  Future<void> forgotPassword(String email);
+  Future<void> resetPassword(String email, String token, String newPassword);
+  Future<User> updateProfile(Map<String, dynamic> data);
+  Future<User> uploadProfileImage(File imageFile);
 }

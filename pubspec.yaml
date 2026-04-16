@@ -124,7 +124,7 @@ flutter:
 
 flutter_native_splash:
   color: "#FFFFFF"
-  image: "assets/logos/medifind_app_logo.png"
+  image: "assets/logos/Medifind_New_Logo-removebg-preview.png"
   android_12:
-    image: "assets/logos/medifind_app_logo_padded.png"
+    image: "assets/logos/Medifind_New_Logo-removebg-preview.png"
     color: "#FFFFFF"

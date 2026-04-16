@@ -12,6 +12,7 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
 
   @override
   Future<List<MedicalReport>> getMedicalReports(String userId) async {
+    // Current MediFindApiClient.getReports() takes no arguments
     final reportsJson = await _apiClient.getReports();
     return reportsJson.map((json) => MedicalReport.fromJson(json as Map<String, dynamic>)).toList();
   }
@@ -23,6 +24,7 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
     required String userId,
     Function(double)? onProgress,
   }) async {
+    // Current MediFindApiClient.uploadReport() takes File and String
     final response = await _apiClient.uploadReport(file, reportType);
     return MedicalReport.fromJson(response as Map<String, dynamic>);
   }

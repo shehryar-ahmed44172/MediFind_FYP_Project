@@ -1,9 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:io';
+import '../../data/datasources/remote/medical_reports_upload_service.dart';
+
 import '../../domain/entities/medical_report.dart';
 import '../../domain/repositories/medical_report_repository.dart';
 import '../../data/repositories/medical_report_repository_impl.dart';
-import '../../data/datasources/remote/medical_reports_upload_service.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 final medicalReportServiceProvider = Provider<MedicalReportsUploadService>((ref) {
@@ -12,8 +13,8 @@ final medicalReportServiceProvider = Provider<MedicalReportsUploadService>((ref)
 });
 
 final medicalReportRepositoryProvider = Provider<MedicalReportRepository>((ref) {
-  final service = ref.watch(medicalReportServiceProvider);
-  return MedicalReportRepositoryImpl(remoteService: service);
+  final apiClient = ref.watch(apiClientProvider);
+  return MedicalReportRepositoryImpl(apiClient: apiClient);
 });
 
 final medicalReportsProvider = FutureProvider.family<List<MedicalReport>, String>((ref, userId) async {

@@ -143,10 +143,17 @@ class CaregiverTrackingScreen extends ConsumerWidget {
                           fontWeight: FontWeight.bold, fontSize: 16)),
                   const Divider(),
                   profileAsync.when(
-                    data: (profile) => _InfoTile(
-                        icon: Icons.person,
-                        label: 'Patient',
-                        value: profile?.fullName ?? 'Patient'),
+                    data: (profile) {
+                      final patientAsync = ref.watch(userProfileProvider(emergency.userId));
+                      return _InfoTile(
+                          icon: Icons.person,
+                          label: 'Patient',
+                          value: patientAsync.when(
+                            data: (u) => u?.fullName ?? 'Patient',
+                            loading: () => '...',
+                            error: (_, __) => 'Patient',
+                          ));
+                    },
                     loading: () => const _InfoTile(icon: Icons.person, label: 'Patient', value: 'Loading...'),
                     error: (_, __) => const _InfoTile(icon: Icons.person, label: 'Patient', value: 'Error'),
                   ),

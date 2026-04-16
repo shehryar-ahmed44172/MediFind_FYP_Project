@@ -116,10 +116,10 @@ class StringUtils {
     if (value == null || value.isEmpty) {
       return 'CNIC is required';
     }
-    // Strip hyphens for digit counting
-    final digits = value.replaceAll('-', '');
-    if (digits.length != 13 || !RegExp(r'^\d{13}$').hasMatch(digits)) {
-      return 'Enter a valid 13-digit CNIC (e.g. 3460X-XXXXXXX-X)';
+    // Strict pattern: 5 digits - 7 digits - 1 digit
+    final cnicRegex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
+    if (!cnicRegex.hasMatch(value)) {
+      return 'Enter a valid CNIC (XXXXX-XXXXXXX-X)';
     }
     return null;
   }

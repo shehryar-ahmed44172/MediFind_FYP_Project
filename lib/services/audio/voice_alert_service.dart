@@ -109,6 +109,16 @@ class VoiceAlertService {
     }
   }
 
+  /// Announce responder assignment
+  Future<void> announceResponderAssigned(String patientName) async {
+    await initialize();
+    try {
+      await _flutterTts.speak('Responder assigned to $patientName. Navigating to location.');
+    } catch (e) {
+      print('Failed to announce responder assignment: $e');
+    }
+  }
+
   /// Speak custom message (for responder notifications, etc.)
   Future<void> speakMessage(String message) async {
     await initialize();

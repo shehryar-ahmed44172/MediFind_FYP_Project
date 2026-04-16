@@ -154,6 +154,16 @@ class LocalDataSource {
     }
   }
 
+  Future<List<Map<String, dynamic>>> getAllEmergencies() async {
+    try {
+      return _emergencyBox.values
+          .map((raw) => json.decode(raw) as Map<String, dynamic>)
+          .toList();
+    } catch (e) {
+      throw DatabaseException(message: 'Failed to get all emergencies', originalException: e);
+    }
+  }
+
   Future<void> deleteEmergency(String emergencyId) async {
     try {
       await _emergencyBox.delete(emergencyId);

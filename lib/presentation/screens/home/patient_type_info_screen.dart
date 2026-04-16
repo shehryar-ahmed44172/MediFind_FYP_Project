@@ -62,23 +62,6 @@ class PatientTypeInfoScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          _PatientTypeCard(
-            type: 'BLIND',
-            isActive: patientType == null || patientType == 'BLIND',
-            icon: Icons.visibility_off_rounded,
-            color: const Color(0xFFF57C00),
-            title: 'Blind / Visually Impaired',
-            subtitle: 'Voice-first, audio-guided emergency activation',
-            features: const [
-              '🗣 Voice guidance reads every button and alert aloud',
-              '🖐 Large tactile SOS button — easy to locate by touch',
-              '🔊 Audio countdown feedback during the 10s safety window',
-              '📢 App auto-generates a voice message for the responder (TTS)',
-              '🩺 Medical summary read aloud to arriving responder',
-              '📳 Vibration confirms SOS sent (for combined impairments)',
-              '⚡ Minimal UI — large buttons, no complex navigation needed',
-            ],
-          ),
           const SizedBox(height: 24),
 
           // Reminder info box

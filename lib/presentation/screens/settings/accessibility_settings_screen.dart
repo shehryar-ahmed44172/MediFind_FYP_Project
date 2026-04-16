@@ -33,13 +33,6 @@ class _AccessibilitySettingsScreenState
           _SectionHeader('Visual Accessibility'),
 
           _AccessibilityTile(
-            icon: Icons.record_voice_over_outlined,
-            title: 'Voice Guidance',
-            subtitle: 'Read buttons and alerts aloud for blind users',
-            value: settings.voiceGuidanceEnabled,
-            onChanged: (v) => notifier.toggleVoiceGuidance(),
-          ),
-          _AccessibilityTile(
             icon: Icons.contrast_rounded,
             title: 'High Contrast Mode',
             subtitle: 'Increase color contrast for better visibility',

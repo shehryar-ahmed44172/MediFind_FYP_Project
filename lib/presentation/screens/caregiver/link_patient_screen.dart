@@ -41,8 +41,9 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
       }
     } catch (e) {
       if (mounted) {
+        final message = e.toString().replaceAll('Exception:', '').trim();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send invite: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text(message), backgroundColor: Colors.red),
         );
       }
     } finally {

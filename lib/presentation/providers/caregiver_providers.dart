@@ -25,8 +25,20 @@ final pendingInvitationsProvider = FutureProvider<List<CaregiverConnection>>((re
 final sendInvitationProvider = FutureProvider.family<void, Map<String, String>>((ref, data) async {
   final repo = ref.watch(connectionRepositoryProvider);
   await repo.sendInvitation(data['patientEmail']!, data['relationship']!);
-  // Invalidate to refresh lists if needed
-  ref.invalidate(caregiverLinksProvider);
+  
+  ref.invalidate(getLinkedPatientsProvider);
+  ref.invalidate(allCaregiverLinksProvider);
+});
+
+final allCaregiverLinksProvider = FutureProvider<List<CaregiverConnection>>((ref) async {
+  final repo = ref.watch(connectionRepositoryProvider);
+  return repo.getPatientsForCaregiverExtended();
+});
+
+final resendInvitationProvider = FutureProvider.family<void, String>((ref, patientId) async {
+  final repo = ref.watch(connectionRepositoryProvider);
+  await repo.resendInvitation(patientId);
+  ref.invalidate(allCaregiverLinksProvider);
 });
 
 // Respond to invitation action

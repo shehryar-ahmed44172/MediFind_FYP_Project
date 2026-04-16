@@ -145,17 +145,26 @@ class _EmergencyRequestScreenState
     final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
 
     return profileAsync.when(
-      data: (profile) => _buildRequestDetails(
-        context: context,
-        theme: theme,
-        emergencyType: emergency.emergencyType,
-        patientName: profile?.fullName ?? 'Patient',
-        distance: 'Calculating...', // Distance calculation logic can be added later
-        bloodGroup: profile?.bloodType ?? 'Unknown',
-        allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
-        conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
-        priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
-      ),
+      data: (profile) {
+        final patientAsync = ref.watch(userProfileProvider(emergency.userId));
+        final patientName = patientAsync.when(
+          data: (u) => u?.fullName ?? 'Patient',
+          loading: () => '...',
+          error: (_, __) => 'Patient',
+        );
+        
+        return _buildRequestDetails(
+          context: context,
+          theme: theme,
+          emergencyType: emergency.emergencyType,
+          patientName: patientName,
+          distance: 'Calculating...', 
+          bloodGroup: profile?.bloodType ?? 'Unknown',
+          allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
+          conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
+          priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+        );
+      },
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => _buildRequestDetails(
         context: context,
@@ -169,7 +178,6 @@ class _EmergencyRequestScreenState
       ),
     );
   }
-
 
   Widget _buildRequestDetails({
     required BuildContext context,

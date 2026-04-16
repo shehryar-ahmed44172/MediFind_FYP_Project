@@ -290,9 +290,21 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                     boxShadow: AppShadows.sosMassiveGlow,
                   ),
                   child: _isFetchingLocation
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 3),
+                      ? Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const CircularProgressIndicator(
+                                color: Colors.white, strokeWidth: 3),
+                            const SizedBox(height: 12),
+                            const Text(
+                              'DETECTING\nLOCATION',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold),
+                            ),
+                          ],
                         )
                       : const Column(
                           mainAxisAlignment: MainAxisAlignment.center,

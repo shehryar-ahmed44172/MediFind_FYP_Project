@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "263293015933",
+    "project_id": "medifind-fcm-helper",
+    "storage_bucket": "medifind-fcm-helper.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:263293015933:android:3be5eceb1f85c6bf85de14",
+        "android_client_info": {
+          "package_name": "com.medifind_mobile_application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDkuxR1il4EOCj1zHErGRFQKklSf8flri4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

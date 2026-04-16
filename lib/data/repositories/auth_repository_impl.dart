@@ -71,4 +71,19 @@ class AuthRepositoryImpl implements AuthRepository {
     await localDataSource.clearAuthToken();
     apiClient.clearAuthToken();
   }
+
+  @override
+  Future<User> getMe() async {
+    return await apiClient.getMe();
+  }
+
+  @override
+  Future<void> updateFcmToken(String token) async {
+    await apiClient.updateFcmToken(token);
+  }
+
+  @override
+  Future<User?> getUser(String userId) async {
+    return await apiClient.getUserProfile(userId);
+  }
 }

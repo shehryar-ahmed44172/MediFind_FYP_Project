@@ -21,6 +21,8 @@ abstract class EmergencyRepository {
 
   Future<void> rejectEmergency(String emergencyId, String responderId);
   
+  Future<List<Emergency>> getActiveEmergencies();
+  
   Future<void> updateEmergencyLocation(
     String emergencyId,
     double latitude,
@@ -32,4 +34,16 @@ abstract class EmergencyRepository {
   Stream<Emergency> watchEmergency(String emergencyId);
   
   Stream<List<Emergency>> watchUserEmergencies(String userId);
+
+  Stream<List<Emergency>> watchActiveEmergencies();
+
+  Future<void> cancelEmergency(String emergencyId);
+
+  Future<void> resolveEmergency(String emergencyId);
+
+  Future<void> updateResponderLocation(double latitude, double longitude);
+
+  Future<void> updateResponderAvailability(bool isAvailable);
+
+  Future<List<User>> getNearbyResponders(double latitude, double longitude);
 }

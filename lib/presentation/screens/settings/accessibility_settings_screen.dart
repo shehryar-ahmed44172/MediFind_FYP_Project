@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 
 class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
@@ -12,15 +13,15 @@ class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
 
 class _AccessibilitySettingsScreenState
     extends ConsumerState<AccessibilitySettingsScreen> {
-  bool _voiceGuidance = false;
-  bool _largeButtons = false;
-  bool _highContrast = false;
-  bool _vibrationFeedback = true;
-  bool _textOnlyMode = false;
+  // Using Riverpod provider instead of local state variables
+
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final settings = ref.watch(accessibilityProvider);
+    final notifier = ref.read(accessibilityProvider.notifier);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accessibility Settings'),
@@ -35,22 +36,49 @@ class _AccessibilitySettingsScreenState
             icon: Icons.record_voice_over_outlined,
             title: 'Voice Guidance',
             subtitle: 'Read buttons and alerts aloud for blind users',
-            value: _voiceGuidance,
-            onChanged: (v) => setState(() => _voiceGuidance = v),
+            value: settings.voiceGuidanceEnabled,
+            onChanged: (v) => notifier.toggleVoiceGuidance(),
           ),
           _AccessibilityTile(
             icon: Icons.contrast_rounded,
             title: 'High Contrast Mode',
             subtitle: 'Increase color contrast for better visibility',
-            value: _highContrast,
-            onChanged: (v) => setState(() => _highContrast = v),
+            value: settings.highContrast,
+            onChanged: (v) => notifier.toggleHighContrast(),
           ),
           _AccessibilityTile(
             icon: Icons.text_fields_rounded,
             title: 'Text-Only Interface',
             subtitle: 'Simplified text-based mode for deaf users',
-            value: _textOnlyMode,
-            onChanged: (v) => setState(() => _textOnlyMode = v),
+            value: settings.textOnlyMode,
+            onChanged: (v) => notifier.toggleTextOnlyMode(),
+          ),
+          
+          const SizedBox(height: 16),
+          _SectionHeader('Font Size'),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.format_size, color: Colors.grey),
+                Expanded(
+                  child: Slider(
+                    value: settings.fontSizeMultiplier,
+                    min: 0.8,
+                    max: 1.5,
+                    divisions: 7,
+                    label: '${(settings.fontSizeMultiplier * 100).toInt()}%',
+                    onChanged: (val) => notifier.setFontSizeMultiplier(val),
+                  ),
+                ),
+                Text('${(settings.fontSizeMultiplier * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
 
           const SizedBox(height: 16),
@@ -60,15 +88,15 @@ class _AccessibilitySettingsScreenState
             icon: Icons.zoom_in_rounded,
             title: 'Large Buttons Mode',
             subtitle: 'Bigger buttons for users with limited dexterity',
-            value: _largeButtons,
-            onChanged: (v) => setState(() => _largeButtons = v),
+            value: settings.largeButtons,
+            onChanged: (v) => notifier.toggleLargeButtons(),
           ),
           _AccessibilityTile(
             icon: Icons.vibration_rounded,
             title: 'Vibration Feedback',
             subtitle: 'Vibrate on SOS trigger and important alerts',
-            value: _vibrationFeedback,
-            onChanged: (v) => setState(() => _vibrationFeedback = v),
+            value: settings.vibrationFeedback,
+            onChanged: (v) => notifier.toggleVibrationFeedback(),
           ),
 
           const SizedBox(height: 24),

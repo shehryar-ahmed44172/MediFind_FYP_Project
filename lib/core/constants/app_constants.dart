@@ -8,10 +8,14 @@ class AppConstants {
   static const String _prodBaseUrl = 'https://api.medifind.com/api/';
   static String get baseUrl => isDevelopment ? _devBaseUrl : _prodBaseUrl;
 
-  // WebSocket Configuration
+  // WebSocket & Socket.io Configuration
   static const String _devWsUrl = 'ws://10.0.2.2:3000/';
   static const String _prodWsUrl = 'wss://api.medifind.com/';
   static String get wsUrl => isDevelopment ? _devWsUrl : _prodWsUrl;
+
+  static const String _devSocketUrl = 'http://10.0.2.2:3000';
+  static const String _prodSocketUrl = 'https://api.medifind.com';
+  static String get socketUrl => isDevelopment ? _devSocketUrl : _prodSocketUrl;
 
   static const String apiVersion = 'v1';
   static const int apiTimeout = 60000; // Increased to 60 seconds for local dev

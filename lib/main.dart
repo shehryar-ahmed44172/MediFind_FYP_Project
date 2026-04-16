@@ -50,8 +50,19 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
   void initState() {
     super.initState();
     // Initialize Push Notifications and FCM Handlers after app mounts
-    // Using Future.microtask to avoid using 'context' during init
-    Future.microtask(() => PushNotificationService.initialize(context));
+    Future.microtask(() async {
+      await PushNotificationService.initialize(context);
+      // Fetch and sync the FCM token with the backend
+      final token = await PushNotificationService.getToken();
+      if (token != null) {
+        // We use ref.read to call the provider once without watching it
+        await ref.read(updateFcmTokenProvider(token).future);
+      }
+      print('\n\n======================================================');
+      print('🚀 YOUR FCM DEVICE TOKEN FOR BACKEND TESTING 🚀');
+      print(token);
+      print('======================================================\n\n');
+    });
   }
 
   @override

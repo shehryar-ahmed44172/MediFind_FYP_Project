@@ -13,6 +13,62 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     required this.localDataSource,
   });
 
+  @override
+  Future<void> cancelEmergency(String emergencyId) async {
+    await apiClient.cancelEmergency(emergencyId);
+    final cached = await localDataSource.getEmergency(emergencyId);
+    if (cached != null) {
+      cached['status'] = 'CANCELLED';
+      await localDataSource.saveEmergency(cached);
+    }
+  }
+
+  @override
+  Future<void> resolveEmergency(String emergencyId) async {
+    await apiClient.resolveEmergency(emergencyId);
+    final cached = await localDataSource.getEmergency(emergencyId);
+    if (cached != null) {
+      cached['status'] = 'COMPLETED';
+      await localDataSource.saveEmergency(cached);
+    }
+  }
+
+  @override
+  Future<void> updateResponderLocation(double latitude, double longitude) async {
+    await apiClient.updateResponderLocation(latitude, longitude);
+  }
+
+  @override
+  Future<List<User>> getNearbyResponders(double latitude, double longitude) async {
+    return await apiClient.getNearbyResponders(latitude, longitude);
+  }
+  @override
+  Future<void> updateResponderAvailability(bool isAvailable) async {
+    await apiClient.setResponderAvailability(isAvailable);
+  }
+
+  @override
+  Future<List<Emergency>> getActiveEmergencies() async {
+    final emergencies = await apiClient.getActiveEmergencies();
+    for (var e in emergencies) {
+      await localDataSource.saveEmergency(_emergencyToMap(e));
+    }
+    return emergencies;
+  }
+
+  @override
+  Stream<List<Emergency>> watchActiveEmergencies() async* {
+    // Return all emergencies from local storage that are not COMPLETED or CANCELLED
+    await for (final _ in localDataSource.watchEmergencies()) {
+      final all = await localDataSource.getAllEmergencies();
+      yield all
+          .map((e) => _mapToEmergency(e))
+          .where((e) => e.status != 'COMPLETED' && e.status != 'CANCELLED')
+          .toList();
+    }
+  }
+
+
   // ---------------------------------------------------------------------------
   // Helper: convert Emergency → Map (for local storage)
   // ---------------------------------------------------------------------------
@@ -69,22 +125,16 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   @override
   Future<Emergency> getEmergency(String emergencyId) async {
     try {
+      final fresh = await apiClient.getEmergency(emergencyId);
+      await localDataSource.saveEmergency(_emergencyToMap(fresh));
+      return fresh;
+    } catch (_) {
       final cached = await localDataSource.getEmergency(emergencyId);
-      if (cached != null) {
-        try {
-          final fresh = await apiClient.getEmergency(emergencyId);
-          await localDataSource.saveEmergency(_emergencyToMap(fresh));
-          return fresh;
-        } catch (_) {
-          return _mapToEmergency(cached);
-        }
-      }
-    } catch (_) {}
-
-    final emergency = await apiClient.getEmergency(emergencyId);
-    await localDataSource.saveEmergency(_emergencyToMap(emergency));
-    return emergency;
+      if (cached != null) return _mapToEmergency(cached);
+      rethrow;
+    }
   }
+
 
   @override
   Future<List<Emergency>> getUserEmergencies(String userId) async {

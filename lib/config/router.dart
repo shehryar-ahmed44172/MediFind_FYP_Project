@@ -22,6 +22,7 @@ import '../presentation/screens/medical/medical_reports_screen.dart';
 import '../presentation/screens/caregiver/manage_caregivers_screen.dart';
 import '../presentation/screens/caregiver/caregiver_home_screen.dart';
 import '../presentation/screens/caregiver/caregiver_tracking_screen.dart';
+import '../presentation/screens/caregiver/link_patient_screen.dart';
 import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
@@ -173,9 +174,11 @@ class AppRouter {
             ),
           ),
           GoRoute(
-            path: 'active',
+            path: 'active/:emergencyId',
             name: 'active-emergency',
-            builder: (context, state) => const ActiveEmergencyScreen(),
+            builder: (context, state) => ActiveEmergencyScreen(
+              emergencyId: state.pathParameters['emergencyId']!,
+            ),
           ),
         ],
       ),
@@ -188,6 +191,11 @@ class AppRouter {
         name: 'caregiver-home',
         builder: (context, state) => const CaregiverHomeScreen(),
         routes: [
+          GoRoute(
+            path: 'link-patient',
+            name: 'caregiver-link-patient',
+            builder: (context, state) => const LinkPatientScreen(),
+          ),
           GoRoute(
             path: 'tracking/:emergencyId',
             name: 'caregiver-tracking',

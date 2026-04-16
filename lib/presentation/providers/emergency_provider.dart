@@ -3,7 +3,7 @@ import '../../data/repositories/emergency_repository_impl.dart';
 import '../../domain/entities/emergency.dart';
 import '../../domain/repositories/emergency_repository.dart';
 import 'auth_provider.dart';
-import '../../services/websocket/web_socket_service.dart';
+import '../../services/socket/socket_service.dart';
 import '../../services/audio/voice_alert_service.dart';
 // Emergency Repository Provider
 final emergencyRepositoryProvider = FutureProvider<EmergencyRepository>((ref) async {
@@ -50,11 +50,24 @@ final watchUserEmergenciesProvider = StreamProvider.family<List<Emergency>, Stri
   yield* emergencyRepo.watchUserEmergencies(userId);
 });
 
+// Get active emergencies provider
+final getActiveEmergenciesProvider = FutureProvider<List<Emergency>>((ref) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  return await repo.getActiveEmergencies();
+});
+
+// Watch active emergencies provider
+final watchActiveEmergenciesProvider = StreamProvider<List<Emergency>>((ref) async* {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  yield* repo.watchActiveEmergencies();
+});
+
 // Update emergency status provider
 final updateEmergencyStatusProvider = FutureProvider.family<void, UpdateEmergencyStatusParams>((ref, params) async {
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   await emergencyRepo.updateEmergencyStatus(params.emergencyId, params.status);
-  ref.refresh(getEmergencyProvider(params.emergencyId));
+  ref.invalidate(getEmergencyProvider(params.emergencyId));
+  ref.invalidate(getActiveEmergenciesProvider);
 });
 
 // Accept emergency provider
@@ -71,6 +84,29 @@ final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>(
 final rejectEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   await emergencyRepo.rejectEmergency(params.emergencyId, params.responderId);
+});
+
+// Set responder availability provider
+final setResponderAvailabilityProvider = FutureProvider.family<void, bool>((ref, isAvailable) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  await repo.updateResponderAvailability(isAvailable);
+  ref.invalidate(currentUserProvider);
+});
+
+// Cancel emergency provider
+final cancelEmergencyProvider = FutureProvider.family<void, String>((ref, emergencyId) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  await repo.cancelEmergency(emergencyId);
+  ref.invalidate(getEmergencyProvider(emergencyId));
+  ref.invalidate(watchActiveEmergenciesProvider);
+});
+
+// Resolve emergency provider
+final resolveEmergencyProvider = FutureProvider.family<void, String>((ref, emergencyId) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  await repo.resolveEmergency(emergencyId);
+  ref.invalidate(getEmergencyProvider(emergencyId));
+  ref.invalidate(getActiveEmergenciesProvider);
 });
 
 // Parameters
@@ -108,13 +144,27 @@ class AcceptRejectParams {
   });
 }
 
-// WebSocket Stream Provider for Real-Time Updates
-final webSocketStreamProvider = StreamProvider.autoDispose<WebSocketMessage>((ref) {
-  final wsService = WebSocketService.instance;
+// Socket Stream Provider for Real-Time Updates (Socket.io)
+final socketStreamProvider = StreamProvider.autoDispose<SocketMessage>((ref) {
+  final socketService = SocketService.instance;
   
+  // Ensure connected with auth token
+  ref.watch(currentUserProvider).whenData((user) {
+    if (user != null) {
+      // Get token from auth provider
+      ref.watch(authRepositoryProvider).whenData((repo) async {
+        final token = await repo.getAuthToken();
+        if (token != null) {
+          socketService.setAuthToken(token);
+          socketService.connect();
+        }
+      });
+    }
+  });
+
   ref.onDispose(() {
-    wsService.disconnect();
+    socketService.disconnect();
   });
   
-  return wsService.messageStream;
+  return socketService.messageStream;
 });

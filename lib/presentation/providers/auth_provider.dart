@@ -87,10 +87,31 @@ final logoutProvider = FutureProvider<void>((ref) async {
   ref.invalidate(currentUserRoleProvider);
 });
 
+// Update FCM Token provider
+final updateFcmTokenProvider = FutureProvider.family<void, String>((ref, token) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  await authRepo.updateFcmToken(token);
+});
+
 // Current user ID provider (for convenience across screens)
 final currentUserIdProvider = FutureProvider<String?>((ref) async {
   final localDs = await ref.watch(localDataSourceProvider.future);
   return localDs.getCurrentUserId();
+});
+
+// Current user full profile provider
+final currentUserProvider = FutureProvider<User?>((ref) async {
+  final userId = await ref.watch(currentUserIdProvider.future);
+  if (userId == null) return null;
+  
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  return await authRepo.getUser(userId);
+});
+
+// Fetch user profile by ID provider
+final userProfileProvider = FutureProvider.family<User?, String>((ref, userId) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  return await authRepo.getUser(userId);
 });
 
 // Current user role provider

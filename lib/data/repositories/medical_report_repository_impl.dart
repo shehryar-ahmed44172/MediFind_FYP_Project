@@ -1,28 +1,19 @@
 import 'dart:io';
 import '../../domain/entities/medical_report.dart';
 import '../../domain/repositories/medical_report_repository.dart';
-import '../datasources/remote/medical_reports_upload_service.dart';
+import '../datasources/remote/medifind_api_client.dart';
 
 class MedicalReportRepositoryImpl implements MedicalReportRepository {
-  final MedicalReportsUploadService _remoteService;
+  final MediFindApiClient _apiClient;
 
   MedicalReportRepositoryImpl({
-    required MedicalReportsUploadService remoteService,
-  }) : _remoteService = remoteService;
+    required MediFindApiClient apiClient,
+  }) : _apiClient = apiClient;
 
   @override
   Future<List<MedicalReport>> getMedicalReports(String userId) async {
-    final reportInfos = await _remoteService.getMedicalReports(userId);
-    return reportInfos.map((info) => MedicalReport(
-      id: info.reportId,
-      fileName: info.fileName,
-      reportType: info.reportType,
-      downloadUrl: info.downloadUrl,
-      uploadedAt: info.uploadedAt,
-      fileSizeBytes: info.fileSizeBytes,
-      userId: userId,
-      mimeType: info.mimeType,
-    )).toList();
+    final reportsJson = await _apiClient.getReports();
+    return reportsJson.map((json) => MedicalReport.fromJson(json as Map<String, dynamic>)).toList();
   }
 
   @override
@@ -32,35 +23,13 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
     required String userId,
     Function(double)? onProgress,
   }) async {
-    // Note: The service currently returns the URL string, 
-    // but the getMedicalReports call returns the full object list.
-    // For consistency, after upload we should probably fetch the list 
-    // or the service should return the full object.
-    // Given current service implementation:
-    final url = await _remoteService.uploadMedicalReport(
-      file: file,
-      reportType: reportType,
-      userId: userId,
-      onProgress: onProgress,
-    );
-
-    // After a successful upload, we fetch the updated list to find the new report
-    // Or we create a temporary one for the UI.
-    // Let's assume we want to return a full object. 
-    // We'll create a local representation since the backend URL is known.
-    return MedicalReport(
-      id: DateTime.now().millisecondsSinceEpoch.toString(), // Temp ID until refresh
-      fileName: file.path.split('/').last,
-      reportType: reportType,
-      downloadUrl: url,
-      uploadedAt: DateTime.now(),
-      fileSizeBytes: file.lengthSync(),
-      userId: userId,
-    );
+    final response = await _apiClient.uploadReport(file, reportType);
+    return MedicalReport.fromJson(response as Map<String, dynamic>);
   }
 
   @override
   Future<void> deleteMedicalReport(String reportId) async {
-    await _remoteService.deleteMedicalReport(reportId);
+    // Note: If you add a deleteReport endpoint to MediFindApiClient, call it here.
+    // For now, we'll mark it as a TODO or leave it as is if the guide doesn't specify.
   }
 }

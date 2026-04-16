@@ -164,7 +164,7 @@ class PushNotificationService {
                         Navigator.of(dialogContext).pop();
                         _currentDialogContext = null;
                         if (requestId.isNotEmpty) {
-                          context.push('/responder/emergency/$requestId');
+                          context.push('/responder/active/$requestId');
                         }
                       },
                     ),

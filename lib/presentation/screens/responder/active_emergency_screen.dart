@@ -3,9 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/emergency_provider.dart';
+import '../../providers/medical_profile_provider.dart';
+import '../../../services/audio/voice_alert_service.dart';
+import '../../../services/socket/socket_service.dart';
+import '../../../services/location/location_service.dart';
+import '../../../domain/entities/emergency.dart' as emergency_entity;
+import 'package:geolocator/geolocator.dart';
+import 'dart:async';
 
 class ActiveEmergencyScreen extends ConsumerStatefulWidget {
-  const ActiveEmergencyScreen({Key? key}) : super(key: key);
+  final String emergencyId;
+  const ActiveEmergencyScreen({Key? key, required this.emergencyId}) : super(key: key);
 
   @override
   ConsumerState<ActiveEmergencyScreen> createState() =>
@@ -14,6 +22,7 @@ class ActiveEmergencyScreen extends ConsumerStatefulWidget {
 
 class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   String _currentStatus = 'ACCEPTED';
+  StreamSubscription<Position>? _locationSubscription;
 
   final List<Map<String, dynamic>> _statusSteps = [
     {'status': 'ACCEPTED', 'label': 'Request Accepted', 'icon': Icons.check_circle_outline},
@@ -22,15 +31,61 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     {'status': 'RESOLVED', 'label': 'Emergency Resolved', 'icon': Icons.check_circle_rounded},
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    // Automatically announce when the active view opens
+    Future.microtask(() async {
+      final emergency = await ref.read(getEmergencyProvider(widget.emergencyId).future);
+      if (emergency != null) {
+        final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
+        
+        if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+           // For deaf patients, we play the detailed medical report
+           await VoiceAlertService().speakAutomatedEmergencyReport(
+             emergency: emergency as emergency_entity.Emergency,
+             medical: profile,
+           );
+        } else {
+           // For normal patients, play standard arrival announcement
+           await VoiceAlertService().announceResponderAssigned('the Patient');
+        }
+      }
+    });
+
+    _startLiveTracking();
+  }
+
+  void _startLiveTracking() {
+    _locationSubscription = LocationService().startLocationUpdates(
+      intervalInSeconds: 5,
+    ).listen((position) {
+      if (_currentStatus != 'RESOLVED') {
+        SocketService.instance.sendLocationUpdate(
+          position.latitude,
+          position.longitude,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _locationSubscription?.cancel();
+    super.dispose();
+  }
+
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _currentStatus = newStatus);
     
     try {
-      // We need to pass the emergencyId here. The screen doesn't seem to have one passed.
-      // Assuming a generic call or using a passed ID in reality. Here I use a mock 'current_emergency_id'.
-      await ref.read(updateEmergencyStatusProvider(
-        UpdateEmergencyStatusParams(emergencyId: 'current_emergency_id', status: newStatus)
-      ).future);
+      if (newStatus == 'RESOLVED') {
+        await ref.read(resolveEmergencyProvider(widget.emergencyId).future);
+      } else {
+        await ref.read(updateEmergencyStatusProvider(
+          UpdateEmergencyStatusParams(emergencyId: widget.emergencyId, status: newStatus)
+        ).future);
+      }
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -64,40 +119,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Patient Info Card
-            Container(
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: AppShadows.neumorphicOut,
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.person_outlined, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text('Patient Info',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                    const Divider(),
-                    const Text('Patient: John Doe',
-                        style: TextStyle(fontSize: 15)),
-                    const SizedBox(height: 4),
-                    const Text('Emergency: Cardiac Emergency',
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 4),
-                    Text('Location: 32.1234, 73.5678',
-                        style: TextStyle(
-                            color: Colors.grey.shade600, fontSize: 13)),
-                  ],
-                ),
-              ),
-            ),
+            _buildPatientInfo(context, theme),
             const SizedBox(height: 16),
 
             // Map placeholder (Google Maps would go here)
@@ -219,6 +241,74 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildPatientInfo(BuildContext context, ThemeData theme) {
+    final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
+
+    return emergencyAsync.when(
+      data: (emergency) {
+        if (emergency == null) return const Text('No active emergency data');
+        final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
+
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.scaffoldBackgroundColor,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: AppShadows.neumorphicOut,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Row(
+                      children: [
+                        Icon(Icons.person_outlined, color: AppColors.primary),
+                        SizedBox(width: 8),
+                        Text('Patient Info',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ],
+                    ),
+                    profileAsync.when(
+                      data: (profile) => (profile?.disabilityType?.toLowerCase().contains('deaf') == true)
+                          ? Tooltip(
+                              message: 'Deaf Patient: Automated Report Available',
+                              child: IconButton(
+                                icon: const Icon(Icons.record_voice_over, color: Colors.orange),
+                                onPressed: () async {
+                                  await VoiceAlertService().speakAutomatedEmergencyReport(
+                                    emergency: emergency as emergency_entity.Emergency,
+                                    medical: profile!,
+                                  );
+                                },
+                              ),
+                            )
+                          : const SizedBox.shrink(),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ],
+                ),
+                const Divider(),
+                Text('Patient ID: ${emergency.userId.substring(0, 8)}...', style: const TextStyle(fontSize: 15)),
+                const SizedBox(height: 4),
+                Text('Emergency: ${emergency.emergencyType.replaceAll('_', ' ')}',
+                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('Location: ${emergency.latitude}, ${emergency.longitude}',
+                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      },
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Text('Error: $e'),
     );
   }
 }

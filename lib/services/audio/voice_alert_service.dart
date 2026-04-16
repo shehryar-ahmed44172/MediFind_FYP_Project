@@ -82,6 +82,33 @@ class VoiceAlertService {
     }
   }
 
+  /// Speak automated situational report for deaf patients
+  Future<void> speakAutomatedEmergencyReport({
+    required Emergency emergency,
+    required MedicalProfile medical,
+  }) async {
+    await initialize();
+
+    try {
+      final typeText = _getEmergencyTypeDescription(emergency.emergencyType);
+      final medicalSummary = _buildMedicalSummaryText(medical);
+      final additionalInfo = emergency.additionalInfo != null && emergency.additionalInfo!.isNotEmpty
+          ? 'Situation details: ${emergency.additionalInfo}. '
+          : '';
+
+      final reportText = 'Automated Emergency Report. Patient is deaf and unable to speak. '
+          'Condition: $typeText emergency. '
+          '$additionalInfo'
+          '$medicalSummary. '
+          'Repeating once.';
+
+      await _flutterTts.setSpeechRate(0.7); // Slightly slower for clarity
+      await _flutterTts.speak(reportText);
+    } catch (e) {
+      print('Failed to speak automated situational report: $e');
+    }
+  }
+
   /// Speak custom message (for responder notifications, etc.)
   Future<void> speakMessage(String message) async {
     await initialize();

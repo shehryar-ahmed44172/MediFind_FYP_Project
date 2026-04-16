@@ -10,4 +10,7 @@ abstract class AuthRepository {
   Future<String?> getAuthToken();
   Future<void> saveAuthToken(String token);
   Future<void> clearAuthToken();
+  Future<User> getMe();
+  Future<void> updateFcmToken(String token);
+  Future<User?> getUser(String userId);
 }

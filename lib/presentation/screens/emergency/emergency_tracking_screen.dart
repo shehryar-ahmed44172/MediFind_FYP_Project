@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../../services/websocket/web_socket_service.dart';
+import '../../../services/socket/socket_service.dart';
+import '../../../domain/entities/emergency.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -20,9 +22,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   @override
   void initState() {
     super.initState();
-    // Connect WebSocket when screen opens
+    // Connect Socket when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(webSocketStreamProvider);
+      ref.read(socketStreamProvider);
     });
   }
 
@@ -31,14 +33,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     // Try to watch live emergency data, fallback to UI directly
     final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
     
-    // Listen for WebSocket events to update local state
-    ref.listen(webSocketStreamProvider, (previous, next) {
+    // Listen for Socket events to update local state
+    ref.listen(socketStreamProvider, (previous, next) {
       if (next.hasValue) {
         final message = next.value!;
-        if (message.event == WebSocketEvent.etaUpdate) {
-          setState(() => _eta = message.data['eta']?.toString() ?? _eta);
-        } else if (message.event == WebSocketEvent.statusUpdate) {
-          setState(() => _currentStatus = message.data['status']?.toString() ?? _currentStatus);
+        if (message.event == SocketEvent.emergencyStatusChange) {
+          final data = message.data as Map<String, dynamic>;
+          setState(() => _currentStatus = data['status']?.toString() ?? _currentStatus);
         }
       }
     });
@@ -48,14 +49,19 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: emergencyAsync.when(
-        data: (emergency) => _buildBody(context, theme),
-        loading: () => _buildBody(context, theme),
-        error: (_, __) => _buildBody(context, theme), // Shows the UI even without backend
+        data: (emergency) {
+          if (emergency == null) {
+            return const Center(child: Text('Emergency not found'));
+          }
+          return _buildBody(context, theme, emergency as Emergency);
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, ThemeData theme) {
+  Widget _buildBody(BuildContext context, ThemeData theme, Emergency emergency) {
     return Stack(
       children: [
         // 1. Full Screen Map Background Simulator
@@ -93,7 +99,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           bottom: 0,
           left: 0,
           right: 0,
-          child: _buildBottomDetailsSheet(context, theme),
+          child: _buildBottomDetailsSheet(context, theme, emergency),
         ),
       ],
     );
@@ -143,6 +149,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               ),
             ],
           ),
+
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
@@ -184,7 +191,11 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     );
   }
 
-  Widget _buildBottomDetailsSheet(BuildContext context, ThemeData theme) {
+  Widget _buildBottomDetailsSheet(BuildContext context, ThemeData theme, Emergency emergency) {
+    final responderAsync = emergency.responderId != null
+        ? ref.watch(userProfileProvider(emergency.responderId!))
+        : const AsyncValue.data(null);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -225,30 +236,32 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Dr. Ahmed Khan',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
+                      responderAsync.when(
+                        data: (responder) => Text(
+                          responder?.fullName ?? (emergency.responderId != null ? 'Assigned' : 'Finding Responder...'),
+                          style: theme.textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                          ),
                         ),
+                        loading: () => const Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold)),
+                        error: (_, __) => const Text('Responder'),
                       ),
                       const SizedBox(height: 4),
                       Row(
                         children: [
                           Icon(Icons.star_rounded, color: Colors.orange.shade400, size: 16),
                           const SizedBox(width: 4),
-                          Text(
-                            '4.9 (120+ Rescues)',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
+                          const Text(
+                            'Emergency Response Team',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
                           ),
                         ],
                       ),
                     ],
                   ),
                 ),
+
                 // Action Buttons
                 Row(
                   children: [
@@ -347,16 +360,19 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               backgroundColor: Colors.red,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              context.go('/home');
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: const Text('Emergency cancelled. Responder notified.'),
-                  backgroundColor: Colors.orange.shade800,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
+              await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
+              if (mounted) {
+                context.go('/home');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: const Text('Emergency cancelled. Responder notified.'),
+                    backgroundColor: Colors.orange.shade800,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             child: const Text('Cancel Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),

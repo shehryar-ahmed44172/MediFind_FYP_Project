@@ -7,6 +7,9 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/medical_profile_provider.dart';
+import '../../../domain/entities/medical_profile.dart';
+import '../../../domain/entities/emergency.dart' as emergency_entity;
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -48,12 +51,29 @@ class _EmergencyRequestScreenState
     try {
       final responderIdResult = await ref.read(currentUserIdProvider.future);
       final responderId = responderIdResult ?? 'responder_generated_id';
+      
+      // Get the emergency data to find the userId
+      final emergency = await ref.read(getEmergencyProvider(widget.requestId).future);
+
       await ref.read(acceptEmergencyProvider(AcceptRejectParams(
         emergencyId: widget.requestId,
         responderId: responderId,
       )).future);
       
-      VoiceAlertService().speakMessage("Responder is on the way. Stay calm.");
+      VoiceAlertService().speakMessage("Emergency accepted. Preparing automated analysis.");
+
+      // Check if patient is deaf and play situational report
+      if (emergency != null) {
+        final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
+        
+        if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+          // Play the detailed medical report for the responder
+          await VoiceAlertService().speakAutomatedEmergencyReport(
+            emergency: emergency as emergency_entity.Emergency,
+            medical: profile,
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -73,9 +93,9 @@ class _EmergencyRequestScreenState
           _countdown--;
         } else {
           timer.cancel();
-          _makePhoneCall('+1234567890'); // Uses url_launcher to open dialer. Note: For fully integrated VoIP (like InDrive), an SDK like Agora is typically required.
+          _makePhoneCall('+1234567890'); // Auto-dial placeholder
           if (mounted) {
-            context.go('/responder/active');
+            context.go('/responder/active/${widget.requestId}');
           }
         }
       });
@@ -112,40 +132,44 @@ class _EmergencyRequestScreenState
         centerTitle: true,
       ),
       body: emergencyAsync.when(
-        data: (emergency) => _buildContent(context, theme, emergency),
-        loading: () => _buildDemoContent(context, theme),
-        error: (_, __) => _buildDemoContent(context, theme),
+        data: (emergency) => _buildContent(context, theme, emergency as emergency_entity.Emergency?),
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error loading emergency: $e')),
       ),
     );
   }
 
-  // When provider has no data yet, show demo content
-  Widget _buildDemoContent(BuildContext context, ThemeData theme) {
-    return _buildRequestDetails(
-      context: context,
-      theme: theme,
-      emergencyType: 'CARDIAC',
-      patientName: 'John Doe',
-      distance: '1.2 km',
-      bloodGroup: 'O+',
-      allergies: 'Penicillin',
-      conditions: 'Hypertension, Diabetes',
+  Widget _buildContent(BuildContext context, ThemeData theme, emergency_entity.Emergency? emergency) {
+    if (emergency == null) return const Center(child: Text('Emergency not found'));
+
+    final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
+
+    return profileAsync.when(
+      data: (profile) => _buildRequestDetails(
+        context: context,
+        theme: theme,
+        emergencyType: emergency.emergencyType,
+        patientName: profile?.fullName ?? 'Patient',
+        distance: 'Calculating...', // Distance calculation logic can be added later
+        bloodGroup: profile?.bloodType ?? 'Unknown',
+        allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
+        conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
+        priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+      ),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => _buildRequestDetails(
+        context: context,
+        theme: theme,
+        emergencyType: emergency.emergencyType,
+        patientName: 'Patient',
+        distance: '...',
+        bloodGroup: 'Unknown',
+        allergies: 'Error loading',
+        conditions: 'Error loading profile',
+      ),
     );
   }
 
-  Widget _buildContent(BuildContext context, ThemeData theme, dynamic emergency) {
-    return _buildRequestDetails(
-      context: context,
-      theme: theme,
-      emergencyType: emergency?.emergencyType ?? 'UNKNOWN',
-      patientName: 'Patient',
-      distance: 'Calculating...',
-      bloodGroup: 'Unknown',
-      allergies: 'None listed',
-      conditions: 'See medical profile',
-      priority: emergency?.priority ?? 'NORMAL',
-    );
-  }
 
   Widget _buildRequestDetails({
     required BuildContext context,

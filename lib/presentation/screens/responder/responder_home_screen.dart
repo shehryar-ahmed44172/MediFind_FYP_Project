@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/emergency_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
@@ -13,8 +14,8 @@ class ResponderHomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
-    // Simulated incoming emergencies — in production wire to watchEmergenciesProvider
-    final incomingRequests = _mockIncomingRequests();
+    final userAsync = ref.watch(currentUserProvider);
+    final emergenciesAsync = ref.watch(watchActiveEmergenciesProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -44,106 +45,121 @@ class ResponderHomeScreen extends ConsumerWidget {
           // Status Toggle
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: AppShadows.neumorphicOut,
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.circle, color: Colors.green, size: 14),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Status: Available',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green)),
-                        Text('You are visible to patients',
-                            style:
-                                TextStyle(fontSize: 12, color: Colors.grey)),
-                      ],
+            child: userAsync.when(
+              data: (user) => Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: AppShadows.neumorphicOut,
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.circle, 
+                        color: (user?.isActive ?? false) ? Colors.green : Colors.grey, 
+                        size: 14),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Status: ${(user?.isActive ?? false) ? 'Available' : 'Offline'}',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: (user?.isActive ?? false) ? Colors.green : Colors.grey)),
+                          Text((user?.isActive ?? false) 
+                              ? 'You are visible to patients' 
+                              : 'You are invisible to patients',
+                              style:
+                                  const TextStyle(fontSize: 12, color: Colors.grey)),
+                        ],
+                      ),
                     ),
-                  ),
-                  Switch(
-                    value: true,
-                    onChanged: (_) {},
-                    activeColor: Colors.green,
-                  ),
-                ],
+                    Switch(
+                      value: user?.isActive ?? false,
+                      onChanged: (value) async {
+                        if (user != null) {
+                          await ref.read(setResponderAvailabilityProvider(value).future);
+                        }
+                      },
+                      activeColor: Colors.green,
+                    ),
+                  ],
+                ),
               ),
+              loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const Text('Failed to load status'),
             ),
           ),
 
           // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text('Incoming Emergencies',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-                const Spacer(),
-                if (incomingRequests.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Text(
-                      '${incomingRequests.length}',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12),
+            child: emergenciesAsync.when(
+              data: (emergencies) => Row(
+                children: [
+                  Text('Incoming Emergencies',
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  if (emergencies.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Text(
+                        '${emergencies.length}',
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
           ),
           const SizedBox(height: 8),
 
           Expanded(
-            child: incomingRequests.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded,
-                            size: 72, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        const Text('No active emergency requests',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
+            child: emergenciesAsync.when(
+              data: (emergencies) => emergencies.isEmpty
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline_rounded,
+                              size: 72, color: Colors.grey.shade300),
+                          const SizedBox(height: 16),
+                          const Text('No active emergency requests',
+                              style: TextStyle(color: Colors.grey)),
+                        ],
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(16),
+                      itemCount: emergencies.length,
+                      itemBuilder: (ctx, i) {
+                        final req = emergencies[i];
+                        return _EmergencyRequestCard(request: req);
+                      },
                     ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: incomingRequests.length,
-                    itemBuilder: (ctx, i) {
-                      final req = incomingRequests[i];
-                      return _EmergencyRequestCard(request: req);
-                    },
-                  ),
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
           ),
         ],
       ),
     );
   }
-
-  List<Map<String, dynamic>> _mockIncomingRequests() {
-    // Returns mock data for demo — real implementation would use a provider
-    return [];
-  }
 }
 
 class _EmergencyRequestCard extends StatelessWidget {
-  final Map<String, dynamic> request;
+  final Emergency request;
   const _EmergencyRequestCard({required this.request});
 
   @override
@@ -157,7 +173,7 @@ class _EmergencyRequestCard extends StatelessWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => context.go('/responder/request/${request['id']}'),
+        onTap: () => context.go('/responder/request/${request.id}'),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -176,13 +192,13 @@ class _EmergencyRequestCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      request['type']?.toString().replaceAll('_', ' ') ?? 'Emergency',
+                      request.emergencyType.replaceAll('_', ' '),
                       style: const TextStyle(
                           fontWeight: FontWeight.bold, fontSize: 15),
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      request['distance'] ?? '0.5 km away',
+                      'Priority: ${request.status}',
                       style: TextStyle(color: Colors.grey.shade600,
                           fontSize: 13),
                     ),

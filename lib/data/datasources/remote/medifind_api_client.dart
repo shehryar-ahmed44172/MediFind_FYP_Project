@@ -143,6 +143,32 @@ class MediFindApiClient {
     }
   }
 
+  Future<User> getMe() async {
+    try {
+      final response = await _dio.get('auth/me');
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+      throw NetworkException(message: 'Failed to fetch current user profile');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> updateFcmToken(String fcmToken) async {
+    try {
+      final response = await _dio.put(
+        'auth/fcm-token',
+        data: {'fcmToken': fcmToken},
+      );
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to update FCM token');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   // EMERGENCY ENDPOINTS
   Future<Emergency> createEmergency(
     String emergencyType,
@@ -204,6 +230,35 @@ class MediFindApiClient {
     }
   }
 
+  Future<List<Emergency>> getActiveEmergencies() async {
+    try {
+      // Guide and Backend controller use GET /api/emergencies for list of active/all
+      final response = await _dio.get('emergencies');
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] as List;
+        return data
+            .map((json) => Emergency.fromJson(json as Map<String, dynamic>))
+            .toList();
+      }
+
+      throw NetworkException(message: 'Failed to fetch active emergencies');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> cancelEmergency(String emergencyId) async {
+    try {
+      final response = await _dio.post('emergencies/$emergencyId/cancel');
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to cancel emergency');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<void> updateEmergencyStatus(String emergencyId, String status) async {
     try {
       // Backend doesn't have a direct 'status' PATCH on emergencies. 
@@ -245,6 +300,69 @@ class MediFindApiClient {
       if (response.statusCode != 200) {
         throw NetworkException(message: 'Failed to reject emergency');
       }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // RESPONDER ENDPOINTS
+  Future<void> updateResponderLocation(double latitude, double longitude) async {
+    try {
+      final response = await _dio.post(
+        'responders/location',
+        data: {
+          'latitude': latitude,
+          'longitude': longitude,
+        },
+      );
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to update responder location');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> setResponderAvailability(bool isAvailable) async {
+    try {
+      final response = await _dio.patch(
+        'responders/availability',
+        data: {'isAvailable': isAvailable},
+      );
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to update responder availability');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> resolveEmergency(String emergencyId) async {
+    try {
+      final response = await _dio.post('responders/emergencies/$emergencyId/resolve');
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to resolve emergency');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<List<User>> getNearbyResponders(double latitude, double longitude, [double radius = 5.0]) async {
+    try {
+      final response = await _dio.get(
+        'responders/nearby',
+        queryParameters: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'radius': radius,
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = response.data['data'] as List;
+        return data.map((json) => User.fromJson(json as Map<String, dynamic>)).toList();
+      }
+      throw NetworkException(message: 'Failed to fetch nearby responders');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -352,13 +470,13 @@ class MediFindApiClient {
       final response = await _dio.post(
         'caregivers/link',
         data: {
-          'caregiverEmail': email,
+          'patientEmail': email, // Changed from caregiverEmail based on user requirement
           'relationship': relationship,
         },
       );
 
-      if (response.statusCode != 201) {
-        throw NetworkException(message: 'Failed to link caregiver');
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to send invitation');
       }
     } on DioException catch (e) {
       throw _handleDioException(e);
@@ -379,13 +497,109 @@ class MediFindApiClient {
     }
   }
 
-  Future<void> unlinkCaregiver(String caregiverId) async {
+  Future<void> unlinkCaregiver(String connectionId) async {
     try {
-      final response = await _dio.delete('caregivers/$caregiverId');
+      final response = await _dio.delete('caregivers/$connectionId');
 
       if (response.statusCode != 200) {
-        throw NetworkException(message: 'Failed to unlink caregiver');
+        throw NetworkException(message: 'Failed to unlink');
       }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> respondToInvitation(String invitationId, bool accept) async {
+    try {
+      // Guide: POST /api/caregivers/invitations/:id/respond
+      final response = await _dio.post(
+        'caregivers/invitations/$invitationId/respond',
+        data: {
+          'accept': accept,
+        },
+      );
+
+      if (response.statusCode != 200) {
+         throw NetworkException(message: 'Failed to respond to invitation');
+      }
+    } on DioException catch (e) {
+       throw _handleDioException(e);
+    }
+  }
+
+  Future<List<dynamic>> getPendingInvitations() async {
+    try {
+      // Guide: GET /api/caregivers/invitations
+      final response = await _dio.get('caregivers/invitations');
+
+      if (response.statusCode == 200) {
+        return response.data['data'] as List;
+      }
+
+      throw NetworkException(message: 'Failed to fetch pending invitations');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // MEDICAL REPORT ENDPOINTS
+  Future<void> uploadReport(String emergencyId, String filePath) async {
+    try {
+      final formData = FormData.fromMap({
+        'report': await MultipartFile.fromFile(filePath),
+      });
+
+      final response = await _dio.post(
+        'reports/$emergencyId',
+        data: formData,
+      );
+
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to upload report');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<List<dynamic>> getReports(String emergencyId) async {
+    try {
+      final response = await _dio.get('reports/$emergencyId');
+      if (response.statusCode == 200) {
+        return response.data['data'] as List;
+      }
+      throw NetworkException(message: 'Failed to fetch reports');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // TRACKING ENDPOINTS
+  Future<void> submitLiveLocation(String emergencyId, double lat, double lng) async {
+    try {
+      final response = await _dio.post(
+        'tracking',
+        data: {
+          'emergencyId': emergencyId,
+          'latitude': lat,
+          'longitude': lng,
+        },
+      );
+      if (response.statusCode != 201 && response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to submit live location');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<dynamic> getLatestTracking(String emergencyId) async {
+    try {
+      final response = await _dio.get('tracking/$emergencyId/latest');
+      if (response.statusCode == 200) {
+        return response.data['data'];
+      }
+      throw NetworkException(message: 'Failed to fetch latest tracking');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -438,6 +652,39 @@ class MediFindApiClient {
       if (response.statusCode != 200) {
         throw NetworkException(message: 'Failed to change password');
       }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // MEDICAL PROFILE ENDPOINTS
+  Future<List<dynamic>> getReports() async {
+    try {
+      final response = await _dio.get('/api/medical-profiles/reports');
+
+      if (response.statusCode == 200) {
+        return response.data['data'] as List<dynamic>;
+      }
+
+      throw NetworkException(message: 'Failed to fetch reports');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<dynamic> uploadReport(File file, String type) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(file.path),
+        'type': type,
+      });
+      final response = await _dio.post('/api/medical-profiles/reports', data: formData);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['data'];
+      }
+
+      throw NetworkException(message: 'Failed to upload report');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

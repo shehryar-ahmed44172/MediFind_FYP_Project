@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:ui';
 import '../../providers/auth_provider.dart';
+import '../../providers/medical_profile_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
@@ -84,11 +85,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     color: Colors.grey.shade600,
                   ),
                 ),
-                Text(
-                  'John Doe', // TODO: Hook up to auth provider later
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                ref.watch(currentUserProvider).when(
+                  data: (user) => Text(
+                    user?.fullName ?? 'User',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
+                  loading: () => const SizedBox(height: 20, width: 60, child: LinearProgressIndicator()),
+                  error: (_, __) => const Text('Welcome!'),
                 ),
               ],
             ),
@@ -107,56 +112,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildMedicalProfileSnapshot(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Medical Profile',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+    final userIdAsync = ref.watch(currentUserIdProvider);
+
+    return userIdAsync.when(
+      data: (userId) {
+        if (userId == null) return const SizedBox.shrink();
+        final profileAsync = ref.watch(getMedicalProfileProvider(userId));
+
+        return profileAsync.when(
+          data: (profile) {
+            return Container(
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppShadows.neumorphicOut,
               ),
-              InkWell(
-                onTap: () => context.go('/home/medical-profile'),
-                child: Row(
-                  children: [
-                    Text(
-                      'View all ',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Medical Profile',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    Icon(Icons.arrow_forward_ios_rounded, 
-                      size: 14, color: theme.colorScheme.primary),
-                  ],
-                ),
+                      InkWell(
+                        onTap: () => context.go('/home/medical-profile'),
+                        child: Row(
+                          children: [
+                            Text(
+                              'View all ',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.primary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Icon(Icons.arrow_forward_ios_rounded, 
+                              size: 14, color: theme.colorScheme.primary),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _buildProfileStat(theme, 'Blood', profile?.bloodType ?? '--', Icons.bloodtype, Colors.red),
+                      Container(width: 1, height: 40, color: Colors.grey.shade200),
+                      _buildProfileStat(theme, 'Allergies', 
+                        (profile?.allergies.isNotEmpty == true) ? profile!.allergies.first : 'None', 
+                        Icons.warning_amber_rounded, Colors.orange),
+                      Container(width: 1, height: 40, color: Colors.grey.shade200),
+                      _buildProfileStat(theme, 'Meds', 
+                        (profile?.medications.isNotEmpty == true) ? '${profile!.medications.length} Active' : 'None', 
+                        Icons.medication_liquid_rounded, AppColors.primary),
+                    ],
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildProfileStat(theme, 'Blood', 'O+', Icons.bloodtype, Colors.red),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              _buildProfileStat(theme, 'Allergies', 'Peanuts', Icons.warning_amber_rounded, Colors.orange),
-              Container(width: 1, height: 40, color: Colors.grey.shade200),
-              _buildProfileStat(theme, 'Meds', '3 Active', Icons.medication_liquid_rounded, AppColors.primary),
-            ],
-          ),
-        ],
-      ),
+            );
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => const Text('Tap to refresh profile'),
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
     );
   }
 

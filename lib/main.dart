@@ -16,6 +16,8 @@ import 'presentation/providers/accessibility_provider.dart';
 // Importing push notification service
 import 'services/notification/push_notification_service.dart';
 import 'presentation/providers/auth_provider.dart';
+import 'presentation/providers/emergency_provider.dart';
+import 'services/socket/socket_service.dart';
 
 
 // The main entry point of the MediFind application
@@ -57,7 +59,14 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
 
   void _setupPushNotifications() async {
     await Future.microtask(() async {
-      await PushNotificationService.initialize(context);
+      // 2. Initialize Push Notification Service (Plan v5: Passed localDataSource)
+      final localDataSource = await ref.read(localDataSourceProvider.future);
+      if (context.mounted) {
+        await PushNotificationService.initialize(context, localDataSource);
+      }
+
+      // 3. Activate Socket Notification Persistence Handler (Plan v5)
+      ref.read(socketNotificationHandlerProvider);
       
       // Fetch the FCM token
       final token = await PushNotificationService.getToken();
@@ -69,10 +78,11 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
       }
     });
 
-    // Listen for auth state changes to sync token on login
+    // Listen for auth state changes to sync token and connect socket (Plan v4.1)
     ref.listenManual(authStateProvider, (previous, next) async {
       final isLoggedIn = next.value ?? false;
       if (isLoggedIn) {
+        // 1. Sync FCM Token
         final token = await PushNotificationService.getToken();
         if (token != null) {
           try {
@@ -82,6 +92,21 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
             debugPrint('❌ Failed to sync FCM Token: $e');
           }
         }
+
+        // 2. Connect Socket.io for In-App Notifications
+        final user = await ref.read(currentUserProvider.future);
+        final authRepo = await ref.read(authRepositoryProvider.future);
+        final jwtToken = await authRepo.getAuthToken();
+        
+        if (user != null && jwtToken != null) {
+          final socketService = SocketService.instance;
+          socketService.setAuthToken(jwtToken);
+          socketService.connect(user.id);
+          debugPrint('🔌 Global Socket.io connection initiated for ${user.fullName}');
+        }
+      } else {
+        // Disconnect if logged out
+        SocketService.instance.disconnect();
       }
     }, fireImmediately: true);
   }

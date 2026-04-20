@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'dart:math' as math;
 import '../../../services/audio/voice_alert_service.dart';
+import '../../services/haptic_feedback_service.dart';
 
 class SosCountdownScreen extends ConsumerStatefulWidget {
   final String emergencyType;
@@ -28,7 +29,7 @@ class SosCountdownScreen extends ConsumerStatefulWidget {
 }
 
 class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late Timer _timer;
   int _secondsLeft = 10;
   final int _maxSeconds = 10;
@@ -37,6 +38,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
+  late AnimationController _flashController;
+  late Animation<Color?> _flashAnimation;
 
   @override
   void initState() {
@@ -52,6 +55,17 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
+    // Flash controller for Deaf users (Visual Siren)
+    _flashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+    );
+    
+    _flashAnimation = ColorTween(
+      begin: Colors.red.shade900,
+      end: Colors.red.shade400,
+    ).animate(_flashController);
+
     HapticFeedback.vibrate();
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -60,7 +74,17 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         _sendSOS();
       } else {
         setState(() => _secondsLeft--);
-        HapticFeedback.lightImpact();
+        final user = ref.read(currentUserProvider).valueOrNull;
+        if (user?.patientType == 'DEAF') {
+          HapticFeedbackService.medium();
+          if (_flashController.isAnimating) {
+            _flashController.stop();
+          } else {
+            _flashController.repeat(reverse: true);
+          }
+        } else {
+          HapticFeedback.lightImpact();
+        }
       }
     });
   }
@@ -69,6 +93,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   void dispose() {
     _timer.cancel();
     _pulseController.dispose();
+    _flashController.dispose();
     super.dispose();
   }
 
@@ -128,7 +153,10 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
   @override
   Widget build(BuildContext context) {
-    if (_isSending) return _buildSendingOverlay();
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isDeaf = user?.patientType == 'DEAF';
+
+    if (_isSending) return _buildSendingOverlay(isDeaf);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -330,39 +358,46 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     );
   }
 
-  Widget _buildSendingOverlay() {
-    return Scaffold(
-      backgroundColor: Colors.red.shade700,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                shape: BoxShape.circle,
+  Widget _buildSendingOverlay(bool isDeaf) {
+    if (isDeaf && !_flashController.isAnimating) {
+      _flashController.repeat(reverse: true);
+    }
+
+    return AnimatedBuilder(
+      animation: _flashAnimation,
+      builder: (context, child) => Scaffold(
+        backgroundColor: isDeaf ? _flashAnimation.value : Colors.red.shade700,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const CircularProgressIndicator(
+                  color: Colors.white, 
+                  strokeWidth: 4,
+                ),
               ),
-              child: const CircularProgressIndicator(
-                color: Colors.white, 
-                strokeWidth: 4,
+              const SizedBox(height: 32),
+              const Text(
+                'Broadcasting Alert...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
-            const Text(
-              'Broadcasting Alert...',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
+              const SizedBox(height: 12),
+              Text(
+                isDeaf ? 'HELP IS COMING - VISUAL ALERT ACTIVE' : 'Finding nearest available responders',
+                style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Finding nearest available responders',
-              style: TextStyle(color: Colors.white70, fontSize: 16),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

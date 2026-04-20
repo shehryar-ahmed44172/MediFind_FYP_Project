@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../../domain/entities/emergency.dart';
 import '../../domain/entities/user.dart';
+import '../../core/utils/parsers.dart';
 
 import '../../domain/repositories/emergency_repository.dart';
 import '../datasources/local/local_data_source.dart';
@@ -60,7 +61,14 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Stream<List<Emergency>> watchActiveEmergencies() async* {
-    // Return all emergencies from local storage that are not COMPLETED or CANCELLED
+    // 1. Yield initial state immediately from cache
+    final initial = await localDataSource.getAllEmergencies();
+    yield initial
+        .map((e) => _mapToEmergency(e))
+        .where((e) => e.status != 'COMPLETED' && e.status != 'CANCELLED')
+        .toList();
+
+    // 2. Then listen for updates
     await for (final _ in localDataSource.watchEmergencies()) {
       final all = await localDataSource.getAllEmergencies();
       yield all
@@ -84,8 +92,8 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
         'longitude': e.longitude,
         'additionalInfo': e.additionalInfo,
         'voiceAlertGenerated': e.voiceAlertGenerated,
-        'createdAt': e.createdAt.toIso8601String(),
-        'updatedAt': e.updatedAt.toIso8601String(),
+        'createdAt': e.createdAt?.toIso8601String(),
+        'updatedAt': e.updatedAt?.toIso8601String(),
       };
 
   // ---------------------------------------------------------------------------
@@ -98,8 +106,8 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
       responderId: map['responderId'] as String?,
       status: map['status'] as String? ?? 'PENDING',
       emergencyType: map['emergencyType'] as String? ?? 'OTHER',
-      latitude: (map['latitude'] as num?)?.toDouble() ?? 0.0,
-      longitude: (map['longitude'] as num?)?.toDouble() ?? 0.0,
+      latitude: doubleFromJson(map['latitude']),
+      longitude: doubleFromJson(map['longitude']),
       additionalInfo: map['additionalInfo'] as String?,
       voiceAlertGenerated: map['voiceAlertGenerated'] as bool? ?? false,
       createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
@@ -219,6 +227,10 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Stream<Emergency> watchEmergency(String emergencyId) async* {
+    // Yield initial state
+    final cachedInitial = await localDataSource.getEmergency(emergencyId);
+    if (cachedInitial != null) yield _mapToEmergency(cachedInitial);
+
     await for (final _ in localDataSource.watchEmergencies()) {
       final cached = await localDataSource.getEmergency(emergencyId);
       if (cached != null) yield _mapToEmergency(cached);
@@ -227,6 +239,10 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Stream<List<Emergency>> watchUserEmergencies(String userId) async* {
+    // Yield initial state
+    final cachedInitial = await localDataSource.getUserEmergencies(userId);
+    yield cachedInitial.map((e) => _mapToEmergency(e)).toList();
+
     await for (final _ in localDataSource.watchEmergencies()) {
       final cached = await localDataSource.getUserEmergencies(userId);
       yield cached.map((e) => _mapToEmergency(e)).toList();

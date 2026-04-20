@@ -53,7 +53,7 @@ class AuthStateNotifier extends StateNotifier<AsyncValue<bool>> {
   void _initializeAuth() async {
     state = const AsyncValue.loading();
     try {
-      final repo = await _authRepository.when(
+      final repo = _authRepository.when(
         data: (repo) => repo,
         loading: () => throw Exception('Auth repository not ready'),
         error: (err, st) => throw err,

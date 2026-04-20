@@ -7,6 +7,11 @@ import '../../providers/medical_profile_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/app_header.dart';
+import '../../services/haptic_feedback_service.dart';
+import '../../widgets/emergency/emergency_overlay.dart';
+import '../../providers/emergency_provider.dart';
+import 'package:flutter/services.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -23,98 +28,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
 
+    final userAsync = ref.watch(currentUserProvider);
+    final isDeafMode = userAsync.maybeWhen(
+      data: (user) => user?.patientType == 'DEAF',
+      orElse: () => false,
+    );
+
+    // Listen for visual emergency alerts (Deaf/Mute accessibility)
+    ref.listen(visualEmergencyAlertProvider, (previous, next) {
+      if (next != null) {
+        EmergencyOverlay.show(
+          context,
+          title: 'Responder Assigned',
+          message: next,
+        );
+        // Reset the alert state after showing
+        ref.read(visualEmergencyAlertProvider.notifier).state = null;
+      }
+    });
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (!isConnected) const ConnectivityBanner(),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // top bar
-                    _buildHeader(theme),
-                    const SizedBox(height: 24),
+      body: Column(
+        children: [
+          if (!isConnected) const ConnectivityBanner(),
+          const AppHeader(),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const SizedBox(height: 8),
+                  // profile summary
+                  _buildMedicalProfileSnapshot(theme),
+                  const SizedBox(height: 32),
 
-                    // profile summary
-                    _buildMedicalProfileSnapshot(theme),
-                    const SizedBox(height: 32),
+                  // main sos btn
+                  _buildMassiveSOSButton(theme, isDeafMode),
+                  const SizedBox(height: 24),
 
-                    // main sos btn
-                    _buildMassiveSOSButton(theme),
-                    const SizedBox(height: 24),
+                  // attach report btn
+                  _buildAttachReportOption(theme),
+                  const SizedBox(height: 32),
 
-                    // attach report btn
-                    _buildAttachReportOption(theme),
-                    const SizedBox(height: 32),
-
-                    // grid for emergency types
-                    _buildEmergencyTypes(theme),
-                  ],
-                ),
+                  // grid for emergency types
+                  _buildQuickServices(theme, isDeafMode),
+                ],
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
       bottomNavigationBar: _buildBottomNav(theme),
     );
   }
 
-  Widget _buildHeader(ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-              child: Icon(Icons.person_outline, color: theme.colorScheme.primary),
-            ),
-            const SizedBox(width: 16),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome,',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                ref.watch(currentUserProvider).when(
-                  data: (user) => Text(
-                    user?.fullName ?? 'User',
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  loading: () => const SizedBox(height: 20, width: 60, child: LinearProgressIndicator()),
-                  error: (_, __) => const Text('Welcome!'),
-                ),
-              ],
-            ),
-          ],
-        ),
-        InkWell(
-          onTap: () => _showNotifications(context, theme),
-          borderRadius: BorderRadius.circular(25),
-          child: Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              shape: BoxShape.circle,
-              boxShadow: AppShadows.neumorphicOut,
-            ),
-            child: const Icon(Icons.notifications_none_rounded, color: Colors.black87),
-          ),
-        )
-      ],
-    );
-  }
 
   void _showNotifications(BuildContext context, ThemeData theme) {
     showModalBottomSheet(
@@ -257,56 +226,88 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildMassiveSOSButton(ThemeData theme) {
+  Widget _buildMassiveSOSButton(ThemeData theme, bool isDeaf) {
     return GestureDetector(
-      onTap: () => context.go('/home/emergency'),
+      onLongPressStart: (_) {
+        if (isDeaf) HapticFeedbackService.heavy();
+      },
+      onLongPress: () {
+         if (isDeaf) HapticFeedbackService.sosPattern();
+         context.go('/home/emergency');
+      },
+      onTap: () {
+        HapticFeedbackService.light();
+        context.go('/home/emergency');
+      },
       child: Center(
-        child: Container(
-          width: 240,
-          height: 240,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: theme.scaffoldBackgroundColor,
-            boxShadow: AppShadows.neumorphicOut,
-          ),
-          child: Container(
-            margin: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
-              ),
-              boxShadow: AppShadows.sosMassiveGlow,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.fingerprint_rounded,
-                  size: 80,
-                  color: Colors.white,
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: const Text(
-                    'PRESS & HOLD',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 1.2,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            if (isDeaf)
+              TweenAnimationBuilder<double>(
+                tween: Tween(begin: 1.0, end: 1.2),
+                duration: const Duration(seconds: 1),
+                curve: Curves.easeInOut,
+                builder: (context, value, child) {
+                  return Container(
+                    width: 240 * value,
+                    height: 240 * value,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.red.withOpacity(0.1),
                     ),
+                  );
+                },
+                onEnd: () {}, // Pulse could be repeated with a stateful animation if needed
+              ),
+            Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: theme.scaffoldBackgroundColor,
+                boxShadow: AppShadows.neumorphicOut,
+              ),
+              child: Container(
+                margin: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
                   ),
+                  boxShadow: AppShadows.sosMassiveGlow,
                 ),
-              ],
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      isDeaf ? Icons.wifi_tethering_rounded : Icons.fingerprint_rounded,
+                      size: isDeaf ? 90 : 80,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        isDeaf ? 'TAP OR HOLD' : 'PRESS & HOLD',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -361,14 +362,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildEmergencyTypes(ThemeData theme) {
+  Widget _buildQuickServices(ThemeData theme, bool isDeaf) {
     final services = [
-      {'title': 'My Profile', 'icon': Icons.health_and_safety_outlined, 'color': Colors.blue, 'route': '/home/medical-profile'},
-      {'title': 'Reports', 'icon': Icons.assignment_outlined, 'color': Colors.orange, 'route': '/home/medical-reports'},
-      {'title': 'Caregivers', 'icon': Icons.people_outline_rounded, 'color': Colors.green, 'route': '/home/caregivers'},
-      {'title': 'Hospitals', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null},
-      {'title': 'Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null},
-      {'title': 'Patient Info', 'icon': Icons.info_outline_rounded, 'color': Colors.purple, 'route': '/home/patient-type-info'},
+      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile'},
+      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports'},
+      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers'},
+      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null},
+      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null},
+      {'title': 'Patient Information', 'icon': Icons.info_outline_rounded, 'color': AppColors.primary, 'route': '/home/patient-type-info'},
     ];
 
     return Column(
@@ -384,7 +385,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             TextButton(
-              onPressed: () {}, 
+              onPressed: () {
+                HapticFeedbackService.light();
+              }, 
               child: const Text('See All', style: TextStyle(fontSize: 12)),
             ),
           ],
@@ -393,11 +396,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.9,
+            childAspectRatio: isDeaf ? 0.95 : 1.1,
           ),
           itemCount: services.length,
           itemBuilder: (context, index) {
@@ -405,36 +408,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             final color = service['color'] as Color;
             return InkWell(
               onTap: () {
+                HapticFeedbackService.medium();
                 if (service['route'] != null) {
                   context.go(service['route'] as String);
                 } else {
                   _showFeatureComingSoon(context, service['title'] as String);
                 }
               },
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(24),
               child: Container(
                 decoration: BoxDecoration(
                   color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: AppShadows.neumorphicOut,
                 ),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(12),
+                      padding: EdgeInsets.all(isDeaf ? 20 : 16),
                       decoration: BoxDecoration(
                         color: color.withOpacity(0.1),
                         shape: BoxShape.circle,
                       ),
-                      child: Icon(service['icon'] as IconData, color: color, size: 24),
+                      child: Icon(
+                        service['icon'] as IconData, 
+                        color: color, 
+                        size: isDeaf ? 44 : 32,
+                      ),
                     ),
                     const SizedBox(height: 12),
-                    Text(
-                      service['title'] as String,
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        service['title'] as String,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: isDeaf ? 14 : 13,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                   ],
@@ -461,18 +474,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildBottomNav(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: AppColors.primary,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFA3B1C6).withOpacity(0.4),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
             offset: const Offset(0, -5),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
@@ -499,7 +512,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? theme.colorScheme.primary.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
@@ -507,15 +520,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             Icon(
               icon,
-              color: isSelected ? theme.colorScheme.primary : Colors.grey.shade400,
+              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
               size: 26,
             ),
             if (isSelected) ...[
               const SizedBox(height: 4),
               Text(
                 label,
-                style: TextStyle(
-                  color: theme.colorScheme.primary,
+                style: const TextStyle(
+                  color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),

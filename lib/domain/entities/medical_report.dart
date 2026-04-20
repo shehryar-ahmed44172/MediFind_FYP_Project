@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/utils/parsers.dart';
 
 part 'medical_report.freezed.dart';
 part 'medical_report.g.dart';
@@ -11,7 +12,7 @@ class MedicalReport with _$MedicalReport {
     required String reportType, // LAB, IMAGING, PRESCRIPTION, OTHER
     required String downloadUrl,
     required DateTime uploadedAt,
-    required int fileSizeBytes,
+    @JsonKey(fromJson: intFromJson) required int fileSizeBytes,
     String? userId,
     String? mimeType,
   }) = _MedicalReport;

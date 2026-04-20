@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/utils/parsers.dart';
 
 part 'emergency.freezed.dart';
 part 'emergency.g.dart';
@@ -6,14 +7,14 @@ part 'emergency.g.dart';
 @freezed
 class Emergency with _$Emergency {
   const factory Emergency({
-    required String id,
-    required String userId,
-    required String status,
-    required String emergencyType,
-    required double latitude,
-    required double longitude,
-    required DateTime createdAt,
-    required DateTime updatedAt,
+    @Default('') String id,
+    @Default('') String userId,
+    @Default('PENDING') String status,
+    @Default('OTHER') String emergencyType,
+    @JsonKey(fromJson: doubleFromJson) @Default(0.0) double latitude,
+    @JsonKey(fromJson: doubleFromJson) @Default(0.0) double longitude,
+    DateTime? createdAt,
+    DateTime? updatedAt,
     String? responderId,
     @Default(false) bool voiceAlertGenerated,
     String? additionalInfo,
@@ -30,8 +31,8 @@ class Emergency with _$Emergency {
 class CreateEmergencyRequest with _$CreateEmergencyRequest {
   const factory CreateEmergencyRequest({
     required String emergencyType,
-    required double latitude,
-    required double longitude,
+    @JsonKey(fromJson: doubleFromJson) required double latitude,
+    @JsonKey(fromJson: doubleFromJson) required double longitude,
     String? additionalInfo,
     @Default('NORMAL') String priority,
   }) = _CreateEmergencyRequest;
@@ -55,8 +56,8 @@ class UpdateEmergencyStatusRequest with _$UpdateEmergencyStatusRequest {
 class EmergencyLocation with _$EmergencyLocation {
   const factory EmergencyLocation({
     required String emergencyId,
-    required double latitude,
-    required double longitude,
+    @JsonKey(fromJson: doubleFromJson) required double latitude,
+    @JsonKey(fromJson: doubleFromJson) required double longitude,
     required DateTime timestamp,
   }) = _EmergencyLocation;
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/app_header.dart';
 import '../../../domain/entities/caregiver_connection.dart';
 
 class MyPatientsScreen extends ConsumerStatefulWidget {
@@ -34,34 +35,42 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Managed Patients'),
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: AppColors.primary,
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: AppColors.primary,
-          tabs: const [
-            Tab(text: 'All'),
-            Tab(text: 'Pending'),
-            Tab(text: 'Failed'),
+      body: SafeArea(
+        child: Column(
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: AppHeader(greetingOverride: 'Managed Patients'),
+            ),
+            TabBar(
+              controller: _tabController,
+              labelColor: AppColors.primary,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: AppColors.primary,
+              tabs: const [
+                Tab(text: 'All'),
+                Tab(text: 'Pending'),
+                Tab(text: 'Failed'),
+              ],
+            ),
+            Expanded(
+              child: linksAsync.when(
+                data: (links) {
+                  return TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildLinksList(links, 'ALL'),
+                      _buildLinksList(links, 'PENDING'),
+                      _buildLinksList(links, 'REJECTED'),
+                    ],
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => Center(child: Text('Error: $err')),
+              ),
+            ),
           ],
         ),
-      ),
-      body: linksAsync.when(
-        data: (links) {
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              _buildLinksList(links, 'ALL'),
-              _buildLinksList(links, 'PENDING'),
-              _buildLinksList(links, 'REJECTED'),
-            ],
-          );
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(child: Text('Error: $err')),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/caregiver/link-patient'),

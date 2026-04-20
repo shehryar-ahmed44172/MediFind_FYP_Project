@@ -735,7 +735,7 @@ class MediFindApiClient {
   // MEDICAL PROFILE ENDPOINTS
   Future<List<dynamic>> getReports() async {
     try {
-      final response = await _dio.get('/api/medical-profiles/reports');
+      final response = await _dio.get('reports/profile');
 
       if (response.statusCode == 200) {
         return response.data['data'] as List<dynamic>;
@@ -750,10 +750,10 @@ class MediFindApiClient {
   Future<dynamic> uploadReport(File file, String type) async {
     try {
       final formData = FormData.fromMap({
-        'file': await MultipartFile.fromFile(file.path),
+        'report': await MultipartFile.fromFile(file.path),
         'type': type,
       });
-      final response = await _dio.post('/api/medical-profiles/reports', data: formData);
+      final response = await _dio.post('reports/profile', data: formData);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         return response.data['data'];

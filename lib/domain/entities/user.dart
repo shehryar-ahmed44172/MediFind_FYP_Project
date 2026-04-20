@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/utils/parsers.dart';
 
 part 'user.freezed.dart';
 part 'user.g.dart';
@@ -57,7 +58,7 @@ class AuthResponse with _$AuthResponse {
   const factory AuthResponse({
     @JsonKey(name: 'token') required String accessToken,
     @Default('') String refreshToken, // Backend docs don't show this, adding default
-    @Default(3600) int expiresIn,
+    @JsonKey(fromJson: intFromJson) @Default(3600) int expiresIn,
     required String userId,
     required String fullName,
     required String email,

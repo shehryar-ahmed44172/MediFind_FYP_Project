@@ -8,14 +8,20 @@ part of 'emergency.dart';
 
 _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
     _$EmergencyImpl(
-      id: json['id'] as String,
-      userId: json['userId'] as String,
-      status: json['status'] as String,
-      emergencyType: json['emergencyType'] as String,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      updatedAt: DateTime.parse(json['updatedAt'] as String),
+      id: json['id'] as String? ?? '',
+      userId: json['userId'] as String? ?? '',
+      status: json['status'] as String? ?? 'PENDING',
+      emergencyType: json['emergencyType'] as String? ?? 'OTHER',
+      latitude:
+          json['latitude'] == null ? 0.0 : doubleFromJson(json['latitude']),
+      longitude:
+          json['longitude'] == null ? 0.0 : doubleFromJson(json['longitude']),
+      createdAt: json['createdAt'] == null
+          ? null
+          : DateTime.parse(json['createdAt'] as String),
+      updatedAt: json['updatedAt'] == null
+          ? null
+          : DateTime.parse(json['updatedAt'] as String),
       responderId: json['responderId'] as String?,
       voiceAlertGenerated: json['voiceAlertGenerated'] as bool? ?? false,
       additionalInfo: json['additionalInfo'] as String?,
@@ -36,8 +42,8 @@ Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
       'emergencyType': instance.emergencyType,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
-      'createdAt': instance.createdAt.toIso8601String(),
-      'updatedAt': instance.updatedAt.toIso8601String(),
+      'createdAt': instance.createdAt?.toIso8601String(),
+      'updatedAt': instance.updatedAt?.toIso8601String(),
       'responderId': instance.responderId,
       'voiceAlertGenerated': instance.voiceAlertGenerated,
       'additionalInfo': instance.additionalInfo,
@@ -50,8 +56,8 @@ _$CreateEmergencyRequestImpl _$$CreateEmergencyRequestImplFromJson(
         Map<String, dynamic> json) =>
     _$CreateEmergencyRequestImpl(
       emergencyType: json['emergencyType'] as String,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      latitude: doubleFromJson(json['latitude']),
+      longitude: doubleFromJson(json['longitude']),
       additionalInfo: json['additionalInfo'] as String?,
       priority: json['priority'] as String? ?? 'NORMAL',
     );
@@ -84,8 +90,8 @@ _$EmergencyLocationImpl _$$EmergencyLocationImplFromJson(
         Map<String, dynamic> json) =>
     _$EmergencyLocationImpl(
       emergencyId: json['emergencyId'] as String,
-      latitude: (json['latitude'] as num).toDouble(),
-      longitude: (json['longitude'] as num).toDouble(),
+      latitude: doubleFromJson(json['latitude']),
+      longitude: doubleFromJson(json['longitude']),
       timestamp: DateTime.parse(json['timestamp'] as String),
     );
 

@@ -2,26 +2,27 @@ import 'package:flutter/material.dart';
 import '../providers/accessibility_provider.dart';
 
 class AppColors {
-  // Primary colors — MediFind Logo Teal Gradient
+  // Primary colors — Updated to match logo (#0C637E, #2496A7, #2891C2)
   static const MaterialColor primary = MaterialColor(
-    0xFF0E9AA7,
+    0xFF0C637E,
     <int, Color>{
-      50: Color(0xFFE2F3F4),
-      100: Color(0xFFB7E2E5),
-      200: Color(0xFF87CFD5),
-      300: Color(0xFF57BBC4),
-      400: Color(0xFF33ADB9),
-      500: Color(0xFF0E9AA7),
-      600: Color(0xFF0C929F),
-      700: Color(0xFF0A8895),
-      800: Color(0xFF087E8B),
-      900: Color(0xFF056C7A),
+      50: Color(0xFFE2F0F3),
+      100: Color(0xFFB7D9E0),
+      200: Color(0xFF87C0CD),
+      300: Color(0xFF57A6B9),
+      400: Color(0xFF3393A9),
+      500: Color(0xFF0C637E), // Base Navy-Teal
+      600: Color(0xFF0A5B76),
+      700: Color(0xFF08516B),
+      800: Color(0xFF064761),
+      900: Color(0xFF04364E),
     },
   );
-  static const Color primaryLight = Color(0xFF1CBBB4);   // Logo lighter teal (highlights)
-  static const Color primaryDark = Color(0xFF0A7E8C);    // Logo darker teal (shadow areas)
+  static const Color primaryLight = Color(0xFF2891C2);   // Sky Blue from logo
+  static const Color primaryDark = Color(0xFF04364E);    // Deepest logo area
+  static const Color secondaryTeal = Color(0xFF2496A7);   // Mid Teal from logo
 
-  // Secondary colors — Logo charcoal/navy text
+  // Secondary/Neutral colors — Charcoal
   static const MaterialColor secondary = MaterialColor(
     0xFF3D4F5F,
     <int, Color>{
@@ -37,48 +38,25 @@ class AppColors {
       900: Color(0xFF1B2632),
     },
   );
-  static const Color secondaryLight = Color(0xFF5A7084);
-  static const Color secondaryDark = Color(0xFF2B3A47);
 
-  // Accent colors
+  // Status and Accent colors
   static const Color accent = Color(0xFFFF6B6B);
-  static const Color accentLight = Color(0xFFFF8A80);
-  static const Color accentDark = Color(0xFFE53935);
-
-  // Status colors
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFFC107);
   static const Color error = Color(0xFFF44336);
-  static const Color info = Color(0xFF2196F3);
 
-  // Neutral colors
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color black = Color(0xFF000000);
-  static const Color grey50 = Color(0xFFFAFAFA);
-  static const Color grey100 = Color(0xFFF5F5F5);
-  static const Color grey200 = Color(0xFFEEEEEE);
-  static const Color grey300 = Color(0xFFE0E0E0);
-  static const Color grey400 = Color(0xFFBDBDBD);
-  static const Color grey500 = Color(0xFF9E9E9E);
-  static const Color grey600 = Color(0xFF757575);
-  static const Color grey700 = Color(0xFF616161);
-  static const Color grey800 = Color(0xFF424242);
-  static const Color grey900 = Color(0xFF212121);
-
-  // Semantic colors - NEUMORPHIC BACKGROUND
-  static const Color background = Color(0xFFE0E5EC); // Neumorphic base
+  // Semantic Neumorphic Background
+  static const Color background = Color(0xFFE0E5EC); 
   static const Color surface = Color(0xFFE0E5EC);
-  static const Color surfaceVariant = Color(0xFFD1D9E6);
   static const Color onBackground = Color(0xFF212121);
   static const Color onSurface = Color(0xFF212121);
   static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color onSecondary = Color(0xFFFFFFFF);
 
-  // MediFind Logo Gradient (for gradient decorations)
+  // MediFind Logo Gradient updated to new colors
   static const List<Color> medifindGradient = [
-    Color(0xFF0A7E8C),  // dark teal
-    Color(0xFF0E9AA7),  // primary teal
-    Color(0xFF1CBBB4),  // light teal
+    Color(0xFF0C637E),  // dark navy teal
+    Color(0xFF2496A7),  // mid teal
+    Color(0xFF2891C2),  // sky blue
   ];
 }
 
@@ -236,6 +214,15 @@ class AppTheme {
       textTheme: _buildTextTheme(settings),
       elevatedButtonTheme: _buildElevatedButtonTheme(settings),
       inputDecorationTheme: _buildInputDecorationTheme(settings),
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: {
+          TargetPlatform.android: ZoomPageTransitionsBuilder(
+            allowEnterRouteSnapshotting: false,
+          ),
+          TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+          TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+        },
+      ),
     );
 
     return baseTheme;

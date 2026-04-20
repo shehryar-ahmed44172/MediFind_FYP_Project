@@ -13,7 +13,7 @@ _$MedicalReportImpl _$$MedicalReportImplFromJson(Map<String, dynamic> json) =>
       reportType: json['reportType'] as String,
       downloadUrl: json['downloadUrl'] as String,
       uploadedAt: DateTime.parse(json['uploadedAt'] as String),
-      fileSizeBytes: (json['fileSizeBytes'] as num).toInt(),
+      fileSizeBytes: intFromJson(json['fileSizeBytes']),
       userId: json['userId'] as String?,
       mimeType: json['mimeType'] as String?,
     );

@@ -26,6 +26,7 @@ mixin _$MedicalReport {
       throw _privateConstructorUsedError; // LAB, IMAGING, PRESCRIPTION, OTHER
   String get downloadUrl => throw _privateConstructorUsedError;
   DateTime get uploadedAt => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: intFromJson)
   int get fileSizeBytes => throw _privateConstructorUsedError;
   String? get userId => throw _privateConstructorUsedError;
   String? get mimeType => throw _privateConstructorUsedError;
@@ -48,7 +49,7 @@ abstract class $MedicalReportCopyWith<$Res> {
       String reportType,
       String downloadUrl,
       DateTime uploadedAt,
-      int fileSizeBytes,
+      @JsonKey(fromJson: intFromJson) int fileSizeBytes,
       String? userId,
       String? mimeType});
 }
@@ -126,7 +127,7 @@ abstract class _$$MedicalReportImplCopyWith<$Res>
       String reportType,
       String downloadUrl,
       DateTime uploadedAt,
-      int fileSizeBytes,
+      @JsonKey(fromJson: intFromJson) int fileSizeBytes,
       String? userId,
       String? mimeType});
 }
@@ -197,7 +198,7 @@ class _$MedicalReportImpl implements _MedicalReport {
       required this.reportType,
       required this.downloadUrl,
       required this.uploadedAt,
-      required this.fileSizeBytes,
+      @JsonKey(fromJson: intFromJson) required this.fileSizeBytes,
       this.userId,
       this.mimeType});
 
@@ -216,6 +217,7 @@ class _$MedicalReportImpl implements _MedicalReport {
   @override
   final DateTime uploadedAt;
   @override
+  @JsonKey(fromJson: intFromJson)
   final int fileSizeBytes;
   @override
   final String? userId;
@@ -274,7 +276,7 @@ abstract class _MedicalReport implements MedicalReport {
       required final String reportType,
       required final String downloadUrl,
       required final DateTime uploadedAt,
-      required final int fileSizeBytes,
+      @JsonKey(fromJson: intFromJson) required final int fileSizeBytes,
       final String? userId,
       final String? mimeType}) = _$MedicalReportImpl;
 
@@ -292,6 +294,7 @@ abstract class _MedicalReport implements MedicalReport {
   @override
   DateTime get uploadedAt;
   @override
+  @JsonKey(fromJson: intFromJson)
   int get fileSizeBytes;
   @override
   String? get userId;

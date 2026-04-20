@@ -44,7 +44,7 @@ class VoiceAlertService {
       await _flutterTts.setLanguage('en-US');
 
       // Set speech rate (0.0 to 2.0)
-      await _flutterTts.setSpeechRate(0.8);
+      await _flutterTts.setSpeechRate(0.5);
 
       // Set pitch
       await _flutterTts.setPitch(1.0);

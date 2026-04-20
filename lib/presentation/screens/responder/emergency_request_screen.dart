@@ -172,9 +172,9 @@ class _EmergencyRequestScreenState
         emergencyType: emergency.emergencyType,
         patientName: 'Patient',
         distance: '...',
-        bloodGroup: 'Unknown',
-        allergies: 'Error loading',
-        conditions: 'Error loading profile',
+        bloodGroup: 'Not provided',
+        allergies: 'No record share requested',
+        conditions: 'Medical profile not provided by patient',
       ),
     );
   }

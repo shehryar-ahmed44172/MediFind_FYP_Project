@@ -11,6 +11,7 @@ import 'my_patients_screen.dart';
 import 'caregiver_map_screen.dart';
 import 'caregiver_history_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../../widgets/common/app_header.dart';
 
 class CaregiverHomeScreen extends ConsumerStatefulWidget {
   const CaregiverHomeScreen({Key? key}) : super(key: key);
@@ -44,18 +45,18 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
   Widget _buildBottomNav(ThemeData theme) {
     return Container(
       decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
+        color: AppColors.primary,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFA3B1C6).withOpacity(0.4),
-            blurRadius: 20,
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 15,
             offset: const Offset(0, -5),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -73,7 +74,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
 
   Widget _buildNavItem(IconData icon, String label, int index, ThemeData theme) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? AppColors.primary : Colors.grey.shade500;
+    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.4);
 
     return InkWell(
       onTap: () => setState(() => _currentIndex = index),
@@ -82,7 +83,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? color.withOpacity(0.1) : Colors.transparent,
+          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -116,28 +117,23 @@ class _DashboardView extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: () => ref.refresh(getLinkedPatientsProvider.future),
-          child: CustomScrollView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              // 1. Header
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
-                  child: _buildHeader(context, ref, asyncUser, theme),
-                ),
-              ),
-
-              // 2. Stats
-              SliverToBoxAdapter(
-                child: asyncPatients.when(
-                  data: (patients) => _buildStatsRow(context, patients, theme),
-                  loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-                  error: (_, __) => const SizedBox.shrink(),
-                ),
-              ),
+      body: Column(
+        children: [
+          const AppHeader(showLogout: true),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: () => ref.refresh(getLinkedPatientsProvider.future),
+              child: CustomScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                slivers: [
+                  // 2. Stats
+                  SliverToBoxAdapter(
+                    child: asyncPatients.when(
+                      data: (patients) => _buildStatsRow(context, patients, theme),
+                      loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ),
 
               // 3. Monitored Patients Title
               SliverToBoxAdapter(
@@ -187,57 +183,8 @@ class _DashboardView extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-
-  // UI Components extracted from previous version
-  Widget _buildHeader(BuildContext context, WidgetRef ref, AsyncValue<dynamic> asyncUser, ThemeData theme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Hello Caregiver,', style: TextStyle(color: Colors.grey.shade600, fontSize: 14)),
-            asyncUser.when(
-              data: (user) => Text(
-                user?.fullName ?? 'Caregiver',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              loading: () => const SizedBox(height: 28, width: 100, child: LinearProgressIndicator()),
-              error: (_, __) => const Text('Welcome Back', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            ),
           ],
         ),
-        Row(
-          children: [
-             _buildCircularAction(context, Icons.notifications_none_rounded, theme, () {}),
-             const SizedBox(width: 12),
-             _buildCircularAction(context, Icons.logout_rounded, theme, () async {
-                  await ref.read(logoutProvider.future);
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-             }, color: Colors.red.shade400),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCircularAction(BuildContext context, IconData icon, ThemeData theme, VoidCallback onTap, {Color? color}) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          shape: BoxShape.circle,
-          boxShadow: AppShadows.neumorphicOut,
-        ),
-        child: Icon(icon, color: color ?? Colors.black87, size: 22),
-      ),
     );
   }
 
@@ -245,11 +192,11 @@ class _DashboardView extends ConsumerWidget {
     final activeAlerts = patients.where((p) => p.hasActiveEmergency == true).length;
     
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
       child: Row(
         children: [
-          _buildStatCard(context, 'Monitored', patients.length.toString(), Icons.people_rounded, AppColors.primary, theme),
-          const SizedBox(width: 16),
+          _buildStatCard(context, 'Total Monitored', patients.length.toString(), Icons.people_rounded, AppColors.primary, theme),
+          const SizedBox(width: 20),
           _buildStatCard(context, 'Active Alerts', activeAlerts.toString(), Icons.warning_amber_rounded, activeAlerts > 0 ? Colors.red : Colors.green, theme),
         ],
       ),
@@ -259,25 +206,37 @@ class _DashboardView extends ConsumerWidget {
   Widget _buildStatCard(BuildContext context, String title, String value, IconData icon, Color color, ThemeData theme) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
         decoration: BoxDecoration(
           color: theme.scaffoldBackgroundColor,
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(28),
           boxShadow: AppShadows.neumorphicOut,
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(8),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withOpacity(0.12),
                 shape: BoxShape.circle,
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: color, size: 28),
             ),
             const SizedBox(height: 12),
-            Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
-            Text(title, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: color)),
+            const SizedBox(height: 4),
+            Text(
+              title, 
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12, 
+                fontWeight: FontWeight.w600, 
+                color: Colors.grey.shade600,
+                letterSpacing: 0.2,
+              ),
+            ),
           ],
         ),
       ),
@@ -313,17 +272,17 @@ class _DashboardView extends ConsumerWidget {
                     alignment: Alignment.bottomRight,
                     children: [
                       CircleAvatar(
-                        radius: 30,
-                        backgroundColor: statusColor.withOpacity(0.1),
-                        child: Icon(Icons.person_rounded, size: 36, color: statusColor),
+                        radius: 34,
+                        backgroundColor: statusColor.withOpacity(0.12),
+                        child: Icon(Icons.person_rounded, size: 40, color: statusColor),
                       ),
                       Container(
-                        width: 16,
-                        height: 16,
+                        width: 18,
+                        height: 18,
                         decoration: BoxDecoration(
                           color: statusColor,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: Colors.white, width: 2.5),
                         ),
                       ),
                     ],

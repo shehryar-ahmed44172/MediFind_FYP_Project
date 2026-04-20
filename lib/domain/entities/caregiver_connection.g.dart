@@ -12,6 +12,7 @@ _$CaregiverConnectionImpl _$$CaregiverConnectionImplFromJson(
       id: json['id'] as String,
       patientId: json['patientId'] as String,
       caregiverId: json['caregiverId'] as String,
+      requesterId: json['requesterId'] as String?,
       patientName: json['patientName'] as String?,
       patientEmail: json['patientEmail'] as String?,
       caregiverName: json['caregiverName'] as String?,
@@ -26,7 +27,7 @@ _$CaregiverConnectionImpl _$$CaregiverConnectionImplFromJson(
           : DateTime.parse(json['updatedAt'] as String),
       hasActiveEmergency: json['hasActiveEmergency'] as bool?,
       activeEmergencyId: json['activeEmergencyId'] as String?,
-      patientAge: (json['patientAge'] as num?)?.toInt(),
+      patientAge: intFromJson(json['patientAge']),
       bloodType: json['bloodType'] as String?,
     );
 
@@ -36,6 +37,7 @@ Map<String, dynamic> _$$CaregiverConnectionImplToJson(
       'id': instance.id,
       'patientId': instance.patientId,
       'caregiverId': instance.caregiverId,
+      'requesterId': instance.requesterId,
       'patientName': instance.patientName,
       'patientEmail': instance.patientEmail,
       'caregiverName': instance.caregiverName,

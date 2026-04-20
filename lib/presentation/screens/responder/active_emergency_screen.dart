@@ -23,6 +23,10 @@ class ActiveEmergencyScreen extends ConsumerStatefulWidget {
 class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   String _currentStatus = 'ACCEPTED';
   StreamSubscription<Position>? _locationSubscription;
+  
+  // Plan v6: Patient tracking coordinates
+  double? _patientLat;
+  double? _patientLng;
 
   final List<Map<String, dynamic>> _statusSteps = [
     {'status': 'ACCEPTED', 'label': 'Request Accepted', 'icon': Icons.check_circle_outline},
@@ -124,23 +128,45 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
 
             // Map placeholder (Google Maps would go here)
             Container(
-              height: 200,
+              height: 250, // Increased for pin visibility
               decoration: BoxDecoration(
                 color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(24),
                 boxShadow: AppShadows.neumorphicIn,
               ),
-              child: const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
                   children: [
-                    Icon(Icons.map_outlined, size: 48, color: AppColors.primary),
-                    SizedBox(height: 8),
-                    Text('Navigation Map',
-                        style: TextStyle(
-                            color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    Text('(Google Maps — requires API key)',
-                        style: TextStyle(color: Colors.grey, fontSize: 12)),
+                    // Grid Simulation
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _GridPainter(),
+                      ),
+                    ),
+                    const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.map_outlined, size: 32, color: AppColors.primaryOpacity),
+                          Text('Navigating to Patient...', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    
+                    // Patient Pin (Plan v6: Tracking target)
+                    Positioned(
+                      top: 100,
+                      left: 150,
+                      child: _buildMapPin(Icons.person_pin_circle_rounded, AppColors.primaryDark),
+                    ),
+                    
+                    // Responder Pin (Self - Plan v6: Simulation)
+                    Positioned(
+                      bottom: 40,
+                      right: 60,
+                      child: _buildMapPin(Icons.directions_car_filled_rounded, Colors.green),
+                    ),
                   ],
                 ),
               ),

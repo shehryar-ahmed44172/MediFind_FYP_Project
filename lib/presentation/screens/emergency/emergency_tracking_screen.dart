@@ -6,6 +6,7 @@ import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../domain/entities/emergency.dart';
+import '../../services/haptic_feedback_service.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -15,15 +16,21 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<EmergencyTrackingScreen> createState() => _EmergencyTrackingScreenState();
 }
 
-class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScreen> {
-  String _currentStatus = 'RESPONDER_ASSIGNED';
-  String _eta = 'calculating...';
+  double? _responderLat;
+  double? _responderLong;
+  String? _responderName;
+  String? _responderPhone;
 
   @override
   void initState() {
     super.initState();
-    // Connect Socket when screen opens
+    // Connect Socket and join rooms when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      final socketService = SocketService.instance;
+      socketService.joinEmergencyRoom(widget.emergencyId);
+      socketService.joinLocationRoom(widget.emergencyId);
+      
+      // Ensure the listener provider is active (Plan v5)
       ref.read(socketStreamProvider);
     });
   }
@@ -37,9 +44,31 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     ref.listen(socketStreamProvider, (previous, next) {
       if (next.hasValue) {
         final message = next.value!;
+        final data = message.data as Map<String, dynamic>;
+
         if (message.event == SocketEvent.emergencyStatusChange) {
-          final data = message.data as Map<String, dynamic>;
-          setState(() => _currentStatus = data['status']?.toString() ?? _currentStatus);
+          final newStatus = data['status']?.toString() ?? data['newStatus']?.toString() ?? _currentStatus;
+          setState(() {
+            _currentStatus = newStatus;
+            // Plan v6: Capture responder details if assigned
+            if (data['responderName'] != null) _responderName = data['responderName'];
+            if (data['responderPhone'] != null) _responderPhone = data['responderPhone'];
+          });
+          
+          // Accessibility: Visual/Haptic feedback on arrival
+          final user = ref.read(currentUserProvider).valueOrNull;
+          if (newStatus == 'ARRIVED' && user?.patientType == 'DEAF') {
+            HapticFeedbackService.sosPattern();
+          }
+        } 
+        else if (message.event == SocketEvent.responderLocationUpdate) {
+          // Plan v6: Update real-time map marker location
+          setState(() {
+            _responderLat = double.tryParse(data['latitude'].toString());
+            _responderLong = double.tryParse(data['longitude'].toString());
+            _eta = data['eta']?.toString() ?? _eta;
+          });
+          print('📍 Live Tracking Update: $_responderLat, $_responderLong');
         }
       }
     });
@@ -83,9 +112,15 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         ),
 
         // 3. Floating Ambulance / User map pins mock
-        Positioned(
-          top: MediaQuery.of(context).size.height * 0.4,
-          left: MediaQuery.of(context).size.width * 0.3,
+        // Pin positions animate based on live responder data (Plan v6)
+        AnimatedPositioned(
+          duration: const Duration(seconds: 1),
+          top: _responderLat != null 
+              ? (MediaQuery.of(context).size.height * 0.4) + ((_responderLat! - emergency.latitude) * 1000)
+              : MediaQuery.of(context).size.height * 0.4,
+          left: _responderLong != null 
+              ? (MediaQuery.of(context).size.width * 0.3) + ((_responderLong! - emergency.longitude) * 1000)
+              : MediaQuery.of(context).size.width * 0.3,
           child: _buildMapPin(Icons.local_hospital_rounded, Colors.red.shade700),
         ),
         Positioned(
@@ -101,7 +136,51 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           right: 0,
           child: _buildBottomDetailsSheet(context, theme, emergency),
         ),
+
+        // 5. Visual "Arrived" Overlay for Deaf Users
+        if (_currentStatus == 'ARRIVED' && (ref.watch(currentUserProvider).valueOrNull?.patientType == 'DEAF'))
+          _buildArrivedVisualAlert(theme),
       ],
+    );
+  }
+
+  Widget _buildArrivedVisualAlert(ThemeData theme) {
+    return Positioned.fill(
+      child: Container(
+        color: Colors.green.withOpacity(0.9),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 100),
+            const SizedBox(height: 24),
+            const Text(
+              'HELP IS HERE!',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'The responder has arrived at your location.',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(height: 48),
+            ElevatedButton(
+              onPressed: () => setState(() => _currentStatus = 'RESOLVED'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: Colors.green,
+                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -238,14 +317,14 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                     children: [
                       responderAsync.when(
                         data: (responder) => Text(
-                          responder?.fullName ?? (emergency.responderId != null ? 'Assigned' : 'Finding Responder...'),
+                          _responderName ?? responder?.fullName ?? (emergency.responderId != null ? 'Responder Assigned' : 'Finding Responder...'),
                           style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
                           ),
                         ),
-                        loading: () => const Text('Loading...', style: TextStyle(fontWeight: FontWeight.bold)),
-                        error: (_, __) => const Text('Responder'),
+                        loading: () => Text(_responderName ?? 'Loading...', style: const TextStyle(fontWeight: FontWeight.bold)),
+                        error: (_, __) => Text(_responderName ?? 'Assigned Responder'),
                       ),
                       const SizedBox(height: 4),
                       Row(

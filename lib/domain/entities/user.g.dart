@@ -91,7 +91,8 @@ _$AuthResponseImpl _$$AuthResponseImplFromJson(Map<String, dynamic> json) =>
     _$AuthResponseImpl(
       accessToken: json['token'] as String,
       refreshToken: json['refreshToken'] as String? ?? '',
-      expiresIn: (json['expiresIn'] as num?)?.toInt() ?? 3600,
+      expiresIn:
+          json['expiresIn'] == null ? 3600 : intFromJson(json['expiresIn']),
       userId: json['userId'] as String,
       fullName: json['fullName'] as String,
       email: json['email'] as String,

@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../core/utils/parsers.dart';
 
 part 'caregiver_connection.freezed.dart';
 part 'caregiver_connection.g.dart';
@@ -9,6 +10,7 @@ class CaregiverConnection with _$CaregiverConnection {
     required String id,
     required String patientId,
     required String caregiverId,
+    String? requesterId,
     String? patientName,
     String? patientEmail,
     String? caregiverName,
@@ -19,7 +21,7 @@ class CaregiverConnection with _$CaregiverConnection {
     DateTime? updatedAt,
     bool? hasActiveEmergency,
     String? activeEmergencyId,
-    int? patientAge,
+    @JsonKey(fromJson: intFromJson) int? patientAge,
     String? bloodType,
   }) = _CaregiverConnection;
 

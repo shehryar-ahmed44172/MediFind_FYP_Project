@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/app_header.dart';
 
 class MedicalProfileScreen extends ConsumerWidget {
   const MedicalProfileScreen({Key? key}) : super(key: key);
@@ -21,18 +22,11 @@ class MedicalProfileScreen extends ConsumerWidget {
   Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId) {
     final profileAsync = ref.watch(getMedicalProfileProvider(userId));
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Medical Profile'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit_outlined),
-            tooltip: 'Edit Profile',
-            onPressed: () => context.go('/home/medical-profile/edit'),
-          ),
-        ],
-      ),
-      body: profileAsync.when(
+      body: Column(
+        children: [
+          const AppHeader(greetingOverride: 'Medical Profile'),
+          Expanded(
+            child: profileAsync.when(
         data: (profile) {
           if (profile == null) {
             return Center(
@@ -155,9 +149,12 @@ class MedicalProfileScreen extends ConsumerWidget {
             ],
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error loading profile: $e')),
-      ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(child: Text('Error loading profile: $e')),
+              ),
+            ),
+          ],
+        ),
     );
   }
 }

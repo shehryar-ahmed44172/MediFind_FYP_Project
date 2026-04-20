@@ -152,7 +152,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         };
       default:
         return {
-          'color': const Color(0xFF0E9AA7), // MediFind primary teal
+          'color': AppColors.primary, // MediFind primary logo color
           'icon': Icons.person_rounded,
           'label': 'Patient',
         };

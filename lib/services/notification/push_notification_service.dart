@@ -5,6 +5,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import '../../presentation/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import '../audio/voice_alert_service.dart';
+import '../../data/datasources/local/local_data_source.dart';
 
 // Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -17,9 +18,11 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 class PushNotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   static BuildContext? _currentDialogContext;
+  static LocalDataSource? _localDataSource;
 
-  static Future<void> initialize(BuildContext context) async {
+  static Future<void> initialize(BuildContext context, LocalDataSource localDataSource) async {
     try {
+      _localDataSource = localDataSource;
       await Firebase.initializeApp();
       
       // Request permissions
@@ -36,11 +39,17 @@ class PushNotificationService {
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
       // Handle foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
         print('Got a message whilst in the foreground!');
         
         final type = message.data['type'];
-        if (type == 'EMERGENCY_REQUEST') {
+        // Plan v4: Support both legacy and new notification types
+        if (type == 'EMERGENCY_REQUEST' || type == 'SOS_TRIGGERED') {
+          // Plan v5: Persist to local DB so Home Page updates automatically
+          if (_localDataSource != null) {
+            await _localDataSource!.saveEmergency(message.data);
+            debugPrint('✅ Persisted incoming emergency ${message.data['id']} to local storage');
+          }
           _showCustomEmergencyModal(context, message.data);
         } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED') {
           _dismissCurrentEmergencyModal();

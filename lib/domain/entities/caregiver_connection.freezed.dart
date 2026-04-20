@@ -23,6 +23,7 @@ mixin _$CaregiverConnection {
   String get id => throw _privateConstructorUsedError;
   String get patientId => throw _privateConstructorUsedError;
   String get caregiverId => throw _privateConstructorUsedError;
+  String? get requesterId => throw _privateConstructorUsedError;
   String? get patientName => throw _privateConstructorUsedError;
   String? get patientEmail => throw _privateConstructorUsedError;
   String? get caregiverName => throw _privateConstructorUsedError;
@@ -34,6 +35,7 @@ mixin _$CaregiverConnection {
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   bool? get hasActiveEmergency => throw _privateConstructorUsedError;
   String? get activeEmergencyId => throw _privateConstructorUsedError;
+  @JsonKey(fromJson: intFromJson)
   int? get patientAge => throw _privateConstructorUsedError;
   String? get bloodType => throw _privateConstructorUsedError;
 
@@ -53,6 +55,7 @@ abstract class $CaregiverConnectionCopyWith<$Res> {
       {String id,
       String patientId,
       String caregiverId,
+      String? requesterId,
       String? patientName,
       String? patientEmail,
       String? caregiverName,
@@ -63,7 +66,7 @@ abstract class $CaregiverConnectionCopyWith<$Res> {
       DateTime? updatedAt,
       bool? hasActiveEmergency,
       String? activeEmergencyId,
-      int? patientAge,
+      @JsonKey(fromJson: intFromJson) int? patientAge,
       String? bloodType});
 }
 
@@ -83,6 +86,7 @@ class _$CaregiverConnectionCopyWithImpl<$Res, $Val extends CaregiverConnection>
     Object? id = null,
     Object? patientId = null,
     Object? caregiverId = null,
+    Object? requesterId = freezed,
     Object? patientName = freezed,
     Object? patientEmail = freezed,
     Object? caregiverName = freezed,
@@ -109,6 +113,10 @@ class _$CaregiverConnectionCopyWithImpl<$Res, $Val extends CaregiverConnection>
           ? _value.caregiverId
           : caregiverId // ignore: cast_nullable_to_non_nullable
               as String,
+      requesterId: freezed == requesterId
+          ? _value.requesterId
+          : requesterId // ignore: cast_nullable_to_non_nullable
+              as String?,
       patientName: freezed == patientName
           ? _value.patientName
           : patientName // ignore: cast_nullable_to_non_nullable
@@ -173,6 +181,7 @@ abstract class _$$CaregiverConnectionImplCopyWith<$Res>
       {String id,
       String patientId,
       String caregiverId,
+      String? requesterId,
       String? patientName,
       String? patientEmail,
       String? caregiverName,
@@ -183,7 +192,7 @@ abstract class _$$CaregiverConnectionImplCopyWith<$Res>
       DateTime? updatedAt,
       bool? hasActiveEmergency,
       String? activeEmergencyId,
-      int? patientAge,
+      @JsonKey(fromJson: intFromJson) int? patientAge,
       String? bloodType});
 }
 
@@ -201,6 +210,7 @@ class __$$CaregiverConnectionImplCopyWithImpl<$Res>
     Object? id = null,
     Object? patientId = null,
     Object? caregiverId = null,
+    Object? requesterId = freezed,
     Object? patientName = freezed,
     Object? patientEmail = freezed,
     Object? caregiverName = freezed,
@@ -227,6 +237,10 @@ class __$$CaregiverConnectionImplCopyWithImpl<$Res>
           ? _value.caregiverId
           : caregiverId // ignore: cast_nullable_to_non_nullable
               as String,
+      requesterId: freezed == requesterId
+          ? _value.requesterId
+          : requesterId // ignore: cast_nullable_to_non_nullable
+              as String?,
       patientName: freezed == patientName
           ? _value.patientName
           : patientName // ignore: cast_nullable_to_non_nullable
@@ -286,6 +300,7 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
       {required this.id,
       required this.patientId,
       required this.caregiverId,
+      this.requesterId,
       this.patientName,
       this.patientEmail,
       this.caregiverName,
@@ -296,7 +311,7 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
       this.updatedAt,
       this.hasActiveEmergency,
       this.activeEmergencyId,
-      this.patientAge,
+      @JsonKey(fromJson: intFromJson) this.patientAge,
       this.bloodType});
 
   factory _$CaregiverConnectionImpl.fromJson(Map<String, dynamic> json) =>
@@ -308,6 +323,8 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
   final String patientId;
   @override
   final String caregiverId;
+  @override
+  final String? requesterId;
   @override
   final String? patientName;
   @override
@@ -330,13 +347,14 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
   @override
   final String? activeEmergencyId;
   @override
+  @JsonKey(fromJson: intFromJson)
   final int? patientAge;
   @override
   final String? bloodType;
 
   @override
   String toString() {
-    return 'CaregiverConnection(id: $id, patientId: $patientId, caregiverId: $caregiverId, patientName: $patientName, patientEmail: $patientEmail, caregiverName: $caregiverName, caregiverEmail: $caregiverEmail, relationship: $relationship, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, hasActiveEmergency: $hasActiveEmergency, activeEmergencyId: $activeEmergencyId, patientAge: $patientAge, bloodType: $bloodType)';
+    return 'CaregiverConnection(id: $id, patientId: $patientId, caregiverId: $caregiverId, requesterId: $requesterId, patientName: $patientName, patientEmail: $patientEmail, caregiverName: $caregiverName, caregiverEmail: $caregiverEmail, relationship: $relationship, status: $status, createdAt: $createdAt, updatedAt: $updatedAt, hasActiveEmergency: $hasActiveEmergency, activeEmergencyId: $activeEmergencyId, patientAge: $patientAge, bloodType: $bloodType)';
   }
 
   @override
@@ -349,6 +367,8 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
                 other.patientId == patientId) &&
             (identical(other.caregiverId, caregiverId) ||
                 other.caregiverId == caregiverId) &&
+            (identical(other.requesterId, requesterId) ||
+                other.requesterId == requesterId) &&
             (identical(other.patientName, patientName) ||
                 other.patientName == patientName) &&
             (identical(other.patientEmail, patientEmail) ||
@@ -381,6 +401,7 @@ class _$CaregiverConnectionImpl implements _CaregiverConnection {
       id,
       patientId,
       caregiverId,
+      requesterId,
       patientName,
       patientEmail,
       caregiverName,
@@ -414,6 +435,7 @@ abstract class _CaregiverConnection implements CaregiverConnection {
       {required final String id,
       required final String patientId,
       required final String caregiverId,
+      final String? requesterId,
       final String? patientName,
       final String? patientEmail,
       final String? caregiverName,
@@ -424,7 +446,7 @@ abstract class _CaregiverConnection implements CaregiverConnection {
       final DateTime? updatedAt,
       final bool? hasActiveEmergency,
       final String? activeEmergencyId,
-      final int? patientAge,
+      @JsonKey(fromJson: intFromJson) final int? patientAge,
       final String? bloodType}) = _$CaregiverConnectionImpl;
 
   factory _CaregiverConnection.fromJson(Map<String, dynamic> json) =
@@ -436,6 +458,8 @@ abstract class _CaregiverConnection implements CaregiverConnection {
   String get patientId;
   @override
   String get caregiverId;
+  @override
+  String? get requesterId;
   @override
   String? get patientName;
   @override
@@ -457,6 +481,7 @@ abstract class _CaregiverConnection implements CaregiverConnection {
   @override
   String? get activeEmergencyId;
   @override
+  @JsonKey(fromJson: intFromJson)
   int? get patientAge;
   @override
   String? get bloodType;

@@ -963,6 +963,7 @@ mixin _$AuthResponse {
   String get accessToken => throw _privateConstructorUsedError;
   String get refreshToken =>
       throw _privateConstructorUsedError; // Backend docs don't show this, adding default
+  @JsonKey(fromJson: intFromJson)
   int get expiresIn => throw _privateConstructorUsedError;
   String get userId => throw _privateConstructorUsedError;
   String get fullName => throw _privateConstructorUsedError;
@@ -984,7 +985,7 @@ abstract class $AuthResponseCopyWith<$Res> {
   $Res call(
       {@JsonKey(name: 'token') String accessToken,
       String refreshToken,
-      int expiresIn,
+      @JsonKey(fromJson: intFromJson) int expiresIn,
       String userId,
       String fullName,
       String email,
@@ -1056,7 +1057,7 @@ abstract class _$$AuthResponseImplCopyWith<$Res>
   $Res call(
       {@JsonKey(name: 'token') String accessToken,
       String refreshToken,
-      int expiresIn,
+      @JsonKey(fromJson: intFromJson) int expiresIn,
       String userId,
       String fullName,
       String email,
@@ -1121,7 +1122,7 @@ class _$AuthResponseImpl implements _AuthResponse {
   const _$AuthResponseImpl(
       {@JsonKey(name: 'token') required this.accessToken,
       this.refreshToken = '',
-      this.expiresIn = 3600,
+      @JsonKey(fromJson: intFromJson) this.expiresIn = 3600,
       required this.userId,
       required this.fullName,
       required this.email,
@@ -1138,7 +1139,7 @@ class _$AuthResponseImpl implements _AuthResponse {
   final String refreshToken;
 // Backend docs don't show this, adding default
   @override
-  @JsonKey()
+  @JsonKey(fromJson: intFromJson)
   final int expiresIn;
   @override
   final String userId;
@@ -1195,7 +1196,7 @@ abstract class _AuthResponse implements AuthResponse {
   const factory _AuthResponse(
       {@JsonKey(name: 'token') required final String accessToken,
       final String refreshToken,
-      final int expiresIn,
+      @JsonKey(fromJson: intFromJson) final int expiresIn,
       required final String userId,
       required final String fullName,
       required final String email,
@@ -1210,6 +1211,7 @@ abstract class _AuthResponse implements AuthResponse {
   @override
   String get refreshToken;
   @override // Backend docs don't show this, adding default
+  @JsonKey(fromJson: intFromJson)
   int get expiresIn;
   @override
   String get userId;

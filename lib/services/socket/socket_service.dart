@@ -35,13 +35,22 @@ class SocketService {
     _authToken = token;
   }
 
-  void connect() {
-    if (_isConnected) return;
+  String? _userId;
+
+  void connect(String userId) {
+    // If already connected for the same user, skip
+    if (_isConnected && _userId == userId) return;
+    
+    // If connected for a different user, disconnect first
+    if (_isConnected) disconnect();
+    
+    _userId = userId;
 
     _socket = IO.io(AppConstants.socketUrl, 
       IO.OptionBuilder()
-        .setTransports(['websocket'])
+        .setTransports(['websocket', 'polling']) // Allow polling as fallback
         .enableAutoConnect()
+        .setAuth({'userId': userId})
         .setExtraHeaders(_authToken != null ? {'Authorization': 'Bearer $_authToken'} : {})
         .build()
     );
@@ -60,6 +69,12 @@ class SocketService {
 
     _socket!.onConnectError((data) => print('Socket Connect Error: $data'));
     _socket!.onError((data) => print('Socket Error: $data'));
+
+    // Generic notification listener (Plan v4)
+    _socket!.on('notification', (data) {
+      print('Socket Notification Received: $data');
+      _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
+    });
 
     // Map guide events
     _socket!.on('NEW_EMERGENCY', (data) {
@@ -81,8 +96,14 @@ class SocketService {
 
   void joinEmergencyRoom(String emergencyId) {
     if (!_isConnected || _socket == null) return;
-    _socket!.emit('join', 'emergency:$emergencyId');
-    print('Joined room: emergency:$emergencyId');
+    _socket!.emit('join:emergency', emergencyId);
+    print('Joined emergency room: $emergencyId');
+  }
+
+  void joinLocationRoom(String emergencyId) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.emit('join:location', emergencyId);
+    print('Joined location tracking room: $emergencyId');
   }
 
   void sendLocationUpdate(double latitude, double longitude) {

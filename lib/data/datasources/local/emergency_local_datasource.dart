@@ -45,8 +45,8 @@ class EmergencyLocalDataSource {
         'latitude': emergency.latitude,
         'longitude': emergency.longitude,
         'additionalInfo': emergency.additionalInfo,
-        'createdAt': emergency.createdAt.toIso8601String(),
-        'updatedAt': emergency.updatedAt.toIso8601String(),
+        'createdAt': emergency.createdAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
+        'updatedAt': emergency.updatedAt?.toIso8601String() ?? DateTime.now().toIso8601String(),
       };
 
       if (emergency.status == 'ACTIVE') {
@@ -85,7 +85,11 @@ class EmergencyLocalDataSource {
       }
 
       // Sort by creation date (newest first)
-      emergencies.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      emergencies.sort((a, b) {
+        final dateA = a.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        final dateB = b.createdAt ?? DateTime.fromMillisecondsSinceEpoch(0);
+        return dateB.compareTo(dateA);
+      });
 
       return emergencies;
     } catch (e) {

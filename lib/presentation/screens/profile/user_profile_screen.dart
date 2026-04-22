@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/profile/invitations_list_widget.dart';
 import '../../../core/constants/app_constants.dart';
@@ -117,12 +118,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final userAsync = ref.watch(currentUserProvider);
+    final settings = ref.watch(accessibilityProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Profile'),
-        centerTitle: true,
-      ),
       body: userAsync.when(
         data: (user) {
           if (user == null) return const Center(child: Text('No user profile found'));
@@ -135,6 +133,53 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               
               const SizedBox(height: 16),
               
+              // Accessibility Mode Badge for Deaf Patients
+              if (settings.textOnlyMode)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 24),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.amber.shade300, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.amber.withOpacity(0.2),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.visibility_rounded, color: Colors.amber.shade900),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Visual Accessibility Active',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: Colors.amber.shade900,
+                                fontSize: 14,
+                              ),
+                            ),
+                            Text(
+                              'High-contrast & visual alerts enabled',
+                              style: TextStyle(
+                                color: Colors.amber.shade800,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // Profile Picture
               Center(
                 child: Hero(
@@ -201,13 +246,54 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     children: [
-                      _profileTile(Icons.person_outline, 'Full Name', user.fullName),
+                      _profileTile(Icons.person_outline, 'Full Name', user.fullName, settings),
                       Divider(color: Colors.grey.withOpacity(0.1), height: 32),
-                      _profileTile(Icons.email_outlined, 'Email', user.email),
+                      _profileTile(Icons.email_outlined, 'Email', user.email, settings),
                       Divider(color: Colors.grey.withOpacity(0.1), height: 32),
-                      _profileTile(Icons.phone_outlined, 'Phone Number', user.phoneNumber),
+                      _profileTile(Icons.phone_outlined, 'Phone Number', user.phoneNumber, settings),
+                      
+                      // CNIC Field
+                      if (user.cnic != null) ...[
+                        Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                        _profileTile(Icons.badge_outlined, 'CNIC', user.cnic!, settings),
+                      ],
+                      
                       Divider(color: Colors.grey.withOpacity(0.1), height: 32),
-                      _profileTile(Icons.badge_outlined, 'Role', user.role),
+                      _profileTile(Icons.security_rounded, 'Role', user.role, settings),
+
+                      // Patient Specific
+                      if (user.role == 'PATIENT' && user.patientType != null) ...[
+                         Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                        _profileTile(Icons.accessible_forward_rounded, 'Patient Type', 
+                          user.patientType!, settings, 
+                          color: user.patientType == 'DEAF' ? Colors.teal : null),
+                      ],
+
+                      // Responder Specific
+                      if (user.role == 'RESPONDER') ...[
+                        if (user.licenseNumber != null) ...[
+                          Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                          _profileTile(Icons.description_outlined, 'License Number', user.licenseNumber!, settings),
+                        ],
+                        if (user.organization != null) ...[
+                          Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                          _profileTile(Icons.business_outlined, 'Organization', user.organization!, settings),
+                        ],
+                        if (user.verificationStatus != null) ...[
+                          Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                          _profileTile(Icons.verified_user_outlined, 'Verification', user.verificationStatus!, settings,
+                            color: user.verificationStatus == 'VERIFIED' ? Colors.green : Colors.orange),
+                        ],
+                        
+                        // Responder Stats
+                        Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                        Row(
+                          children: [
+                            Expanded(child: _profileTile(Icons.star_outline, 'Rating', '${user.rating ?? 5.0}', settings, color: Colors.amber)),
+                            Expanded(child: _profileTile(Icons.assignment_turned_in_outlined, 'Completed', '${user.totalResponsesHandled ?? 0}', settings)),
+                          ],
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -259,21 +345,22 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     );
   }
 
-  Widget _profileTile(IconData icon, String title, String subtitle) {
+  Widget _profileTile(IconData icon, String title, String subtitle, AccessibilitySettings settings, {Color? color}) {
+    final m = settings.fontSizeMultiplier;
     return ListTile(
       contentPadding: EdgeInsets.zero,
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(8 * m),
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.05),
+          color: (color ?? Colors.grey).withOpacity(0.05),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: Colors.grey.shade600, size: 20),
+        child: Icon(icon, color: color ?? Colors.grey.shade600, size: 20 * m),
       ),
       title: Text(title,
-          style: TextStyle(fontSize: 11, color: Colors.grey.shade500, letterSpacing: 1)),
+          style: TextStyle(fontSize: 11 * m, color: Colors.grey.shade500, letterSpacing: 1)),
       subtitle: Text(subtitle,
-          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16 * m)),
     );
   }
 }

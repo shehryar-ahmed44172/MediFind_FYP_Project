@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 
 class AppHeader extends ConsumerWidget {
@@ -24,103 +25,105 @@ class AppHeader extends ConsumerWidget {
     final userAsync = ref.watch(currentUserProvider);
 
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: AppColors.medifindGradient,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(32),
+          bottomRight: Radius.circular(32),
+        ),
       ),
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
           child: Row(
             children: [
-            // Left: App Logo
-            Image.asset(
-              'assets/logos/Medifind_New_Logo-removebg-preview.png',
-              height: 48,
-              fit: BoxFit.contain,
-              color: Colors.white,
-              colorBlendMode: BlendMode.srcIn,
-              errorBuilder: (context, error, stackTrace) => 
-                const Icon(Icons.medication_rounded, color: Colors.white, size: 32),
-            ),
-            
-            const SizedBox(width: 12),
-  
-            // Center: Title (if provided)
-            if (greetingOverride != null)
+              // Left: Back Button OR Logo
+              if (greetingOverride != null && context.canPop())
+                IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
+                  onPressed: () => context.pop(),
+                )
+              else if (greetingOverride == null)
+                Image.asset(
+                  'assets/logos/Medifind_New_Logo-removebg-preview.png',
+                  height: 48,
+                  fit: BoxFit.contain,
+                  color: Colors.white,
+                  colorBlendMode: BlendMode.srcIn,
+                  errorBuilder: (context, error, stackTrace) => 
+                    const Icon(Icons.medication_rounded, color: Colors.white, size: 32),
+                ),
+              
+              if (greetingOverride == null)
+                const SizedBox(width: 8),
+
+              // Center/Title Area
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: centerTitle ? MainAxisAlignment.center : MainAxisAlignment.start,
-                    children: [
+                child: Row(
+                  mainAxisAlignment: centerTitle ? MainAxisAlignment.center : MainAxisAlignment.start,
+                  children: [
+                    if (greetingOverride != null)
                       Flexible(
                         child: Text(
                           greetingOverride!,
-                          style: theme.textTheme.titleMedium?.copyWith(
+                          style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
-                            fontSize: 16,
+                            fontSize: 18 * ref.watch(fontSizeMultiplierProvider),
                           ),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
                       ),
-                      userAsync.when(
-                        data: (user) => user?.patientType == 'DEAF'
-                            ? AnimatedContainer(
-                                duration: const Duration(seconds: 1),
-                                margin: const EdgeInsets.only(left: 8),
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: Colors.amberAccent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(Icons.visibility_rounded, size: 14, color: AppColors.primary),
-                              )
+                    
+                    // Accessibility Badge
+                    userAsync.when(
+                      data: (user) => user?.patientType == 'DEAF'
+                          ? Container(
+                              margin: const EdgeInsets.only(left: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.amberAccent,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.visibility_rounded, size: 14, color: AppColors.primary),
+                            )
                           : const SizedBox.shrink(),
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                      ),
-                    ],
-                  ),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ],
                 ),
-              )
-            else
-              const Spacer(),
-  
-            // Right: Actions
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Notifications
-                _buildActionButton(
-                  icon: Icons.notifications_none_rounded,
-                  theme: theme,
-                  onTap: () => _showNotifications(context, theme),
-                  color: Colors.white,
-                ),
-                
-                if (showLogout) ...[
-                  const SizedBox(width: 8),
+              ),
+
+              // Right: Actions
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   _buildActionButton(
-                    icon: Icons.logout_rounded,
+                    icon: Icons.notifications_none_rounded,
                     theme: theme,
+                    onTap: () => _showNotifications(context, theme),
                     color: Colors.white,
-                    onTap: () => _handleLogout(context, ref),
                   ),
-                ],
-                
+                  
+                  if (showLogout) ...[
+                    const SizedBox(width: 8),
+                    _buildActionButton(
+                      icon: Icons.logout_rounded,
+                      theme: theme,
+                      color: Colors.white,
+                      onTap: () => _handleLogout(context, ref),
+                    ),
+                  ],
+                  
                   if (showProfile) ...[
                     const SizedBox(width: 12),
-                    // Profile Mini-Avatar
                     userAsync.when(
                       data: (user) => GestureDetector(
                         onTap: () => context.push('/profile'),
@@ -130,12 +133,12 @@ class AppHeader extends ConsumerWidget {
                       error: (_, __) => const Icon(Icons.account_circle_rounded, color: Colors.white),
                     ),
                   ],
-              ],
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 
@@ -190,6 +193,7 @@ class AppHeader extends ConsumerWidget {
           ],
         ),
       ],
+
     );
   }
 

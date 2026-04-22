@@ -1,17 +1,24 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/repositories/emergency_repository_impl.dart';
-import '../../domain/entities/emergency.dart';
 import '../../domain/repositories/emergency_repository.dart';
+import '../../services/notification/push_notification_service.dart';
 import 'auth_provider.dart';
 import '../../services/socket/socket_service.dart';
 import '../../services/audio/voice_alert_service.dart';
 import '../../presentation/services/haptic_feedback_service.dart';
+import '../../services/location/location_service.dart';
+import '../../domain/entities/emergency.dart';
 
 // Provider to track if a visual emergency alert should be shown (for accessibility)
 final visualEmergencyAlertProvider = StateProvider<String?>((ref) => null);
+
+// Simulation Mode Provider (Plan v6)
+final simulationModeProvider = StateProvider<bool>((ref) => false);
 // Emergency Repository Provider
 final emergencyRepositoryProvider = FutureProvider<EmergencyRepository>((ref) async {
+  // CRITICAL: Wait for auth initialization so the API Client has its token set
+  await ref.watch(authRepositoryProvider.future);
   final apiClient = ref.watch(apiClientProvider);
   final localDataSource = await ref.watch(localDataSourceProvider.future);
   return EmergencyRepositoryImpl(
@@ -80,6 +87,7 @@ final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>(
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   await emergencyRepo.acceptEmergency(params.emergencyId, params.responderId);
   ref.refresh(getEmergencyProvider(params.emergencyId));
+  ref.invalidate(watchActiveEmergenciesProvider);
   
   // Handle Accessibility-Aware Notifications
   final user = ref.read(currentUserProvider).valueOrNull;
@@ -97,13 +105,38 @@ final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>(
 final rejectEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   await emergencyRepo.rejectEmergency(params.emergencyId, params.responderId);
+  ref.invalidate(watchActiveEmergenciesProvider);
 });
 
 // Set responder availability provider
 final setResponderAvailabilityProvider = FutureProvider.family<void, bool>((ref, isAvailable) async {
   final repo = await ref.watch(emergencyRepositoryProvider.future);
+  
+  if (isAvailable) {
+    try {
+      // CRITICAL FIX: The backend uses PostGIS `ST_DWithin`. If the responder
+      // has no location set, they will NEVER receive emergency notifications.
+      final position = await LocationService().getCurrentLocation();
+      await repo.updateResponderLocation(position.latitude, position.longitude);
+      debugPrint('📍 Pushed Responder Location to Backend: ${position.latitude}, ${position.longitude}');
+    } catch (e) {
+      debugPrint('❌ Failed to push responder location: $e');
+      // If we completely fail to get location, we might want to alert the UI, 
+      // but we still attempt to set availability as a fallback.
+    }
+  }
+
   await repo.updateResponderAvailability(isAvailable);
   ref.invalidate(currentUserProvider);
+});
+
+// Provider to push a fake location for testing (Plan v7)
+final pushFakeLocationProvider = FutureProvider.family<void, double>((ref, offset) async {
+  final repo = await ref.read(emergencyRepositoryProvider.future);
+  final position = await LocationService().getCurrentLocation();
+  // Add a slight offset (approx 0.05 is ~5km)
+  await repo.updateResponderLocation(position.latitude + offset, position.longitude + offset);
+  debugPrint('🧪 Pushed Fake Location (Offset $offset): ${position.latitude + offset}');
 });
 
 // Cancel emergency provider
@@ -120,6 +153,20 @@ final resolveEmergencyProvider = FutureProvider.family<void, String>((ref, emerg
   await repo.resolveEmergency(emergencyId);
   ref.invalidate(getEmergencyProvider(emergencyId));
   ref.invalidate(getActiveEmergenciesProvider);
+});
+
+// Cancel responder assignment provider
+final cancelResponderAssignmentProvider = FutureProvider.family<void, String>((ref, emergencyId) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  await repo.cancelAssignment(emergencyId);
+  ref.invalidate(getEmergencyProvider(emergencyId));
+  ref.invalidate(watchActiveEmergenciesProvider);
+});
+
+// Get responder history provider
+final getResponderHistoryProvider = FutureProvider<List<dynamic>>((ref) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  return await repo.getResponderHistory();
 });
 
 // Parameters
@@ -173,11 +220,16 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
           final emergencyId = data['id'] ?? data['emergencyId'];
           if (emergencyId != null) {
             try {
+              // Plan v5: Unified visual alert + persistence
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
-              debugPrint('✅ Socket Notification: Persisted emergency $emergencyId');
+              
+              // Trigger the visual modal immediately from the socket
+              PushNotificationService.showEmergencyAlert(data);
+              
+              debugPrint('✅ Socket Notification: Persisted and Alerted $emergencyId');
             } catch (e) {
-              debugPrint('❌ Failed to persist socket notification: $e');
+              debugPrint('❌ Failed to handle socket notification: $e');
             }
           }
         }
@@ -187,7 +239,8 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 });
 
 // Socket Stream Provider for Real-Time Updates (Socket.io)
-final socketStreamProvider = StreamProvider.autoDispose<SocketMessage>((ref) {
+// Removing autoDispose to keep socket alive in background for SOS alerts
+final socketStreamProvider = StreamProvider<SocketMessage>((ref) {
   final socketService = SocketService.instance;
   
   // Ensure connected with auth token

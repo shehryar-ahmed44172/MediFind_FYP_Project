@@ -5,10 +5,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../../domain/entities/emergency.dart';
+import 'package:medifind_mobile_application/core/utils/responsive.dart';
 
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
+import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
+import '../settings/settings_screen.dart';
 
 class ResponderHomeScreen extends ConsumerStatefulWidget {
   const ResponderHomeScreen({Key? key}) : super(key: key);
@@ -19,14 +21,22 @@ class ResponderHomeScreen extends ConsumerStatefulWidget {
 
 class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   int _currentIndex = 0;
+  bool _isUpdatingStatus = false;
 
   @override
   void initState() {
     super.initState();
     // Plan v5: Fetch fresh data from server on dashboard load
     // This ensures we show pending requests even if the socket was offline
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(getActiveEmergenciesProvider);
+      
+      // CRITICAL: Sync location on load if responder is already active
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user?.isActive == true) {
+        debugPrint('📍 Responder is active, syncing location on dashboard load...');
+        ref.read(setResponderAvailabilityProvider(true));
+      }
     });
   }
 
@@ -43,8 +53,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
         children: [
           const AppHeader(
             showLogout: true,
-            showProfile: false, // Profile moved to bottom menu
-            greetingOverride: 'Responder Dashboard',
+            showProfile: false,
           ),
           if (!isConnected) const ConnectivityBanner(),
 
@@ -53,8 +62,8 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
               index: _currentIndex,
               children: [
                 _buildIncomingRequests(theme, userAsync, emergenciesAsync),
-                _buildHistoryPlaceholder(theme),
-                _buildSettingsPlaceholder(theme),
+                _buildHistoryTab(theme),
+                const SettingsScreen(showHeader: false),
               ],
             ),
           ),
@@ -66,49 +75,121 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
   Widget _buildIncomingRequests(ThemeData theme, AsyncValue userAsync, AsyncValue emergenciesAsync) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        userAsync.when(
+          data: (user) => Padding(
+            padding: EdgeInsets.fromLTRB(2.hp, 2.hp, 2.hp, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Hello,',
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.6),
+                  ),
+                ),
+                Text(
+                  user?.fullName.split(' ')[0] ?? 'Responder',
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          loading: () => const SizedBox.shrink(),
+          error: (_, __) => const SizedBox.shrink(),
+        ),
+        
         // Status Toggle
         Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(2.hp),
           child: userAsync.when(
             data: (user) => Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
               decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: AppShadows.neumorphicOut,
+                color: theme.cardColor,
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: AppShadows.cardShadow,
+                border: Border.all(
+                  color: (user?.isActive ?? false) 
+                    ? Colors.green.withOpacity(0.1) 
+                    : Colors.grey.withOpacity(0.1),
+                  width: 2,
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.circle, 
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: (user?.isActive ?? false) 
+                        ? Colors.green.withOpacity(0.1) 
+                        : Colors.grey.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.power_settings_new_rounded, 
                       color: (user?.isActive ?? false) ? Colors.green : Colors.grey, 
-                      size: 14),
-                  const SizedBox(width: 8),
+                      size: 28
+                    ),
+                  ),
+                  const SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Status: ${(user?.isActive ?? false) ? 'Available' : 'Offline'}',
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: (user?.isActive ?? false) ? Colors.green : Colors.grey)),
-                        Text((user?.isActive ?? false) 
-                            ? 'You are visible to patients' 
-                            : 'You are invisible to patients',
-                            style:
-                                const TextStyle(fontSize: 12, color: Colors.grey)),
+                        Text(
+                          (user?.isActive ?? false) ? 'Ready to Respond' : 'Currently Offline',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: (user?.isActive ?? false) ? Colors.green.shade800 : Colors.grey.shade800
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          (user?.isActive ?? false) 
+                            ? 'You are active on the network' 
+                            : 'Switch on to receive alerts',
+                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                        ),
                       ],
                     ),
                   ),
-                  Switch(
-                    value: user?.isActive ?? false,
-                    onChanged: (value) async {
-                      if (user != null) {
-                        await ref.read(setResponderAvailabilityProvider(value).future);
-                      }
-                    },
-                    activeColor: Colors.green,
-                  ),
+                  _isUpdatingStatus 
+                    ? const SizedBox(
+                        width: 48,
+                        height: 24,
+                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                      )
+                    : Switch.adaptive(
+                        value: user?.isActive ?? false,
+                        activeTrackColor: Colors.green.shade200,
+                        activeColor: Colors.green.shade700,
+                        onChanged: (value) async {
+                          if (user != null) {
+                            setState(() => _isUpdatingStatus = true);
+                            try {
+                              await ref.read(setResponderAvailabilityProvider(value).future);
+                              if (mounted && value) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: const Text('You are now ONLINE and visible to patients.'),
+                                    backgroundColor: Colors.green.shade700,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  ),
+                                );
+                              }
+                            } finally {
+                              if (mounted) setState(() => _isUpdatingStatus = false);
+                            }
+                          }
+                        },
+                      ),
                 ],
               ),
             ),
@@ -126,6 +207,20 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                 Text('Incoming Emergencies',
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 18, color: Colors.grey),
+                  onPressed: () => ref.invalidate(getActiveEmergenciesProvider),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.analytics_outlined, size: 18, color: Colors.blue),
+                  onPressed: () => context.push('/profile/diagnostics'),
+                  tooltip: 'System Diagnostics',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
                 const Spacer(),
                 if (emergencies.isNotEmpty)
                   Container(
@@ -181,33 +276,59 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     );
   }
 
-  Widget _buildHistoryPlaceholder(ThemeData theme) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.history_rounded, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text('Emergency History Coming Soon', style: TextStyle(color: Colors.grey)),
-        ],
-      ),
+  Widget _buildHistoryTab(ThemeData theme) {
+    final historyAsync = ref.watch(getResponderHistoryProvider);
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Text('Response History',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.refresh_rounded),
+                onPressed: () => ref.invalidate(getResponderHistoryProvider),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: historyAsync.when(
+            data: (history) => history.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.history_rounded,
+                            size: 72, color: Colors.grey.shade300),
+                        const SizedBox(height: 16),
+                        const Text('No past records found',
+                            style: TextStyle(color: Colors.grey)),
+                      ],
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: history.length,
+                    itemBuilder: (ctx, i) {
+                      final item = history[i] as Map<String, dynamic>;
+                      return _HistoryItemCard(item: item);
+                    },
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('Error: $e')),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildSettingsPlaceholder(ThemeData theme) {
-     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.settings_suggest_rounded, size: 64, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => context.push('/profile'),
-            child: const Text('Go to User Profile'),
-          ),
-        ],
-      ),
-    );
+     return const SizedBox.shrink();
   }
 
   Widget _buildBottomNav(ThemeData theme) {
@@ -230,7 +351,8 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
             children: [
               _buildNavItem(Icons.home_rounded, 'Dashboard', 0, _currentIndex == 0, theme),
               _buildNavItem(Icons.history_rounded, 'History', 1, _currentIndex == 1, theme),
-              _buildNavItem(Icons.person_rounded, 'Profile', 2, _currentIndex == 2, theme),
+              _buildNavItem(Icons.settings_rounded, 'Settings', 2, _currentIndex == 2, theme),
+              _buildNavItem(Icons.person_rounded, 'Profile', 3, false, theme),
             ],
           ),
         ),
@@ -241,9 +363,9 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   Widget _buildNavItem(IconData icon, String label, int index, bool isSelected, ThemeData theme) {
     return InkWell(
       onTap: () {
-        if (index == 2) {
+        if (index == 3) {
           context.push('/profile');
-           return;
+          return;
         }
         setState(() => _currentIndex = index);
       },
@@ -280,59 +402,191 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   }
 }
 
-class _EmergencyRequestCard extends StatelessWidget {
-  final Emergency request;
-  const _EmergencyRequestCard({required this.request});
+class _HistoryItemCard extends StatelessWidget {
+  final Map<String, dynamic> item;
+
+  const _HistoryItemCard({Key? key, required this.item}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = item['status'] as String? ?? 'PENDING';
+    final emergency = item['emergency'] as Map<String, dynamic>? ?? {};
+    final patient = emergency['patient'] as Map<String, dynamic>? ?? {};
+    final type = emergency['emergencyType'] as String? ?? 'Medical';
+    final date = DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now();
+
+    Color statusColor;
+    IconData statusIcon;
+    switch (status) {
+      case 'ACCEPTED':
+      case 'RESPONDER_ASSIGNED':
+        statusColor = Colors.green;
+        statusIcon = Icons.check_circle_outline;
+        break;
+      case 'REJECTED':
+        statusColor = Colors.red;
+        statusIcon = Icons.cancel_outlined;
+        break;
+      case 'COMPLETED':
+        statusColor = Colors.blue;
+        statusIcon = Icons.task_alt;
+        break;
+      default:
+        statusColor = Colors.orange;
+        statusIcon = Icons.hourglass_empty;
+    }
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(16),
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
         boxShadow: AppShadows.neumorphicOut,
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => context.go('/responder/request/${request.id}'),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                    color: Colors.red.shade100,
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.emergency_rounded,
-                    color: Colors.red, size: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      request.emergencyType.replaceAll('_', ' '),
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold, fontSize: 15),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Priority: ${request.status}',
-                      style: TextStyle(color: Colors.grey.shade600,
-                          fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded),
-            ],
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(16),
+        leading: Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: statusColor.withOpacity(0.1),
+            shape: BoxShape.circle,
           ),
+          child: Icon(statusIcon, color: statusColor),
+        ),
+        title: Row(
+          children: [
+            Text(type.replaceAll('_', ' '), style: const TextStyle(fontWeight: FontWeight.bold)),
+            const Spacer(),
+            Text(
+              '${date.day}/${date.month} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+            ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 4),
+            Text('Patient: ${patient['fullName'] ?? 'Unknown'}', style: TextStyle(color: Colors.grey.shade700)),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: statusColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                status,
+                style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
+class _EmergencyRequestCard extends ConsumerWidget {
+  final Emergency request;
+  const _EmergencyRequestCard({required this.request});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    
+    return Dismissible(
+      key: Key(request.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        alignment: Alignment.centerRight,
+        padding: const EdgeInsets.only(right: 20),
+        decoration: BoxDecoration(
+          color: Colors.red.shade100,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+      ),
+      onDismissed: (_) async {
+        final localDs = await ref.read(localDataSourceProvider.future);
+        await localDs.deleteEmergency(request.id);
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppShadows.cardShadow,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(24),
+          child: InkWell(
+            onTap: () => context.go('/responder/request/${request.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.red.shade400, Colors.red.shade700],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.red.withOpacity(0.3),
+                          blurRadius: 8,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.emergency_rounded, color: Colors.white, size: 28),
+                  ),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request.emergencyType.replaceAll('_', ' '),
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold, 
+                            fontSize: 17,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade600),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Incoming Request',
+                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.05),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

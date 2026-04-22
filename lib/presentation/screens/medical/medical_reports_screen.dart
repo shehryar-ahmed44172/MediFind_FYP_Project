@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_report_provider.dart';
 import '../../../domain/entities/medical_report.dart';
+import 'package:medifind_mobile_application/core/utils/responsive.dart';
 
 class MedicalReportsScreen extends ConsumerStatefulWidget {
   const MedicalReportsScreen({Key? key}) : super(key: key);
@@ -133,10 +134,6 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
     final isPageLoading = ref.watch(medicalReportsNotifierProvider).isLoading;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Medical Reports'),
-        centerTitle: true,
-      ),
       body: Column(
         children: [
           // Upload Section
@@ -153,10 +150,10 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
               children: [
                 Icon(Icons.upload_file_outlined,
                     size: 40, color: AppColors.primary),
-                const SizedBox(height: 8),
-                const Text('Upload Medical Reports',
+                 const SizedBox(height: 8),
+                Text('Upload Medical Reports',
                     style:
-                        TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 18.sp)),
                 const SizedBox(height: 4),
                 const Text(
                   'Upload medical record images securely',
@@ -242,9 +239,9 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
                           child: ListTile(
-                            leading: Container(
-                              width: 50,
-                              height: 50,
+                             leading: Container(
+                              width: 12.wp,
+                              height: 12.wp,
                               decoration: BoxDecoration(
                                 color: AppColors.primary.withOpacity(0.1),
                                 borderRadius: BorderRadius.circular(8),
@@ -285,6 +282,8 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
           backgroundColor: Colors.black,
           body: Center(
             child: InteractiveViewer(
+              clipBehavior: Clip.none,
+              maxScale: 5.0,
               child: Image.network(
                 report.downloadUrl,
                 loadingBuilder: (context, child, progress) {

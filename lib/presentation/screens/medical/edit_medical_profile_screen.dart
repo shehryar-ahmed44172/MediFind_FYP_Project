@@ -128,14 +128,6 @@ class _EditMedicalProfileScreenState
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Edit Medical Profile'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/home/medical-profile'),
-        ),
-      ),
       body: Form(
         key: _formKey,
         child: ListView(

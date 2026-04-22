@@ -108,12 +108,38 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
     );
   }
 
-  /// Reset to defaults
-  void resetToDefaults() {
-    state = AccessibilitySettings();
+  String? _initializedFromUserId;
+
+  /// Initialize based on user patient type
+  void initializeFromUser(String? patientType, [String? userId]) {
+    // Avoid re-initialization for the same user if already state-synced
+    if (userId != null && _initializedFromUserId == userId) return;
+    
+    final type = patientType?.toUpperCase() ?? 'NORMAL';
+    
+    if (type == 'DEAF') {
+      state = AccessibilitySettings(
+        textOnlyMode: true,
+        vibrationFeedback: true,
+        highContrast: true, // Now ON by default to show clear difference
+        fontSizeMultiplier: 1.15, // Noticeably larger
+      );
+    } else {
+      state = AccessibilitySettings();
+    }
+    
+    if (userId != null) {
+      _initializedFromUserId = userId;
+    }
   }
 
-  /// Apply all settings at once
+  /// Force a re-initialization (e.g. settings reset)
+  void reinitialize(String? patientType, [String? userId]) {
+    _initializedFromUserId = null;
+    initializeFromUser(patientType, userId);
+  }
+
+  /// Apply all settings at once (existing method preserved)
   void applySettings(
     bool voiceGuidance,
     bool textOnly,

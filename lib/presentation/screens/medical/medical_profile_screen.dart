@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/app_header.dart';
 
@@ -12,19 +13,21 @@ class MedicalProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUserId = ref.watch(currentUserIdProvider);
+    final settings = ref.watch(accessibilityProvider);
+    final m = settings.fontSizeMultiplier;
+    
     return currentUserId.when(
-      data: (userId) => _buildProfileContent(context, ref, userId ?? ''),
+      data: (userId) => _buildProfileContent(context, ref, userId ?? '', settings, m),
       loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
     );
   }
 
-  Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId) {
+  Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId, AccessibilitySettings settings, double m) {
     final profileAsync = ref.watch(getMedicalProfileProvider(userId));
     return Scaffold(
       body: Column(
         children: [
-          const AppHeader(greetingOverride: 'Medical Profile'),
           Expanded(
             child: profileAsync.when(
         data: (profile) {
@@ -65,9 +68,9 @@ class MedicalProfileScreen extends ConsumerWidget {
                   child: Text(
                     profile.bloodType.isNotEmpty ? profile.bloodType : 'Not set',
                     style: TextStyle(
-                      fontSize: 28,
+                      fontSize: 28 * m,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red.shade700,
+                      color: settings.highContrast ? Colors.black : Colors.red.shade700,
                     ),
                   ),
                 ),
@@ -150,11 +153,114 @@ class MedicalProfileScreen extends ConsumerWidget {
           );
         },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => Center(child: Text('Error loading profile: $e')),
+                error: (e, _) => _ErrorView(
+                  message: e.toString(),
+                  onRetry: () => ref.invalidate(getMedicalProfileProvider(userId)),
+                ),
               ),
             ),
           ],
         ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _ErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Center(
+      child: Container(
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
+          borderRadius: BorderRadius.circular(32),
+          boxShadow: AppShadows.neumorphicOut,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.2),
+                    blurRadius: 20,
+                    spreadRadius: 5,
+                  ),
+                ],
+              ),
+              child: Icon(
+                Icons.wifi_off_rounded,
+                size: 48,
+                color: Colors.red.shade700,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Connection Issue',
+              style: theme.textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.onBackground,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              message.contains('timeout') 
+                  ? 'The server is taking too long to respond. Please check your internet.' 
+                  : 'We encountered an error while loading your profile. Please try again.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onBackground.withOpacity(0.6),
+              ),
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: onRetry,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 8,
+                shadowColor: AppColors.primary.withOpacity(0.4),
+              ),
+              child: const Text(
+                'TRY AGAIN',
+                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Go Back',
+                style: TextStyle(
+                  color: theme.colorScheme.onBackground.withOpacity(0.5),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

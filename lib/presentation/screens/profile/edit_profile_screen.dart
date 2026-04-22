@@ -15,6 +15,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
+  late TextEditingController _emailController;
+  late TextEditingController _cnicController;
   bool _isLoading = false;
 
   @override
@@ -23,12 +25,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final user = ref.read(currentUserProvider).value;
     _nameController = TextEditingController(text: user?.fullName ?? '');
     _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
+    _emailController = TextEditingController(text: user?.email ?? '');
+    _cnicController = TextEditingController(text: user?.cnic ?? 'N/A');
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
+    _cnicController.dispose();
     super.dispose();
   }
 
@@ -65,10 +71,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Edit Profile'),
-        centerTitle: true,
-      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Form(
@@ -101,6 +103,22 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 icon: Icons.phone_outlined,
                 keyboardType: TextInputType.phone,
                 validator: (val) => val == null || val.isEmpty ? 'Please enter your phone number' : null,
+              ),
+              const SizedBox(height: 20),
+
+              _buildTextField(
+                label: 'Email Address (Immutable)',
+                controller: _emailController,
+                icon: Icons.email_outlined,
+                readOnly: true,
+              ),
+              const SizedBox(height: 20),
+
+              _buildTextField(
+                label: 'CNIC (Immutable)',
+                controller: _cnicController,
+                icon: Icons.badge_outlined,
+                readOnly: true,
               ),
               const SizedBox(height: 48),
 
@@ -137,6 +155,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     required IconData icon,
     TextInputType? keyboardType,
     String? Function(String?)? validator,
+    bool readOnly = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -153,8 +172,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             controller: controller,
             keyboardType: keyboardType,
             validator: validator,
+            readOnly: readOnly,
+            style: readOnly ? TextStyle(color: Colors.grey.shade600) : null,
             decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: AppColors.primary, size: 20),
+              prefixIcon: Icon(icon, color: readOnly ? Colors.grey : AppColors.primary, size: 20),
               border: InputBorder.none,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),

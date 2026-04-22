@@ -172,6 +172,14 @@ class LocalDataSource {
     }
   }
 
+  Future<void> clearAllEmergencies() async {
+    try {
+      await _emergencyBox.clear();
+    } catch (e) {
+      throw DatabaseException(message: 'Failed to clear emergencies', originalException: e);
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Medical Profile operations (JSON storage)
   // ---------------------------------------------------------------------------

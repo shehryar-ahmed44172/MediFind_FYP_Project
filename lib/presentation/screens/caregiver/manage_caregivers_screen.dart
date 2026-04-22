@@ -130,10 +130,6 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Caregivers'),
-        centerTitle: true,
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddCaregiverSheet,
         icon: const Icon(Icons.add),

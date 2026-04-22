@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 
 class MedicalReportsUploadService {
   final Dio _dio;
-  static const String _baseUrl = 'reports';
+  static const String _baseUrl = '/medical-reports';
 
   MedicalReportsUploadService({Dio? dio}) : _dio = dio ?? Dio();
 
@@ -38,9 +38,9 @@ class MedicalReportsUploadService {
       // Validate file type
       _validateFileType(file.path);
 
-      // Create form data (Backend expects field name 'report')
+      // Create form data
       final formData = FormData.fromMap({
-        'report': await MultipartFile.fromFile(
+        'file': await MultipartFile.fromFile(
           file.path,
           filename: file.path.split('/').last,
         ),
@@ -48,9 +48,9 @@ class MedicalReportsUploadService {
         'userId': userId,
       });
 
-      // Upload with progress tracking to the /profile endpoint
+      // Upload with progress tracking
       final response = await _dio.post(
-        '$_baseUrl/profile',
+        '$_baseUrl/upload',
         data: formData,
         onSendProgress: (sent, total) {
           final progress = sent / total;
@@ -69,14 +69,14 @@ class MedicalReportsUploadService {
     }
   }
 
+  /// Get list of medical reports for a user
+  /// API: GET /api/medical-reports/{userId}
   Future<List<MedicalReportInfo>> getMedicalReports(String userId) async {
     try {
-      // Backend uses /api/reports/profile to get current user's reports
-      final response = await _dio.get('$_baseUrl/profile');
+      final response = await _dio.get('$_baseUrl/$userId');
 
       if (response.statusCode == 200) {
-        final data = response.data['data'];
-        final items = data is List ? data : [];
+        final items = response.data['data'] as List;
         return items
             .map((e) => MedicalReportInfo.fromJson(e as Map<String, dynamic>))
             .toList();

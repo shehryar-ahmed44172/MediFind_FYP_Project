@@ -18,6 +18,8 @@ import 'services/notification/push_notification_service.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
+import 'core/utils/responsive.dart';
+import 'config/router.dart'; // Added for AppRouter.navigatorKey
 
 
 // The main entry point of the MediFind application
@@ -62,7 +64,7 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
       // 2. Initialize Push Notification Service (Plan v5: Passed localDataSource)
       final localDataSource = await ref.read(localDataSourceProvider.future);
       if (context.mounted) {
-        await PushNotificationService.initialize(context, localDataSource);
+        await PushNotificationService.initialize(AppRouter.navigatorKey, localDataSource);
       }
 
       // 3. Activate Socket Notification Persistence Handler (Plan v5)
@@ -113,6 +115,9 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
 
   @override
   Widget build(BuildContext context) {
+    // Initialize responsiveness engine
+    SizeConfig().init(context);
+    
     final accessibilitySettings = ref.watch(accessibilityProvider);
 
     // Returning MaterialApp with routing capabilities configured

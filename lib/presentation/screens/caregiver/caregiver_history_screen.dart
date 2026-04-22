@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/caregiver_providers.dart';
+import '../../widgets/common/app_header.dart';
 
 class CaregiverHistoryScreen extends ConsumerWidget {
   const CaregiverHistoryScreen({Key? key}) : super(key: key);
@@ -13,19 +14,22 @@ class CaregiverHistoryScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Alert History'),
-        centerTitle: true,
-      ),
-      body: asyncPatients.when(
-        data: (patients) {
-          if (patients.isEmpty) {
-            return _buildEmptyState(context, theme);
-          }
-          return _buildHistoryFeed(context, theme);
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+      body: Column(
+        children: [
+          AppHeader(greetingOverride: 'Alert History'),
+          Expanded(
+            child: asyncPatients.when(
+              data: (patients) {
+                if (patients.isEmpty) {
+                  return _buildEmptyState(context, theme);
+                }
+                return _buildHistoryFeed(context, theme);
+              },
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(child: Text('Error: $e')),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -1,12 +1,21 @@
+import 'dart:async';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
+import 'dart:math' as math;
+import '../../../services/audio/voice_alert_service.dart';
+import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../domain/entities/emergency.dart';
-import '../../services/haptic_feedback_service.dart';
+
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/utils/map_utils.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -16,33 +25,87 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   ConsumerState<EmergencyTrackingScreen> createState() => _EmergencyTrackingScreenState();
 }
 
+class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScreen> {
+  GoogleMapController? _mapController;
+  final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
+  
   double? _responderLat;
   double? _responderLong;
   String? _responderName;
   String? _responderPhone;
+  String _currentStatus = 'PENDING';
+  String _eta = 'Calculating...';
+  
+  BitmapDescriptor? _ambulanceIcon;
+  final Set<Marker> _markers = {};
 
   @override
   void initState() {
     super.initState();
-    // Connect Socket and join rooms when screen opens
+    _loadMarkerIcons();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final socketService = SocketService.instance;
       socketService.joinEmergencyRoom(widget.emergencyId);
       socketService.joinLocationRoom(widget.emergencyId);
-      
-      // Ensure the listener provider is active (Plan v5)
       ref.read(socketStreamProvider);
     });
   }
 
+  Future<void> _loadMarkerIcons() async {
+    final icon = await MapUtils.getAmbulanceMarker();
+    if (mounted) {
+      setState(() {
+        _ambulanceIcon = icon;
+      });
+    }
+  }
+
+  void _updateMarkers(Emergency emergency) {
+    _markers.clear();
+    
+    // Patient Marker
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('patient'),
+        position: LatLng(emergency.latitude, emergency.longitude),
+        infoWindow: const InfoWindow(title: 'Your Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+      ),
+    );
+
+    // Responder Marker
+    if (_responderLat != null && _responderLong != null) {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('responder'),
+          position: LatLng(_responderLat!, _responderLong!),
+          icon: _ambulanceIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: InfoWindow(title: _responderName ?? 'Responder'),
+          rotation: 0, // Could calculate rotation based on movement later
+        ),
+      );
+      
+      // Auto-center if needed
+      _animateToResponder();
+    }
+  }
+
+  void _animateToResponder() async {
+    if (_mapController != null && _responderLat != null && _responderLong != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(LatLng(_responderLat!, _responderLong!)),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Try to watch live emergency data, fallback to UI directly
+    final settings = ref.watch(accessibilityProvider);
+    final isSimulation = ref.watch(simulationModeProvider);
     final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
     
-    // Listen for Socket events to update local state
     ref.listen(socketStreamProvider, (previous, next) {
-      if (next.hasValue) {
+      if (next.hasValue && !isSimulation) { // Only listen to real socket if NOT simulating
         final message = next.value!;
         final data = message.data as Map<String, dynamic>;
 
@@ -50,99 +113,293 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
           final newStatus = data['status']?.toString() ?? data['newStatus']?.toString() ?? _currentStatus;
           setState(() {
             _currentStatus = newStatus;
-            // Plan v6: Capture responder details if assigned
             if (data['responderName'] != null) _responderName = data['responderName'];
             if (data['responderPhone'] != null) _responderPhone = data['responderPhone'];
           });
           
-          // Accessibility: Visual/Haptic feedback on arrival
-          final user = ref.read(currentUserProvider).valueOrNull;
-          if (newStatus == 'ARRIVED' && user?.patientType == 'DEAF') {
-            HapticFeedbackService.sosPattern();
+          if (newStatus == 'ARRIVED' && settings.textOnlyMode) {
+            if (settings.vibrationFeedback) HapticFeedbackService.sosPattern();
           }
         } 
         else if (message.event == SocketEvent.responderLocationUpdate) {
-          // Plan v6: Update real-time map marker location
           setState(() {
             _responderLat = double.tryParse(data['latitude'].toString());
             _responderLong = double.tryParse(data['longitude'].toString());
             _eta = data['eta']?.toString() ?? _eta;
           });
-          print('📍 Live Tracking Update: $_responderLat, $_responderLong');
         }
       }
     });
 
-    final theme = Theme.of(context);
+    // Handle Simulation logic
+    if (isSimulation) {
+      _startSimulation();
+    }
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: emergencyAsync.when(
-        data: (emergency) {
-          if (emergency == null) {
-            return const Center(child: Text('Emergency not found'));
-          }
-          return _buildBody(context, theme, emergency as Emergency);
-        },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+    final theme = AppTheme.buildDarkTheme(settings);
+
+    return Theme(
+      data: theme,
+      child: Scaffold(
+        backgroundColor: theme.scaffoldBackgroundColor,
+        body: emergencyAsync.when(
+          data: (emergency) {
+            if (emergency == null) return const Center(child: Text('Emergency not found'));
+            _updateMarkers(emergency as Emergency);
+            return _buildModernBody(context, theme, emergency as Emergency, settings);
+          },
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+        ),
       ),
     );
   }
 
-  Widget _buildBody(BuildContext context, ThemeData theme, Emergency emergency) {
+  Timer? _simTimer;
+  void _startSimulation() {
+    if (_simTimer != null) return;
+    _simTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
+      if (!mounted || !ref.read(simulationModeProvider)) {
+        timer.cancel();
+        _simTimer = null;
+        return;
+      }
+      
+      final emergency = ref.read(getEmergencyProvider(widget.emergencyId)).valueOrNull;
+      if (emergency != null) {
+        setState(() {
+          // Move responder slightly closer to patient on each tick
+          _responderLat = (_responderLat ?? emergency.latitude + 0.01) - 0.0005;
+          _responderLong = (_responderLong ?? emergency.longitude + 0.01) - 0.0005;
+          _eta = "4 min";
+          _responderName = "Simulated Responder";
+          _currentStatus = 'EN_ROUTE';
+        });
+      }
+    });
+  }
+
+  Widget _buildModernBody(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings) {
     return Stack(
       children: [
-        // 1. Full Screen Map Background Simulator
+        // 1. Dark Map
         Positioned.fill(
-          child: CustomPaint(
-            painter: _TrackingMapPainter(),
-            child: Container(
-              color: AppColors.primary.withOpacity(0.02),
+          child: GoogleMap(
+            mapType: MapType.normal,
+            initialCameraPosition: CameraPosition(
+              target: LatLng(emergency.latitude, emergency.longitude),
+              zoom: 15,
             ),
+            markers: _markers,
+            myLocationEnabled: true,
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            style: MapUtils.getDarkMapStyle(),
+            onMapCreated: (GoogleMapController controller) {
+              if (!_controller.isCompleted) _controller.complete(controller);
+              _mapController = controller;
+            },
           ),
         ),
 
-        // 2. Floating ETA Header Card (FR7.2)
+        // 2. Glassmorphism Top Bar
         Positioned(
           top: MediaQuery.of(context).padding.top + 16,
           left: 16,
           right: 16,
-          child: _buildETAHeader(theme),
+          child: _buildGlassHeader(theme, settings),
         ),
 
-        // 3. Floating Ambulance / User map pins mock
-        // Pin positions animate based on live responder data (Plan v6)
-        AnimatedPositioned(
-          duration: const Duration(seconds: 1),
-          top: _responderLat != null 
-              ? (MediaQuery.of(context).size.height * 0.4) + ((_responderLat! - emergency.latitude) * 1000)
-              : MediaQuery.of(context).size.height * 0.4,
-          left: _responderLong != null 
-              ? (MediaQuery.of(context).size.width * 0.3) + ((_responderLong! - emergency.longitude) * 1000)
-              : MediaQuery.of(context).size.width * 0.3,
-          child: _buildMapPin(Icons.local_hospital_rounded, Colors.red.shade700),
-        ),
+        // 3. Floating Action Buttons
         Positioned(
-          top: MediaQuery.of(context).size.height * 0.55,
-          left: MediaQuery.of(context).size.width * 0.6,
-          child: _buildMapPin(Icons.person_pin_circle_rounded, AppColors.primaryDark),
+          right: 16,
+          bottom: 120, // Above bottom sheet
+          child: Column(
+            children: [
+              _buildFloatingMapButton(Icons.my_location, () => _animateToResponder()),
+              const SizedBox(height: 12),
+              _buildFloatingMapButton(Icons.layers_rounded, () {}),
+            ],
+          ),
         ),
 
-        // 4. Bottom Responder Details & Status Sheet (FR7.4, FR5.1-5.7 context)
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: _buildBottomDetailsSheet(context, theme, emergency),
-        ),
+        // 4. Modern Draggable Bottom Sheet
+        _buildDraggableBottomSheet(context, theme, emergency, settings),
 
-        // 5. Visual "Arrived" Overlay for Deaf Users
-        if (_currentStatus == 'ARRIVED' && (ref.watch(currentUserProvider).valueOrNull?.patientType == 'DEAF'))
+        if (_currentStatus == 'ARRIVED' && settings.textOnlyMode)
           _buildArrivedVisualAlert(theme),
       ],
     );
   }
+
+  Widget _buildGlassHeader(ThemeData theme, AccessibilitySettings settings) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(24),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.emergency_share_rounded, color: Colors.greenAccent, size: 22),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Help arriving in',
+                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                    ),
+                    Text(
+                      _eta,
+                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text('LIVE', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 10)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFloatingMapButton(IconData icon, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E293B),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4))
+          ],
+        ),
+        child: Icon(icon, color: Colors.white, size: 24),
+      ),
+    );
+  }
+
+  Widget _buildDraggableBottomSheet(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.35,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFF1E293B),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, -5))
+            ],
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(24),
+            children: [
+              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 30,
+                    backgroundColor: AppColors.primary.withOpacity(0.2),
+                    child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 32),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_responderName ?? 'Assigning Responder...', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white)),
+                        const Text('Level 1 Responder • ⭐ 4.9', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
+                    ),
+                  ),
+                  _buildCircleAction(Icons.phone_rounded, Colors.green),
+                  const SizedBox(width: 12),
+                  _buildCircleAction(Icons.chat_bubble_rounded, Colors.blue),
+                ],
+              ),
+              const SizedBox(height: 24),
+              const Divider(color: Colors.white10),
+              const SizedBox(height: 24),
+              const Text('Live Status Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+              const SizedBox(height: 20),
+              _buildModernStatusTimeline(theme, settings),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => _showCancelDialog(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.withOpacity(0.1),
+                    foregroundColor: Colors.redAccent,
+                    side: const BorderSide(color: Colors.redAccent, width: 1),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('CANCEL EMERGENCY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCircleAction(IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  Widget _buildModernStatusTimeline(ThemeData theme, AccessibilitySettings settings) {
+    final statusOrder = ['PENDING', 'RESPONDER_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'];
+    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, 4);
+
+    return Column(
+      children: [
+        _ModernTimelineItem(label: 'SOS Signal Received', time: '1:42 PM', isDone: currentIndex >= 0, isLast: false),
+        _ModernTimelineItem(label: 'Responder Dispatched', time: '1:44 PM', isDone: currentIndex >= 1, isLast: false),
+        _ModernTimelineItem(label: 'En Route to Location', time: 'ETA 4 min', isDone: currentIndex > 2, isCurrent: currentIndex == 2, isLast: false),
+        _ModernTimelineItem(label: 'Arrived at Destination', time: '--:--', isDone: currentIndex >= 3, isLast: true),
+      ],
+    );
+  }
+
 
   Widget _buildArrivedVisualAlert(ThemeData theme) {
     return Positioned.fill(
@@ -153,20 +410,9 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
           children: [
             const Icon(Icons.check_circle_rounded, color: Colors.white, size: 100),
             const SizedBox(height: 24),
-            const Text(
-              'HELP IS HERE!',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 2,
-              ),
-            ),
+            const Text('HELP IS HERE!', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
             const SizedBox(height: 16),
-            const Text(
-              'The responder has arrived at your location.',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
+            const Text('The responder has arrived at your location.', style: TextStyle(color: Colors.white, fontSize: 18)),
             const SizedBox(height: 48),
             ElevatedButton(
               onPressed: () => setState(() => _currentStatus = 'RESOLVED'),
@@ -184,276 +430,24 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
     );
   }
 
-  Widget _buildETAHeader(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.directions_car_filled_rounded, color: Colors.green),
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Help is arriving in',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  Text(
-                    _eta,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: theme.colorScheme.primary,
-                      fontSize: 22,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Text(
-              'LIVE',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 1.2,
-                fontSize: 12,
-              ),
-            ),
-          )
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapPin(IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        boxShadow: [
-          BoxShadow(
-            color: color.withOpacity(0.4),
-            blurRadius: 12,
-            spreadRadius: 4,
-            offset: const Offset(0, 6),
-          ),
-        ],
-        border: Border.all(color: Colors.white, width: 3),
-      ),
-      child: Icon(icon, color: Colors.white, size: 28),
-    );
-  }
-
-  Widget _buildBottomDetailsSheet(BuildContext context, ThemeData theme, Emergency emergency) {
-    final responderAsync = emergency.responderId != null
-        ? ref.watch(userProfileProvider(emergency.responderId!))
-        : const AsyncValue.data(null);
-
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag indicator handle
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 24),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-            ),
-
-            // Responder Identifier Card
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                  child: Icon(Icons.medical_services_rounded, 
-                    color: theme.colorScheme.primary, size: 30),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      responderAsync.when(
-                        data: (responder) => Text(
-                          _responderName ?? responder?.fullName ?? (emergency.responderId != null ? 'Responder Assigned' : 'Finding Responder...'),
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        loading: () => Text(_responderName ?? 'Loading...', style: const TextStyle(fontWeight: FontWeight.bold)),
-                        error: (_, __) => Text(_responderName ?? 'Assigned Responder'),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.star_rounded, color: Colors.orange.shade400, size: 16),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'Emergency Response Team',
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                // Action Buttons
-                Row(
-                  children: [
-                    _buildActionButton(Icons.chat_bubble_rounded, AppColors.primary),
-                    const SizedBox(width: 12),
-                    _buildActionButton(Icons.phone_rounded, Colors.green),
-                  ],
-                ),
-              ],
-            ),
-            
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 20),
-              child: Divider(),
-            ),
-
-            // Emergency Status Tracker
-            Text(
-              'Emergency Status',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            
-            _buildStatusTimeline(theme),
-
-            const SizedBox(height: 24),
-
-            // Cancel SOS String (FR4.5)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _showCancelDialog(context),
-                icon: const Icon(Icons.close_rounded, color: Colors.red),
-                label: const Text('Cancel Request', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.withOpacity(0.1),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActionButton(IconData icon, Color color) {
-    return InkWell(
-      onTap: () {},
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Icon(icon, color: color, size: 22),
-      ),
-    );
-  }
-
-  Widget _buildStatusTimeline(ThemeData theme) {
-    final statusOrder = ['PENDING', 'RESPONDER_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'];
-    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, 4);
-
-    return Column(
-      children: [
-        _StatusTimelineItem(label: 'SOS Alert Sent', isDone: currentIndex >= 0, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Responder Assigned', isDone: currentIndex >= 1, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Ambulance En Route', isDone: currentIndex > 2, isCurrent: currentIndex == 2, isLast: false, theme: theme),
-        _StatusTimelineItem(label: 'Arrived at Location', isDone: currentIndex >= 3, isLast: true, theme: theme),
-      ],
-    );
-  }
-
   void _showCancelDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cancel Emergency?', style: TextStyle(fontWeight: FontWeight.bold)),
-        content: const Text('Are you sure you want to cancel the active emergency? The assigned responder will be notified immediately.'),
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Cancel Emergency?', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+        content: const Text('Are you sure you want to cancel the active emergency?', style: TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('No, keep active', style: TextStyle(color: Colors.grey)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No', style: TextStyle(color: Colors.grey))),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
               Navigator.pop(ctx);
               await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
-              if (mounted) {
-                context.go('/home');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Emergency cancelled. Responder notified.'),
-                    backgroundColor: Colors.orange.shade800,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
+              if (mounted) context.go('/home');
             },
-            child: const Text('Cancel Request', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            child: const Text('Cancel'),
           ),
         ],
       ),
@@ -461,24 +455,25 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   }
 }
 
-class _StatusTimelineItem extends StatelessWidget {
+class _ModernTimelineItem extends StatelessWidget {
   final String label;
+  final String time;
   final bool isDone;
   final bool isCurrent;
   final bool isLast;
-  final ThemeData theme;
 
-  const _StatusTimelineItem({
+  const _ModernTimelineItem({
     required this.label,
+    required this.time,
     required this.isDone,
     this.isCurrent = false,
     required this.isLast,
-    required this.theme,
-  });
+    Key? key,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final color = isDone ? Colors.green : (isCurrent ? theme.colorScheme.primary : Colors.grey.shade300);
+    final color = isDone ? Colors.greenAccent : (isCurrent ? Colors.blueAccent : Colors.grey.withOpacity(0.3));
     
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -486,29 +481,42 @@ class _StatusTimelineItem extends StatelessWidget {
         Column(
           children: [
             Container(
-              width: 16,
-              height: 16,
+              width: 14,
+              height: 14,
               decoration: BoxDecoration(
-                color: isDone ? Colors.green : (isCurrent ? Colors.white : Colors.grey.shade300),
+                color: isDone ? Colors.greenAccent : Colors.transparent,
                 shape: BoxShape.circle,
-                border: isCurrent ? Border.all(color: theme.colorScheme.primary, width: 4) : null,
+                border: Border.all(color: color, width: 2),
+                boxShadow: isCurrent ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)] : null,
               ),
-              child: isDone ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
+              child: isDone ? const Icon(Icons.check, size: 8, color: Colors.black) : null,
             ),
             if (!isLast)
               Container(
                 width: 2,
-                height: 24,
-                color: isDone ? Colors.green : Colors.grey.shade200,
+                height: 32,
+                color: isDone ? Colors.greenAccent.withOpacity(0.3) : Colors.white10,
               ),
           ],
         ),
         const SizedBox(width: 16),
-        Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            color: isDone || isCurrent ? Colors.black87 : Colors.grey.shade500,
-            fontWeight: isDone || isCurrent ? FontWeight.bold : FontWeight.normal,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  color: isDone || isCurrent ? Colors.white : Colors.white38,
+                  fontWeight: isDone || isCurrent ? FontWeight.bold : FontWeight.normal,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                time,
+                style: TextStyle(color: Colors.white24, fontSize: 11),
+              ),
+            ],
           ),
         ),
       ],
@@ -516,30 +524,3 @@ class _StatusTimelineItem extends StatelessWidget {
   }
 }
 
-// Background map grid simulation
-class _TrackingMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primary.withOpacity(0.08)
-      ..strokeWidth = 14
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-
-    final path = Path();
-    path.moveTo(size.width * 0.2, 0);
-    path.lineTo(size.width * 0.3, size.height * 0.4);
-    path.lineTo(size.width * 0.6, size.height * 0.55);
-    path.lineTo(size.width * 0.8, size.height);
-    
-    canvas.drawPath(path, paint);
-    
-    paint.strokeWidth = 6;
-    paint.color = AppColors.primary.withOpacity(0.04);
-    canvas.drawLine(Offset(0, size.height * 0.3), Offset(size.width * 0.5, size.height * 0.3), paint);
-    canvas.drawLine(Offset(size.width * 0.6, size.height * 0.8), Offset(size.width, size.height * 0.6), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

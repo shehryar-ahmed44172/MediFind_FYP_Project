@@ -11,6 +11,7 @@ import 'my_patients_screen.dart';
 import 'caregiver_map_screen.dart';
 import 'caregiver_history_screen.dart';
 import '../profile/user_profile_screen.dart';
+import '../settings/settings_screen.dart';
 import '../../widgets/common/app_header.dart';
 
 class CaregiverHomeScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     const MyPatientsScreen(),
     const CaregiverMapScreen(),
     const CaregiverHistoryScreen(),
+    const SettingsScreen(showHeader: false),
     const UserProfileScreen(),
   ];
 
@@ -49,22 +51,23 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
+            blurRadius: 20,
+            offset: const Offset(0, -8),
           ),
         ],
       ),
       child: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildNavItem(Icons.home_rounded, 'Home', 0, theme),
               _buildNavItem(Icons.people_rounded, 'Patients', 1, theme),
-              _buildNavItem(Icons.location_on_rounded, 'Maps', 2, theme),
+              _buildNavItem(Icons.map_rounded, 'Maps', 2, theme),
               _buildNavItem(Icons.history_rounded, 'History', 3, theme),
-              _buildNavItem(Icons.person_rounded, 'Profile', 4, theme),
+              _buildNavItem(Icons.settings_rounded, 'Settings', 4, theme),
+              _buildNavItem(Icons.person_rounded, 'Profile', 5, theme),
             ],
           ),
         ),
@@ -74,32 +77,40 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
 
   Widget _buildNavItem(IconData icon, String label, int index, ThemeData theme) {
     final isSelected = _currentIndex == index;
-    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.4);
+    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.45);
 
-    return InkWell(
-      onTap: () => setState(() => _currentIndex = index),
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _currentIndex = index),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          padding: const EdgeInsets.symmetric(vertical: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon, 
+                color: color, 
+                size: isSelected ? 22 : 20,
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: TextStyle(
+                  color: color,
+                  fontSize: 9,
+                  fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -126,6 +137,34 @@ class _DashboardView extends ConsumerWidget {
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
+                  // 1. Greeting
+                  SliverToBoxAdapter(
+                    child: ref.watch(currentUserProvider).when(
+                      data: (user) => Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Hello,',
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                              ),
+                            ),
+                            Text(
+                              user?.fullName.split(' ')[0] ?? 'Caregiver',
+                              style: theme.textTheme.headlineMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, __) => const SizedBox.shrink(),
+                    ),
+                  ),
                   // 2. Stats
                   SliverToBoxAdapter(
                     child: asyncPatients.when(

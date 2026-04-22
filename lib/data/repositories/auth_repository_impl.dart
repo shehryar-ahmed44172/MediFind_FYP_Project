@@ -107,7 +107,7 @@ class AuthRepositoryImpl implements AuthRepository {
       responderType: profile.responderType,
       vehicleType: profile.vehicleType,
       profileImageUrl: profile.profileImageUrl,
-      isActive: true,
+      isActive: profile.isActive ?? true,
       createdAt: profile.lastUpdated ?? DateTime.now(),
       updatedAt: profile.lastUpdated ?? DateTime.now(),
     );

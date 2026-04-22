@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/emergency_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../../services/socket/socket_service.dart';
@@ -10,6 +11,9 @@ import '../../../services/location/location_service.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
+
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/utils/map_utils.dart';
 
 class ActiveEmergencyScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -21,12 +25,17 @@ class ActiveEmergencyScreen extends ConsumerStatefulWidget {
 }
 
 class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
+  GoogleMapController? _mapController;
+  final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
+  
   String _currentStatus = 'ACCEPTED';
   StreamSubscription<Position>? _locationSubscription;
   
-  // Plan v6: Patient tracking coordinates
-  double? _patientLat;
-  double? _patientLng;
+  double? _myLat;
+  double? _myLng;
+  
+  BitmapDescriptor? _ambulanceIcon;
+  final Set<Marker> _markers = {};
 
   final List<Map<String, dynamic>> _statusSteps = [
     {'status': 'ACCEPTED', 'label': 'Request Accepted', 'icon': Icons.check_circle_outline},
@@ -38,39 +47,61 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   @override
   void initState() {
     super.initState();
-    // Automatically announce when the active view opens
+    _loadMarkerIcons();
     Future.microtask(() async {
       final emergency = await ref.read(getEmergencyProvider(widget.emergencyId).future);
       if (emergency != null) {
         final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-        
         if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
-           // For deaf patients, we play the detailed medical report
            await VoiceAlertService().speakAutomatedEmergencyReport(
              emergency: emergency as emergency_entity.Emergency,
              medical: profile,
            );
         } else {
-           // For normal patients, play standard arrival announcement
            await VoiceAlertService().announceResponderAssigned('the Patient');
         }
       }
     });
-
     _startLiveTracking();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final icon = await MapUtils.getAmbulanceMarker();
+    if (mounted) {
+      setState(() {
+        _ambulanceIcon = icon;
+      });
+    }
   }
 
   void _startLiveTracking() {
     _locationSubscription = LocationService().startLocationUpdates(
       intervalInSeconds: 5,
     ).listen((position) {
-      if (_currentStatus != 'RESOLVED') {
-        SocketService.instance.sendLocationUpdate(
-          position.latitude,
-          position.longitude,
-        );
+      if (mounted) {
+        setState(() {
+          _myLat = position.latitude;
+          _myLng = position.longitude;
+        });
+        
+        if (_currentStatus != 'RESOLVED') {
+          SocketService.instance.sendLocationUpdate(
+            position.latitude,
+            position.longitude,
+          );
+        }
+        
+        _animateToMe();
       }
     });
+  }
+
+  void _animateToMe() {
+    if (_mapController != null && _myLat != null && _myLng != null) {
+      _mapController!.animateCamera(
+        CameraUpdate.newLatLng(LatLng(_myLat!, _myLng!)),
+      );
+    }
   }
 
   @override
@@ -81,7 +112,6 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
 
   Future<void> _updateStatus(String newStatus) async {
     setState(() => _currentStatus = newStatus);
-    
     try {
       if (newStatus == 'RESOLVED') {
         await ref.read(resolveEmergencyProvider(widget.emergencyId).future);
@@ -90,7 +120,6 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
           UpdateEmergencyStatusParams(emergencyId: widget.emergencyId, status: newStatus)
         ).future);
       }
-      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -105,11 +134,76 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     }
   }
 
+  Future<void> _confirmCancellation(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Response?'),
+        content: const Text('Are you sure you want to cancel your response to this emergency? The request will be re-broadcasted to other responders.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No, Stay')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true), 
+            child: const Text('Yes, Cancel', style: TextStyle(color: Colors.red))
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      _handleCancellation();
+    }
+  }
+
+  Future<void> _handleCancellation() async {
+    try {
+      await ref.read(cancelResponderAssignmentProvider(widget.emergencyId).future);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Response cancelled. Returning to dashboard.')),
+        );
+        context.go('/responder');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _updateMarkers(emergency_entity.Emergency emergency) {
+    _markers.clear();
+    
+    // Patient Marker
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('patient'),
+        position: LatLng(emergency.latitude, emergency.longitude),
+        infoWindow: const InfoWindow(title: 'Patient Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+      ),
+    );
+
+    // Responder (ME) Marker
+    if (_myLat != null && _myLng != null) {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('me'),
+          position: LatLng(_myLat!, _myLng!),
+          icon: _ambulanceIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: const InfoWindow(title: 'You'),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final currentIdx =
-        _statusSteps.indexWhere((s) => s['status'] == _currentStatus);
+    final currentIdx = _statusSteps.indexWhere((s) => s['status'] == _currentStatus);
+    final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -117,63 +211,43 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         title: const Text('Active Emergency'),
         centerTitle: true,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Patient Info Card
-            _buildPatientInfo(context, theme),
-            const SizedBox(height: 16),
-
-            // Map placeholder (Google Maps would go here)
-            Container(
-              height: 250, // Increased for pin visibility
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: AppShadows.neumorphicIn,
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: Stack(
-                  children: [
-                    // Grid Simulation
-                    Positioned.fill(
-                      child: CustomPaint(
-                        painter: _GridPainter(),
+      body: emergencyAsync.when(
+        data: (emergency) {
+          if (emergency == null) return const Center(child: Text('Emergency not found'));
+          _updateMarkers(emergency as emergency_entity.Emergency);
+          
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildPatientInfo(context, theme, emergency),
+                const SizedBox(height: 16),
+                Container(
+                  height: 300,
+                  decoration: BoxDecoration(
+                    color: theme.scaffoldBackgroundColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: AppShadows.neumorphicOut,
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: GoogleMap(
+                      initialCameraPosition: CameraPosition(
+                        target: LatLng(emergency.latitude, emergency.longitude),
+                        zoom: 14,
                       ),
+                      markers: _markers,
+                      myLocationEnabled: true,
+                      myLocationButtonEnabled: false,
+                      onMapCreated: (controller) {
+                        _controller.complete(controller);
+                        _mapController = controller;
+                      },
                     ),
-                    const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.map_outlined, size: 32, color: AppColors.primaryOpacity),
-                          Text('Navigating to Patient...', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                    
-                    // Patient Pin (Plan v6: Tracking target)
-                    Positioned(
-                      top: 100,
-                      left: 150,
-                      child: _buildMapPin(Icons.person_pin_circle_rounded, AppColors.primaryDark),
-                    ),
-                    
-                    // Responder Pin (Self - Plan v6: Simulation)
-                    Positioned(
-                      bottom: 40,
-                      right: 60,
-                      child: _buildMapPin(Icons.directions_car_filled_rounded, Colors.green),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // Status Timeline
+                const SizedBox(height: 16),
             Container(
               decoration: BoxDecoration(
                 color: theme.scaffoldBackgroundColor,
@@ -185,20 +259,16 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Status Timeline',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold, fontSize: 16)),
+                    const Text('Status Timeline', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 12),
                     ..._statusSteps.asMap().entries.map((entry) {
                       final idx = entry.key;
                       final step = entry.value;
-                      final isDone = idx <= currentIdx;
-                      final isCurrent = idx == currentIdx;
                       return _StatusStep(
                         icon: step['icon'],
                         label: step['label'],
-                        isDone: isDone,
-                        isCurrent: isCurrent,
+                        isDone: idx <= currentIdx,
+                        isCurrent: idx == currentIdx,
                         isLast: idx == _statusSteps.length - 1,
                       );
                     }),
@@ -207,134 +277,159 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            // Action Buttons
             if (_currentStatus != 'RESOLVED') ...[
               ElevatedButton.icon(
                 onPressed: () {
                   final nextIdx = currentIdx + 1;
-                  if (nextIdx < _statusSteps.length) {
-                    _updateStatus(_statusSteps[nextIdx]['status']);
-                  }
+                  if (nextIdx < _statusSteps.length) _updateStatus(_statusSteps[nextIdx]['status']);
                 },
                 icon: const Icon(Icons.arrow_forward_rounded),
                 label: Text(
-                  currentIdx + 1 < _statusSteps.length
-                      ? 'Mark: ${_statusSteps[currentIdx + 1]['label']}'
-                      : 'Completed',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                  currentIdx + 1 < _statusSteps.length ? 'Mark: ${_statusSteps[currentIdx + 1]['label']}' : 'Completed',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
               ),
             ] else ...[
               Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(12),
-                  boxShadow: AppShadows.neumorphicIn,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: Colors.green),
-                    SizedBox(width: 8),
-                    Text('Emergency Resolved!',
-                        style: TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16)),
-                  ],
-                ),
+                decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(12), boxShadow: AppShadows.neumorphicIn),
+                child: const Row(mainAxisAlignment: MainAxisAlignment.center, children: [Icon(Icons.check_circle_rounded, color: Colors.green), SizedBox(width: 8), Text('Emergency Resolved!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold, fontSize: 16))]),
               ),
               const SizedBox(height: 12),
-              ElevatedButton(
-                onPressed: () => context.go('/responder'),
-                child: const Text('Return to Dashboard'),
-                style: ElevatedButton.styleFrom(
+                ElevatedButton(
+                  onPressed: () => context.go('/responder'),
+                  child: const Text('Return to Dashboard'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () => _confirmCancellation(context),
+                icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                label: const Text('Cancel Response', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  side: const BorderSide(color: Colors.red, width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
             ],
-          ],
-        ),
+          ),
+        );
+        },
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (e, _) => Center(child: Text('Error: $e')),
       ),
     );
   }
 
-  Widget _buildPatientInfo(BuildContext context, ThemeData theme) {
-    final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
-
-    return emergencyAsync.when(
-      data: (emergency) {
-        if (emergency == null) return const Text('No active emergency data');
-        final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
-
-        return Container(
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: AppShadows.neumorphicOut,
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildPatientInfo(BuildContext context, ThemeData theme, emergency_entity.Emergency emergency) {
+    final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
+    final patientAsync = ref.watch(userProfileProvider(emergency.userId));
+    
+    return Container(
+      decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, borderRadius: BorderRadius.circular(16), boxShadow: AppShadows.neumorphicOut),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Row(
-                      children: [
-                        Icon(Icons.person_outlined, color: AppColors.primary),
-                        SizedBox(width: 8),
-                        Text('Patient Info',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ],
-                    ),
-                    profileAsync.when(
-                      data: (profile) => (profile?.disabilityType?.toLowerCase().contains('deaf') == true)
-                          ? Tooltip(
-                              message: 'Deaf Patient: Automated Report Available',
-                              child: IconButton(
-                                icon: const Icon(Icons.record_voice_over, color: Colors.orange),
-                                onPressed: () async {
-                                  await VoiceAlertService().speakAutomatedEmergencyReport(
-                                    emergency: emergency as emergency_entity.Emergency,
-                                    medical: profile!,
-                                  );
-                                },
-                              ),
-                            )
-                          : const SizedBox.shrink(),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    ),
-                  ],
+                const Row(children: [Icon(Icons.person_outlined, color: AppColors.primary), SizedBox(width: 8), Text('Patient Info', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
+                profileAsync.when(
+                  data: (profile) => (profile?.disabilityType?.toLowerCase().contains('deaf') == true)
+                      ? IconButton(
+                          icon: const Icon(Icons.record_voice_over, color: Colors.orange),
+                          onPressed: () async {
+                            await VoiceAlertService().speakAutomatedEmergencyReport(emergency: emergency as emergency_entity.Emergency, medical: profile!);
+                          },
+                        )
+                      : const SizedBox.shrink(),
+                  loading: () => const SizedBox.shrink(),
+                  error: (_, __) => const SizedBox.shrink(),
                 ),
-                const Divider(),
-                Text('Patient ID: ${emergency.userId.substring(0, 8)}...', style: const TextStyle(fontSize: 15)),
+              ],
+            ),
+            const Divider(),
+            patientAsync.when(
+              data: (u) => Text('Patient Name: ${u?.fullName ?? 'Anonymous'}', 
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              loading: () => const Text('Loading patient name...', style: TextStyle(fontSize: 16)),
+              error: (_, __) => const Text('Patient Name: Anonymous', style: TextStyle(fontSize: 16)),
+            ),
                 const SizedBox(height: 4),
-                Text('Emergency: ${emergency.emergencyType.replaceAll('_', ' ')}',
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text('Location: ${emergency.latitude}, ${emergency.longitude}',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                Text('Emergency: ${emergency.emergencyType.replaceAll('_', ' ')}', 
+                  style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)),
+                const SizedBox(height: 12),
+                
+                // Medical Details Section
+                profileAsync.when(
+                  data: (profile) {
+                    if (profile == null) return const Text('No medical profile linked.', style: TextStyle(color: Colors.grey));
+                    
+                    final allergies = profile.allergies.isNotEmpty ? profile.allergies.join(', ') : 'None';
+                    final chronic = profile.chronicDiseases.isNotEmpty ? profile.chronicDiseases.join(', ') : 'None';
+
+                    return Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.medical_services, size: 18, color: Colors.blue.shade900),
+                              const SizedBox(width: 8),
+                              const Text('Medical Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildDetailRow('Blood Type', profile.bloodType ?? 'Unknown'),
+                          _buildDetailRow('Allergies', allergies),
+                          _buildDetailRow('Chronic', chronic),
+                          // Manual summary since voiceSummary getter was lost
+                          const Divider(),
+                          Text('Medical Summary:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue.shade900)),
+                          Text(
+                            'Emergency reported at location. Patient has $allergies allergies and $chronic chronic conditions.',
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Failed to load profile: $e', style: const TextStyle(color: Colors.red)),
+                ),
+                const SizedBox(height: 12),
+                Text('Location: ${emergency.latitude.toStringAsFixed(5)}, ${emergency.longitude.toStringAsFixed(5)}', 
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
               ],
             ),
           ),
         );
-      },
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Text('Error: $e'),
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 80, child: Text('$label:', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
+        ],
+      ),
     );
   }
 }
@@ -345,14 +440,7 @@ class _StatusStep extends StatelessWidget {
   final bool isDone;
   final bool isCurrent;
   final bool isLast;
-
-  const _StatusStep({
-    required this.icon,
-    required this.label,
-    required this.isDone,
-    required this.isCurrent,
-    required this.isLast,
-  });
+  const _StatusStep({required this.icon, required this.label, required this.isDone, required this.isCurrent, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
@@ -365,32 +453,14 @@ class _StatusStep extends StatelessWidget {
             Container(
               width: 36,
               height: 36,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isDone ? Colors.green : Colors.grey.shade200,
-                border: isCurrent
-                    ? Border.all(color: Colors.green, width: 3)
-                    : null,
-              ),
-              child: Icon(icon,
-                  color: isDone ? Colors.white : Colors.grey.shade400,
-                  size: 18),
+              decoration: BoxDecoration(shape: BoxShape.circle, color: isDone ? Colors.green : Colors.grey.shade200, border: isCurrent ? Border.all(color: Colors.green, width: 3) : null),
+              child: Icon(icon, color: isDone ? Colors.white : Colors.grey.shade400, size: 18),
             ),
-            if (!isLast)
-              Container(width: 2, height: 32, color: color),
+            if (!isLast) Container(width: 2, height: 32, color: color),
           ],
         ),
         const SizedBox(width: 12),
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
-              color: isDone ? Colors.black : Colors.grey,
-            ),
-          ),
-        ),
+        Padding(padding: const EdgeInsets.only(top: 6), child: Text(label, style: TextStyle(fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal, color: isDone ? Colors.black : Colors.grey))),
       ],
     );
   }

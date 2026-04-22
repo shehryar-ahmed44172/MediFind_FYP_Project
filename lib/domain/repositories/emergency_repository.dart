@@ -41,10 +41,14 @@ abstract class EmergencyRepository {
   Future<void> cancelEmergency(String emergencyId);
 
   Future<void> resolveEmergency(String emergencyId);
+  
+  Future<void> cancelAssignment(String emergencyId);
 
   Future<void> updateResponderLocation(double latitude, double longitude);
 
   Future<void> updateResponderAvailability(bool isAvailable);
+  
+  Future<List<dynamic>> getResponderHistory();
 
   Future<List<User>> getNearbyResponders(double latitude, double longitude);
 }

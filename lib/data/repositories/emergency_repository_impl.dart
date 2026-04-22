@@ -27,6 +27,17 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   }
 
   @override
+  Future<void> cancelAssignment(String emergencyId) async {
+    await apiClient.cancelResponderAssignment(emergencyId);
+    final cached = await localDataSource.getEmergency(emergencyId);
+    if (cached != null) {
+      cached['responderId'] = null;
+      cached['status'] = 'ACTIVE';
+      await localDataSource.saveEmergency(cached);
+    }
+  }
+
+  @override
   Future<void> resolveEmergency(String emergencyId) async {
     await apiClient.resolveEmergency(emergencyId);
     final cached = await localDataSource.getEmergency(emergencyId);
@@ -65,7 +76,11 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     final initial = await localDataSource.getAllEmergencies();
     yield initial
         .map((e) => _mapToEmergency(e))
-        .where((e) => e.status != 'COMPLETED' && e.status != 'CANCELLED')
+        .where((e) => 
+            e.status != 'COMPLETED' && 
+            e.status != 'CANCELLED' && 
+            e.status != 'REJECTED' && 
+            e.status != 'RESPONDER_ASSIGNED')
         .toList();
 
     // 2. Then listen for updates
@@ -73,7 +88,11 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
       final all = await localDataSource.getAllEmergencies();
       yield all
           .map((e) => _mapToEmergency(e))
-          .where((e) => e.status != 'COMPLETED' && e.status != 'CANCELLED')
+          .where((e) => 
+              e.status != 'COMPLETED' && 
+              e.status != 'CANCELLED' && 
+              e.status != 'REJECTED' && 
+              e.status != 'RESPONDER_ASSIGNED')
           .toList();
     }
   }
@@ -199,7 +218,16 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   @override
   Future<void> rejectEmergency(String emergencyId, String responderId) async {
     await apiClient.rejectEmergency(emergencyId, responderId);
-    // You could also remove it from local cache, so it doesn't show up
+    final cached = await localDataSource.getEmergency(emergencyId);
+    if (cached != null) {
+      cached['status'] = 'REJECTED';
+      await localDataSource.saveEmergency(cached);
+    }
+  }
+
+  @override
+  Future<List<dynamic>> getResponderHistory() async {
+    return await apiClient.getResponderHistory();
   }
 
   @override

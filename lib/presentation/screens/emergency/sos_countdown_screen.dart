@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import 'dart:math' as math;
 import '../../../services/audio/voice_alert_service.dart';
@@ -153,8 +154,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
   @override
   Widget build(BuildContext context) {
-    final user = ref.watch(currentUserProvider).valueOrNull;
-    final isDeaf = user?.patientType == 'DEAF';
+    final settings = ref.watch(accessibilityProvider);
+    final isDeaf = settings.textOnlyMode;
 
     if (_isSending) return _buildSendingOverlay(isDeaf);
     final theme = Theme.of(context);

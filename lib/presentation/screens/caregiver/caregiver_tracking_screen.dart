@@ -7,23 +7,88 @@ import '../../providers/auth_provider.dart';
 import '../../../domain/entities/emergency.dart';
 import '../../../services/socket/socket_service.dart';
 
-class CaregiverTrackingScreen extends ConsumerWidget {
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/utils/map_utils.dart';
+import 'dart:async';
+
+class CaregiverTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
   const CaregiverTrackingScreen({Key? key, required this.emergencyId})
       : super(key: key);
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CaregiverTrackingScreen> createState() => _CaregiverTrackingScreenState();
+}
+
+class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScreen> {
+  GoogleMapController? _mapController;
+  final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
+  
+  BitmapDescriptor? _ambulanceIcon;
+  final Set<Marker> _markers = {};
+  
+  double? _responderLat;
+  double? _responderLng;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMarkerIcons();
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    final icon = await MapUtils.getAmbulanceMarker();
+    if (mounted) {
+      setState(() {
+        _ambulanceIcon = icon;
+      });
+    }
+  }
+
+  void _updateMarkers(Emergency emergency) {
+    _markers.clear();
+    
+    // Patient Marker
+    _markers.add(
+      Marker(
+        markerId: const MarkerId('patient'),
+        position: LatLng(emergency.latitude, emergency.longitude),
+        infoWindow: const InfoWindow(title: 'Patient Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+      ),
+    );
+
+    // Responder Marker
+    if (_responderLat != null && _responderLng != null) {
+      _markers.add(
+        Marker(
+          markerId: const MarkerId('responder'),
+          position: LatLng(_responderLat!, _responderLng!),
+          icon: _ambulanceIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          infoWindow: const InfoWindow(title: 'Responder'),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final emergencyAsync = ref.watch(getEmergencyProvider(emergencyId));
+    final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
     
     // Listen for Socket events to refresh data
     ref.listen(socketStreamProvider, (previous, next) {
       if (next.hasValue) {
         final message = next.value!;
-        if (message.event == SocketEvent.emergencyStatusChange || 
-            message.event == SocketEvent.responderLocationUpdate) {
-          ref.invalidate(getEmergencyProvider(emergencyId));
+        final data = message.data as Map<String, dynamic>;
+        
+        if (message.event == SocketEvent.emergencyStatusChange) {
+          ref.invalidate(getEmergencyProvider(widget.emergencyId));
+        } else if (message.event == SocketEvent.responderLocationUpdate) {
+          setState(() {
+            _responderLat = double.tryParse(data['latitude'].toString());
+            _responderLng = double.tryParse(data['longitude'].toString());
+          });
         }
       }
     });
@@ -37,7 +102,8 @@ class CaregiverTrackingScreen extends ConsumerWidget {
       body: emergencyAsync.when(
         data: (emergency) {
           if (emergency == null) return const Center(child: Text('Emergency not found'));
-          return _buildDynamicContent(context, ref, theme, emergency);
+          _updateMarkers(emergency as Emergency);
+          return _buildDynamicContent(context, theme, emergency);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -45,7 +111,7 @@ class CaregiverTrackingScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildDynamicContent(BuildContext context, WidgetRef ref, ThemeData theme, Emergency emergency) {
+  Widget _buildDynamicContent(BuildContext context, ThemeData theme, Emergency emergency) {
     final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
     final responderAsync = emergency.responderId != null 
         ? ref.watch(userProfileProvider(emergency.responderId!))
@@ -84,7 +150,7 @@ class CaregiverTrackingScreen extends ConsumerWidget {
                       Text('Emergency Type: ${emergency.emergencyType.replaceAll('_', ' ')}',
                           style: const TextStyle(fontSize: 13)),
                       if (emergency.status != 'RESOLVED')
-                        const Text('ETA: ~8 minutes', // In a real app, this would be calculated
+                        const Text('ETA: ~8 minutes', 
                             style: TextStyle(
                                 color: Colors.green,
                                 fontWeight: FontWeight.bold)),
@@ -96,31 +162,28 @@ class CaregiverTrackingScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
 
-          // Map Placeholder
+          // Real Map Integration
           Container(
-            height: 280,
+            height: 320,
             decoration: BoxDecoration(
               color: theme.scaffoldBackgroundColor,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: AppShadows.neumorphicIn,
+              boxShadow: AppShadows.neumorphicOut,
             ),
-            child: const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.map_outlined, size: 64, color: AppColors.primary),
-                  SizedBox(height: 8),
-                  Text('Live Map',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16)),
-                  SizedBox(height: 4),
-                  Text('Patient and Responder locations',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                  Text('(Google Maps API key required)',
-                      style: TextStyle(color: Colors.grey, fontSize: 11)),
-                ],
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: GoogleMap(
+                initialCameraPosition: CameraPosition(
+                  target: LatLng(emergency.latitude, emergency.longitude),
+                  zoom: 14,
+                ),
+                markers: _markers,
+                myLocationEnabled: false,
+                zoomControlsEnabled: false,
+                onMapCreated: (controller) {
+                  _controller.complete(controller);
+                  _mapController = controller;
+                },
               ),
             ),
           ),

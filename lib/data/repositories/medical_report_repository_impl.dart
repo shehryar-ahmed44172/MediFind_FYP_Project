@@ -2,6 +2,7 @@ import 'dart:io';
 import '../../domain/entities/medical_report.dart';
 import '../../domain/repositories/medical_report_repository.dart';
 import '../datasources/remote/medifind_api_client.dart';
+import '../../core/constants/app_constants.dart';
 
 class MedicalReportRepositoryImpl implements MedicalReportRepository {
   final MediFindApiClient _apiClient;
@@ -12,9 +13,11 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
 
   @override
   Future<List<MedicalReport>> getMedicalReports(String userId) async {
-    // Current MediFindApiClient.getReports() takes no arguments
     final reportsJson = await _apiClient.getReports();
-    return reportsJson.map((json) => MedicalReport.fromJson(json as Map<String, dynamic>)).toList();
+    return reportsJson.map((json) {
+      final normalized = _normalizeReportJson(json as Map<String, dynamic>);
+      return MedicalReport.fromJson(normalized);
+    }).toList();
   }
 
   @override
@@ -24,9 +27,38 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
     required String userId,
     Function(double)? onProgress,
   }) async {
-    // Current MediFindApiClient.uploadReport() takes File and String
-    final response = await _apiClient.uploadReport(file, reportType);
-    return MedicalReport.fromJson(response as Map<String, dynamic>);
+    final response = await _apiClient.uploadReport(file, reportType, userId);
+    final normalized = _normalizeReportJson(response as Map<String, dynamic>);
+    return MedicalReport.fromJson(normalized);
+  }
+
+  Map<String, dynamic> _normalizeReportJson(Map<String, dynamic> json) {
+    // Backend field variation mapping
+    final id = json['id'] ?? json['reportId'] ?? json['_id'] ?? '';
+    final rawUrl = json['downloadUrl'] ?? json['url'] ?? json['fileUrl'] ?? '';
+    
+    // Construct absolute URL if it's relative
+    String downloadUrl = '';
+    if (rawUrl.isNotEmpty) {
+      if (rawUrl.toString().startsWith('http')) {
+        downloadUrl = rawUrl;
+      } else {
+        // Prepend base URL (removing /api/ suffix if present)
+        final host = AppConstants.baseUrl.replaceAll('/api/', '');
+        final path = rawUrl.toString().startsWith('/') ? rawUrl : '/$rawUrl';
+        downloadUrl = '$host$path';
+      }
+    }
+
+    return {
+      ...json,
+      'id': id,
+      'fileName': json['fileName'] ?? json['name'] ?? 'Medical Report',
+      'reportType': json['reportType'] ?? json['type'] ?? 'OTHER',
+      'downloadUrl': downloadUrl,
+      'uploadedAt': json['uploadedAt'] ?? DateTime.now().toIso8601String(),
+      'fileSizeBytes': json['fileSizeBytes'] ?? json['size'] ?? 0,
+    };
   }
 
   @override

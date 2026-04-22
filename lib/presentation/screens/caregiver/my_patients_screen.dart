@@ -35,13 +35,9 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: AppHeader(greetingOverride: 'Managed Patients'),
-            ),
+      body: Column(
+        children: [
+          AppHeader(greetingOverride: 'Managed Patients'),
             TabBar(
               controller: _tabController,
               labelColor: AppColors.primary,
@@ -71,7 +67,6 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
             ),
           ],
         ),
-      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/caregiver/link-patient'),
         icon: const Icon(Icons.person_add_rounded),

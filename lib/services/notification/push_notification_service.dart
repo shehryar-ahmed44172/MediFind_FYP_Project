@@ -17,11 +17,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
 class PushNotificationService {
   static final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  static GlobalKey<NavigatorState>? _navigatorKey;
   static BuildContext? _currentDialogContext;
   static LocalDataSource? _localDataSource;
 
-  static Future<void> initialize(BuildContext context, LocalDataSource localDataSource) async {
+  static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey, LocalDataSource localDataSource) async {
     try {
+      _navigatorKey = navigatorKey;
       _localDataSource = localDataSource;
       await Firebase.initializeApp();
       
@@ -40,17 +42,20 @@ class PushNotificationService {
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-        print('Got a message whilst in the foreground!');
+        debugPrint('🔔 FCM Foreground Message Received: ${message.data}');
         
         final type = message.data['type'];
-        // Plan v4: Support both legacy and new notification types
-        if (type == 'EMERGENCY_REQUEST' || type == 'SOS_TRIGGERED') {
-          // Plan v5: Persist to local DB so Home Page updates automatically
+        final legacyType = message.data['legacy_type'];
+        
+        // Match either the new SOS_TRIGGERED or the legacy EMERGENCY_REQUEST
+        if (type == 'SOS_TRIGGERED' || type == 'EMERGENCY_REQUEST' || legacyType == 'EMERGENCY_REQUEST') {
+          debugPrint('🚨 SOS Triggered! Triggering Visual Alert...');
+          
           if (_localDataSource != null) {
             await _localDataSource!.saveEmergency(message.data);
-            debugPrint('✅ Persisted incoming emergency ${message.data['id']} to local storage');
           }
-          _showCustomEmergencyModal(context, message.data);
+          
+          showEmergencyAlert(message.data);
         } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED') {
           _dismissCurrentEmergencyModal();
         }
@@ -60,8 +65,8 @@ class PushNotificationService {
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         if (message.data['type'] == 'EMERGENCY_REQUEST') {
           final requestId = message.data['emergencyId'] ?? '';
-          if (requestId.isNotEmpty) {
-            context.push('/responder/emergency/$requestId');
+          if (requestId.isNotEmpty && _navigatorKey?.currentContext != null) {
+            _navigatorKey!.currentContext!.push('/responder/emergency/$requestId');
           }
         }
       });
@@ -84,15 +89,22 @@ class PushNotificationService {
     }
   }
 
-  static void _showCustomEmergencyModal(BuildContext context, Map<String, dynamic> data) {
+  static void showEmergencyAlert(Map<String, dynamic> data) {
+    if (_navigatorKey == null || _navigatorKey!.currentContext == null) {
+      debugPrint('❌ Cannot show Emergency Modal: Navigator context is null');
+      return;
+    }
+
+    final context = _navigatorKey!.currentContext!;
+
     // If another modal is somehow open, close it
     _dismissCurrentEmergencyModal();
 
     final emergencyType = data['emergencyType'] ?? 'Unknown Emergency';
-    final distance = data['distance'] ?? 'Calculating...';
+    final distance = data['distanceKm'] ?? data['distance'] ?? 'Calculating...';
     
     // Trigger Voice Alert
-    VoiceAlertService().speakMessage('Emergency Alert! ${emergencyType.replaceAll('_', ' ')} reported $distance away.');
+    VoiceAlertService().speakMessage('Emergency Alert! ${emergencyType.replaceAll('_', ' ')} reported $distance kilometers away.');
 
     showDialog(
       context: context,
@@ -100,7 +112,7 @@ class PushNotificationService {
       builder: (BuildContext dialogContext) {
         _currentDialogContext = dialogContext;
         final priority = data['priority'] ?? 'NORMAL';
-        final requestId = data['emergencyId'] ?? '';
+        final requestId = data['emergencyId'] ?? data['id'] ?? '';
 
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -151,7 +163,38 @@ class PushNotificationService {
                   ),
                 ],
                 const SizedBox(height: 12),
-                Text('Distance: $distance', style: const TextStyle(fontSize: 16)),
+                Text('Distance: $distance km', style: const TextStyle(fontSize: 16)),
+                const SizedBox(height: 12),
+                if (data['voiceSummary'] != null || data['medicalContext'] != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.blue.shade100),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.medical_services_outlined, size: 16, color: Colors.blue.shade900),
+                            const SizedBox(width: 8),
+                            Text('Medical Context', 
+                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          data['voiceSummary'] ?? data['medicalContext'] ?? '',
+                          style: TextStyle(fontSize: 13, color: Colors.blue.shade800),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -172,8 +215,8 @@ class PushNotificationService {
                       onPressed: () {
                         Navigator.of(dialogContext).pop();
                         _currentDialogContext = null;
-                        if (requestId.isNotEmpty) {
-                          context.push('/responder/active/$requestId');
+                        if (requestId.isNotEmpty && _navigatorKey?.currentContext != null) {
+                          _navigatorKey!.currentContext!.push('/responder/request/$requestId');
                         }
                       },
                     ),

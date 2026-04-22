@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/accessibility_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
 class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
@@ -154,6 +155,39 @@ class _AccessibilitySettingsScreenState
             child: const Text('Save Settings', style: TextStyle(fontSize: 16)),
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Reset to Defaults Button
+          Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: OutlinedButton.icon(
+              onPressed: () {
+                final user = ref.read(currentUserProvider).valueOrNull;
+                notifier.initializeFromUser(user?.patientType);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Settings reset to profile defaults!'),
+                    backgroundColor: AppColors.primary,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.restore_rounded),
+              label: const Text('Reset to Profile Defaults'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.grey.shade700,
+                side: BorderSide(color: Colors.grey.shade300),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 32),
         ],
       ),
     );

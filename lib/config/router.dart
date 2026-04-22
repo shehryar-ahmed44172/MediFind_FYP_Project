@@ -31,6 +31,9 @@ import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
+import '../presentation/screens/settings/diagnostics_screen.dart';
+import '../presentation/screens/home/patient_shell.dart';
+import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
@@ -60,7 +63,13 @@ class AppRouter {
       GoRoute(
         path: '/splash',
         name: 'splash',
-        builder: (context, state) => const SplashScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const SplashScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
       // -----------------------------------------------------------------------
       // Auth Routes (Login, Register, Password Management)
@@ -68,7 +77,16 @@ class AppRouter {
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginScreen(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          child: const LoginScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return SlideTransition(
+              position: animation.drive(Tween(begin: const Offset(0, 1), end: Offset.zero).chain(CurveTween(curve: Curves.easeOutCubic))),
+              child: child,
+            );
+          },
+        ),
       ),
       GoRoute(
         path: '/select-role',
@@ -91,68 +109,94 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // Patient Routes (Main features for primary users)
+      // Patient Shell (Persistent Header & Bottom Nav)
       // -----------------------------------------------------------------------
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
+      ShellRoute(
+        navigatorKey: GlobalKey<NavigatorState>(),
+        builder: (context, state, child) => PatientShell(child: child),
         routes: [
           GoRoute(
-            path: 'emergency',
-            name: 'emergency',
-            builder: (context, state) => const EmergencyScreen(),
+            path: '/home',
+            name: 'home',
+            builder: (context, state) => const HomeScreen(),
+            routes: [
+              GoRoute(
+                path: 'emergency',
+                name: 'emergency',
+                builder: (context, state) => const EmergencyScreen(),
+              ),
+              GoRoute(
+                path: 'sos-countdown',
+                name: 'sos-countdown',
+                pageBuilder: (context, state) {
+                  final extra = state.extra as Map<String, dynamic>? ?? {};
+                  return CustomTransitionPage(
+                    key: state.pageKey,
+                    child: SosCountdownScreen(
+                      emergencyType: extra['emergencyType'] ?? 'OTHER',
+                      latitude: (extra['latitude'] as num?)?.toDouble() ?? 0.0,
+                      longitude: (extra['longitude'] as num?)?.toDouble() ?? 0.0,
+                      additionalInfo: extra['additionalInfo'],
+                    ),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return ScaleTransition(scale: animation, child: child);
+                    },
+                  );
+                },
+              ),
+              GoRoute(
+                path: 'medical-profile',
+                name: 'medical-profile',
+                builder: (context, state) => const MedicalProfileScreen(),
+              ),
+              GoRoute(
+                path: 'medical-profile/edit',
+                name: 'edit-medical-profile',
+                builder: (context, state) => const EditMedicalProfileScreen(),
+              ),
+              GoRoute(
+                path: 'medical-reports',
+                name: 'medical-reports',
+                builder: (context, state) => const MedicalReportsScreen(),
+              ),
+              GoRoute(
+                path: 'caregivers',
+                name: 'caregivers',
+                builder: (context, state) => const ManageCaregiversScreen(),
+              ),
+              GoRoute(
+                path: 'settings/accessibility',
+                name: 'accessibility',
+                builder: (context, state) => const AccessibilitySettingsScreen(),
+              ),
+              GoRoute(
+                path: 'patient-type-info',
+                name: 'patient-type-info',
+                builder: (context, state) => const PatientTypeInfoScreen(),
+              ),
+            ],
           ),
           GoRoute(
-            path: 'sos-countdown',
-            name: 'sos-countdown',
-            builder: (context, state) {
-              // Extracting extra parameters for SOS screen safely
-              final extra = state.extra as Map<String, dynamic>? ?? {};
-              return SosCountdownScreen(
-                emergencyType: extra['emergencyType'] ?? 'OTHER',
-                latitude: (extra['latitude'] as num?)?.toDouble() ?? 0.0,
-                longitude: (extra['longitude'] as num?)?.toDouble() ?? 0.0,
-                additionalInfo: extra['additionalInfo'],
-              );
-            },
+            path: '/profile',
+            name: 'profile',
+            builder: (context, state) => const UserProfileScreen(),
+            routes: [
+              GoRoute(
+                path: 'edit',
+                name: 'edit-profile',
+                builder: (context, state) => const EditProfileScreen(),
+              ),
+              GoRoute(
+                path: 'diagnostics',
+                name: 'diagnostics',
+                builder: (context, state) => const DiagnosticsScreen(),
+              ),
+            ],
           ),
           GoRoute(
-            path: 'emergency/:emergencyId/tracking',
-            name: 'emergency-tracking',
-            builder: (context, state) => EmergencyTrackingScreen(
-              emergencyId: state.pathParameters['emergencyId']!,
-            ),
-          ),
-          GoRoute(
-            path: 'medical-profile',
-            name: 'medical-profile',
-            builder: (context, state) => const MedicalProfileScreen(),
-          ),
-          GoRoute(
-            path: 'medical-profile/edit',
-            name: 'edit-medical-profile',
-            builder: (context, state) => const EditMedicalProfileScreen(),
-          ),
-          GoRoute(
-            path: 'medical-reports',
-            name: 'medical-reports',
-            builder: (context, state) => const MedicalReportsScreen(),
-          ),
-          GoRoute(
-            path: 'caregivers',
-            name: 'caregivers',
-            builder: (context, state) => const ManageCaregiversScreen(),
-          ),
-          GoRoute(
-            path: 'settings/accessibility',
-            name: 'accessibility',
-            builder: (context, state) => const AccessibilitySettingsScreen(),
-          ),
-          GoRoute(
-            path: 'patient-type-info',
-            name: 'patient-type-info',
-            builder: (context, state) => const PatientTypeInfoScreen(),
+            path: '/settings',
+            name: 'settings',
+            builder: (context, state) => const SettingsScreen(),
           ),
         ],
       ),
@@ -219,17 +263,14 @@ class AppRouter {
           ),
         ],
       ),
+
+      // Non-Shell Routes (Tracking screens should be full screen)
       GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const UserProfileScreen(),
-        routes: [
-          GoRoute(
-            path: 'edit',
-            name: 'edit-profile',
-            builder: (context, state) => const EditProfileScreen(),
-          ),
-        ],
+        path: '/emergency/:emergencyId/tracking',
+        name: 'emergency-tracking',
+        builder: (context, state) => EmergencyTrackingScreen(
+          emergencyId: state.pathParameters['emergencyId']!,
+        ),
       ),
     ],
     // Error handling route if a user navigates to an unknown path

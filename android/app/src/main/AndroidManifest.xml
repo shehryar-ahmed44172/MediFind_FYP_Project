@@ -64,7 +64,7 @@
         <!-- Google Maps API Key (REPLACE THIS WITH A REAL KEY FOR MAPS TO WORK) -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="YOUR_MAPS_API_KEY_HERE"/>
+            android:value="AIzaSyCIKpj5_dsjIUN7zBpll144D7Dxfwaz_xE"/>
 
         <meta-data
             android:name="flutterEmbedding"

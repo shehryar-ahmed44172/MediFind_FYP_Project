@@ -8,7 +8,7 @@ part 'emergency.g.dart';
 class Emergency with _$Emergency {
   const factory Emergency({
     @Default('') String id,
-    @Default('') String userId,
+    @JsonKey(name: 'patientId') @Default('') String userId,
     @Default('PENDING') String status,
     @Default('OTHER') String emergencyType,
     @JsonKey(fromJson: doubleFromJson) @Default(0.0) double latitude,

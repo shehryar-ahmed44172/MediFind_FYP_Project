@@ -40,6 +40,9 @@ class MediFindApiClient {
         onRequest: (options, handler) {
           if (_authToken != null) {
             options.headers['Authorization'] = 'Bearer $_authToken';
+            debugPrint('🔑 Adding Auth Header: Bearer ${_authToken!.substring(0, 10)}...');
+          } else {
+            debugPrint('⚠️ No Auth Token available in MediFindApiClient');
           }
           return handler.next(options);
         },
@@ -229,12 +232,46 @@ class MediFindApiClient {
     try {
       final response = await _dio.get('auth/me');
       if (response.statusCode == 200) {
-        return User.fromJson(response.data['data'] as Map<String, dynamic>);
+        final data = response.data['data'] as Map<String, dynamic>;
+        return _flattenUserJson(data);
       }
       throw NetworkException(message: 'Failed to fetch current user profile');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
+  }
+
+  /// Helper to flatten nested role profiles from backend into the flat User entity
+  User _flattenUserJson(Map<String, dynamic> json) {
+    final Map<String, dynamic> flat = Map<String, dynamic>.from(json);
+    
+    // Extract from responder profile
+    if (json['responder'] != null && json['responder'] is Map) {
+      final resp = json['responder'] as Map<String, dynamic>;
+      flat['cnic'] ??= resp['cnic'];
+      flat['licenseNumber'] ??= resp['licenseNumber'];
+      flat['organization'] ??= resp['organization'];
+      flat['responderType'] ??= resp['responderType'];
+      flat['vehicleType'] ??= resp['vehicleType'];
+      flat['verificationStatus'] ??= resp['verificationStatus'];
+      flat['rating'] ??= resp['rating'];
+      flat['totalResponsesHandled'] ??= resp['totalResponsesHandled'];
+    }
+    
+    // Extract from medical profile
+    if (json['medicalProfile'] != null && json['medicalProfile'] is Map) {
+      final med = json['medicalProfile'] as Map<String, dynamic>;
+      flat['cnic'] ??= med['cnic'];
+      flat['patientType'] ??= med['patientType'];
+    }
+    
+    // Extract from caregiver profile
+    if (json['caregiverProfile'] != null && json['caregiverProfile'] is Map) {
+      final cg = json['caregiverProfile'] as Map<String, dynamic>;
+      flat['cnic'] ??= cg['cnic'];
+    }
+
+    return User.fromJson(flat);
   }
 
   Future<void> updateFcmToken(String fcmToken) async {
@@ -450,6 +487,18 @@ class MediFindApiClient {
     }
   }
 
+  Future<List<dynamic>> getResponderHistory() async {
+    try {
+      final response = await _dio.get('responders/history');
+      if (response.statusCode == 200) {
+        return response.data['data'] as List<dynamic>;
+      }
+      throw NetworkException(message: 'Failed to fetch responder history');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   // MEDICAL PROFILE ENDPOINTS
   Future<MedicalProfile> getMedicalProfile([String? userId]) async {
     try {
@@ -500,6 +549,14 @@ class MediFindApiClient {
   }
 
   // USER ENDPOINTS
+  Future<void> cancelResponderAssignment(String emergencyId) async {
+    try {
+      await _dio.post('responders/emergencies/$emergencyId/cancel');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<UserProfile> getUserProfile(String userId) async {
     try {
       final response = await _dio.get('users/$userId');
@@ -747,11 +804,12 @@ class MediFindApiClient {
     }
   }
 
-  Future<dynamic> uploadReport(File file, String type) async {
+  Future<dynamic> uploadReport(File file, String reportType, [String? userId]) async {
     try {
       final formData = FormData.fromMap({
         'report': await MultipartFile.fromFile(file.path),
-        'type': type,
+        'reportType': reportType,
+        if (userId != null) 'userId': userId,
       });
       final response = await _dio.post('reports/profile', data: formData);
 

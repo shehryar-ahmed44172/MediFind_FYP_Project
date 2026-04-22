@@ -34,6 +34,16 @@ mixin _$User {
       throw _privateConstructorUsedError; // For Responders
   String? get vehicleType =>
       throw _privateConstructorUsedError; // For Responders
+  String? get responderId => throw _privateConstructorUsedError;
+  String? get cnic => throw _privateConstructorUsedError;
+  String? get verificationStatus => throw _privateConstructorUsedError;
+  double? get rating => throw _privateConstructorUsedError;
+  int? get totalResponsesHandled => throw _privateConstructorUsedError;
+  bool get voiceAlertGenerated => throw _privateConstructorUsedError;
+  String? get additionalInfo => throw _privateConstructorUsedError;
+  DateTime? get completedAt => throw _privateConstructorUsedError;
+  String get priority => throw _privateConstructorUsedError;
+  DateTime? get expiresAt => throw _privateConstructorUsedError;
   String? get profileImageUrl => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
@@ -60,6 +70,16 @@ abstract class $UserCopyWith<$Res> {
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
+      String? responderId,
+      String? cnic,
+      String? verificationStatus,
+      double? rating,
+      int? totalResponsesHandled,
+      bool voiceAlertGenerated,
+      String? additionalInfo,
+      DateTime? completedAt,
+      String priority,
+      DateTime? expiresAt,
       String? profileImageUrl,
       bool isActive,
       DateTime createdAt,
@@ -89,6 +109,16 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
+    Object? responderId = freezed,
+    Object? cnic = freezed,
+    Object? verificationStatus = freezed,
+    Object? rating = freezed,
+    Object? totalResponsesHandled = freezed,
+    Object? voiceAlertGenerated = null,
+    Object? additionalInfo = freezed,
+    Object? completedAt = freezed,
+    Object? priority = null,
+    Object? expiresAt = freezed,
     Object? profileImageUrl = freezed,
     Object? isActive = null,
     Object? createdAt = null,
@@ -135,6 +165,46 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
+      responderId: freezed == responderId
+          ? _value.responderId
+          : responderId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
+      verificationStatus: freezed == verificationStatus
+          ? _value.verificationStatus
+          : verificationStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      rating: freezed == rating
+          ? _value.rating
+          : rating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      totalResponsesHandled: freezed == totalResponsesHandled
+          ? _value.totalResponsesHandled
+          : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
+              as int?,
+      voiceAlertGenerated: null == voiceAlertGenerated
+          ? _value.voiceAlertGenerated
+          : voiceAlertGenerated // ignore: cast_nullable_to_non_nullable
+              as bool,
+      additionalInfo: freezed == additionalInfo
+          ? _value.additionalInfo
+          : additionalInfo // ignore: cast_nullable_to_non_nullable
+              as String?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -173,6 +243,16 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
+      String? responderId,
+      String? cnic,
+      String? verificationStatus,
+      double? rating,
+      int? totalResponsesHandled,
+      bool voiceAlertGenerated,
+      String? additionalInfo,
+      DateTime? completedAt,
+      String priority,
+      DateTime? expiresAt,
       String? profileImageUrl,
       bool isActive,
       DateTime createdAt,
@@ -199,6 +279,16 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
+    Object? responderId = freezed,
+    Object? cnic = freezed,
+    Object? verificationStatus = freezed,
+    Object? rating = freezed,
+    Object? totalResponsesHandled = freezed,
+    Object? voiceAlertGenerated = null,
+    Object? additionalInfo = freezed,
+    Object? completedAt = freezed,
+    Object? priority = null,
+    Object? expiresAt = freezed,
     Object? profileImageUrl = freezed,
     Object? isActive = null,
     Object? createdAt = null,
@@ -245,6 +335,46 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
+      responderId: freezed == responderId
+          ? _value.responderId
+          : responderId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
+      verificationStatus: freezed == verificationStatus
+          ? _value.verificationStatus
+          : verificationStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      rating: freezed == rating
+          ? _value.rating
+          : rating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      totalResponsesHandled: freezed == totalResponsesHandled
+          ? _value.totalResponsesHandled
+          : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
+              as int?,
+      voiceAlertGenerated: null == voiceAlertGenerated
+          ? _value.voiceAlertGenerated
+          : voiceAlertGenerated // ignore: cast_nullable_to_non_nullable
+              as bool,
+      additionalInfo: freezed == additionalInfo
+          ? _value.additionalInfo
+          : additionalInfo // ignore: cast_nullable_to_non_nullable
+              as String?,
+      completedAt: freezed == completedAt
+          ? _value.completedAt
+          : completedAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
+      priority: null == priority
+          ? _value.priority
+          : priority // ignore: cast_nullable_to_non_nullable
+              as String,
+      expiresAt: freezed == expiresAt
+          ? _value.expiresAt
+          : expiresAt // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -279,6 +409,16 @@ class _$UserImpl implements _User {
       this.licenseNumber,
       this.responderType,
       this.vehicleType,
+      this.responderId,
+      this.cnic,
+      this.verificationStatus,
+      this.rating,
+      this.totalResponsesHandled,
+      this.voiceAlertGenerated = false,
+      this.additionalInfo,
+      this.completedAt,
+      this.priority = 'NORMAL',
+      this.expiresAt,
       this.profileImageUrl,
       this.isActive = true,
       required this.createdAt,
@@ -313,6 +453,28 @@ class _$UserImpl implements _User {
   final String? vehicleType;
 // For Responders
   @override
+  final String? responderId;
+  @override
+  final String? cnic;
+  @override
+  final String? verificationStatus;
+  @override
+  final double? rating;
+  @override
+  final int? totalResponsesHandled;
+  @override
+  @JsonKey()
+  final bool voiceAlertGenerated;
+  @override
+  final String? additionalInfo;
+  @override
+  final DateTime? completedAt;
+  @override
+  @JsonKey()
+  final String priority;
+  @override
+  final DateTime? expiresAt;
+  @override
   final String? profileImageUrl;
   @override
   @JsonKey()
@@ -324,7 +486,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, responderId: $responderId, cnic: $cnic, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -349,6 +511,24 @@ class _$UserImpl implements _User {
                 other.responderType == responderType) &&
             (identical(other.vehicleType, vehicleType) ||
                 other.vehicleType == vehicleType) &&
+            (identical(other.responderId, responderId) ||
+                other.responderId == responderId) &&
+            (identical(other.cnic, cnic) || other.cnic == cnic) &&
+            (identical(other.verificationStatus, verificationStatus) ||
+                other.verificationStatus == verificationStatus) &&
+            (identical(other.rating, rating) || other.rating == rating) &&
+            (identical(other.totalResponsesHandled, totalResponsesHandled) ||
+                other.totalResponsesHandled == totalResponsesHandled) &&
+            (identical(other.voiceAlertGenerated, voiceAlertGenerated) ||
+                other.voiceAlertGenerated == voiceAlertGenerated) &&
+            (identical(other.additionalInfo, additionalInfo) ||
+                other.additionalInfo == additionalInfo) &&
+            (identical(other.completedAt, completedAt) ||
+                other.completedAt == completedAt) &&
+            (identical(other.priority, priority) ||
+                other.priority == priority) &&
+            (identical(other.expiresAt, expiresAt) ||
+                other.expiresAt == expiresAt) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
                 other.profileImageUrl == profileImageUrl) &&
             (identical(other.isActive, isActive) ||
@@ -361,22 +541,33 @@ class _$UserImpl implements _User {
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      id,
-      fullName,
-      email,
-      phoneNumber,
-      role,
-      patientType,
-      organization,
-      licenseNumber,
-      responderType,
-      vehicleType,
-      profileImageUrl,
-      isActive,
-      createdAt,
-      updatedAt);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        id,
+        fullName,
+        email,
+        phoneNumber,
+        role,
+        patientType,
+        organization,
+        licenseNumber,
+        responderType,
+        vehicleType,
+        responderId,
+        cnic,
+        verificationStatus,
+        rating,
+        totalResponsesHandled,
+        voiceAlertGenerated,
+        additionalInfo,
+        completedAt,
+        priority,
+        expiresAt,
+        profileImageUrl,
+        isActive,
+        createdAt,
+        updatedAt
+      ]);
 
   @JsonKey(ignore: true)
   @override
@@ -404,6 +595,16 @@ abstract class _User implements User {
       final String? licenseNumber,
       final String? responderType,
       final String? vehicleType,
+      final String? responderId,
+      final String? cnic,
+      final String? verificationStatus,
+      final double? rating,
+      final int? totalResponsesHandled,
+      final bool voiceAlertGenerated,
+      final String? additionalInfo,
+      final DateTime? completedAt,
+      final String priority,
+      final DateTime? expiresAt,
       final String? profileImageUrl,
       final bool isActive,
       required final DateTime createdAt,
@@ -432,6 +633,26 @@ abstract class _User implements User {
   @override // For Responders
   String? get vehicleType;
   @override // For Responders
+  String? get responderId;
+  @override
+  String? get cnic;
+  @override
+  String? get verificationStatus;
+  @override
+  double? get rating;
+  @override
+  int? get totalResponsesHandled;
+  @override
+  bool get voiceAlertGenerated;
+  @override
+  String? get additionalInfo;
+  @override
+  DateTime? get completedAt;
+  @override
+  String get priority;
+  @override
+  DateTime? get expiresAt;
+  @override
   String? get profileImageUrl;
   @override
   bool get isActive;
@@ -461,6 +682,10 @@ mixin _$UserProfile {
   String? get licenseNumber => throw _privateConstructorUsedError;
   String? get responderType => throw _privateConstructorUsedError;
   String? get vehicleType => throw _privateConstructorUsedError;
+  String? get cnic => throw _privateConstructorUsedError;
+  String? get verificationStatus => throw _privateConstructorUsedError;
+  double? get rating => throw _privateConstructorUsedError;
+  int? get totalResponsesHandled => throw _privateConstructorUsedError;
   String? get profileImageUrl => throw _privateConstructorUsedError;
   String? get bio => throw _privateConstructorUsedError;
   String? get address => throw _privateConstructorUsedError;
@@ -468,6 +693,7 @@ mixin _$UserProfile {
   String? get state => throw _privateConstructorUsedError;
   String? get country => throw _privateConstructorUsedError;
   String? get zipCode => throw _privateConstructorUsedError;
+  bool? get isActive => throw _privateConstructorUsedError;
   DateTime? get lastUpdated => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -493,6 +719,10 @@ abstract class $UserProfileCopyWith<$Res> {
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
+      String? cnic,
+      String? verificationStatus,
+      double? rating,
+      int? totalResponsesHandled,
       String? profileImageUrl,
       String? bio,
       String? address,
@@ -500,6 +730,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? state,
       String? country,
       String? zipCode,
+      bool? isActive,
       DateTime? lastUpdated});
 }
 
@@ -526,6 +757,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
+    Object? cnic = freezed,
+    Object? verificationStatus = freezed,
+    Object? rating = freezed,
+    Object? totalResponsesHandled = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
     Object? address = freezed,
@@ -533,6 +768,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? state = freezed,
     Object? country = freezed,
     Object? zipCode = freezed,
+    Object? isActive = freezed,
     Object? lastUpdated = freezed,
   }) {
     return _then(_value.copyWith(
@@ -576,6 +812,22 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
+      verificationStatus: freezed == verificationStatus
+          ? _value.verificationStatus
+          : verificationStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      rating: freezed == rating
+          ? _value.rating
+          : rating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      totalResponsesHandled: freezed == totalResponsesHandled
+          ? _value.totalResponsesHandled
+          : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
+              as int?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -604,6 +856,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.zipCode
           : zipCode // ignore: cast_nullable_to_non_nullable
               as String?,
+      isActive: freezed == isActive
+          ? _value.isActive
+          : isActive // ignore: cast_nullable_to_non_nullable
+              as bool?,
       lastUpdated: freezed == lastUpdated
           ? _value.lastUpdated
           : lastUpdated // ignore: cast_nullable_to_non_nullable
@@ -631,6 +887,10 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
+      String? cnic,
+      String? verificationStatus,
+      double? rating,
+      int? totalResponsesHandled,
       String? profileImageUrl,
       String? bio,
       String? address,
@@ -638,6 +898,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? state,
       String? country,
       String? zipCode,
+      bool? isActive,
       DateTime? lastUpdated});
 }
 
@@ -662,6 +923,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
+    Object? cnic = freezed,
+    Object? verificationStatus = freezed,
+    Object? rating = freezed,
+    Object? totalResponsesHandled = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
     Object? address = freezed,
@@ -669,6 +934,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? state = freezed,
     Object? country = freezed,
     Object? zipCode = freezed,
+    Object? isActive = freezed,
     Object? lastUpdated = freezed,
   }) {
     return _then(_$UserProfileImpl(
@@ -712,6 +978,22 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
+      cnic: freezed == cnic
+          ? _value.cnic
+          : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
+      verificationStatus: freezed == verificationStatus
+          ? _value.verificationStatus
+          : verificationStatus // ignore: cast_nullable_to_non_nullable
+              as String?,
+      rating: freezed == rating
+          ? _value.rating
+          : rating // ignore: cast_nullable_to_non_nullable
+              as double?,
+      totalResponsesHandled: freezed == totalResponsesHandled
+          ? _value.totalResponsesHandled
+          : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
+              as int?,
       profileImageUrl: freezed == profileImageUrl
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
@@ -740,6 +1022,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.zipCode
           : zipCode // ignore: cast_nullable_to_non_nullable
               as String?,
+      isActive: freezed == isActive
+          ? _value.isActive
+          : isActive // ignore: cast_nullable_to_non_nullable
+              as bool?,
       lastUpdated: freezed == lastUpdated
           ? _value.lastUpdated
           : lastUpdated // ignore: cast_nullable_to_non_nullable
@@ -762,6 +1048,10 @@ class _$UserProfileImpl implements _UserProfile {
       this.licenseNumber,
       this.responderType,
       this.vehicleType,
+      this.cnic,
+      this.verificationStatus,
+      this.rating,
+      this.totalResponsesHandled,
       this.profileImageUrl,
       this.bio,
       this.address,
@@ -769,6 +1059,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.state,
       this.country,
       this.zipCode,
+      this.isActive,
       this.lastUpdated});
 
   factory _$UserProfileImpl.fromJson(Map<String, dynamic> json) =>
@@ -795,6 +1086,14 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String? vehicleType;
   @override
+  final String? cnic;
+  @override
+  final String? verificationStatus;
+  @override
+  final double? rating;
+  @override
+  final int? totalResponsesHandled;
+  @override
   final String? profileImageUrl;
   @override
   final String? bio;
@@ -809,11 +1108,13 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String? zipCode;
   @override
+  final bool? isActive;
+  @override
   final DateTime? lastUpdated;
 
   @override
   String toString() {
-    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, lastUpdated: $lastUpdated)';
+    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, isActive: $isActive, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -838,6 +1139,12 @@ class _$UserProfileImpl implements _UserProfile {
                 other.responderType == responderType) &&
             (identical(other.vehicleType, vehicleType) ||
                 other.vehicleType == vehicleType) &&
+            (identical(other.cnic, cnic) || other.cnic == cnic) &&
+            (identical(other.verificationStatus, verificationStatus) ||
+                other.verificationStatus == verificationStatus) &&
+            (identical(other.rating, rating) || other.rating == rating) &&
+            (identical(other.totalResponsesHandled, totalResponsesHandled) ||
+                other.totalResponsesHandled == totalResponsesHandled) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
                 other.profileImageUrl == profileImageUrl) &&
             (identical(other.bio, bio) || other.bio == bio) &&
@@ -846,32 +1153,40 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.state, state) || other.state == state) &&
             (identical(other.country, country) || other.country == country) &&
             (identical(other.zipCode, zipCode) || other.zipCode == zipCode) &&
+            (identical(other.isActive, isActive) ||
+                other.isActive == isActive) &&
             (identical(other.lastUpdated, lastUpdated) ||
                 other.lastUpdated == lastUpdated));
   }
 
   @JsonKey(ignore: true)
   @override
-  int get hashCode => Object.hash(
-      runtimeType,
-      userId,
-      fullName,
-      email,
-      phoneNumber,
-      role,
-      patientType,
-      organization,
-      licenseNumber,
-      responderType,
-      vehicleType,
-      profileImageUrl,
-      bio,
-      address,
-      city,
-      state,
-      country,
-      zipCode,
-      lastUpdated);
+  int get hashCode => Object.hashAll([
+        runtimeType,
+        userId,
+        fullName,
+        email,
+        phoneNumber,
+        role,
+        patientType,
+        organization,
+        licenseNumber,
+        responderType,
+        vehicleType,
+        cnic,
+        verificationStatus,
+        rating,
+        totalResponsesHandled,
+        profileImageUrl,
+        bio,
+        address,
+        city,
+        state,
+        country,
+        zipCode,
+        isActive,
+        lastUpdated
+      ]);
 
   @JsonKey(ignore: true)
   @override
@@ -899,6 +1214,10 @@ abstract class _UserProfile implements UserProfile {
       final String? licenseNumber,
       final String? responderType,
       final String? vehicleType,
+      final String? cnic,
+      final String? verificationStatus,
+      final double? rating,
+      final int? totalResponsesHandled,
       final String? profileImageUrl,
       final String? bio,
       final String? address,
@@ -906,6 +1225,7 @@ abstract class _UserProfile implements UserProfile {
       final String? state,
       final String? country,
       final String? zipCode,
+      final bool? isActive,
       final DateTime? lastUpdated}) = _$UserProfileImpl;
 
   factory _UserProfile.fromJson(Map<String, dynamic> json) =
@@ -932,6 +1252,14 @@ abstract class _UserProfile implements UserProfile {
   @override
   String? get vehicleType;
   @override
+  String? get cnic;
+  @override
+  String? get verificationStatus;
+  @override
+  double? get rating;
+  @override
+  int? get totalResponsesHandled;
+  @override
   String? get profileImageUrl;
   @override
   String? get bio;
@@ -945,6 +1273,8 @@ abstract class _UserProfile implements UserProfile {
   String? get country;
   @override
   String? get zipCode;
+  @override
+  bool? get isActive;
   @override
   DateTime? get lastUpdated;
   @override

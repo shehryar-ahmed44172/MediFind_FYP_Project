@@ -2,6 +2,8 @@ import '../../../domain/entities/medical_profile.dart';
 import '../../../domain/repositories/medical_profile_repository.dart';
 import '../datasources/local/medical_profile_local_datasource.dart';
 import '../datasources/remote/medical_profile_remote_datasource.dart';
+import 'package:dio/dio.dart';
+import '../../../core/utils/exceptions.dart';
 
 class MedicalProfileRepositoryImpl implements MedicalProfileRepository {
   final MedicalProfileRemoteDataSource remoteDataSource;
@@ -18,23 +20,30 @@ class MedicalProfileRepositoryImpl implements MedicalProfileRepository {
       // 1. Try to fetch from remote
       final profile = await remoteDataSource.getMedicalProfile(userId);
       
-      // 2. Cache locally on success (use profile.userId as key)
+      // 2. Cache locally on success
       await localDataSource.saveMedicalProfile(profile.toJson());
       
       return profile;
     } catch (e) {
-      // 3. Fallback to local data if remote fails
-      // Note: If userId is null, we need the current user's ID to check local storage
-      // For now, if remote fails and no userId is provided, we can't easily find it in local box 
-      // unless we assume the only profile in the box is the current user's.
-      // But let's check with a known ID if possible.
+      // Handle "Not Found" case gracefully - user just hasn't created a profile yet
+      if (e is NetworkException && e.originalException is DioException) {
+        final dioError = e.originalException as DioException;
+        if (dioError.response?.statusCode == 404) {
+          return null; // Valid state: no profile yet
+        }
+      }
+
+      // 3. Fallback to local data if remote fails for other reasons
       if (userId != null) {
         final localData = await localDataSource.getMedicalProfile(userId);
         if (localData != null) {
           return MedicalProfile.fromJson(localData);
         }
       }
-      rethrow;
+      
+      // 4. If we have no remote data and no local data, assume the profile doesn't exist yet
+      // This prevents the user from seeing a generic 'Error occurred' screen and being unable to create one.
+      return null;
     }
   }
 

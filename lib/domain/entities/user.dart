@@ -17,6 +17,16 @@ class User with _$User {
     String? licenseNumber, // For Responders
     String? responderType, // For Responders
     String? vehicleType, // For Responders
+    String? responderId,
+    String? cnic,
+    String? verificationStatus,
+    double? rating,
+    int? totalResponsesHandled,
+    @Default(false) bool voiceAlertGenerated,
+    String? additionalInfo,
+    DateTime? completedAt,
+    @Default('NORMAL') String priority,
+    DateTime? expiresAt,
     String? profileImageUrl,
     @Default(true) bool isActive,
     required DateTime createdAt,
@@ -39,6 +49,10 @@ class UserProfile with _$UserProfile {
     String? licenseNumber,
     String? responderType,
     String? vehicleType,
+    String? cnic,
+    String? verificationStatus,
+    double? rating,
+    int? totalResponsesHandled,
     String? profileImageUrl,
     String? bio,
     String? address,
@@ -46,6 +60,7 @@ class UserProfile with _$UserProfile {
     String? state,
     String? country,
     String? zipCode,
+    bool? isActive,
     DateTime? lastUpdated,
   }) = _UserProfile;
 

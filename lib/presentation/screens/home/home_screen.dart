@@ -7,10 +7,13 @@ import '../../providers/medical_profile_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
-import '../../services/haptic_feedback_service.dart';
-import '../../widgets/emergency/emergency_overlay.dart';
+import 'package:medifind_mobile_application/services/notification/push_notification_service.dart';
+import 'package:medifind_mobile_application/core/utils/responsive.dart';
+import 'package:medifind_mobile_application/presentation/services/haptic_feedback_service.dart';
+import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
+import 'package:medifind_mobile_application/presentation/widgets/emergency/emergency_overlay.dart';
 import '../../providers/emergency_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import 'package:flutter/services.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -24,19 +27,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   int _currentIndex = 0;
 
   @override
+  void initState() {
+    super.initState();
+    // FIX: Run accessibility init once after first frame, NOT inside build().
+    // Calling setState-triggering code inside build() causes infinite rebuild loops (blinking).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user != null) {
+        ref.read(accessibilityProvider.notifier).initializeFromUser(user.patientType, user.id);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
 
+    final settings = ref.watch(accessibilityProvider);
+    final isDeafMode = settings.textOnlyMode;
+
     final userAsync = ref.watch(currentUserProvider);
-    final isDeafMode = userAsync.maybeWhen(
-      data: (user) => user?.patientType == 'DEAF',
-      orElse: () => false,
-    );
 
     // Listen for visual emergency alerts (Deaf/Mute accessibility)
     ref.listen(visualEmergencyAlertProvider, (previous, next) {
       if (next != null) {
+        if (settings.vibrationFeedback) HapticFeedbackService.sosPattern();
         EmergencyOverlay.show(
           context,
           title: 'Responder Assigned',
@@ -49,17 +65,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      body: Column(
-        children: [
-          if (!isConnected) const ConnectivityBanner(),
-          const AppHeader(),
-          Expanded(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Visual Accessibility Banner (Immediate feedback for Deaf mode)
+            if (isDeafMode)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade700,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'Visual Accessibility Mode Active',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => context.go('/home/settings/accessibility'),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'SETTINGS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          decoration: TextDecoration.underline,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (!isConnected) const ConnectivityBanner(),
+            
+            Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const SizedBox(height: 8),
+                  userAsync.when(
+                    data: (user) => Padding(
+                      padding: const EdgeInsets.only(bottom: 24, left: 4),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Hello,',
+                            style: theme.textTheme.bodyLarge?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.6),
+                            ),
+                          ),
+                          Text(
+                            user?.fullName.split(' ')[0] ?? 'User',
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: theme.colorScheme.onSurface,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    loading: () => const SizedBox(height: 60),
+                    error: (_, __) => const SizedBox.shrink(),
+                  ),
                   // profile summary
                   _buildMedicalProfileSnapshot(theme),
                   const SizedBox(height: 32),
@@ -80,9 +170,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      bottomNavigationBar: _buildBottomNav(theme),
-    );
-  }
+    ),
+  );
+}
 
 
   void _showNotifications(BuildContext context, ThemeData theme) {
@@ -160,7 +250,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => context.go('/home/medical-profile'),
+                        onTap: () => context.push('/home/medical-profile'),
                         child: Row(
                           children: [
                             Text(
@@ -237,7 +327,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       onTap: () {
         HapticFeedbackService.light();
-        context.go('/home/emergency');
+        context.push('/home/emergency');
       },
       child: Center(
         child: Stack(
@@ -250,8 +340,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 curve: Curves.easeInOut,
                 builder: (context, value, child) {
                   return Container(
-                    width: 240 * value,
-                    height: 240 * value,
+                    width: 65.wp * value,
+                    height: 65.wp * value,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: Colors.red.withOpacity(0.1),
@@ -261,8 +351,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 onEnd: () {}, // Pulse could be repeated with a stateful animation if needed
               ),
             Container(
-              width: 240,
-              height: 240,
+              width: 65.wp,
+              height: 65.wp,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: theme.scaffoldBackgroundColor,
@@ -323,7 +413,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.go('/home/medical-reports'),
+          onTap: () => context.push('/home/medical-reports'),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -400,7 +490,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: isDeaf ? 0.95 : 1.1,
+            childAspectRatio: isDeaf ? (SizeConfig.screenWidth > 600 ? 1.2 : 0.9) : (SizeConfig.screenWidth > 600 ? 1.4 : 1.1),
           ),
           itemCount: services.length,
           itemBuilder: (context, index) {
@@ -410,7 +500,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onTap: () {
                 HapticFeedbackService.medium();
                 if (service['route'] != null) {
-                  context.go(service['route'] as String);
+                  context.push(service['route'] as String);
                 } else {
                   _showFeatureComingSoon(context, service['title'] as String);
                 }
@@ -470,75 +560,4 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     );
   }
-
-  Widget _buildBottomNav(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_rounded, 'Home', 0, true, theme),
-              _buildNavItem(Icons.content_paste_rounded, 'Reports', 1, false, theme),
-              _buildNavItem(Icons.location_on_rounded, 'Alerts', 2, false, theme),
-              _buildNavItem(Icons.person_rounded, 'Profile', 3, false, theme),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index, bool isSelected, ThemeData theme) {
-    return InkWell(
-      onTap: () {
-        setState(() => _currentIndex = index);
-        if (index == 1) context.go('/home/medical-reports');
-        if (index == 2) context.go('/home/caregivers'); // Link Alerts/Location to Caregivers for now
-        if (index == 3) context.push('/profile');
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-              size: 26,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ]
-          ],
-        ),
-      ),
-    );
-  }
-
-
 }

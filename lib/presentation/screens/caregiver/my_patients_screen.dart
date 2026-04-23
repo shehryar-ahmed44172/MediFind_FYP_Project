@@ -37,7 +37,7 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
-          AppHeader(greetingOverride: 'Managed Patients'),
+          const SizedBox(height: 16),
             TabBar(
               controller: _tabController,
               labelColor: AppColors.primary,
@@ -116,59 +116,62 @@ class _PatientManageCard extends ConsumerWidget {
     if (isAccepted) statusColor = Colors.green;
     if (isRejected) statusColor = Colors.red;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: statusColor.withOpacity(0.1),
-              child: Icon(Icons.person_rounded, color: statusColor, size: 32),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    link.patientName ?? link.patientEmail ?? 'Unknown',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: statusColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          isRejected ? 'FAILED' : link.status,
-                          style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(link.relationship, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                    ],
-                  ),
-                ],
+    return InkWell(
+      onTap: () => context.push('/caregiver/patient-profile/${link.patientId}'),
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: theme.scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: AppShadows.neumorphicOut,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: statusColor.withOpacity(0.1),
+                child: Icon(Icons.person_rounded, color: statusColor, size: 32),
               ),
-            ),
-            if (!isAccepted)
-              IconButton(
-                onPressed: () => _showResendConfirm(context, ref),
-                icon: Icon(Icons.refresh_rounded, color: AppColors.primary),
-                tooltip: 'Resend Invitation',
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      link.patientName ?? link.patientEmail ?? 'Unknown',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isRejected ? 'FAILED' : link.status,
+                            style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(link.relationship, style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-          ],
+              if (!isAccepted)
+                IconButton(
+                  onPressed: () => _showResendConfirm(context, ref),
+                  icon: Icon(Icons.refresh_rounded, color: AppColors.primary),
+                  tooltip: 'Resend Invitation',
+                ),
+            ],
+          ),
         ),
       ),
     );

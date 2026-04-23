@@ -12,4 +12,6 @@ abstract class MedicalReportRepository {
   });
   
   Future<void> deleteMedicalReport(String reportId);
+  
+  Future<MedicalReport> renameMedicalReport(String reportId, String newName);
 }

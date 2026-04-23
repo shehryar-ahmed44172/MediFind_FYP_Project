@@ -63,7 +63,13 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
 
   @override
   Future<void> deleteMedicalReport(String reportId) async {
-    // Note: If you add a deleteReport endpoint to MediFindApiClient, call it here.
-    // For now, we'll mark it as a TODO or leave it as is if the guide doesn't specify.
+    await _apiClient.deleteReport(reportId);
+  }
+
+  @override
+  Future<MedicalReport> renameMedicalReport(String reportId, String newName) async {
+    final response = await _apiClient.renameReport(reportId, newName);
+    final normalized = _normalizeReportJson(response as Map<String, dynamic>);
+    return MedicalReport.fromJson(normalized);
   }
 }

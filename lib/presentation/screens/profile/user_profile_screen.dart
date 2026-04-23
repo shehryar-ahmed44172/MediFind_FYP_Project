@@ -10,7 +10,8 @@ import '../../widgets/profile/invitations_list_widget.dart';
 import '../../../core/constants/app_constants.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
-  const UserProfileScreen({Key? key}) : super(key: key);
+  final String? userId;
+  const UserProfileScreen({Key? key, this.userId}) : super(key: key);
 
   @override
   ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -106,19 +107,25 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 
   String _getProfileImageUrl(String? path) {
-    if (path == null) return '';
+    if (path == null || path.isEmpty) return '';
     if (path.startsWith('http')) return path;
     
-    // Get base URL (remove /api/ at the end)
-    final baseUrl = AppConstants.baseUrl.replaceAll('/api/', '');
-    return '$baseUrl$path';
+    // Use socketUrl (which is the root) instead of baseUrl (which has /api/)
+    final rootUrl = AppConstants.socketUrl.endsWith('/') 
+        ? AppConstants.socketUrl.substring(0, AppConstants.socketUrl.length - 1)
+        : AppConstants.socketUrl;
+    final cleanPath = path.startsWith('/') ? path : '/$path';
+    return '$rootUrl$cleanPath';
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final userAsync = ref.watch(currentUserProvider);
+    final userAsync = widget.userId != null 
+        ? ref.watch(userProfileProvider(widget.userId!))
+        : ref.watch(currentUserProvider);
     final settings = ref.watch(accessibilityProvider);
+    final bool isOwnProfile = widget.userId == null;
 
     return Scaffold(
       body: userAsync.when(
@@ -279,6 +286,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                           Divider(color: Colors.grey.withOpacity(0.1), height: 32),
                           _profileTile(Icons.business_outlined, 'Organization', user.organization!, settings),
                         ],
+                        if (user.vehicleType != null) ...[
+                          Divider(color: Colors.grey.withOpacity(0.1), height: 32),
+                          _profileTile(Icons.emergency_rounded, 'Vehicle Type', user.vehicleType!, settings),
+                        ],
                         if (user.verificationStatus != null) ...[
                           Divider(color: Colors.grey.withOpacity(0.1), height: 32),
                           _profileTile(Icons.verified_user_outlined, 'Verification', user.verificationStatus!, settings,
@@ -301,41 +312,63 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               const SizedBox(height: 24),
 
               // Edit Button
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: AppShadows.neumorphicOut,
-                ),
-                child: ElevatedButton.icon(
-                  onPressed: () => context.push('/profile/edit'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: theme.scaffoldBackgroundColor,
-                    foregroundColor: theme.colorScheme.primary,
-                    elevation: 0,
-                    minimumSize: const Size(double.infinity, 56),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ).copyWith(
-                    overlayColor: MaterialStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+              if (isOwnProfile) ...[
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: AppShadows.neumorphicOut,
                   ),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit Profile',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  child: ElevatedButton.icon(
+                    onPressed: () => context.push('/edit-profile'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.scaffoldBackgroundColor,
+                      foregroundColor: theme.colorScheme.primary,
+                      elevation: 0,
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ).copyWith(
+                      overlayColor: MaterialStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+                    ),
+                    icon: const Icon(Icons.edit_outlined),
+                    label: const Text('Edit Profile',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 32),
-              
-              // Logout
-              TextButton.icon(
-                onPressed: () async {
-                  await ref.read(logoutProvider.future);
-                  if (context.mounted) context.go('/login');
-                },
-                icon: const Icon(Icons.logout, color: Colors.red),
-                label: const Text('Logout', style: TextStyle(color: Colors.red)),
-              ),
-              const SizedBox(height: 32),
+                const SizedBox(height: 32),
+                
+                // Logout
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Logout'),
+                        content: const Text('Are you sure you want to logout?'),
+                        actions: [
+                          TextButton(
+                            child: const Text('Cancel'),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                          TextButton(
+                            style: TextButton.styleFrom(foregroundColor: Colors.red),
+                            child: const Text('Logout'),
+                            onPressed: () async {
+                              Navigator.pop(context);
+                              await ref.read(logoutProvider.future);
+                              if (context.mounted) context.go('/login');
+                            },
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.logout, color: Colors.red),
+                  label: const Text('Logout', style: TextStyle(color: Colors.red)),
+                ),
+                const SizedBox(height: 32),
+              ],
             ],
           );
         },

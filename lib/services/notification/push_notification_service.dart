@@ -165,7 +165,7 @@ class PushNotificationService {
                 const SizedBox(height: 12),
                 Text('Distance: $distance km', style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 12),
-                if (data['voiceSummary'] != null || data['medicalContext'] != null) ...[
+                if (data['voiceSummary'] != null || data['medicalContext'] != null || data['bloodType'] != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -180,17 +180,33 @@ class PushNotificationService {
                           children: [
                             Icon(Icons.medical_services_outlined, size: 16, color: Colors.blue.shade900),
                             const SizedBox(width: 8),
-                            Text('Medical Context', 
+                            Text('Medical Summary', 
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.blue.shade900)),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          data['voiceSummary'] ?? data['medicalContext'] ?? '',
-                          style: TextStyle(fontSize: 13, color: Colors.blue.shade800),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        const SizedBox(height: 8),
+                        if (data['bloodType'] != null)
+                          Text('Blood Type: ${data['bloodType']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                        
+                        if (data['voiceSummary'] != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('Note: ${data['voiceSummary']}', style: TextStyle(fontSize: 13, color: Colors.blue.shade800)),
+                          ),
+
+                        if (data['allergies'] != null && data['allergies'] != '[]')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('Allergies: ${data['allergies'].toString().replaceAll('[', '').replaceAll(']', '').replaceAll('"', '')}', 
+                              style: const TextStyle(fontSize: 13, color: Colors.red)),
+                          ),
+                          
+                        if (data['chronicDiseases'] != null && data['chronicDiseases'] != '[]')
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text('Conditions: ${data['chronicDiseases'].toString().replaceAll('[', '').replaceAll(']', '').replaceAll('"', '')}', 
+                              style: TextStyle(fontSize: 13, color: Colors.orange.shade900)),
+                          ),
                       ],
                     ),
                   ),

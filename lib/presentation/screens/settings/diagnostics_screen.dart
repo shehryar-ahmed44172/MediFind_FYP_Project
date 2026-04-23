@@ -217,15 +217,46 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: () {
-                            Clipboard.setData(ClipboardData(text: _fcmToken!));
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('FCM Token copied to clipboard')),
-                            );
-                          },
-                          icon: const Icon(Icons.copy_rounded, size: 18),
-                          label: const Text('Copy Token for Testing'),
+                        Row(
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () {
+                                Clipboard.setData(ClipboardData(text: _fcmToken!));
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('FCM Token copied to clipboard')),
+                                );
+                              },
+                              icon: const Icon(Icons.copy_rounded, size: 18),
+                              label: const Text('Copy Token'),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: () async {
+                                if (_fcmToken != null) {
+                                  try {
+                                    await ref.read(updateFcmTokenProvider(_fcmToken!).future);
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(content: Text('✅ Token synced to backend successfully!')),
+                                      );
+                                    }
+                                  } catch (e) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(content: Text('❌ Sync failed: $e')),
+                                      );
+                                    }
+                                  }
+                                }
+                              },
+                              icon: const Icon(Icons.sync_rounded),
+                              label: const Text('Sync to Backend'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.green,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],

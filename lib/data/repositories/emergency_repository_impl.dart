@@ -63,7 +63,20 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Future<List<Emergency>> getActiveEmergencies() async {
+    // Determine if we should fetch all or just responder-specific
+    // This is handled by the provider calling the right method, 
+    // but for backward compatibility we keep this as "All" for now or update it.
     final emergencies = await apiClient.getActiveEmergencies();
+    for (var e in emergencies) {
+      await localDataSource.saveEmergency(_emergencyToMap(e));
+    }
+    return emergencies;
+  }
+
+  @override
+  Future<List<Emergency>> getResponderActiveRequests() async {
+    final emergencies = await apiClient.getResponderActiveRequests();
+    // Save to local DB to ensure they are available for watchActiveEmergencies
     for (var e in emergencies) {
       await localDataSource.saveEmergency(_emergencyToMap(e));
     }

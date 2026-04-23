@@ -24,6 +24,8 @@ abstract class EmergencyRepository {
   
   Future<List<Emergency>> getActiveEmergencies();
   
+  Future<List<Emergency>> getResponderActiveRequests();
+  
   Future<void> updateEmergencyLocation(
     String emergencyId,
     double latitude,

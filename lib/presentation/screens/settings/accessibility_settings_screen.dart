@@ -23,6 +23,12 @@ class _AccessibilitySettingsScreenState
     final settings = ref.watch(accessibilityProvider);
     final notifier = ref.read(accessibilityProvider.notifier);
 
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final role = user?.role ?? 'PATIENT';
+    final isPatient = role == 'PATIENT';
+    final isResponder = role == 'RESPONDER';
+    final isCaregiver = role == 'CAREGIVER';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Accessibility Settings'),
@@ -40,13 +46,15 @@ class _AccessibilitySettingsScreenState
             value: settings.highContrast,
             onChanged: (v) => notifier.toggleHighContrast(),
           ),
-          _AccessibilityTile(
-            icon: Icons.text_fields_rounded,
-            title: 'Text-Only Interface',
-            subtitle: 'Simplified text-based mode for deaf users',
-            value: settings.textOnlyMode,
-            onChanged: (v) => notifier.toggleTextOnlyMode(),
-          ),
+          
+          if (isPatient)
+            _AccessibilityTile(
+              icon: Icons.text_fields_rounded,
+              title: 'Text-Only Interface',
+              subtitle: 'Simplified text-based mode for deaf users',
+              value: settings.textOnlyMode,
+              onChanged: (v) => notifier.toggleTextOnlyMode(),
+            ),
           
           const SizedBox(height: 16),
           _SectionHeader('Font Size'),
@@ -88,44 +96,41 @@ class _AccessibilitySettingsScreenState
           _AccessibilityTile(
             icon: Icons.vibration_rounded,
             title: 'Vibration Feedback',
-            subtitle: 'Vibrate on SOS trigger and important alerts',
+            subtitle: isResponder
+                ? 'Vibrate on incoming emergencies and notifications'
+                : isCaregiver
+                    ? 'Vibrate on patient alerts and notifications'
+                    : 'Vibrate on SOS trigger and important alerts',
             value: settings.vibrationFeedback,
             onChanged: (v) => notifier.toggleVibrationFeedback(),
           ),
 
           const SizedBox(height: 24),
 
-          // SOS Minimization Tip
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: AppShadows.neumorphicIn,
+          // Role-Specific Tips
+          if (isPatient)
+            _buildTipCard(
+              theme,
+              Icons.info_outline,
+              'Quick SOS Tip',
+              'SOS is designed to be triggered in just 2 taps: \n'
+              '1. Long press the SOS button on the home screen\n'
+              '2. Confirm in the 10-second countdown',
+            )
+          else if (isResponder)
+            _buildTipCard(
+              theme,
+              Icons.bolt_rounded,
+              'Response Guidelines',
+              'Stay Ready: Keep your status set to "Ready to Respond" and ensure notification sounds are enabled to receive emergency alerts instantly.',
+            )
+          else if (isCaregiver)
+            _buildTipCard(
+              theme,
+              Icons.security_rounded,
+              'Monitoring Tips',
+              'Real-time Safety: You will receive instant vibration and visual alerts if any of your linked patients trigger an emergency SOS.',
             ),
-            child: const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.info_outline, color: AppColors.primary),
-                    SizedBox(width: 8),
-                    Text('Quick SOS Tip',
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary)),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'SOS is designed to be triggered in just 2 taps: \n'
-                  '1. Long press the SOS button on the home screen\n'
-                  '2. Confirm in the 10-second countdown',
-                  style: TextStyle(fontSize: 13),
-                ),
-              ],
-            ),
-          ),
           const SizedBox(height: 24),
 
           Container(
@@ -188,6 +193,37 @@ class _AccessibilitySettingsScreenState
             ),
           ),
           const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTipCard(ThemeData theme, IconData icon, String title, String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: AppShadows.neumorphicIn,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(title,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            style: const TextStyle(fontSize: 13),
+          ),
         ],
       ),
     );

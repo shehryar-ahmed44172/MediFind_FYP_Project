@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
@@ -101,6 +102,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(accessibilityProvider);
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isDeafPatient = (user?.patientType?.toUpperCase() == 'DEAF') || settings.textOnlyMode;
     final isSimulation = ref.watch(simulationModeProvider);
     final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
     
@@ -117,7 +120,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             if (data['responderPhone'] != null) _responderPhone = data['responderPhone'];
           });
           
-          if (newStatus == 'ARRIVED' && settings.textOnlyMode) {
+          if (newStatus == 'ARRIVED' && isDeafPatient) {
             if (settings.vibrationFeedback) HapticFeedbackService.sosPattern();
           }
         } 
@@ -146,7 +149,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           data: (emergency) {
             if (emergency == null) return const Center(child: Text('Emergency not found'));
             _updateMarkers(emergency as Emergency);
-            return _buildModernBody(context, theme, emergency as Emergency, settings);
+            return _buildModernBody(context, theme, emergency as Emergency, settings, isDeafPatient);
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
@@ -179,7 +182,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     });
   }
 
-  Widget _buildModernBody(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings) {
+  Widget _buildModernBody(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings, bool isDeafPatient) {
     return Stack(
       children: [
         // 1. Dark Map
@@ -208,7 +211,24 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           top: MediaQuery.of(context).padding.top + 16,
           left: 16,
           right: 16,
-          child: _buildGlassHeader(theme, settings),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => context.go('/home'),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.3),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  ),
+                  child: const Icon(Icons.arrow_back_rounded, color: Colors.white, size: 24),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: _buildGlassHeader(theme, settings)),
+            ],
+          ),
         ),
 
         // 3. Floating Action Buttons
@@ -225,9 +245,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         ),
 
         // 4. Modern Draggable Bottom Sheet
-        _buildDraggableBottomSheet(context, theme, emergency, settings),
+        _buildDraggableBottomSheet(context, theme, emergency, settings, isDeafPatient),
 
-        if (_currentStatus == 'ARRIVED' && settings.textOnlyMode)
+        if (_currentStatus == 'ARRIVED' && isDeafPatient)
           _buildArrivedVisualAlert(theme),
       ],
     );
@@ -304,7 +324,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     );
   }
 
-  Widget _buildDraggableBottomSheet(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings) {
+  Widget _buildDraggableBottomSheet(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings, bool isDeafPatient) {
     return DraggableScrollableSheet(
       initialChildSize: 0.35,
       minChildSize: 0.35,
@@ -337,13 +357,21 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(_responderName ?? 'Assigning Responder...', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white)),
-                        const Text('Level 1 Responder • ⭐ 4.9', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                        Text('${_currentStatus.replaceAll('_', ' ')} • Active Response', style: const TextStyle(color: Colors.grey, fontSize: 13)),
                       ],
                     ),
                   ),
-                  _buildCircleAction(Icons.phone_rounded, Colors.green),
-                  const SizedBox(width: 12),
-                  _buildCircleAction(Icons.chat_bubble_rounded, Colors.blue),
+                  if (!isDeafPatient) ...[
+                    _buildCircleAction(Icons.phone_rounded, Colors.green, () {
+                      if (_responderPhone != null) {
+                        _makePhoneCall(_responderPhone!);
+                      }
+                    }),
+                    const SizedBox(width: 12),
+                  ],
+                  _buildCircleAction(Icons.chat_bubble_rounded, Colors.blue, () {
+                    _openChat();
+                  }),
                 ],
               ),
               const SizedBox(height: 24),
@@ -375,14 +403,34 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     );
   }
 
-  Widget _buildCircleAction(IconData icon, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        shape: BoxShape.circle,
+  Widget _buildCircleAction(IconData icon, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          shape: BoxShape.circle,
+        ),
+        child: Icon(icon, color: color, size: 22),
       ),
-      child: Icon(icon, color: color, size: 22),
+    );
+  }
+
+  void _makePhoneCall(String phoneNumber) async {
+    final uri = Uri.parse('tel:$phoneNumber');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  void _openChat() {
+    // Navigate to Chat Screen (Planned Feature)
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Chat feature is coming soon!'),
+        behavior: SnackBarBehavior.floating,
+      ),
     );
   }
 

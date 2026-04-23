@@ -16,7 +16,7 @@ class CaregiverHistoryScreen extends ConsumerWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
-          AppHeader(greetingOverride: 'Alert History'),
+          const SizedBox(height: 16),
           Expanded(
             child: asyncPatients.when(
               data: (patients) {

@@ -125,6 +125,26 @@ class MedicalProfileScreen extends ConsumerWidget {
                             .toList(),
                       ),
               ),
+              const SizedBox(height: 16),
+
+              _SectionCard(
+                title: 'Emergency Contacts',
+                icon: Icons.contact_phone_outlined,
+                iconColor: Colors.orange,
+                child: profile.emergencyContacts.isEmpty
+                    ? const Text('None', style: TextStyle(color: Colors.grey))
+                    : Column(
+                        children: profile.emergencyContacts
+                            .map((c) => ListTile(
+                                  dense: true,
+                                  leading: const Icon(Icons.person, size: 20, color: Colors.orange),
+                                  title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                                  subtitle: Text('${c.relationship} • ${c.phoneNumber}'),
+                                  contentPadding: EdgeInsets.zero,
+                                ))
+                            .toList(),
+                      ),
+              ),
               const SizedBox(height: 24),
 
               // Medical Reports CTA

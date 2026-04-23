@@ -9,7 +9,7 @@ class AppConstants {
   static String get baseUrl => isDevelopment ? _devBaseUrl : _prodBaseUrl;
 
   // WebSocket & Socket.io Configuration
-  static const String _devWsUrl = 'ws://10.0.2.2:3000/';
+  static const String _devWsUrl = 'ws://192.168.100.86:3000/';
   static const String _prodWsUrl = 'wss://api.medifind.com/';
   static String get wsUrl => isDevelopment ? _devWsUrl : _prodWsUrl;
 

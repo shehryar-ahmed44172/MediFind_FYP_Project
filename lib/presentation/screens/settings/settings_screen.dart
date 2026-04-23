@@ -25,26 +25,35 @@ class SettingsScreen extends ConsumerWidget {
 
               // ── PATIENT ──────────────────────────────────────────────────
               if (role == 'PATIENT') ...[
-                _buildSectionHeader(theme, 'Accessibility'),
+                _buildSectionHeader(theme, 'Appearance'),
                 _buildSettingsTile(
                   context,
-                  Icons.hearing_rounded,
-                  'Visual & Deaf Mode',
-                  'Configure visual alerts, font size & deaf accessibility',
+                  Icons.palette_rounded,
+                  'App Theme',
+                  'Switch between Light, Dark and System modes',
                   const Color(0xFF6366F1),
-                  () => context.push('/home/settings/accessibility'),
-                ),
-                const SizedBox(height: 32),
-                _buildSectionHeader(theme, 'Account & Medical'),
-                _buildSettingsTile(
-                  context,
-                  Icons.person_rounded,
-                  'Personal Information',
-                  'Update your basic profile',
-                  const Color(0xFF10B981),
-                  () => context.push('/profile/edit'),
+                  () {
+                    // Placeholder for theme selection
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Theme settings coming soon!')),
+                    );
+                  },
                 ),
                 const SizedBox(height: 16),
+                _buildSettingsTile(
+                  context,
+                  Icons.format_size_rounded,
+                  'Text & Appearance',
+                  'Adjust font sizes and visual elements',
+                  const Color(0xFF8B5CF6),
+                  () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Appearance settings coming soon!')),
+                    );
+                  },
+                ),
+                const SizedBox(height: 32),
+                _buildSectionHeader(theme, 'Health & Security'),
                 _buildSettingsTile(
                   context,
                   Icons.medical_services_rounded,
@@ -58,7 +67,7 @@ class SettingsScreen extends ConsumerWidget {
                   context,
                   Icons.people_alt_rounded,
                   'My Caregivers',
-                  'Manage linked caregiver accounts',
+                  'Manage trusted caregiver accounts',
                   const Color(0xFFF59E0B),
                   () => context.push('/home/caregivers'),
                 ),
@@ -66,93 +75,66 @@ class SettingsScreen extends ConsumerWidget {
 
               // ── RESPONDER ─────────────────────────────────────────────────
               if (role == 'RESPONDER') ...[
-                _buildSectionHeader(theme, 'Notification Preferences'),
+                _buildSectionHeader(theme, 'App Experience'),
                 _buildSettingsTile(
                   context,
-                  Icons.notifications_active_rounded,
-                  'Alert & Sound Settings',
-                  'Manage emergency alert sounds & vibrations',
+                  Icons.palette_rounded,
+                  'Theme & Appearance',
+                  'Customize the look and feel of your dashboard',
                   const Color(0xFF6366F1),
-                  () => context.push('/home/settings/accessibility'),
+                  () {},
                 ),
                 const SizedBox(height: 32),
-                _buildSectionHeader(theme, 'Account & Profile'),
+                _buildSectionHeader(theme, 'Response History'),
                 _buildSettingsTile(
                   context,
-                  Icons.person_rounded,
-                  'Personal Information',
-                  'Update your basic profile',
-                  const Color(0xFF10B981),
-                  () => context.push('/profile/edit'),
-                ),
-                const SizedBox(height: 16),
-                _buildSettingsTile(
-                  context,
-                  Icons.assignment_ind_rounded,
-                  'Responder Profile',
-                  'Certification & training details',
-                  const Color(0xFF0D9488),
-                  () => {},
-                ),
-                const SizedBox(height: 16),
-                _buildSettingsTile(
-                  context,
-                  Icons.history_edu_rounded,
-                  'Emergency History',
+                  Icons.history_rounded,
+                  'Emergency Logs',
                   'Review your past emergency responses',
                   const Color(0xFF4F46E5),
-                  () => {},
+                  () => context.go('/responder/history'),
                 ),
                 const SizedBox(height: 32),
-                _buildSectionHeader(theme, 'Developer Tools'),
+                _buildSectionHeader(theme, 'System Tools'),
                 _buildSettingsTile(
                   context,
                   Icons.terminal_rounded,
-                  'System Diagnostics',
-                  'Socket status, FCM & emergency simulation',
+                  'Diagnostics',
+                  'Socket status, FCM & system monitoring',
                   const Color(0xFF64748B),
-                  () => context.push('/profile/diagnostics'),
+                  () => context.push('/diagnostics'),
                 ),
               ],
 
               // ── CAREGIVER ─────────────────────────────────────────────────
               if (role == 'CAREGIVER') ...[
-                _buildSectionHeader(theme, 'Alert Preferences'),
+                _buildSectionHeader(theme, 'App Experience'),
                 _buildSettingsTile(
                   context,
-                  Icons.campaign_rounded,
-                  'Notification Settings',
-                  'Manage patient alert & notification preferences',
+                  Icons.palette_rounded,
+                  'Theme & Appearance',
+                  'Customize colors and layout preferences',
                   const Color(0xFF6366F1),
-                  () => context.push('/home/settings/accessibility'),
+                  () {},
                 ),
                 const SizedBox(height: 32),
                 _buildSectionHeader(theme, 'Account & Patients'),
                 _buildSettingsTile(
                   context,
-                  Icons.person_rounded,
-                  'Personal Information',
-                  'Update your basic profile',
-                  const Color(0xFF10B981),
-                  () => context.push('/profile/edit'),
-                ),
-                const SizedBox(height: 16),
-                _buildSettingsTile(
-                  context,
                   Icons.supervisor_account_rounded,
                   'My Patients',
-                  'Manage your linked patients',
+                  'View and manage your linked patients',
                   const Color(0xFF8B5CF6),
-                  () => context.push('/home/caregivers/patients'),
+                  () => context.go('/caregiver/my-patients'),
                 ),
                 const SizedBox(height: 16),
                 _buildSettingsTile(
                   context,
-                  Icons.add_link_rounded,
+                  Icons.person_add_rounded,
                   'Link New Patient',
-                  'Send a connection request to a patient',
+                  'Connect with a new patient via email',
                   const Color(0xFFEC4899),
-                  () => context.push('/home/caregivers/link-patient'),
+                  () => context.go('/caregiver/link-patient'),
                 ),
               ],
 
@@ -264,8 +246,6 @@ class SettingsScreen extends ConsumerWidget {
     Color color,
     VoidCallback onTap,
   ) {
-    final theme = Theme.of(context);
-    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(

@@ -61,6 +61,19 @@ class MedicalReportsNotifier extends StateNotifier<AsyncValue<void>> {
       final repo = _ref.read(medicalReportRepositoryProvider);
       await repo.deleteMedicalReport(reportId);
       
+      _ref.invalidate(medicalReportsProvider(userId));
+      state = const AsyncValue.data(null);
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+    }
+  }
+
+  Future<void> renameReport(String reportId, String newName, String userId) async {
+    state = const AsyncValue.loading();
+    try {
+      final repo = _ref.read(medicalReportRepositoryProvider);
+      await repo.renameMedicalReport(reportId, newName);
+      
       // Refresh the list
       _ref.invalidate(medicalReportsProvider(userId));
       state = const AsyncValue.data(null);

@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:hive_flutter/hive_flutter.dart';
-import '/core/constants/app_constants.dart';
-import '/core/utils/exceptions.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/exceptions.dart';
 
 /// LocalDataSource stores all data as JSON strings in Hive boxes.
 /// This avoids the need for HiveAdapters on Freezed-generated classes.

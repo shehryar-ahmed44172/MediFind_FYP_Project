@@ -459,7 +459,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers'},
       {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null},
       {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null},
-      {'title': 'Patient Information', 'icon': Icons.info_outline_rounded, 'color': AppColors.primary, 'route': '/home/patient-type-info'},
+      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts'},
     ];
 
     return Column(

@@ -1926,6 +1926,8 @@ mixin _$RegisterRequest {
   String get phoneNumber => throw _privateConstructorUsedError;
   String get password => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
+  String? get city => throw _privateConstructorUsedError;
+  String? get address => throw _privateConstructorUsedError;
   String? get cnic => throw _privateConstructorUsedError;
   String? get patientType => throw _privateConstructorUsedError;
   String? get organization => throw _privateConstructorUsedError;
@@ -1951,6 +1953,8 @@ abstract class $RegisterRequestCopyWith<$Res> {
       String phoneNumber,
       String password,
       String role,
+      String? city,
+      String? address,
       String? cnic,
       String? patientType,
       String? organization,
@@ -1977,6 +1981,8 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? city = freezed,
+    Object? address = freezed,
     Object? cnic = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
@@ -2005,6 +2011,14 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      city: freezed == city
+          ? _value.city
+          : city // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: freezed == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String?,
       cnic: freezed == cnic
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
@@ -2047,6 +2061,8 @@ abstract class _$$RegisterRequestImplCopyWith<$Res>
       String phoneNumber,
       String password,
       String role,
+      String? city,
+      String? address,
       String? cnic,
       String? patientType,
       String? organization,
@@ -2071,6 +2087,8 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
     Object? phoneNumber = null,
     Object? password = null,
     Object? role = null,
+    Object? city = freezed,
+    Object? address = freezed,
     Object? cnic = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
@@ -2099,6 +2117,14 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
           ? _value.role
           : role // ignore: cast_nullable_to_non_nullable
               as String,
+      city: freezed == city
+          ? _value.city
+          : city // ignore: cast_nullable_to_non_nullable
+              as String?,
+      address: freezed == address
+          ? _value.address
+          : address // ignore: cast_nullable_to_non_nullable
+              as String?,
       cnic: freezed == cnic
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
@@ -2136,6 +2162,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       required this.phoneNumber,
       required this.password,
       required this.role,
+      this.city,
+      this.address,
       this.cnic,
       this.patientType,
       this.organization,
@@ -2157,6 +2185,10 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   @override
   final String role;
   @override
+  final String? city;
+  @override
+  final String? address;
+  @override
   final String? cnic;
   @override
   final String? patientType;
@@ -2171,7 +2203,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
 
   @override
   String toString() {
-    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, cnic: $cnic, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
+    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, city: $city, address: $address, cnic: $cnic, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
   }
 
   @override
@@ -2187,6 +2219,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
             (identical(other.password, password) ||
                 other.password == password) &&
             (identical(other.role, role) || other.role == role) &&
+            (identical(other.city, city) || other.city == city) &&
+            (identical(other.address, address) || other.address == address) &&
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
             (identical(other.patientType, patientType) ||
                 other.patientType == patientType) &&
@@ -2209,6 +2243,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       phoneNumber,
       password,
       role,
+      city,
+      address,
       cnic,
       patientType,
       organization,
@@ -2238,6 +2274,8 @@ abstract class _RegisterRequest implements RegisterRequest {
       required final String phoneNumber,
       required final String password,
       required final String role,
+      final String? city,
+      final String? address,
       final String? cnic,
       final String? patientType,
       final String? organization,
@@ -2258,6 +2296,10 @@ abstract class _RegisterRequest implements RegisterRequest {
   String get password;
   @override
   String get role;
+  @override
+  String? get city;
+  @override
+  String? get address;
   @override
   String? get cnic;
   @override

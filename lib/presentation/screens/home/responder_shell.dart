@@ -4,55 +4,41 @@ import 'package:go_router/go_router.dart';
 import '../../widgets/common/app_header.dart';
 import '../../theme/app_theme.dart';
 
-class PatientShell extends ConsumerWidget {
+class ResponderShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
   final GoRouterState state;
-  const PatientShell({Key? key, required this.navigationShell, required this.state}) : super(key: key);
+  const ResponderShell({Key? key, required this.navigationShell, required this.state}) : super(key: key);
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     
     String? title;
-    final location = state.matchedLocation.toLowerCase();
     final currentIndex = navigationShell.currentIndex;
-    
+
     // Map index to titles for the header
     switch (currentIndex) {
-      case 0:
-        if (location.contains('emergency-contacts')) {
-          title = 'Emergency Contacts';
-        } else {
-          title = null;
-        }
-        break;
-      case 1: title = 'Medical Records'; break;
-      case 2: title = 'My Caregivers'; break;
+      case 1: title = 'Response History'; break;
+      case 2: title = 'Settings'; break;
       case 3: title = 'User Profile'; break;
-      case 4: title = 'Settings'; break;
       default: title = null;
     }
-
-    final isEmergencyRoute = location.contains('emergency') || 
-                             location.contains('sos') || 
-                             location.contains('tracking');
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: Column(
         children: [
-          if (!isEmergencyRoute)
-            AppHeader(
-              greetingOverride: title,
-              showProfile: currentIndex != 3,
-              canPop: state.uri.pathSegments.length > 1,
-            ),
+          AppHeader(
+            greetingOverride: title,
+            showProfile: currentIndex != 3,
+            canPop: state.uri.pathSegments.length > 2,
+          ),
           Expanded(
             child: navigationShell,
           ),
         ],
       ),
-      bottomNavigationBar: isEmergencyRoute ? null : _buildBottomNav(context, currentIndex),
+      bottomNavigationBar: _buildBottomNav(context, currentIndex),
     );
   }
 
@@ -81,11 +67,10 @@ class PatientShell extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildNavItem(context, Icons.home_rounded, 'Home', 0, currentIndex == 0),
-              _buildNavItem(context, Icons.content_paste_rounded, 'Reports', 1, currentIndex == 1),
-              _buildNavItem(context, Icons.people_alt_rounded, 'Care', 2, currentIndex == 2),
+              _buildNavItem(context, Icons.home_rounded, 'Dashboard', 0, currentIndex == 0),
+              _buildNavItem(context, Icons.history_rounded, 'History', 1, currentIndex == 1),
+              _buildNavItem(context, Icons.settings_rounded, 'Settings', 2, currentIndex == 2),
               _buildNavItem(context, Icons.person_rounded, 'Profile', 3, currentIndex == 3),
-              _buildNavItem(context, Icons.settings_rounded, 'Settings', 4, currentIndex == 4),
             ],
           ),
         ),
@@ -94,11 +79,13 @@ class PatientShell extends ConsumerWidget {
   }
 
   Widget _buildNavItem(BuildContext context, IconData icon, String label, int index, bool isSelected) {
+    final color = isSelected ? Colors.white : Colors.white.withOpacity(0.45);
+
     return InkWell(
       onTap: () => _onTap(context, index),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
@@ -106,18 +93,14 @@ class PatientShell extends ConsumerWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-              size: 24,
-            ),
+            Icon(icon, color: color, size: 26),
             if (isSelected) ...[
               const SizedBox(height: 4),
               Text(
                 label,
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 10,
+                  fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),

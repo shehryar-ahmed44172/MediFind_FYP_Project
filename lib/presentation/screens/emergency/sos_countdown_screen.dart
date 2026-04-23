@@ -7,6 +7,9 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import '../../../core/utils/map_utils.dart';
+import '../../../services/socket/socket_service.dart';
 import 'dart:math' as math;
 import '../../../services/audio/voice_alert_service.dart';
 import '../../services/haptic_feedback_service.dart';
@@ -32,21 +35,30 @@ class SosCountdownScreen extends ConsumerStatefulWidget {
 class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     with TickerProviderStateMixin {
   late Timer _timer;
-  int _secondsLeft = 10;
-  final int _maxSeconds = 10;
+  int _secondsLeft = 60;
+  final int _maxSeconds = 60;
   bool _cancelled = false;
-  bool _isSending = false;
+  bool _isSearching = false;
+  String? _emergencyId;
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  late AnimationController _flashController;
-  late Animation<Color?> _flashAnimation;
+  late AnimationController _radarController;
+  late Animation<double> _radarAnimation;
+  
+  final Set<Marker> _markers = {};
+  GoogleMapController? _mapController;
+  BitmapDescriptor? _ambulanceIcon;
+  BitmapDescriptor? _userIcon;
+  
+  late AnimationController _bikeMovementController;
+  final List<_SimulatedBike> _simulatedBikes = [];
+  final math.Random _random = math.Random();
 
   @override
   void initState() {
     super.initState();
     
-    // Continuous pulse for the glowing rings
     _pulseController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
@@ -56,52 +68,124 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Flash controller for Deaf users (Visual Siren)
-    _flashController = AnimationController(
+    _radarController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
-    );
+      duration: const Duration(seconds: 2),
+    )..repeat();
     
-    _flashAnimation = ColorTween(
-      begin: Colors.red.shade900,
-      end: Colors.red.shade400,
-    ).animate(_flashController);
+    _radarAnimation = Tween<double>(begin: 0, end: 1.0).animate(
+      CurvedAnimation(parent: _radarController, curve: Curves.easeOut),
+    );
 
-    HapticFeedback.vibrate();
+    _bikeMovementController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 1),
+    )..addListener(_updateBikePositions);
+    _bikeMovementController.repeat();
 
+    _loadMarkerIcons();
+    _initializeSearch();
+    _initSimulatedBikes();
+  }
+
+  void _initSimulatedBikes() {
+    for (int i = 0; i < 4; i++) {
+      _simulatedBikes.add(_SimulatedBike(
+        id: 'sim_$i',
+        position: LatLng(
+          widget.latitude + (_random.nextDouble() - 0.5) * 0.015,
+          widget.longitude + (_random.nextDouble() - 0.5) * 0.015,
+        ),
+        target: LatLng(
+          widget.latitude + (_random.nextDouble() - 0.5) * 0.015,
+          widget.longitude + (_random.nextDouble() - 0.5) * 0.015,
+        ),
+      ));
+    }
+  }
+
+  void _updateBikePositions() {
+    if (!mounted || _cancelled || _ambulanceIcon == null) return;
+
+    setState(() {
+      _markers.clear();
+      
+      // User Marker
+      _markers.add(Marker(
+        markerId: const MarkerId('user'),
+        position: LatLng(widget.latitude, widget.longitude),
+        icon: _userIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+      ));
+
+      // Move each bike
+      for (var bike in _simulatedBikes) {
+        bike.moveTowardsTarget();
+        if (bike.hasReachedTarget()) {
+          bike.setNewTarget(widget.latitude, widget.longitude, _random);
+        }
+        
+        _markers.add(Marker(
+          markerId: MarkerId(bike.id),
+          position: bike.position,
+          icon: _ambulanceIcon!,
+          rotation: bike.rotation,
+          anchor: const Offset(0.5, 0.5),
+          flat: true,
+        ));
+      }
+    });
+  }
+
+  Future<void> _loadMarkerIcons() async {
+    try {
+      final icons = await Future.wait([
+        MapUtils.getAmbulanceMarker(),
+        MapUtils.getPatientMarker(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _ambulanceIcon = icons[0];
+          _userIcon = icons[1];
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading marker icons: $e');
+    }
+  }
+
+  void _initializeSearch() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_secondsLeft <= 1) {
         timer.cancel();
-        _sendSOS();
+        _autoCancel();
       } else {
-        setState(() => _secondsLeft--);
-        final user = ref.read(currentUserProvider).valueOrNull;
-        if (user?.patientType == 'DEAF') {
-          HapticFeedbackService.medium();
-          if (_flashController.isAnimating) {
-            _flashController.stop();
-          } else {
-            _flashController.repeat(reverse: true);
-          }
-        } else {
+        if (mounted) {
+          setState(() => _secondsLeft--);
           HapticFeedback.lightImpact();
         }
       }
     });
+
+    // Start SOS Broadcast immediately
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _sendSOS();
+    });
   }
+
 
   @override
   void dispose() {
     _timer.cancel();
     _pulseController.dispose();
-    _flashController.dispose();
+    _radarController.dispose();
+    _bikeMovementController.dispose();
     super.dispose();
   }
 
   Future<void> _sendSOS() async {
-    if (_cancelled || _isSending) return;
-    setState(() => _isSending = true);
-
+    if (_cancelled || _isSearching) return;
+    
+    setState(() => _isSearching = true);
     try {
       final params = CreateEmergencyParams(
         emergencyType: widget.emergencyType,
@@ -111,22 +195,31 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       );
 
       final emergency = await ref.read(createEmergencyProvider(params).future);
-      VoiceAlertService().speakMessage("Emergency triggered. Help is on the way.");
-
-      if (mounted) {
-        context.go('/home/emergency/${emergency.id}/tracking');
-      }
+      _emergencyId = emergency.id;
+      
+      // Join Socket room to listen for acceptance
+      SocketService.instance.joinEmergencyRoom(emergency.id);
+      VoiceAlertService().speakMessage("Emergency request sent. Searching for nearby responders.");
+      
     } catch (e) {
+      debugPrint('❌ [SOS] Failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to send SOS: $e'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
+          SnackBar(content: Text('Failed to trigger SOS: $e'), backgroundColor: Colors.red),
         );
-        context.go('/home');
       }
+    }
+  }
+
+  void _autoCancel() async {
+    if (_emergencyId != null) {
+      await ref.read(cancelEmergencyProvider(_emergencyId!).future);
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No responders available. Emergency cancelled automatically.')),
+      );
+      context.go('/home');
     }
   }
 
@@ -155,46 +248,65 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(accessibilityProvider);
-    final isDeaf = settings.textOnlyMode;
-
-    if (_isSending) return _buildSendingOverlay(isDeaf);
     final theme = Theme.of(context);
+
+    // Listen for responder assigned event
+    ref.listen(socketStreamProvider, (previous, next) {
+      if (next.hasValue && next.value!.event == SocketEvent.emergencyStatusChange) {
+        final data = next.value!.data as Map<String, dynamic>;
+        final status = data['status']?.toString() ?? data['newStatus']?.toString();
+        if (status == 'RESPONDER_ASSIGNED' || status == 'EN_ROUTE') {
+          _timer.cancel();
+          context.go('/emergency/${_emergencyId}/tracking');
+        }
+      }
+    });
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          // Background Map Mockup
+      body: SafeArea(
+        top: false, // Let the map bleed to the top
+        child: Stack(
+          children: [
+          // Real Google Map
           Positioned(
             top: 0,
             left: 0,
             right: 0,
-            height: MediaQuery.of(context).size.height * 0.4,
-            child: Container(
-              color: AppColors.primaryLight.withOpacity(0.15), // Mock map color
-              child: Stack(
-                children: [
-                  // Fake map grid lines and markers
-                  CustomPaint(painter: _FakeMapPainter(), size: Size.infinite),
-                  Center(
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.15),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.red.withOpacity(0.3),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.location_on, color: Colors.red, size: 32),
-                      ),
-                    ),
+            height: MediaQuery.of(context).size.height * 0.45,
+            child: Stack(
+              children: [
+                GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(widget.latitude, widget.longitude),
+                    zoom: 15,
                   ),
-                ],
-              ),
+                  markers: _markers,
+                  style: MapUtils.getDarkMapStyle(),
+                  zoomControlsEnabled: false,
+                  myLocationButtonEnabled: false,
+                  onMapCreated: (controller) => _mapController = controller,
+                ),
+                // Radar Pulse Effect
+                Center(
+                  child: AnimatedBuilder(
+                    animation: _radarAnimation,
+                    builder: (context, child) {
+                      return Container(
+                        width: 200 * _radarAnimation.value,
+                        height: 200 * _radarAnimation.value,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(1 - _radarAnimation.value),
+                            width: 2,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
           ),
 
@@ -356,75 +468,59 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
           ),
         ],
       ),
-    );
+    ),
+  );
+}
+}
+
+class _SimulatedBike {
+  final String id;
+  LatLng position;
+  LatLng target;
+  double rotation = 0;
+  final double speed = 0.00005;
+
+  _SimulatedBike({required this.id, required this.position, required this.target}) {
+    _calculateRotation();
   }
 
-  Widget _buildSendingOverlay(bool isDeaf) {
-    if (isDeaf && !_flashController.isAnimating) {
-      _flashController.repeat(reverse: true);
+  void moveTowardsTarget() {
+    double latDiff = target.latitude - position.latitude;
+    double lngDiff = target.longitude - position.longitude;
+    double distance = math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+
+    if (distance > speed) {
+      position = LatLng(
+        position.latitude + (latDiff / distance) * speed,
+        position.longitude + (lngDiff / distance) * speed,
+      );
     }
+  }
 
-    return AnimatedBuilder(
-      animation: _flashAnimation,
-      builder: (context, child) => Scaffold(
-        backgroundColor: isDeaf ? _flashAnimation.value : Colors.red.shade700,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const CircularProgressIndicator(
-                  color: Colors.white, 
-                  strokeWidth: 4,
-                ),
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'Broadcasting Alert...',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                isDeaf ? 'HELP IS COMING - VISUAL ALERT ACTIVE' : 'Finding nearest available responders',
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      ),
+  bool hasReachedTarget() {
+    double latDiff = target.latitude - position.latitude;
+    double lngDiff = target.longitude - position.longitude;
+    return math.sqrt(latDiff * latDiff + lngDiff * lngDiff) < speed * 2;
+  }
+
+  void setNewTarget(double centerLat, double centerLng, math.Random random) {
+    target = LatLng(
+      centerLat + (random.nextDouble() - 0.5) * 0.015,
+      centerLng + (random.nextDouble() - 0.5) * 0.015,
     );
+    _calculateRotation();
+  }
+
+  void _calculateRotation() {
+    double lat1 = position.latitude * math.pi / 180;
+    double lng1 = position.longitude * math.pi / 180;
+    double lat2 = target.latitude * math.pi / 180;
+    double lng2 = target.longitude * math.pi / 180;
+
+    double y = math.sin(lng2 - lng1) * math.cos(lat2);
+    double x = math.cos(lat1) * math.sin(lat2) -
+        math.sin(lat1) * math.cos(lat2) * math.cos(lng2 - lng1);
+    rotation = math.atan2(y, x) * 180 / math.pi;
   }
 }
 
-// Simple fake map painter to make the background look like a map without importing heavy dependencies
-class _FakeMapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.primary.withOpacity(0.05)
-      ..strokeWidth = 10
-      ..strokeCap = StrokeCap.round;
-
-    // Draw some random "roads"
-    canvas.drawLine(Offset(0, size.height * 0.3), Offset(size.width, size.height * 0.4), paint);
-    canvas.drawLine(Offset(size.width * 0.4, 0), Offset(size.width * 0.5, size.height), paint);
-    canvas.drawLine(Offset(size.width * 0.2, size.height), Offset(size.width * 0.8, 0), paint);
-    
-    paint.strokeWidth = 4;
-    paint.color = AppColors.primary.withOpacity(0.03);
-    canvas.drawLine(Offset(0, size.height * 0.7), Offset(size.width, size.height * 0.7), paint);
-    canvas.drawLine(Offset(size.width * 0.8, 0), Offset(size.width * 0.8, size.height), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}

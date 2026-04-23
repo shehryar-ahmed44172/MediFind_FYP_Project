@@ -1,11 +1,11 @@
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import '/core/constants/app_constants.dart';
-import '/core/utils/exceptions.dart';
-import '/domain/entities/emergency.dart';
-import '/domain/entities/medical_profile.dart';
-import '/domain/entities/user.dart';
+import '../../../core/constants/app_constants.dart';
+import '../../../core/utils/exceptions.dart';
+import '../../../domain/entities/emergency.dart';
+import '../../../domain/entities/medical_profile.dart';
+import '../../../domain/entities/user.dart';
 
 class MediFindApiClient {
   final Dio _dio;
@@ -405,6 +405,17 @@ class MediFindApiClient {
       if (response.statusCode != 200) {
         throw NetworkException(message: 'Failed to accept emergency');
       }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<List<Emergency>> getResponderActiveRequests() async {
+    try {
+      final response = await _dio.get('responders/emergencies');
+      return (response.data['data'] as List)
+          .map((e) => Emergency.fromJson(e))
+          .toList();
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -823,7 +834,58 @@ class MediFindApiClient {
     }
   }
 
+  Future<void> deleteReport(String id) async {
+    try {
+      final response = await _dio.delete('reports/$id');
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to delete report');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<dynamic> renameReport(String id, String newName) async {
+    try {
+      final response = await _dio.patch(
+        'reports/$id',
+        data: {'fileName': newName},
+      );
+      if (response.statusCode == 200) {
+        return response.data['data'];
+      }
+      throw NetworkException(message: 'Failed to rename report');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   // ERROR HANDLING
+  Future<List<dynamic>> getNotificationHistory({int limit = 50}) async {
+    try {
+      final response = await _dio.get('notifications/history', queryParameters: {'limit': limit});
+      return response.data['data'] as List;
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> markNotificationRead(String id) async {
+    try {
+      await _dio.patch('notifications/$id/read');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> markAllNotificationsRead() async {
+    try {
+      await _dio.patch('notifications/read-all');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   AppException _handleDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:

@@ -21,6 +21,7 @@ Emergency _$EmergencyFromJson(Map<String, dynamic> json) {
 /// @nodoc
 mixin _$Emergency {
   String get id => throw _privateConstructorUsedError;
+  @JsonKey(name: 'patientId')
   String get userId => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   String get emergencyType => throw _privateConstructorUsedError;
@@ -50,7 +51,7 @@ abstract class $EmergencyCopyWith<$Res> {
   @useResult
   $Res call(
       {String id,
-      String userId,
+      @JsonKey(name: 'patientId') String userId,
       String status,
       String emergencyType,
       @JsonKey(fromJson: doubleFromJson) double latitude,
@@ -164,7 +165,7 @@ abstract class _$$EmergencyImplCopyWith<$Res>
   @useResult
   $Res call(
       {String id,
-      String userId,
+      @JsonKey(name: 'patientId') String userId,
       String status,
       String emergencyType,
       @JsonKey(fromJson: doubleFromJson) double latitude,
@@ -271,7 +272,7 @@ class __$$EmergencyImplCopyWithImpl<$Res>
 class _$EmergencyImpl implements _Emergency {
   const _$EmergencyImpl(
       {this.id = '',
-      this.userId = '',
+      @JsonKey(name: 'patientId') this.userId = '',
       this.status = 'PENDING',
       this.emergencyType = 'OTHER',
       @JsonKey(fromJson: doubleFromJson) this.latitude = 0.0,
@@ -292,7 +293,7 @@ class _$EmergencyImpl implements _Emergency {
   @JsonKey()
   final String id;
   @override
-  @JsonKey()
+  @JsonKey(name: 'patientId')
   final String userId;
   @override
   @JsonKey()
@@ -398,7 +399,7 @@ class _$EmergencyImpl implements _Emergency {
 abstract class _Emergency implements Emergency {
   const factory _Emergency(
       {final String id,
-      final String userId,
+      @JsonKey(name: 'patientId') final String userId,
       final String status,
       final String emergencyType,
       @JsonKey(fromJson: doubleFromJson) final double latitude,
@@ -418,6 +419,7 @@ abstract class _Emergency implements Emergency {
   @override
   String get id;
   @override
+  @JsonKey(name: 'patientId')
   String get userId;
   @override
   String get status;

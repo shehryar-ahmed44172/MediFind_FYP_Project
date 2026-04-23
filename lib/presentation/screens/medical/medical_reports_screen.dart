@@ -83,6 +83,59 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
     );
   }
 
+  void _renameReport(MedicalReport report) {
+    final userId = ref.read(currentUserIdProvider).valueOrNull;
+    if (userId == null) return;
+
+    final controller = TextEditingController(text: report.fileName);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename Report'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'File Name',
+            hintText: 'Enter new name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final newName = controller.text.trim();
+              if (newName.isEmpty || newName == report.fileName) {
+                Navigator.pop(ctx);
+                return;
+              }
+              Navigator.pop(ctx);
+              try {
+                await ref
+                    .read(medicalReportsNotifierProvider.notifier)
+                    .renameReport(report.id, newName, userId);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Report renamed'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                _showError(e.toString());
+              }
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _deleteReport(MedicalReport report) {
     final userId = ref.read(currentUserIdProvider).valueOrNull;
     if (userId == null) return;
@@ -120,6 +173,39 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
             child: const Text('Delete', style: TextStyle(color: Colors.white)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showReportOptions(MedicalReport report) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Rename'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _renameReport(report);
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _deleteReport(report);
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -256,10 +342,9 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
                               style: const TextStyle(fontSize: 12),
                             ),
                             trailing: IconButton(
-                              icon: const Icon(Icons.delete_outline,
-                                  color: Colors.red),
-                              onPressed: () => _deleteReport(report),
-                              tooltip: 'Delete report',
+                              icon: const Icon(Icons.more_vert),
+                              onPressed: () => _showReportOptions(report),
+                              tooltip: 'Report options',
                             ),
                             onTap: () => _viewReport(report),
                           ),

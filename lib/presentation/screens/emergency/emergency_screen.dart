@@ -56,7 +56,6 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
     final isConnected = ref.read(isConnectedProvider);
 
     if (!isConnected) {
-      // FR9.8 — Offline fallback: open SMS or native call
       _showOfflineFallbackDialog();
       return;
     }
@@ -78,7 +77,6 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
       final position = await locationService.getCurrentLocation();
 
       if (mounted) {
-        // Navigate to countdown screen, passing emergency params
         context.go('/home/sos-countdown', extra: {
           'emergencyType': _selectedEmergencyType,
           'latitude': position.latitude,
@@ -183,181 +181,182 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
     final isConnected = ref.watch(isConnectedProvider);
 
     return Scaffold(
-      body: Column(
-        children: [
-          const AppHeader(greetingOverride: 'Emergency Alert'),
-          if (!isConnected)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.signal_wifi_off, color: Colors.orange),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'No internet. SOS will use SMS/Call fallback.',
-                      style: TextStyle(fontSize: 12),
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (!isConnected)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.signal_wifi_off, color: Colors.orange),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'No internet. SOS will use SMS/Call fallback.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Text('Select Emergency Type',
-                      style: theme.textTheme.titleLarge
-                          ?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  GridView.count(
-                    crossAxisCount: 2,
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                    childAspectRatio: 1.2,
-                    children: _emergencyTypes.map((type) {
-                      final isSelected = _selectedEmergencyType == type['value'];
-                      return InkWell(
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          setState(() => _selectedEmergencyType = type['value']);
-                        },
-                        borderRadius: BorderRadius.circular(24),
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(24),
-                            color: isSelected
-                                ? AppColors.primary
-                                : theme.scaffoldBackgroundColor,
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: AppColors.primary.withOpacity(0.35),
-                                      blurRadius: 15,
-                                      offset: const Offset(0, 8),
-                                    )
-                                  ]
-                                : AppShadows.neumorphicOut,
-                          ),
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                type['icon'],
-                                color: isSelected ? Colors.white : AppColors.primary,
-                                size: 32,
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                type['label'],
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: isSelected
-                                      ? Colors.white
-                                      : Colors.black87,
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text('Select Emergency Type',
+                        style: theme.textTheme.titleLarge
+                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 16),
+                    GridView.count(
+                      crossAxisCount: 2,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.2,
+                      children: _emergencyTypes.map((type) {
+                        final isSelected = _selectedEmergencyType == type['value'];
+                        return InkWell(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            setState(() => _selectedEmergencyType = type['value']);
+                          },
+                          borderRadius: BorderRadius.circular(24),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(24),
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : theme.scaffoldBackgroundColor,
+                              boxShadow: isSelected
+                                  ? [
+                                      BoxShadow(
+                                        color: AppColors.primary.withOpacity(0.35),
+                                        blurRadius: 15,
+                                        offset: const Offset(0, 8),
+                                      )
+                                    ]
+                                  : AppShadows.neumorphicOut,
+                            ),
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  type['icon'],
+                                  color: isSelected ? Colors.white : AppColors.primary,
+                                  size: 32,
                                 ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 32),
-                  AnimatedBuilder(
-                    animation: _pulseAnimation,
-                    builder: (ctx, child) => Transform.scale(
-                      scale: _pulseAnimation.value,
-                      child: child,
-                    ),
-                    child: GestureDetector(
-                      onTap: _isFetchingLocation ? null : _triggerSOS,
-                      child: Container(
-                        width: 180,
-                        height: 180,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
-                          ),
-                          boxShadow: AppShadows.sosMassiveGlow,
-                        ),
-                        child: _isFetchingLocation
-                            ? Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const CircularProgressIndicator(
-                                      color: Colors.white, strokeWidth: 3),
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'DETECTING\nLOCATION',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold),
+                                const SizedBox(height: 12),
+                                Text(
+                                  type['label'],
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : Colors.black87,
                                   ),
-                                ],
-                              )
-                            : const Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.emergency_rounded,
-                                      size: 64, color: Colors.white),
-                                  SizedBox(height: 4),
-                                  Text('SOS',
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 32),
+                    AnimatedBuilder(
+                      animation: _pulseAnimation,
+                      builder: (ctx, child) => Transform.scale(
+                        scale: _pulseAnimation.value,
+                        child: child,
+                      ),
+                      child: GestureDetector(
+                        onTap: _isFetchingLocation ? null : _triggerSOS,
+                        child: Container(
+                          width: 180,
+                          height: 180,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: const LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
+                            ),
+                            boxShadow: AppShadows.sosMassiveGlow,
+                          ),
+                          child: _isFetchingLocation
+                              ? Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const CircularProgressIndicator(
+                                        color: Colors.white, strokeWidth: 3),
+                                    const SizedBox(height: 12),
+                                    const Text(
+                                      'DETECTING\nLOCATION',
+                                      textAlign: TextAlign.center,
                                       style: TextStyle(
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white)),
-                                ],
-                              ),
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold),
+                                    ),
+                                  ],
+                                )
+                              : const Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.emergency_rounded,
+                                        size: 64, color: Colors.white),
+                                    SizedBox(height: 4),
+                                    Text('SOS',
+                                        style: TextStyle(
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white)),
+                                  ],
+                                ),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Tap to send emergency alert',
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 32),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: AppShadows.neumorphicIn,
+                    const SizedBox(height: 16),
+                    Text(
+                      'Tap to send emergency alert',
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
-                    child: TextField(
-                      controller: _additionalInfoController,
-                      maxLines: 3,
-                      decoration: const InputDecoration(
-                        labelText: 'Additional Information (optional)',
-                        hintText: 'Describe your situation briefly...',
-                        fillColor: Colors.transparent,
+                    const SizedBox(height: 32),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: theme.scaffoldBackgroundColor,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: AppShadows.neumorphicIn,
+                      ),
+                      child: TextField(
+                        controller: _additionalInfoController,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Additional Information (optional)',
+                          hintText: 'Describe your situation briefly...',
+                          fillColor: Colors.transparent,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

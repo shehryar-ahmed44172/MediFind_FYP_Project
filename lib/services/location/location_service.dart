@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../core/utils/exceptions.dart';
 
 class LocationService {
@@ -154,5 +155,24 @@ class LocationService {
   /// Open location settings
   Future<bool> openLocationSettings() async {
     return await Geolocator.openLocationSettings();
+  }
+
+  /// Get City and Area from coordinates
+  Future<Map<String, String>> getPlaceFromCoordinates(double lat, double lng) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(lat, lng);
+      
+      if (placemarks.isNotEmpty) {
+        final place = placemarks.first;
+        return {
+          'city': place.locality ?? place.subAdministrativeArea ?? '',
+          'address': place.subLocality ?? place.name ?? '',
+        };
+      }
+      return {'city': '', 'address': ''};
+    } catch (e) {
+      debugPrint('Error in reverse geocoding: $e');
+      return {'city': '', 'address': ''};
+    }
   }
 }

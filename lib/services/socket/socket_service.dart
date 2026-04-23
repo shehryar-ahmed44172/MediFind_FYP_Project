@@ -72,7 +72,7 @@ class SocketService {
 
     // Generic notification listener (Plan v4)
     _socket!.on('notification', (data) {
-      print('Socket Notification Received: $data');
+      print('🔔 Global Socket Notification Received: $data');
       _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
     });
 

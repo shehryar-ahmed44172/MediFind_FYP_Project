@@ -11,6 +11,7 @@ class RoleSelectionScreen extends StatefulWidget {
 
 class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
   String? _selectedRole;
+  String _selectedPatientType = 'NORMAL'; // Default for Patient role
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +89,45 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 isSelected: _selectedRole == 'PATIENT',
                 onTap: () => setState(() => _selectedRole = 'PATIENT'),
               ),
+              
+              // Patient Sub-options
+              if (_selectedRole == 'PATIENT') ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Select Accessibility Mode:',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          _SubOptionChip(
+                            label: 'Standard Patient',
+                            icon: Icons.person_outline_rounded,
+                            isSelected: _selectedPatientType == 'NORMAL',
+                            onTap: () => setState(() => _selectedPatientType = 'NORMAL'),
+                          ),
+                          const SizedBox(width: 12),
+                          _SubOptionChip(
+                            label: 'Deaf Mode',
+                            icon: Icons.hearing_disabled_rounded,
+                            isSelected: _selectedPatientType == 'DEAF',
+                            onTap: () => setState(() => _selectedPatientType = 'DEAF'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
               const SizedBox(height: 16),
               _RoleTile(
                 title: 'Emergency Responder',
@@ -134,7 +174,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         ? null
                         : () => context.go(
                               '/register',
-                              extra: {'role': _selectedRole},
+                              extra: {
+                                'role': _selectedRole,
+                                'patientType': _selectedRole == 'PATIENT' ? _selectedPatientType : null,
+                              },
                             ),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
@@ -156,6 +199,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   ),
                 ),
               ),
+
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -268,6 +312,70 @@ class _RoleTile extends StatelessWidget {
               child: isSelected
                   ? const Icon(Icons.check, color: Colors.white, size: 14)
                   : null,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SubOptionChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SubOptionChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = theme.colorScheme.primary;
+
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? color : theme.scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isSelected ? color : Colors.grey.shade300,
+            width: 1.5,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.white : Colors.grey.shade600,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: isSelected ? Colors.white : Colors.grey.shade700,
+              ),
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import '../../data/repositories/emergency_repository_impl.dart';
 import '../../domain/repositories/emergency_repository.dart';
 import '../../services/notification/push_notification_service.dart';
@@ -65,6 +66,12 @@ final watchUserEmergenciesProvider = StreamProvider.family<List<Emergency>, Stri
 // Get active emergencies provider
 final getActiveEmergenciesProvider = FutureProvider<List<Emergency>>((ref) async {
   final repo = await ref.watch(emergencyRepositoryProvider.future);
+  final user = ref.read(currentUserProvider).valueOrNull;
+  
+  if (user?.role == 'RESPONDER') {
+    return await repo.getResponderActiveRequests();
+  }
+  
   return await repo.getActiveEmergencies();
 });
 
@@ -137,6 +144,12 @@ final pushFakeLocationProvider = FutureProvider.family<void, double>((ref, offse
   // Add a slight offset (approx 0.05 is ~5km)
   await repo.updateResponderLocation(position.latitude + offset, position.longitude + offset);
   debugPrint('🧪 Pushed Fake Location (Offset $offset): ${position.latitude + offset}');
+});
+
+// Provider to update responder location (NEW)
+final updateResponderLocationProvider = FutureProvider.family<void, Position>((ref, position) async {
+  final repo = await ref.watch(emergencyRepositoryProvider.future);
+  await repo.updateResponderLocation(position.latitude, position.longitude);
 });
 
 // Cancel emergency provider

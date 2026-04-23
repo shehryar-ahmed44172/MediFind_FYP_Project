@@ -116,6 +116,8 @@ class RegisterRequest with _$RegisterRequest {
     required String phoneNumber,
     required String password,
     required String role,
+    String? city,
+    String? address,
     String? cnic,
     String? patientType,
     String? organization,

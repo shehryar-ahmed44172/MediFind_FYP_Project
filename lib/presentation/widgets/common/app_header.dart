@@ -3,20 +3,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
+import '../../providers/notification_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../../core/constants/app_constants.dart';
 
 class AppHeader extends ConsumerWidget {
   final bool showLogout;
   final bool showProfile;
   final String? greetingOverride;
   final bool centerTitle;
+  final bool canPop; // New explicit flag
 
   const AppHeader({
     Key? key,
-    this.showLogout = false,
+    this.showLogout = true,
     this.showProfile = true,
     this.greetingOverride,
     this.centerTitle = false,
+    this.canPop = false, // Default to false
   }) : super(key: key);
 
   @override
@@ -43,7 +47,7 @@ class AppHeader extends ConsumerWidget {
           child: Row(
             children: [
               // Left: Back Button OR Logo
-              if (greetingOverride != null && context.canPop())
+              if (greetingOverride != null && canPop)
                 IconButton(
                   icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
                   onPressed: () => context.pop(),
@@ -70,7 +74,7 @@ class AppHeader extends ConsumerWidget {
                     if (greetingOverride != null)
                       Flexible(
                         child: Text(
-                          greetingOverride!,
+                          greetingOverride ?? '',
                           style: theme.textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: Colors.white,
@@ -105,11 +109,41 @@ class AppHeader extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildActionButton(
-                    icon: Icons.notifications_none_rounded,
-                    theme: theme,
-                    onTap: () => _showNotifications(context, theme),
-                    color: Colors.white,
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      _buildActionButton(
+                        icon: Icons.notifications_none_rounded,
+                        theme: theme,
+                        onTap: () => _showNotifications(context, ref, theme),
+                        color: Colors.white,
+                      ),
+                      if (ref.watch(unreadNotificationsCountProvider) > 0)
+                        Positioned(
+                          right: -2,
+                          top: -2,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: Text(
+                              ref.watch(unreadNotificationsCountProvider).toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                   
                   if (showLogout) ...[
@@ -143,6 +177,20 @@ class AppHeader extends ConsumerWidget {
   }
 
   Widget _buildAvatar(String? imageUrl, ThemeData theme) {
+    String? fullImageUrl;
+    if (imageUrl != null && imageUrl.isNotEmpty) {
+      if (imageUrl.startsWith('http')) {
+        fullImageUrl = imageUrl;
+      } else {
+        // Use socketUrl (which is the root) instead of baseUrl (which has /api/)
+        final rootUrl = AppConstants.socketUrl.endsWith('/') 
+            ? AppConstants.socketUrl.substring(0, AppConstants.socketUrl.length - 1)
+            : AppConstants.socketUrl;
+        final cleanPath = imageUrl.startsWith('/') ? imageUrl : '/$imageUrl';
+        fullImageUrl = '$rootUrl$cleanPath';
+      }
+    }
+
     return Container(
       decoration: BoxDecoration(
         shape: BoxShape.circle,
@@ -151,8 +199,8 @@ class AppHeader extends ConsumerWidget {
       child: CircleAvatar(
         radius: 20,
         backgroundColor: Colors.white.withOpacity(0.1),
-        backgroundImage: imageUrl != null && imageUrl.isNotEmpty ? NetworkImage(imageUrl) : null,
-        child: (imageUrl == null || imageUrl.isEmpty)
+        backgroundImage: fullImageUrl != null ? NetworkImage(fullImageUrl) : null,
+        child: fullImageUrl == null
             ? const Icon(Icons.person_rounded, color: Colors.white, size: 20)
             : null,
       ),
@@ -197,43 +245,110 @@ class AppHeader extends ConsumerWidget {
     );
   }
 
-  void _showNotifications(BuildContext context, ThemeData theme) {
+  void _showNotifications(BuildContext context, WidgetRef ref, ThemeData theme) {
      showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          final notificationsAsync = ref.watch(notificationsProvider);
+          
+          return Container(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.7,
             ),
-            const SizedBox(height: 24),
-            Row(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.notifications_active_outlined, color: AppColors.primary),
-                const SizedBox(width: 12),
-                Text(
-                  'Notifications',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.notifications_active_outlined, color: AppColors.primary),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Notifications',
+                          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    if (ref.read(unreadNotificationsCountProvider) > 0)
+                      TextButton(
+                        onPressed: () => ref.read(markAllAsReadProvider),
+                        child: const Text('Mark all as read'),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: notificationsAsync.when(
+                    data: (notifications) {
+                      if (notifications.isEmpty) {
+                        return const Center(child: Text('No notifications yet'));
+                      }
+                      return ListView.builder(
+                        itemCount: notifications.length,
+                        itemBuilder: (context, index) {
+                          final n = notifications[index];
+                          if (n == null) return const SizedBox.shrink();
+                          final bool isRead = n['isRead'] ?? false;
+                          
+                          return ListTile(
+                            contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: isRead ? Colors.grey.shade100 : AppColors.primary.withOpacity(0.1),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isRead ? Icons.notifications_none : Icons.notifications_active,
+                                color: isRead ? Colors.grey : AppColors.primary,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              n['title'] ?? 'Notification',
+                              style: TextStyle(
+                                fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(n['body'] ?? ''),
+                            trailing: !isRead 
+                              ? IconButton(
+                                  icon: const Icon(Icons.check_circle_outline, size: 20),
+                                  onPressed: () => ref.read(markAsReadProvider(n['id'])),
+                                )
+                              : null,
+                          );
+                        },
+                      );
+                    },
+                    loading: () => const Center(child: CircularProgressIndicator()),
+                    error: (e, _) => Center(child: Text('Error: $e')),
+                  ),
+                ),
+                const SizedBox(height: 16),
               ],
             ),
-            const SizedBox(height: 32),
-            const Text('No new notifications'),
-            const SizedBox(height: 32),
-          ],
-        ),
+          );
+        }
       ),
     );
   }

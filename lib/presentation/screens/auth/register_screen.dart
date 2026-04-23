@@ -9,10 +9,17 @@ import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../../domain/entities/user.dart';
 import '../../theme/app_theme.dart';
+import '../../../services/location/location_service.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final String role;
-  const RegisterScreen({Key? key, required this.role}) : super(key: key);
+  final String? patientType; // NORMAL, DEAF (Passed from RoleSelection)
+  
+  const RegisterScreen({
+    Key? key,
+    required this.role,
+    this.patientType,
+  }) : super(key: key);
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -26,6 +33,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _cnicController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _cityController = TextEditingController();
+  final _addressController = TextEditingController();
 
   // Responder specific controllers
   final _organizationController = TextEditingController();
@@ -45,6 +54,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _obscureConfirmPassword = true;
   String _selectedPatientType = 'NORMAL';
   bool _isLoading = false;
+  bool _isFetchingLocation = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize from widget parameter if available
+    if (widget.patientType != null) {
+      _selectedPatientType = widget.patientType!;
+    }
+  }
 
   @override
   void dispose() {
@@ -56,6 +75,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _confirmPasswordController.dispose();
     _organizationController.dispose();
     _licenseController.dispose();
+    _cityController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 
@@ -84,6 +105,44 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  Future<void> _fetchLocation() async {
+    setState(() => _isFetchingLocation = true);
+    try {
+      final locationService = LocationService();
+      final position = await locationService.getCurrentLocation();
+      final place = await locationService.getPlaceFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (mounted) {
+        setState(() {
+          _cityController.text = place['city'] ?? '';
+          _addressController.text = place['address'] ?? '';
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location fetched successfully!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to fetch location: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isFetchingLocation = false);
+    }
+  }
+
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -96,6 +155,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         phoneNumber: _phoneController.text.trim(),
         password: _passwordController.text,
         role: widget.role,
+        city: _cityController.text.trim(),
+        address: _addressController.text.trim(),
         cnic: _cnicController.text.trim(),
         patientType: widget.role == 'PATIENT' ? _selectedPatientType : null,
         organization:
@@ -283,8 +344,64 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
+                // ─── Location Information ───────────────────────────
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _SectionHeader(title: 'Location Information', color: roleColor),
+                    TextButton.icon(
+                      onPressed: _isFetchingLocation ? null : _fetchLocation,
+                      icon: _isFetchingLocation
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.blue))
+                          : Icon(Icons.my_location_rounded,
+                              size: 18, color: roleColor),
+                      label: Text(
+                        _isFetchingLocation ? 'Fetching...' : 'Get My Location',
+                        style: TextStyle(
+                            color: roleColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _cityController,
+                        decoration: const InputDecoration(
+                          labelText: 'City',
+                          prefixIcon: Icon(Icons.location_city_rounded),
+                        ),
+                        validator: (v) =>
+                            v.isNullOrEmpty ? 'City is required' : null,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Address / Area',
+                          prefixIcon: Icon(Icons.map_rounded),
+                        ),
+                        validator: (v) =>
+                            v.isNullOrEmpty ? 'Address is required' : null,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
                 // ─── Role Specific Fields ───────────────────────────
-                if (widget.role == 'PATIENT') ...[
+                // We only show Accessibility Mode if it wasn't pre-selected in Role Selection
+                if (widget.role == 'PATIENT' && widget.patientType == null) ...[
                   _SectionHeader(title: 'Accessibility Mode', color: roleColor),
                   const SizedBox(height: 8),
                   Text(

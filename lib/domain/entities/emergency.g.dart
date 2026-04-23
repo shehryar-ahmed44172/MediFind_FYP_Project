@@ -9,7 +9,7 @@ part of 'emergency.dart';
 _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
     _$EmergencyImpl(
       id: json['id'] as String? ?? '',
-      userId: json['userId'] as String? ?? '',
+      userId: json['patientId'] as String? ?? '',
       status: json['status'] as String? ?? 'PENDING',
       emergencyType: json['emergencyType'] as String? ?? 'OTHER',
       latitude:
@@ -37,7 +37,7 @@ _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
 Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
     <String, dynamic>{
       'id': instance.id,
-      'userId': instance.userId,
+      'patientId': instance.userId,
       'status': instance.status,
       'emergencyType': instance.emergencyType,
       'latitude': instance.latitude,

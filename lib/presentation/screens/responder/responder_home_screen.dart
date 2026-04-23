@@ -11,6 +11,11 @@ import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
 import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
 import '../settings/settings_screen.dart';
+import '../profile/user_profile_screen.dart';
+import '../../../services/location/location_service.dart';
+import '../../../services/location/responder_location_tracker.dart';
+
+import '../../providers/navigation_provider.dart';
 
 class ResponderHomeScreen extends ConsumerStatefulWidget {
   const ResponderHomeScreen({Key? key}) : super(key: key);
@@ -20,22 +25,22 @@ class ResponderHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
-  int _currentIndex = 0;
   bool _isUpdatingStatus = false;
 
   @override
   void initState() {
     super.initState();
-    // Plan v5: Fetch fresh data from server on dashboard load
-    // This ensures we show pending requests even if the socket was offline
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       ref.read(getActiveEmergenciesProvider);
-      
-      // CRITICAL: Sync location on load if responder is already active
       final user = ref.read(currentUserProvider).valueOrNull;
       if (user?.isActive == true) {
-        debugPrint('📍 Responder is active, syncing location on dashboard load...');
+        // Sync availability
         ref.read(setResponderAvailabilityProvider(true));
+        
+        // Start background location tracking for visibility
+        ref.read(responderLocationTrackerProvider).start();
+        
+        debugPrint('📍 Responder initialized and tracking started');
       }
     });
   }
@@ -46,31 +51,25 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     final isConnected = ref.watch(isConnectedProvider);
     final userAsync = ref.watch(currentUserProvider);
     final emergenciesAsync = ref.watch(watchActiveEmergenciesProvider);
+    final state = GoRouterState.of(context);
+    final path = state.uri.path;
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Column(
-        children: [
-          const AppHeader(
-            showLogout: true,
-            showProfile: false,
-          ),
-          if (!isConnected) const ConnectivityBanner(),
-
-          Expanded(
-            child: IndexedStack(
-              index: _currentIndex,
-              children: [
-                _buildIncomingRequests(theme, userAsync, emergenciesAsync),
-                _buildHistoryTab(theme),
-                const SettingsScreen(showHeader: false),
-              ],
-            ),
-          ),
-        ],
-      ),
-      bottomNavigationBar: _buildBottomNav(theme),
+    return Column(
+      children: [
+        if (!isConnected) const ConnectivityBanner(),
+        Expanded(
+          child: _buildMainContent(path, theme, userAsync, emergenciesAsync),
+        ),
+      ],
     );
+  }
+
+  Widget _buildMainContent(String path, ThemeData theme, AsyncValue userAsync, AsyncValue emergenciesAsync) {
+    if (path.contains('/responder/history')) {
+      return _buildHistoryTab(theme);
+    }
+    // Default to Dashboard (Incoming Requests)
+    return _buildIncomingRequests(theme, userAsync, emergenciesAsync);
   }
 
   Widget _buildIncomingRequests(ThemeData theme, AsyncValue userAsync, AsyncValue emergenciesAsync) {
@@ -174,15 +173,24 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                             setState(() => _isUpdatingStatus = true);
                             try {
                               await ref.read(setResponderAvailabilityProvider(value).future);
-                              if (mounted && value) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: const Text('You are now ONLINE and visible to patients.'),
-                                    backgroundColor: Colors.green.shade700,
-                                    behavior: SnackBarBehavior.floating,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                  ),
-                                );
+                              
+                              if (value) {
+                                // Start tracking immediately when going online
+                                ref.read(responderLocationTrackerProvider).start();
+
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('You are now ONLINE and visible to patients.'),
+                                      backgroundColor: Colors.green.shade700,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    ),
+                                  );
+                                }
+                              } else {
+                                // Stop tracking when going offline
+                                ref.read(responderLocationTrackerProvider).stop();
                               }
                             } finally {
                               if (mounted) setState(() => _isUpdatingStatus = false);
@@ -216,7 +224,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                 const SizedBox(width: 8),
                 IconButton(
                   icon: const Icon(Icons.analytics_outlined, size: 18, color: Colors.blue),
-                  onPressed: () => context.push('/profile/diagnostics'),
+                  onPressed: () => context.push('/diagnostics'),
                   tooltip: 'System Diagnostics',
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
@@ -327,79 +335,6 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     );
   }
 
-  Widget _buildSettingsPlaceholder(ThemeData theme) {
-     return const SizedBox.shrink();
-  }
-
-  Widget _buildBottomNav(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.home_rounded, 'Dashboard', 0, _currentIndex == 0, theme),
-              _buildNavItem(Icons.history_rounded, 'History', 1, _currentIndex == 1, theme),
-              _buildNavItem(Icons.settings_rounded, 'Settings', 2, _currentIndex == 2, theme),
-              _buildNavItem(Icons.person_rounded, 'Profile', 3, false, theme),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(IconData icon, String label, int index, bool isSelected, ThemeData theme) {
-    return InkWell(
-      onTap: () {
-        if (index == 3) {
-          context.push('/profile');
-          return;
-        }
-        setState(() => _currentIndex = index);
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-              size: 26,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ]
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _HistoryItemCard extends StatelessWidget {
@@ -413,7 +348,7 @@ class _HistoryItemCard extends StatelessWidget {
     final status = item['status'] as String? ?? 'PENDING';
     final emergency = item['emergency'] as Map<String, dynamic>? ?? {};
     final patient = emergency['patient'] as Map<String, dynamic>? ?? {};
-    final type = emergency['emergencyType'] as String? ?? 'Medical';
+    final type = (emergency['emergencyType'] as String? ?? 'Medical').toUpperCase();
     final date = DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now();
 
     Color statusColor;
@@ -437,52 +372,104 @@ class _HistoryItemCard extends StatelessWidget {
         statusIcon = Icons.hourglass_empty;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: statusColor.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(statusIcon, color: statusColor),
+    return InkWell(
+      onTap: () => _showHistoryDetails(context),
+      borderRadius: BorderRadius.circular(24),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          color: theme.cardColor,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: AppShadows.cardShadow,
         ),
-        title: Row(
-          children: [
-            Text(type.replaceAll('_', ' '), style: const TextStyle(fontWeight: FontWeight.bold)),
-            const Spacer(),
-            Text(
-              '${date.day}/${date.month} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+        child: ListTile(
+          contentPadding: const EdgeInsets.all(16),
+          leading: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-          ],
+            child: Icon(statusIcon, color: statusColor),
+          ),
+          title: Row(
+            children: [
+              Text(type.replaceAll('_', ' '),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              const Spacer(),
+              Text(
+                '${date.day}/${date.month} ${date.hour}:${date.minute.toString().padLeft(2, '0')}',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+              ),
+            ],
+          ),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 4),
+              Text('Patient: ${patient['fullName'] ?? 'Unknown User'}',
+                  style: TextStyle(color: Colors.grey.shade700)),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  status,
+                  style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold),
+                ),
+              ),
+            ],
+          ),
         ),
-        subtitle: Column(
+      ),
+    );
+  }
+
+  void _showHistoryDetails(BuildContext context) {
+    final emergency = item['emergency'] as Map<String, dynamic>? ?? {};
+    final patient = emergency['patient'] as Map<String, dynamic>? ?? {};
+    final date = DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text('Response Details', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 4),
-            Text('Patient: ${patient['fullName'] ?? 'Unknown'}', style: TextStyle(color: Colors.grey.shade700)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                status,
-                style: TextStyle(color: statusColor, fontSize: 11, fontWeight: FontWeight.bold),
-              ),
-            ),
+            _buildDetailRow(Icons.person_rounded, 'Patient', patient['fullName'] ?? 'Unknown'),
+            _buildDetailRow(Icons.emergency_rounded, 'Type', emergency['emergencyType'] ?? 'Medical'),
+            _buildDetailRow(Icons.calendar_today_rounded, 'Date', '${date.day}/${date.month}/${date.year}'),
+            _buildDetailRow(Icons.info_outline_rounded, 'Status', item['status'] ?? 'N/A'),
+            if (item['rejectionReason'] != null)
+              _buildDetailRow(Icons.warning_amber_rounded, 'Reason', item['rejectionReason']),
           ],
         ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(IconData icon, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.bold)),
+          Expanded(child: Text(value)),
+        ],
       ),
     );
   }
@@ -509,8 +496,22 @@ class _EmergencyRequestCard extends ConsumerWidget {
         child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
       ),
       onDismissed: (_) async {
+        // First delete locally to remove from UI instantly
         final localDs = await ref.read(localDataSourceProvider.future);
         await localDs.deleteEmergency(request.id);
+        
+        // Notify backend that responder rejected the request
+        final user = ref.read(currentUserProvider).valueOrNull;
+        if (user != null) {
+          try {
+            await ref.read(rejectEmergencyProvider(
+              AcceptRejectParams(emergencyId: request.id, responderId: user.id)
+            ).future);
+            debugPrint('Emergency rejected on backend');
+          } catch (e) {
+            debugPrint('Failed to reject emergency on backend: $e');
+          }
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),

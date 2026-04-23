@@ -17,7 +17,7 @@ class CaregiverMapScreen extends ConsumerWidget {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Column(
         children: [
-          AppHeader(greetingOverride: 'Patient Locations'),
+          const SizedBox(height: 16),
           Expanded(
             child: asyncPatients.when(
               data: (patients) {

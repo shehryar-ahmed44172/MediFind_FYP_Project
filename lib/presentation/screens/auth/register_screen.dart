@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -150,26 +151,59 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final request = RegisterRequest(
-        fullName: _fullNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phoneNumber: _phoneController.text.trim(),
-        password: _passwordController.text,
-        role: widget.role,
-        city: _cityController.text.trim(),
-        address: _addressController.text.trim(),
-        cnic: _cnicController.text.trim(),
-        patientType: widget.role == 'PATIENT' ? _selectedPatientType : null,
-        organization:
+      debugPrint('📝 [Register] Starting registration process for role: ${widget.role}');
+      String? cnicFrontUrl;
+      String? cnicBackUrl;
+      String? empFrontUrl;
+      String? empBackUrl;
+
+      if (widget.role == 'RESPONDER') {
+        debugPrint('📤 [Register] Uploading responder documents...');
+        final authRepo = await ref.read(authRepositoryProvider.future);
+        if (_cnicFront != null) {
+          debugPrint('   - Uploading CNIC Front: ${_cnicFront!.path}');
+          cnicFrontUrl = await authRepo.uploadDocument(File(_cnicFront!.path));
+        }
+        if (_cnicBack != null) {
+          debugPrint('   - Uploading CNIC Back: ${_cnicBack!.path}');
+          cnicBackUrl = await authRepo.uploadDocument(File(_cnicBack!.path));
+        }
+        if (_employeeCardFront != null) {
+          debugPrint('   - Uploading Employee Card Front: ${_employeeCardFront!.path}');
+          empFrontUrl = await authRepo.uploadDocument(File(_employeeCardFront!.path));
+        }
+        if (_employeeCardBack != null) {
+          debugPrint('   - Uploading Employee Card Back: ${_employeeCardBack!.path}');
+          empBackUrl = await authRepo.uploadDocument(File(_employeeCardBack!.path));
+        }
+      }
+
+      debugPrint('📡 [Register] Sending registration request to API...');
+      final Map<String, dynamic> request = {
+        'fullName': _fullNameController.text.trim(),
+        'email': _emailController.text.trim(),
+        'phoneNumber': _phoneController.text.trim(),
+        'password': _passwordController.text,
+        'role': widget.role,
+        'city': _cityController.text.trim(),
+        'address': _addressController.text.trim(),
+        'cnic': _cnicController.text.trim(),
+        'patientType': widget.role == 'PATIENT' ? _selectedPatientType : null,
+        'organization':
             widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
-        licenseNumber:
+        'licenseNumber':
             widget.role == 'RESPONDER' ? _licenseController.text.trim() : null,
-        responderType:
+        'responderType':
             widget.role == 'RESPONDER' ? _selectedResponderType : null,
-        vehicleType: widget.role == 'RESPONDER' ? _selectedVehicleType : null,
-      );
+        'vehicleType': widget.role == 'RESPONDER' ? _selectedVehicleType : null,
+        'cnicImageUrl': cnicFrontUrl,
+        'cnicBackImageUrl': cnicBackUrl,
+        'employeeCardImageUrl': empFrontUrl,
+        'employeeCardBackImageUrl': empBackUrl,
+      };
 
       await ref.read(registerProvider(request).future);
+      debugPrint('✅ [Register] Registration successful!');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -182,6 +216,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         context.go('/verify-email', extra: {'email': _emailController.text.trim()});
       }
     } catch (e) {
+      debugPrint('❌ [Register] Registration failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

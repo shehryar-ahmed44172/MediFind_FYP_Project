@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../datasources/local/local_data_source.dart';
 import '../datasources/remote/medifind_api_client.dart';
+import '../../services/socket/socket_service.dart';
 
 class AuthRepositoryImpl implements AuthRepository {
   final MediFindApiClient apiClient;
@@ -17,7 +19,11 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<void> initialize() async {
     final token = await localDataSource.getAuthToken();
     if (token != null && token.isNotEmpty) {
+      debugPrint('🔑 AuthRepository: Found token in storage, setting in API client');
       apiClient.setAuthToken(token);
+      SocketService.instance.setAuthToken(token);
+    } else {
+      debugPrint('⚠️ AuthRepository: No token found in storage during initialization');
     }
   }
 
@@ -29,11 +35,12 @@ class AuthRepositoryImpl implements AuthRepository {
     await localDataSource.saveCurrentUserId(response.userId);
     await localDataSource.saveCurrentUserRole(response.role);
     apiClient.setAuthToken(response.accessToken);
+    SocketService.instance.setAuthToken(response.accessToken);
     return response;
   }
 
   @override
-  Future<RegisterResponse> register(RegisterRequest request) async {
+  Future<RegisterResponse> register(Map<String, dynamic> request) async {
     return await apiClient.register(request);
   }
 
@@ -43,6 +50,7 @@ class AuthRepositoryImpl implements AuthRepository {
     await localDataSource.saveAuthToken(response.accessToken);
     await localDataSource.saveRefreshToken(response.refreshToken);
     apiClient.setAuthToken(response.accessToken);
+    SocketService.instance.setAuthToken(response.accessToken);
     return response;
   }
 
@@ -141,5 +149,11 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User> uploadProfileImage(File imageFile) async {
     return await apiClient.uploadProfileImage(imageFile);
+  }
+
+  @override
+  Future<String> uploadDocument(File file) async {
+    final response = await apiClient.uploadChatFile(file);
+    return response['url'] as String;
   }
 }

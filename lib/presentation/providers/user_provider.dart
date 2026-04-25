@@ -6,6 +6,9 @@ import 'auth_provider.dart';
 
 // User Repository Provider
 final userRepositoryProvider = FutureProvider<UserRepository>((ref) async {
+  // Ensure auth is initialized
+  await ref.watch(authRepositoryProvider.future);
+  
   final apiClient = ref.watch(apiClientProvider);
   final localDataSource = await ref.watch(localDataSourceProvider.future);
   return UserRepositoryImpl(

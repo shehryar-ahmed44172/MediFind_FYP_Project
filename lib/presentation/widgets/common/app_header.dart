@@ -49,8 +49,8 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Row(
             children: [
-              // Left: Drawer Toggle OR Back Button
-              if (greetingOverride != null && canPop)
+              // Left: Logo OR Back Button
+              if (canPop)
                 Container(
                   margin: const EdgeInsets.only(right: 12),
                   child: _buildActionButton(
@@ -67,12 +67,12 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                   ),
                 )
               else
-                _buildActionButton(
-                  icon: Icons.menu_rounded,
-                  theme: theme,
-                  onTap: () {
-                    Scaffold.of(context).openDrawer();
-                  },
+                Image.asset(
+                  'assets/logos/Medifind_New_Logo-removebg-preview.png',
+                  height: 55,
+                  color: Colors.white,
+                  colorBlendMode: BlendMode.srcIn,
+                  fit: BoxFit.contain,
                 ),
               
               const SizedBox(width: 12),
@@ -196,6 +196,16 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                       error: (_, __) => const Icon(Icons.account_circle_rounded, color: Colors.white),
                     ),
                   ],
+
+                  // Side Drawer Toggle (Burger)
+                  const SizedBox(width: 8),
+                  _buildActionButton(
+                    icon: Icons.menu_rounded,
+                    theme: theme,
+                    onTap: () {
+                      Scaffold.of(context).openEndDrawer();
+                    },
+                  ),
                 ],
               ),
             ],

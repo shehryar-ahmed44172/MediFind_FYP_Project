@@ -1,3 +1,4 @@
+import 'dart:io';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/repositories/chat_repository.dart';
 import '../datasources/remote/medifind_api_client.dart';
@@ -34,5 +35,11 @@ class ChatRepositoryImpl implements ChatRepository {
   Future<ChatRoom> createOrGetChatRoom(String targetUserId) async {
     final response = await apiClient.createOrGetChatRoom(targetUserId);
     return ChatRoom.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<String> uploadFile(File file) async {
+    final response = await apiClient.uploadChatFile(file);
+    return response['url'] as String;
   }
 }

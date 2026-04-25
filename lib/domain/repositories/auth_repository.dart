@@ -4,7 +4,7 @@ import '../entities/user.dart';
 /// Abstract repository for authentication operations
 abstract class AuthRepository {
   Future<AuthResponse> login(String email, String password);
-  Future<RegisterResponse> register(RegisterRequest request);
+  Future<RegisterResponse> register(Map<String, dynamic> request);
   Future<AuthResponse> refreshToken(String token);
   Future<void> logout();
   Future<bool> isUserLoggedIn();
@@ -20,4 +20,5 @@ abstract class AuthRepository {
   Future<void> resendVerificationCode(String email);
   Future<User> updateProfile(Map<String, dynamic> data);
   Future<User> uploadProfileImage(File imageFile);
+  Future<String> uploadDocument(File file);
 }

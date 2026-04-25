@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/exceptions.dart';
@@ -22,7 +23,9 @@ class LocalDataSource {
       _authBox = await Hive.openBox<String>(AppConstants.authBoxKey);
       _caregiverBox = await Hive.openBox<String>('caregivers');
       _generalBox = await Hive.openBox<String>('general');
+      debugPrint('📦 Hive Initialized: ${_authBox.name}, ${_userBox.name}, etc.');
     } catch (e) {
+      debugPrint('❌ Hive Initialization Failed: $e');
       throw DatabaseException(
         message: 'Failed to initialize local database',
         originalException: e,

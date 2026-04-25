@@ -7,7 +7,8 @@ enum MessageType {
   @JsonValue('TEXT') TEXT,
   @JsonValue('IMAGE') IMAGE,
   @JsonValue('AUDIO') AUDIO,
-  @JsonValue('VOICE_ALERT') VOICE_ALERT
+  @JsonValue('VOICE_ALERT') VOICE_ALERT,
+  @JsonValue('DOCUMENT') DOCUMENT
 }
 
 @freezed

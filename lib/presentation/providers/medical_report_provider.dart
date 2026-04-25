@@ -8,8 +8,9 @@ import '../../data/repositories/medical_report_repository_impl.dart';
 import '../../presentation/providers/auth_provider.dart';
 
 final medicalReportServiceProvider = Provider<MedicalReportsUploadService>((ref) {
-  final dio = ref.watch(dioProvider);
-  return MedicalReportsUploadService(dio: dio);
+  // Watch apiClientProvider to ensure Dio is configured with interceptors
+  final apiClient = ref.watch(apiClientProvider);
+  return MedicalReportsUploadService(dio: apiClient.dio);
 });
 
 final medicalReportRepositoryProvider = Provider<MedicalReportRepository>((ref) {
@@ -18,6 +19,9 @@ final medicalReportRepositoryProvider = Provider<MedicalReportRepository>((ref) 
 });
 
 final medicalReportsProvider = FutureProvider.family<List<MedicalReport>, String>((ref, userId) async {
+  // Ensure auth is initialized
+  await ref.watch(authRepositoryProvider.future);
+  
   final repo = ref.watch(medicalReportRepositoryProvider);
   return await repo.getMedicalReports(userId);
 });
@@ -39,6 +43,8 @@ class MedicalReportsNotifier extends StateNotifier<AsyncValue<void>> {
   }) async {
     state = const AsyncValue.loading();
     try {
+      // Ensure auth is initialized
+      await _ref.read(authRepositoryProvider.future);
       final repo = _ref.read(medicalReportRepositoryProvider);
       await repo.uploadMedicalReport(
         file: file,

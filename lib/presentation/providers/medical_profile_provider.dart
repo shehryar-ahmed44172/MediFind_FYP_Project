@@ -7,8 +7,9 @@ import '../../domain/repositories/medical_profile_repository.dart';
 import 'auth_provider.dart';
 // Specialized data source providers
 final medicalProfileRemoteDataSourceProvider = Provider<MedicalProfileRemoteDataSource>((ref) {
-  final dio = ref.watch(dioProvider);
-  return MedicalProfileRemoteDataSource(dio);
+  // Watch apiClientProvider to ensure Dio is configured with interceptors
+  final apiClient = ref.watch(apiClientProvider);
+  return MedicalProfileRemoteDataSource(apiClient.dio);
 });
 
 final medicalProfileLocalDataSourceProvider = FutureProvider<MedicalProfileLocalDataSource>((ref) async {
@@ -31,7 +32,18 @@ final medicalProfileRepositoryProvider =
 // Get medical profile for a userId
 final getMedicalProfileProvider =
     FutureProvider.family<MedicalProfile?, String>((ref, userId) async {
+  // Ensure auth is initialized
+  await ref.watch(authRepositoryProvider.future);
+  
+  final currentUserId = await ref.watch(currentUserIdProvider.future);
   final repo = await ref.watch(medicalProfileRepositoryProvider.future);
+  
+  // If we are requesting our own profile, don't pass the userId to the repository
+  // which will trigger the /api/medical-profile base endpoint (GET me)
+  if (userId == currentUserId) {
+    return await repo.getMedicalProfile(null);
+  }
+  
   return await repo.getMedicalProfile(userId);
 });
 

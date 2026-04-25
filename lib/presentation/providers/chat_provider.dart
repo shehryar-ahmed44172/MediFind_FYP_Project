@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../domain/entities/chat_message.dart';
 import '../../domain/repositories/chat_repository.dart';
@@ -15,6 +17,9 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 
 // Chat Rooms Provider
 final chatRoomsProvider = FutureProvider<List<ChatRoom>>((ref) async {
+  // Ensure auth is initialized
+  await ref.watch(authRepositoryProvider.future);
+  
   final repo = ref.watch(chatRepositoryProvider);
   return repo.getChatRooms();
 });
@@ -37,6 +42,9 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
 
   Future<void> fetchMessages() async {
     try {
+      // Ensure auth is initialized before fetching (prevents race condition on startup)
+      await _ref.read(authRepositoryProvider.future);
+      
       final messages = await _repo.getChatMessages(_roomId);
       state = AsyncValue.data(messages);
       
@@ -71,19 +79,45 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
       });
     });
   }
-
   Future<void> sendMessage(String content, {MessageType type = MessageType.TEXT}) async {
     try {
       final message = await _repo.sendMessage(_roomId, content, type: type);
       
-      // Optimistic update already handled by socket potentially, 
-      // but if socket doesn't echo back to sender, we add it here.
       final currentMessages = state.value ?? [];
       if (!currentMessages.any((m) => m.id == message.id)) {
         state = AsyncValue.data([...currentMessages, message]);
       }
     } catch (e) {
-      // Handle error
+      debugPrint('❌ Error sending message: $e');
+    }
+  }
+
+  Future<void> sendVoiceMessage(String filePath) async {
+    try {
+      final mediaUrl = await _repo.uploadFile(File(filePath));
+      final message = await _repo.sendMessage(_roomId, 'Voice Message', type: MessageType.AUDIO, mediaUrl: mediaUrl);
+      
+      final currentMessages = state.value ?? [];
+      if (!currentMessages.any((m) => m.id == message.id)) {
+        state = AsyncValue.data([...currentMessages, message]);
+      }
+    } catch (e) {
+      debugPrint('❌ Error sending voice message: $e');
+    }
+  }
+
+  Future<void> sendFileMessage(File file, MessageType type) async {
+    try {
+      final mediaUrl = await _repo.uploadFile(file);
+      final filename = file.path.split('/').last;
+      final message = await _repo.sendMessage(_roomId, filename, type: type, mediaUrl: mediaUrl);
+      
+      final currentMessages = state.value ?? [];
+      if (!currentMessages.any((m) => m.id == message.id)) {
+        state = AsyncValue.data([...currentMessages, message]);
+      }
+    } catch (e) {
+      debugPrint('❌ Error sending file message: $e');
     }
   }
 
@@ -96,6 +130,9 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
 
 // Provider to get/create a room for a specific caregiver/patient
 final getChatRoomForUserProvider = FutureProvider.family<ChatRoom, String>((ref, targetUserId) async {
+  // Ensure auth is initialized
+  await ref.watch(authRepositoryProvider.future);
+  
   final repo = ref.watch(chatRepositoryProvider);
   return repo.createOrGetChatRoom(targetUserId);
 });

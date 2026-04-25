@@ -43,7 +43,7 @@ class PatientShell extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
-      drawer: AppDrawer(),
+      endDrawer: AppDrawer(),
       body: Column(
         children: [
           if (!isEmergencyRoute)

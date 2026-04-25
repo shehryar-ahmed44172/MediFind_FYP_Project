@@ -35,13 +35,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
+      debugPrint('🔑 [Login] Attempting login for: ${_emailController.text.trim()}');
       final params = LoginParams(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       // attempt login
+      debugPrint('📡 [Login] Sending request to backend...');
       await ref.read(loginProvider(params).future);
+      debugPrint('✅ [Login] Login successful!');
 
       if (mounted) {
         final role = await ref.read(currentUserRoleProvider.future);
@@ -50,6 +53,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     } catch (e) {
+      debugPrint('❌ [Login] Login failed: $e');
       if (mounted) {
         final errorStr = e.toString();
         if (errorStr.contains('verify your email')) {

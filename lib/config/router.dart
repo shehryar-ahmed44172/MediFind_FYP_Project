@@ -100,6 +100,11 @@ class AppRouter {
         builder: (context, state) => const RoleSelectionScreen(),
       ),
       GoRoute(
+        path: '/forgot-password',
+        name: 'forgot-password',
+        builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
         path: '/register',
         name: 'register',
         builder: (context, state) {

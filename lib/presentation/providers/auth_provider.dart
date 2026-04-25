@@ -6,15 +6,62 @@ import '../../data/repositories/auth_repository_impl.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/entities/user.dart';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 // API Client Provider
 final dioProvider = Provider<Dio>((ref) {
   return Dio();
 });
 
-final apiClientProvider = Provider<MediFindApiClient>((ref) {
+final Provider<MediFindApiClient> apiClientProvider = Provider<MediFindApiClient>((ref) {
   final dio = ref.watch(dioProvider);
-  return MediFindApiClient(dio);
+  final client = MediFindApiClient(dio);
+
+  // Set up token refresh callback
+  client.onTokenExpired = () async {
+    try {
+      debugPrint('⏳ [AuthService] Interceptor triggering token refresh...');
+      // We use ref.read here because this is an asynchronous callback triggered later
+      final localDataSource = await ref.read(localDataSourceProvider.future);
+      final refreshToken = await localDataSource.getRefreshToken();
+      
+      if (refreshToken == null || refreshToken.isEmpty) {
+        debugPrint('⚠️ [AuthService] No refresh token available');
+        return null;
+      }
+      
+      // Call the refresh endpoint
+      final response = await client.refreshToken(refreshToken);
+      
+      // Save the new tokens
+      await localDataSource.saveAuthToken(response.accessToken);
+      if (response.refreshToken.isNotEmpty) {
+        await localDataSource.saveRefreshToken(response.refreshToken);
+      }
+      
+      debugPrint('✅ [AuthService] Token refreshed and saved successfully');
+      return response.accessToken;
+    } catch (e) {
+      debugPrint('❌ [AuthService] Token refresh failed: $e');
+      return null;
+    }
+  };
+
+  // Set up session expiration callback
+  client.onSessionExpired = () {
+    debugPrint('🚪 [AuthService] Session expired. Forcing logout...');
+    // To break circularity, we don't reference logoutProvider directly.
+    // Instead, we clear the token and invalidate the auth state.
+    // We use Future.delayed to ensure invalidation happens outside the current build/init cycle
+    Future.delayed(Duration.zero, () {
+      ref.read(localDataSourceProvider.future).then((ds) {
+        ds.clearAuthToken();
+        ref.invalidate(authStateProvider);
+      });
+    });
+  };
+
+  return client;
 });
 
 // Local Data Source Provider
@@ -77,7 +124,7 @@ final loginProvider =
 });
 
 final registerProvider =
-    FutureProvider.family<void, RegisterRequest>((ref, request) async {
+    FutureProvider.family<void, Map<String, dynamic>>((ref, request) async {
   final authRepo = await ref.watch(authRepositoryProvider.future);
   await authRepo.register(request);
 });

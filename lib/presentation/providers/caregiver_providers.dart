@@ -12,17 +12,20 @@ final connectionRepositoryProvider = Provider<ConnectionRepository>((ref) {
 
 // Providers for data fetching
 final caregiverLinksProvider = FutureProvider<List<CaregiverConnection>>((ref) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   return repo.getCaregiverLinks();
 });
 
 final pendingInvitationsProvider = FutureProvider<List<CaregiverConnection>>((ref) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   return repo.getPendingInvitations();
 });
 
 // Send invitation action
 final sendInvitationProvider = FutureProvider.family<void, Map<String, String>>((ref, data) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   await repo.sendInvitation(data['patientEmail']!, data['relationship']!);
   
@@ -31,11 +34,13 @@ final sendInvitationProvider = FutureProvider.family<void, Map<String, String>>(
 });
 
 final allCaregiverLinksProvider = FutureProvider<List<CaregiverConnection>>((ref) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   return repo.getPatientsForCaregiverExtended();
 });
 
 final resendInvitationProvider = FutureProvider.family<void, String>((ref, patientId) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   await repo.resendInvitation(patientId);
   ref.invalidate(allCaregiverLinksProvider);
@@ -43,6 +48,7 @@ final resendInvitationProvider = FutureProvider.family<void, String>((ref, patie
 
 // Respond to invitation action
 final respondToInvitationProvider = FutureProvider.family<void, Map<String, dynamic>>((ref, data) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   await repo.respondToInvitation(data['invitationId'] as String, data['accept'] as bool);
   
@@ -51,6 +57,7 @@ final respondToInvitationProvider = FutureProvider.family<void, Map<String, dyna
 });
 
 final getLinkedPatientsProvider = FutureProvider<List<CaregiverConnection>>((ref) async {
+  await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
   return repo.getCaregiverLinks();
 });

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
@@ -7,15 +8,33 @@ import '../../../domain/entities/emergency.dart';
 import '../../../domain/entities/medical_profile.dart';
 import '../../../domain/entities/user.dart';
 
+typedef TokenRefreshCallback = Future<String?> Function();
+typedef LogoutCallback = void Function();
+
 class MediFindApiClient {
   final Dio _dio;
-  String? _authToken;
+  Dio get dio => _dio;
+  
+  // SHARED STATIC AUTH STATE
+  static String? _authToken;
+  static bool _isRefreshing = false;
+  static final List<Completer<void>> _refreshQueue = [];
+  
+  TokenRefreshCallback? onTokenExpired;
+  LogoutCallback? onSessionExpired;
 
   MediFindApiClient(this._dio) {
+    // Synchronize this instance with existing static token
+    if (_authToken != null) {
+      _dio.options.headers['Authorization'] = 'Bearer $_authToken';
+    }
     _configureDio();
   }
 
   void _configureDio() {
+    // Prevent adding multiple copies of the same interceptors if Dio is shared
+    _dio.interceptors.removeWhere((i) => i is LogInterceptor || i is InterceptorsWrapper);
+    
     _dio.options = BaseOptions(
       baseUrl: AppConstants.baseUrl,
       connectTimeout: Duration(milliseconds: AppConstants.apiTimeout),
@@ -46,14 +65,65 @@ class MediFindApiClient {
           }
           return handler.next(options);
         },
-        onError: (error, handler) {
+        onError: (error, handler) async {
           if (error.response?.statusCode == 401) {
             // Handle token expiration
+            debugPrint('🚨 401 Unauthorized detected for: ${error.requestOptions.path}');
+            
+            if (onTokenExpired != null) {
+              if (_isRefreshing) {
+                debugPrint('⏳ Refresh already in progress, queuing request...');
+                final completer = Completer<void>();
+                _refreshQueue.add(completer);
+                await completer.future;
+                
+                // Retry request with new token
+                return handler.resolve(await _retry(error.requestOptions));
+              }
+
+              _isRefreshing = true;
+              debugPrint('🔄 Attempting to refresh token...');
+              
+              try {
+                final newToken = await onTokenExpired!();
+                
+                if (newToken != null) {
+                  debugPrint('✅ Token refreshed successfully');
+                  _authToken = newToken;
+                  
+                  // Complete all queued requests
+                  for (var completer in _refreshQueue) {
+                    completer.complete();
+                  }
+                  _refreshQueue.clear();
+                  _isRefreshing = false;
+                  
+                  // Retry original request
+                  return handler.resolve(await _retry(error.requestOptions));
+                } else {
+                  debugPrint('❌ Token refresh failed (null returned)');
+                }
+              } catch (e) {
+                debugPrint('❌ Token refresh failed with error: $e');
+              } finally {
+                _isRefreshing = false;
+              }
+            }
+
+            // If we get here, refresh failed or was not possible
+            debugPrint('🚪 Session expired, triggering logout...');
+            onSessionExpired?.call();
+
             return handler.reject(
-              AuthenticationException(
-                message: 'Session expired. Please login again.',
-                code: 'TOKEN_EXPIRED',
-              ) as DioException,
+              DioException(
+                requestOptions: error.requestOptions,
+                error: AuthenticationException(
+                  message: 'Session expired. Please login again.',
+                  code: 'TOKEN_EXPIRED',
+                ),
+                type: DioExceptionType.badResponse,
+                response: error.response,
+              ),
             );
           }
           return handler.next(error);
@@ -63,11 +133,33 @@ class MediFindApiClient {
   }
 
   void setAuthToken(String token) {
+    debugPrint('🔑 MediFindApiClient: Token has been SET globally (${token.substring(0, 10)}...)');
     _authToken = token;
+    _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
   void clearAuthToken() {
+    debugPrint('🔑 MediFindApiClient: Token has been CLEARED globally');
     _authToken = null;
+    _dio.options.headers.remove('Authorization');
+  }
+
+  Future<Response<dynamic>> _retry(RequestOptions requestOptions) {
+    final options = Options(
+      method: requestOptions.method,
+      headers: requestOptions.headers,
+    );
+    // Update auth header
+    if (_authToken != null) {
+      options.headers?['Authorization'] = 'Bearer $_authToken';
+    }
+    
+    return _dio.request<dynamic>(
+      requestOptions.path,
+      data: requestOptions.data,
+      queryParameters: requestOptions.queryParameters,
+      options: options,
+    );
   }
 
   // AUTH ENDPOINTS
@@ -97,11 +189,11 @@ class MediFindApiClient {
     }
   }
 
-  Future<RegisterResponse> register(RegisterRequest request) async {
+  Future<RegisterResponse> register(Map<String, dynamic> request) async {
     try {
       final response = await _dio.post(
         'auth/register',
-        data: request.toJson(),
+        data: request,
       );
 
       if (response.statusCode == 201) {
@@ -903,9 +995,13 @@ class MediFindApiClient {
   Future<List<dynamic>> getNotificationHistory({int limit = 50}) async {
     try {
       final response = await _dio.get('notifications/history', queryParameters: {'limit': limit});
-      return response.data['data'] as List;
+      final data = response.data['data'];
+      if (data == null) return [];
+      return data as List;
     } on DioException catch (e) {
       throw _handleDioException(e);
+    } catch (e) {
+      throw NetworkException(message: 'Failed to parse notifications: $e');
     }
   }
 
@@ -974,6 +1070,24 @@ class MediFindApiClient {
     }
   }
 
+  Future<Map<String, dynamic>> uploadChatFile(File file) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          file.path,
+          filename: file.path.split(RegExp(r'[/\\]')).last,
+        ),
+      });
+      final response = await _dio.post('chat/upload', data: formData);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data as Map<String, dynamic>;
+      }
+      throw NetworkException(message: 'Failed to upload chat file');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   AppException _handleDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -997,8 +1111,9 @@ class MediFindApiClient {
           originalException: e,
         );
       case DioExceptionType.unknown:
+        final innerError = e.error?.toString() ?? e.message ?? 'Unknown error';
         return NetworkException(
-          message: 'An unexpected error occurred',
+          message: 'Network connection issue: $innerError',
           originalException: e,
         );
       default:

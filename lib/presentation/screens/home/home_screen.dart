@@ -43,181 +43,132 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
-
     final settings = ref.watch(accessibilityProvider);
     final isDeafMode = settings.textOnlyMode;
-
     final userAsync = ref.watch(currentUserProvider);
-
-    // Listen for visual emergency alerts (Deaf/Mute accessibility)
-    ref.listen(visualEmergencyAlertProvider, (previous, next) {
-      if (next != null) {
-        if (settings.vibrationFeedback) HapticFeedbackService.sosPattern();
-        EmergencyOverlay.show(
-          context,
-          title: 'Responder Assigned',
-          message: next,
-        );
-        // Reset the alert state after showing
-        ref.read(visualEmergencyAlertProvider.notifier).state = null;
-      }
-    });
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: SafeArea(
         child: Column(
           children: [
-            // Visual Accessibility Banner (Immediate feedback for Deaf mode)
-            if (isDeafMode)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-                decoration: BoxDecoration(
-                  color: Colors.amber.shade700,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.visibility, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Visual Accessibility Mode Active',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.go('/home/settings/accessibility'),
-                      style: TextButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(0, 0),
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        'SETTINGS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          decoration: TextDecoration.underline,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
+            if (isDeafMode) _buildAccessibilityBanner(context),
             if (!isConnected) const ConnectivityBanner(),
             
             Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  userAsync.when(
-                    data: (user) => Padding(
-                      padding: const EdgeInsets.only(bottom: 24, left: 4),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Hello,',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.6),
-                            ),
-                          ),
-                          Text(
-                            user?.fullName.split(' ')[0] ?? 'User',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    loading: () => const SizedBox(height: 60),
-                    error: (_, __) => const SizedBox.shrink(),
-                  ),
-                  // profile summary
-                  _buildMedicalProfileSnapshot(theme),
-                  const SizedBox(height: 32),
-
-                  // main sos btn
-                  _buildMassiveSOSButton(theme, isDeafMode),
-                  const SizedBox(height: 24),
-
-                  // attach report btn
-                  _buildAttachReportOption(theme),
-                  const SizedBox(height: 32),
-
-                  // grid for emergency types
-                  _buildQuickServices(theme, isDeafMode),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-
-  void _showNotifications(BuildContext context, ThemeData theme) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Icon(Icons.notifications_active_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 12),
-                Text(
-                  'Notifications',
-                  style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              child: SingleChildScrollView(
+                padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.hp),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildWelcomeHeader(userAsync, theme),
+                    _buildMedicalProfileSnapshot(theme),
+                    const SizedBox(height: 24),
+                    _buildMassiveSOSButton(theme, isDeafMode),
+                    const SizedBox(height: 32),
+                    _buildSectionHeader(theme, 'Quick Actions'),
+                    const SizedBox(height: 16),
+                    _buildQuickActionGrid(theme),
+                    const SizedBox(height: 32),
+                  ],
                 ),
-              ],
+              ),
             ),
-            const SizedBox(height: 32),
-            Icon(Icons.notifications_off_outlined, size: 64, color: Colors.grey.shade300),
-            const SizedBox(height: 16),
-            const Text(
-              'No new notifications',
-              style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
-            ),
-            const SizedBox(height: 32),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildAccessibilityBanner(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      decoration: BoxDecoration(color: Colors.amber.shade700),
+      child: const Row(
+        children: [
+          Icon(Icons.visibility, color: Colors.white, size: 18),
+          SizedBox(width: 8),
+          Text('Visual Accessibility Mode Active', 
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWelcomeHeader(AsyncValue<dynamic> userAsync, ThemeData theme) {
+    return userAsync.when(
+      data: (user) => Padding(
+        padding: EdgeInsets.only(bottom: 3.hp, left: 1.wp),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
+            Text(user?.fullName.split(' ')[0] ?? 'User',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+          ],
+        ),
+      ),
+      loading: () => const SizedBox(height: 60),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  Widget _buildSectionHeader(ThemeData theme, String title) {
+    return Text(
+      title,
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+    );
+  }
+
+  Widget _buildQuickActionGrid(ThemeData theme) {
+    final actions = [
+      {'title': 'Medical Records', 'icon': Icons.assignment_rounded, 'color': AppColors.primary, 'route': '/home/medical-reports'},
+      {'title': 'My Caregivers', 'icon': Icons.people_alt_rounded, 'color': AppColors.secondary, 'route': '/home/caregivers'},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.blue, 'route': '/chats'},
+      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_rounded, 'color': Colors.orange, 'route': '/home/emergency-contacts'},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.3,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        final color = action['color'] as Color;
+        return InkWell(
+          onTap: () {
+            if (action['route'] != null) {
+              context.push(action['route'] as String);
+            } else {
+              _showFeatureComingSoon(context, action['title'] as String);
+            }
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(action['icon'] as IconData, color: color, size: 32),
+                const SizedBox(height: 8),
+                Text(action['title'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
@@ -23,13 +24,13 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
-            horizontal: size.width * 0.06,
-            vertical: 24,
+            horizontal: 6.wp,
+            vertical: 2.hp,
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 20),
+              SizedBox(height: 2.hp),
               // Back button
               Align(
                 alignment: Alignment.centerLeft,
@@ -43,11 +44,11 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       boxShadow: AppShadows.neumorphicOut,
                     ),
                     child: Icon(Icons.arrow_back_ios_new_rounded,
-                        size: 18, color: theme.colorScheme.primary),
+                        size: 1.8.hp, color: theme.colorScheme.primary),
                   ),
                 ),
               ),
-              const SizedBox(height: 32),
+              SizedBox(height: 4.hp),
 
               // Header
               Container(
@@ -58,9 +59,9 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                   boxShadow: AppShadows.neumorphicOut,
                 ),
                 child: Icon(Icons.local_hospital_rounded,
-                    size: 64, color: theme.colorScheme.primary),
+                    size: 8.hp, color: theme.colorScheme.primary),
               ).center(),
-              const SizedBox(height: 24),
+              SizedBox(height: 3.hp),
 
               Text(
                 'Join MediFind',
@@ -68,17 +69,19 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 style: theme.textTheme.displaySmall?.copyWith(
                   fontWeight: FontWeight.bold,
                   color: theme.colorScheme.primary,
+                  fontSize: 3.5.hp,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 1.hp),
               Text(
                 'Who are you? Select your role to continue.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: Colors.grey.shade600,
+                  fontSize: 1.6.hp,
                 ),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 4.hp),
 
               // Role cards
               _RoleTile(
@@ -92,7 +95,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               
               // Patient Sub-options
               if (_selectedRole == 'PATIENT') ...[
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
                 Padding(
                   padding: const EdgeInsets.only(left: 12),
                   child: Column(
@@ -103,9 +106,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                         style: theme.textTheme.labelLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: theme.colorScheme.primary,
+                          fontSize: 1.6.hp,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 1.5.hp),
                       Row(
                         children: [
                           _SubOptionChip(
@@ -128,7 +132,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 ),
               ],
 
-              const SizedBox(height: 16),
+              SizedBox(height: 2.hp),
               _RoleTile(
                 title: 'Emergency Responder',
                 subtitle: 'Receive alerts, respond to medical emergencies nearby.',
@@ -137,7 +141,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 isSelected: _selectedRole == 'RESPONDER',
                 onTap: () => setState(() => _selectedRole = 'RESPONDER'),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 2.hp),
               _RoleTile(
                 title: 'Caregiver',
                 subtitle: 'Monitor a patient\'s emergencies and receive live updates.',
@@ -146,7 +150,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 isSelected: _selectedRole == 'CAREGIVER',
                 onTap: () => setState(() => _selectedRole = 'CAREGIVER'),
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 4.hp),
 
               // Continue button
               AnimatedOpacity(
@@ -173,14 +177,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                     onPressed: _selectedRole == null
                         ? null
                         : () => context.go(
-                              '/register',
-                              extra: {
-                                'role': _selectedRole,
-                                'patientType': _selectedRole == 'PATIENT' ? _selectedPatientType : null,
-                              },
-                            ),
+                               '/register',
+                               extra: {
+                                 'role': _selectedRole,
+                                 'patientType': _selectedRole == 'PATIENT' ? _selectedPatientType : null,
+                               },
+                             ),
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(vertical: 2.hp),
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
@@ -188,10 +192,10 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: const Text(
+                    child: Text(
                       'Continue',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 1.8.hp,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -200,14 +204,14 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                 ),
               ),
 
-              const SizedBox(height: 20),
+              SizedBox(height: 3.hp),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("Already have an account? "),
+                  Text("Already have an account? ", style: TextStyle(fontSize: 1.4.hp)),
                   TextButton(
                     onPressed: () => context.go('/login'),
-                    child: const Text('Login'),
+                    child: Text('Login', style: TextStyle(fontSize: 1.4.hp, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),

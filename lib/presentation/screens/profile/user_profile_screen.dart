@@ -135,10 +135,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // Pending Invitations Widget
-              const InvitationsListWidget(),
-              
-              const SizedBox(height: 16),
               
               // Accessibility Mode Badge for Deaf Patients
               if (settings.textOnlyMode)

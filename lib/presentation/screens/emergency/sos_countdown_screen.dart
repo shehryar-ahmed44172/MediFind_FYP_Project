@@ -471,6 +471,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     ),
   );
 }
+
 }
 
 class _SimulatedBike {

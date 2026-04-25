@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
+import '../../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
@@ -50,13 +51,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Login failed: ${e.toString().replaceAll('Exception:', '').trim()}'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final errorStr = e.toString();
+        if (errorStr.contains('verify your email')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please verify your email before logging in.'),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+          context.go('/verify-email', extra: {'email': _emailController.text.trim()});
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Login failed: ${errorStr.replaceAll('Exception:', '').trim()}'),
+              backgroundColor: Colors.red.shade700,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -85,13 +98,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 2.hp),
           child: Form(
             key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 60),
+                SizedBox(height: 6.hp),
 
                 // header
                 Semantics(
@@ -101,13 +114,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     children: [
                       Image.asset(
                         'assets/logos/Medifind_New_Logo-removebg-preview.png',
-                        height: 160,
+                        height: 18.hp,
                         fit: BoxFit.contain,
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 48),
+                SizedBox(height: 5.hp),
 
                 // email field
                 TextFormField(
@@ -119,7 +132,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   validator: (value) => StringUtils.validateEmail(value),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
 
                 // pass field
                 TextFormField(
@@ -141,16 +154,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 1.hp),
 
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
                     onPressed: () => context.go('/forgot-password'),
-                    child: const Text('Forgot Password?'),
+                    child: Text('Forgot Password?', style: TextStyle(fontSize: 1.6.hp)),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
 
                 // login btn with neumorphic effect
                 Container(
@@ -173,7 +186,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _login,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(vertical: 2.hp),
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
@@ -187,25 +200,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             width: 24,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text(
+                        : Text(
                             'Login',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 1.8.hp,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 3.hp),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don't have an account? "),
+                    Text("Don't have an account? ", style: TextStyle(fontSize: 1.6.hp)),
                     TextButton(
                       onPressed: () => context.go('/select-role'),
-                      child: const Text('Register'),
+                      child: Text('Register', style: TextStyle(fontSize: 1.6.hp, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),

@@ -7,7 +7,7 @@ import '../../providers/notification_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
 
-class AppHeader extends ConsumerWidget {
+class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   final bool showLogout;
   final bool showProfile;
   final String? greetingOverride;
@@ -22,6 +22,9 @@ class AppHeader extends ConsumerWidget {
     this.centerTitle = false,
     this.canPop = false, // Default to false
   }) : super(key: key);
+
+  @override
+  Size get preferredSize => const Size.fromHeight(100); // Standard header height for this design
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -43,28 +46,36 @@ class AppHeader extends ConsumerWidget {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
           child: Row(
             children: [
-              // Left: Back Button OR Logo
+              // Left: Drawer Toggle OR Back Button
               if (greetingOverride != null && canPop)
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 20),
-                  onPressed: () => context.pop(),
+                Container(
+                  margin: const EdgeInsets.only(right: 12),
+                  child: _buildActionButton(
+                    icon: Icons.arrow_back_ios_new_rounded,
+                    theme: theme,
+                    onTap: () {
+                      if (Navigator.of(context).canPop()) {
+                        Navigator.of(context).pop();
+                      } else {
+                        context.go(userAsync.valueOrNull?.role == 'CAREGIVER' ? '/caregiver' : '/home');
+                      }
+                    },
+                    size: 18,
+                  ),
                 )
-              else if (greetingOverride == null)
-                Image.asset(
-                  'assets/logos/Medifind_New_Logo-removebg-preview.png',
-                  height: 48,
-                  fit: BoxFit.contain,
-                  color: Colors.white,
-                  colorBlendMode: BlendMode.srcIn,
-                  errorBuilder: (context, error, stackTrace) => 
-                    const Icon(Icons.medication_rounded, color: Colors.white, size: 32),
+              else
+                _buildActionButton(
+                  icon: Icons.menu_rounded,
+                  theme: theme,
+                  onTap: () {
+                    Scaffold.of(context).openDrawer();
+                  },
                 ),
               
-              if (greetingOverride == null)
-                const SizedBox(width: 8),
+              const SizedBox(width: 12),
 
               // Center/Title Area
               Expanded(
@@ -73,15 +84,18 @@ class AppHeader extends ConsumerWidget {
                   children: [
                     if (greetingOverride != null)
                       Flexible(
-                        child: Text(
-                          greetingOverride ?? '',
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            fontSize: 18 * ref.watch(fontSizeMultiplierProvider),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            greetingOverride ?? '',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              fontSize: 20 * ref.watch(fontSizeMultiplierProvider),
+                            ),
+                            maxLines: 1,
                           ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
                         ),
                       ),
                     
@@ -109,45 +123,60 @@ class AppHeader extends ConsumerWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      _buildActionButton(
-                        icon: Icons.notifications_none_rounded,
-                        theme: theme,
-                        onTap: () => _showNotifications(context, ref, theme),
-                        color: Colors.white,
-                      ),
-                      if (ref.watch(unreadNotificationsCountProvider) > 0)
-                        Positioned(
-                          right: -2,
-                          top: -2,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            constraints: const BoxConstraints(
-                              minWidth: 16,
-                              minHeight: 16,
-                            ),
-                            child: Text(
-                              ref.watch(unreadNotificationsCountProvider).toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
+                    _buildActionButton(
+                      icon: Icons.chat_bubble_outline_rounded,
+                      theme: theme,
+                      onTap: () {
+                        final user = userAsync.valueOrNull;
+                        final role = user?.role ?? 'PATIENT';
+                        if (role == 'PATIENT') {
+                          context.push('/chats');
+                        } else if (role == 'CAREGIVER') {
+                          context.push('/caregiver/chats');
+                        }
+                      },
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 8),
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
+                        _buildActionButton(
+                          icon: Icons.notifications_none_rounded,
+                          theme: theme,
+                          onTap: () => _showNotifications(context, ref, theme),
+                          color: Colors.white,
+                        ),
+                        if (ref.watch(unreadNotificationsCountProvider) > 0)
+                          Positioned(
+                            right: -2,
+                            top: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
                               ),
-                              textAlign: TextAlign.center,
+                              constraints: const BoxConstraints(
+                                minWidth: 16,
+                                minHeight: 16,
+                              ),
+                              child: Text(
+                                ref.watch(unreadNotificationsCountProvider).toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
                             ),
                           ),
-                        ),
-                    ],
-                  ),
+                      ],
+                    ),
                   
                   if (showLogout) ...[
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 6),
                     _buildActionButton(
                       icon: Icons.logout_rounded,
                       theme: theme,
@@ -157,7 +186,7 @@ class AppHeader extends ConsumerWidget {
                   ],
                   
                   if (showProfile) ...[
-                    const SizedBox(width: 12),
+                    const SizedBox(width: 8),
                     userAsync.when(
                       data: (user) => GestureDetector(
                         onTap: () => context.push('/profile'),
@@ -212,17 +241,18 @@ class AppHeader extends ConsumerWidget {
     required ThemeData theme,
     required VoidCallback onTap,
     Color? color,
+    double size = 22,
   }) {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withOpacity(0.15),
           shape: BoxShape.circle,
         ),
-        child: Icon(icon, color: color ?? Colors.white, size: 22),
+        child: Icon(icon, color: color ?? Colors.white, size: size),
       ),
     );
   }

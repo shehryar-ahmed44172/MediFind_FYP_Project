@@ -7,6 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../../domain/entities/caregiver_connection.dart';
 import '../../widgets/common/app_header.dart';
 import '../../providers/navigation_provider.dart';
+import '../../../core/utils/responsive.dart';
 
 class CaregiverHomeScreen extends ConsumerStatefulWidget {
   const CaregiverHomeScreen({Key? key}) : super(key: key);
@@ -21,94 +22,133 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     final theme = Theme.of(context);
     final asyncPatients = ref.watch(getLinkedPatientsProvider);
 
-    return RefreshIndicator(
-      onRefresh: () => ref.refresh(getLinkedPatientsProvider.future),
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          // 1. Greeting
-          SliverToBoxAdapter(
-            child: ref.watch(currentUserProvider).when(
-              data: (user) => Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: RefreshIndicator(
+        onRefresh: () => ref.refresh(getLinkedPatientsProvider.future),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            // 1. Greeting
+            SliverToBoxAdapter(
+              child: ref.watch(currentUserProvider).when(
+                data: (user) => Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
+                      Text(user?.fullName.split(' ')[0] ?? 'Caregiver',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+                    ],
+                  ),
+                ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+              ),
+            ),
+            
+            // 2. Quick Actions Grid
+            SliverToBoxAdapter(
+              child: _buildQuickActionGrid(theme),
+            ),
+
+            // 3. Monitored Patients Title
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Hello,',
-                      style: theme.textTheme.bodyLarge?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.6),
-                      ),
-                    ),
-                    Text(
-                      user?.fullName.split(' ')[0] ?? 'Caregiver',
-                      style: theme.textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                    ),
+                    const Text('Live Monitoring', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    if (asyncPatients.hasValue && asyncPatients.value!.isNotEmpty)
+                      Text('Recent Updates', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
                   ],
                 ),
               ),
-              loading: () => const SizedBox.shrink(),
-              error: (_, __) => const SizedBox.shrink(),
             ),
-          ),
-          // 2. Stats
-          SliverToBoxAdapter(
-            child: asyncPatients.when(
-              data: (patients) => _buildStatsRow(context, patients, theme),
-              loading: () => const SizedBox(height: 100, child: Center(child: CircularProgressIndicator())),
-              error: (_, __) => const SizedBox.shrink(),
-            ),
-          ),
 
-          // 3. Monitored Patients Title
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Monitored Patients', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (asyncPatients.hasValue && asyncPatients.value!.isNotEmpty)
-                    Text('Active Previews', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-                ],
-              ),
-            ),
-          ),
+            // 4. Patients List
+            asyncPatients.when(
+              data: (patients) {
+                if (patients.isEmpty) {
+                  return SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildEmptyState(context, theme),
+                  );
+                }
 
-          // 4. Patients List
-          asyncPatients.when(
-            data: (patients) {
-              if (patients.isEmpty) {
-                return SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _buildEmptyState(context, theme),
+                return SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      return RepaintBoundary(
+                        child: _buildPatientCard(context, patients[index], theme),
+                      );
+                    },
+                    childCount: patients.length,
+                    addAutomaticKeepAlives: true,
+                    addRepaintBoundaries: true,
+                  ),
                 );
-              }
-
-              final sortedPatients = List<CaregiverConnection>.from(patients)
-                ..sort((a, b) {
-                  if (a.hasActiveEmergency == true && b.hasActiveEmergency != true) return -1;
-                  if (a.hasActiveEmergency != true && b.hasActiveEmergency == true) return 1;
-                  return 0;
-                });
-
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _buildPatientCard(context, sortedPatients[index], theme),
-                  childCount: sortedPatients.length,
-                ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-            error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red)))),
-          ),
-          
-          const SliverToBoxAdapter(child: SizedBox(height: 32)),
-        ],
+              },
+              loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
+              error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red)))),
+            ),
+            
+            const SliverToBoxAdapter(child: SizedBox(height: 32)),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildQuickActionGrid(ThemeData theme) {
+    final actions = [
+      {'title': 'My Patients', 'icon': Icons.people_rounded, 'color': AppColors.primary, 'route': '/caregiver/my-patients'},
+      {'title': 'Live Map', 'icon': Icons.map_rounded, 'color': Colors.blue, 'route': '/caregiver/maps'},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/chats'},
+      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/caregiver/history'},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.4,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        final color = action['color'] as Color;
+        return InkWell(
+          onTap: () {
+            if (action['route'] != null) {
+              context.push(action['route'] as String);
+            }
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(action['icon'] as IconData, color: color, size: 28),
+                const SizedBox(height: 8),
+                Text(action['title'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -272,7 +312,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
           ),
           const SizedBox(height: 32),
           ElevatedButton.icon(
-            onPressed: () => context.push('/caregiver/link-patient'),
+            onPressed: () => context.push('/caregiver/my-patients/link-patient'),
             icon: const Icon(Icons.person_add_rounded),
             label: const Text('Link Now'),
             style: ElevatedButton.styleFrom(

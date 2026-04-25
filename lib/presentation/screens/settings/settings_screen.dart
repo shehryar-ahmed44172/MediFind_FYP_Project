@@ -134,7 +134,7 @@ class SettingsScreen extends ConsumerWidget {
                   'Link New Patient',
                   'Connect with a new patient via email',
                   const Color(0xFFEC4899),
-                  () => context.go('/caregiver/link-patient'),
+                  () => context.go('/caregiver/my-patients/link-patient'),
                 ),
               ],
 

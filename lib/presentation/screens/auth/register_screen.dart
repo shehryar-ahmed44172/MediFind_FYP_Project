@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../../domain/entities/user.dart';
 import '../../theme/app_theme.dart';
 import '../../../services/location/location_service.dart';
+import 'package:medifind_mobile_application/core/utils/responsive.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final String role;
@@ -173,12 +174,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registration successful! Please log in.'),
+            content: Text('Registration successful! Please verify your email.'),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
-        context.go('/login');
+        context.go('/verify-email', extra: {'email': _emailController.text.trim()});
       }
     } catch (e) {
       if (mounted) {
@@ -235,8 +236,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           key: _formKey,
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
-              horizontal: size.width * 0.06,
-              vertical: 24,
+              horizontal: 6.wp,
+              vertical: 3.hp,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -254,11 +255,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         boxShadow: AppShadows.neumorphicOut,
                       ),
                       child: Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 18, color: roleColor),
+                          size: 1.8.hp, color: roleColor),
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 3.hp),
 
                 // Role Badge Header
                 Row(
@@ -279,6 +280,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           'Create Account',
                           style: theme.textTheme.headlineSmall?.copyWith(
                             fontWeight: FontWeight.bold,
+                            fontSize: 2.4.hp,
                           ),
                         ),
                         Text(
@@ -286,17 +288,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: roleColor,
                             fontWeight: FontWeight.w600,
+                            fontSize: 1.4.hp,
                           ),
                         ),
                       ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 4.hp),
 
                 // ─── Personal Information ───────────────────────────
                 _SectionHeader(title: 'Personal Information', color: roleColor),
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
                 TextFormField(
                   controller: _fullNameController,
                   textCapitalization: TextCapitalization.words,
@@ -306,7 +309,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (v) => StringUtils.validateName(v),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 1.6.hp),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -316,7 +319,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (v) => StringUtils.validateEmail(v),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 1.6.hp),
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -326,7 +329,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (v) => StringUtils.validatePhoneNumber(v),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 1.6.hp),
                 TextFormField(
                   controller: _cnicController,
                   keyboardType: TextInputType.number,
@@ -342,7 +345,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ],
                   validator: (v) => StringUtils.validateCnic(v),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 3.hp),
 
                 // ─── Location Information ───────────────────────────
                 Row(
@@ -352,11 +355,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     TextButton.icon(
                       onPressed: _isFetchingLocation ? null : _fetchLocation,
                       icon: _isFetchingLocation
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 14,
                               height: 14,
                               child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.blue))
+                                  strokeWidth: 2, color: roleColor))
                           : Icon(Icons.my_location_rounded,
                               size: 18, color: roleColor),
                       label: Text(
@@ -364,12 +367,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         style: TextStyle(
                             color: roleColor,
                             fontWeight: FontWeight.bold,
-                            fontSize: 12),
+                            fontSize: 1.4.hp),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
                 Row(
                   children: [
                     Expanded(
@@ -397,19 +400,19 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 3.hp),
 
                 // ─── Role Specific Fields ───────────────────────────
                 // We only show Accessibility Mode if it wasn't pre-selected in Role Selection
                 if (widget.role == 'PATIENT' && widget.patientType == null) ...[
                   _SectionHeader(title: 'Accessibility Mode', color: roleColor),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 1.hp),
                   Text(
                     'Select your accessibility needs.',
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
+                        ?.copyWith(color: Colors.grey.shade600, fontSize: 1.2.hp),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 2.hp),
                   Row(
                     children: [
                       _PatientTypeChip(
@@ -431,13 +434,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 3.hp),
                 ],
 
                 if (widget.role == 'RESPONDER') ...[
                   _SectionHeader(
                       title: 'Responder Credentials', color: roleColor),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 2.hp),
                   TextFormField(
                     controller: _organizationController,
                     textCapitalization: TextCapitalization.words,
@@ -448,7 +451,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     validator: (v) =>
                         v.isNullOrEmpty ? 'Required for verification' : null,
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 1.6.hp),
                   TextFormField(
                     controller: _licenseController,
                     decoration: const InputDecoration(
@@ -458,10 +461,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     validator: (v) =>
                         v.isNullOrEmpty ? 'Required for verification' : null,
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 1.6.hp),
 
                   // Responder Type is fixed to 'Emergency Responder' as per requirements
-                  const SizedBox(height: 14),
+                  SizedBox(height: 1.6.hp),
 
                   // Vehicle Type (full width, Motorbike added)
                   DropdownButtonFormField<String>(
@@ -483,17 +486,17 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       }
                     },
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 3.hp),
 
                   // ─── Document Uploads ───────────────────────────
                   _SectionHeader(title: 'Identity Documents', color: roleColor),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 1.hp),
                   Text(
                     'Upload your CNIC and Employee Card for admin verification.',
                     style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.grey.shade600),
+                        ?.copyWith(color: Colors.grey.shade600, fontSize: 1.2.hp),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 2.hp),
 
                   // CNIC Row
                   Text(
@@ -501,7 +504,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     style: theme.textTheme.labelLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 1.hp),
                   Row(
                     children: [
                       Expanded(
@@ -525,7 +528,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 2.hp),
 
                   // Employee Card Row
                   Text(
@@ -533,7 +536,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     style: theme.textTheme.labelLarge
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 1.hp),
                   Row(
                     children: [
                       Expanded(
@@ -557,12 +560,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 3.hp),
                 ],
 
                 // ─── Security ───────────────────────────────────────
                 _SectionHeader(title: 'Security', color: roleColor),
-                const SizedBox(height: 16),
+                SizedBox(height: 2.hp),
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -579,7 +582,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   validator: (v) => StringUtils.validatePassword(v),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 1.6.hp),
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
@@ -602,7 +605,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     return null;
                   },
                 ),
-                const SizedBox(height: 32),
+                SizedBox(height: 4.hp),
 
                 // Submit Button
                 Container(
@@ -625,7 +628,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _register,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      padding: EdgeInsets.symmetric(vertical: 2.hp),
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
                       shape: RoundedRectangleBorder(
@@ -640,29 +643,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             child: CircularProgressIndicator(
                                 strokeWidth: 2, color: Colors.white),
                           )
-                        : const Text(
+                        : Text(
                             'Create Account',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 1.8.hp,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
                             ),
                           ),
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 3.hp),
 
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('Already have an account? '),
+                    Text('Already have an account? ', style: TextStyle(fontSize: 1.4.hp)),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: const Text('Login'),
+                      child: Text('Login', style: TextStyle(fontSize: 1.4.hp, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 2.hp),
               ],
             ),
           ),

@@ -5,6 +5,7 @@ import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/app_header.dart';
 import '../../../domain/entities/caregiver_connection.dart';
+import '../../providers/chat_provider.dart';
 
 class MyPatientsScreen extends ConsumerStatefulWidget {
   const MyPatientsScreen({Key? key}) : super(key: key);
@@ -68,7 +69,7 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
           ],
         ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.push('/caregiver/link-patient'),
+        onPressed: () => context.push('/caregiver/my-patients/link-patient'),
         icon: const Icon(Icons.person_add_rounded),
         label: const Text('Add Patient'),
       ),
@@ -117,7 +118,7 @@ class _PatientManageCard extends ConsumerWidget {
     if (isRejected) statusColor = Colors.red;
 
     return InkWell(
-      onTap: () => context.push('/caregiver/patient-profile/${link.patientId}'),
+      onTap: () => context.push('/caregiver/my-patients/patient-profile/${link.patientId}'),
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
@@ -164,6 +165,17 @@ class _PatientManageCard extends ConsumerWidget {
                   ],
                 ),
               ),
+              if (isAccepted)
+                IconButton(
+                  onPressed: () async {
+                    final room = await ref.read(getChatRoomForUserProvider(link.patientId).future);
+                    if (context.mounted) {
+                      context.push('/chat/${room.id}', extra: link.patientName);
+                    }
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
+                  tooltip: 'Chat with Patient',
+                ),
               if (!isAccepted)
                 IconButton(
                   onPressed: () => _showResendConfirm(context, ref),

@@ -61,65 +61,68 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Icon(Icons.person_add_alt_1, size: 80, color: AppColors.primary),
-          const SizedBox(height: 24),
-          const Text(
-            'Invite Patient',
-            style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Enter the patient\'s registered email address to send them a connection request.',
-            style: TextStyle(color: Colors.grey),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 32),
-          TextField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
-            decoration: InputDecoration(
-              labelText: 'Patient Email',
-              prefixIcon: const Icon(Icons.email_outlined),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+    return Scaffold(
+      appBar: const AppHeader(greetingOverride: 'Link Patient', canPop: true, showLogout: false, showProfile: false),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Icon(Icons.person_add_alt_1, size: 80, color: AppColors.primary),
+            const SizedBox(height: 24),
+            const Text(
+              'Invite Patient',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
             ),
-          ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _selectedRelationship,
-            decoration: InputDecoration(
-              labelText: 'Relationship to Patient',
-              prefixIcon: const Icon(Icons.family_restroom),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+            const SizedBox(height: 8),
+            const Text(
+              'Enter the patient\'s registered email address to send them a connection request.',
+              style: TextStyle(color: Colors.grey),
+              textAlign: TextAlign.center,
             ),
-            items: _relationshipOptions.map((String value) {
-              return DropdownMenuItem<String>(
-                value: value,
-                child: Text(value),
-              );
-            }).toList(),
-            onChanged: (newValue) {
-              setState(() {
-                _selectedRelationship = newValue!;
-              });
-            },
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: _isLoading ? null : _sendInvitation,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+            const SizedBox(height: 32),
+            TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText: 'Patient Email',
+                prefixIcon: const Icon(Icons.email_outlined),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
             ),
-            child: _isLoading 
-                ? const CircularProgressIndicator(color: Colors.white)
-                : const Text('Send Invitation', style: TextStyle(fontSize: 16)),
-          ),
-        ],
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              value: _selectedRelationship,
+              decoration: InputDecoration(
+                labelText: 'Relationship to Patient',
+                prefixIcon: const Icon(Icons.family_restroom),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              items: _relationshipOptions.map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (newValue) {
+                setState(() {
+                  _selectedRelationship = newValue!;
+                });
+              },
+            ),
+            const SizedBox(height: 32),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _sendInvitation,
+              style: ElevatedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: _isLoading 
+                  ? const CircularProgressIndicator(color: Colors.white)
+                  : const Text('Send Invitation', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        ),
       ),
     );
   }

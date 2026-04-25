@@ -8,6 +8,7 @@ enum SocketEvent {
   responderLocationUpdate,
   emergencyStatusChange,
   responderArrived,
+  newMessage,
   unknown
 }
 
@@ -92,6 +93,11 @@ class SocketService {
     _socket!.on('RESPONDER_ARRIVED', (data) {
       _messageController.add(SocketMessage(SocketEvent.responderArrived, data));
     });
+
+    _socket!.on('message:new', (data) {
+      print('💬 New Chat Message Received: $data');
+      _messageController.add(SocketMessage(SocketEvent.newMessage, data));
+    });
   }
 
   void joinEmergencyRoom(String emergencyId) {
@@ -104,6 +110,18 @@ class SocketService {
     if (!_isConnected || _socket == null) return;
     _socket!.emit('join:location', emergencyId);
     print('Joined location tracking room: $emergencyId');
+  }
+
+  void joinChatRoom(String roomId) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.emit('join:chat', roomId);
+    print('Joined chat room: $roomId');
+  }
+
+  void leaveChatRoom(String roomId) {
+    if (!_isConnected || _socket == null) return;
+    _socket!.emit('leave:chat', roomId); // Optional on backend but good practice
+    print('Left chat room: $roomId');
   }
 
   void sendLocationUpdate(double latitude, double longitude) {

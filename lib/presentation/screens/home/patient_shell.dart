@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../widgets/common/app_header.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/navigation/app_drawer.dart';
 
 class PatientShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
@@ -22,6 +23,8 @@ class PatientShell extends ConsumerWidget {
       case 0:
         if (location.contains('emergency-contacts')) {
           title = 'Emergency Contacts';
+        } else if (location.contains('medical-profile')) {
+          title = 'Medical Profile';
         } else {
           title = null;
         }
@@ -30,6 +33,7 @@ class PatientShell extends ConsumerWidget {
       case 2: title = 'My Caregivers'; break;
       case 3: title = 'User Profile'; break;
       case 4: title = 'Settings'; break;
+      case 5: title = 'Messages'; break;
       default: title = null;
     }
 
@@ -39,91 +43,19 @@ class PatientShell extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      drawer: AppDrawer(),
       body: Column(
         children: [
           if (!isEmergencyRoute)
             AppHeader(
               greetingOverride: title,
               showProfile: currentIndex != 3,
-              canPop: state.uri.pathSegments.length > 1,
+              canPop: currentIndex == 0 ? state.uri.pathSegments.length > 1 : state.uri.pathSegments.length > 2,
             ),
           Expanded(
             child: navigationShell,
           ),
         ],
-      ),
-      bottomNavigationBar: isEmergencyRoute ? null : _buildBottomNav(context, currentIndex),
-    );
-  }
-
-  void _onTap(BuildContext context, int index) {
-    navigationShell.goBranch(
-      index,
-      initialLocation: index == navigationShell.currentIndex,
-    );
-  }
-
-  Widget _buildBottomNav(BuildContext context, int currentIndex) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(context, Icons.home_rounded, 'Home', 0, currentIndex == 0),
-              _buildNavItem(context, Icons.content_paste_rounded, 'Reports', 1, currentIndex == 1),
-              _buildNavItem(context, Icons.people_alt_rounded, 'Care', 2, currentIndex == 2),
-              _buildNavItem(context, Icons.person_rounded, 'Profile', 3, currentIndex == 3),
-              _buildNavItem(context, Icons.settings_rounded, 'Settings', 4, currentIndex == 4),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem(BuildContext context, IconData icon, String label, int index, bool isSelected) {
-    return InkWell(
-      onTap: () => _onTap(context, index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.12) : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.white : Colors.white.withOpacity(0.4),
-              size: 24,
-            ),
-            if (isSelected) ...[
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ]
-          ],
-        ),
       ),
     );
   }

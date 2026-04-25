@@ -4,6 +4,9 @@ import '../../providers/caregiver_providers.dart';
 import '../../../domain/entities/caregiver_connection.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/utils/responsive.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/chat_provider.dart';
+import 'package:go_router/go_router.dart';
 
 class ManageCaregiversScreen extends ConsumerStatefulWidget {
   const ManageCaregiversScreen({Key? key}) : super(key: key);
@@ -167,6 +170,30 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
     );
   }
 
+  void _handleInvitationResponse(CaregiverConnection link, bool accept) async {
+    try {
+      await ref.read(respondToInvitationProvider({
+        'invitationId': link.id,
+        'accept': accept,
+      }).future);
+      ref.invalidate(allCaregiverLinksProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(accept ? 'Invitation accepted' : 'Invitation rejected'),
+            backgroundColor: accept ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final linksAsync = ref.watch(allCaregiverLinksProvider);
@@ -219,7 +246,10 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
                 final link = links[i];
                 return _CaregiverCard(
                   link: link,
+                  currentUserId: ref.read(currentUserProvider).valueOrNull?.id ?? '',
                   onDelete: () => _handleRemove(link),
+                  onAccept: () => _handleInvitationResponse(link, true),
+                  onReject: () => _handleInvitationResponse(link, false),
                 );
               },
             ),
@@ -234,12 +264,18 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
 
 class _CaregiverCard extends StatelessWidget {
   final CaregiverConnection link;
+  final String currentUserId;
   final VoidCallback onDelete;
+  final VoidCallback onAccept;
+  final VoidCallback onReject;
 
   const _CaregiverCard({
     Key? key,
     required this.link,
+    required this.currentUserId,
     required this.onDelete,
+    required this.onAccept,
+    required this.onReject,
   }) : super(key: key);
 
   @override
@@ -343,14 +379,47 @@ class _CaregiverCard extends StatelessWidget {
                   Text(link.caregiverEmail ?? 'No email',
                       style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: onDelete,
-                    icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
-                    label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                  if (link.status.toUpperCase() == 'PENDING' && link.requesterId != currentUserId) ...[
+                    TextButton(
+                      onPressed: onReject,
+                      child: const Text('Reject', style: TextStyle(color: Colors.red, fontSize: 13)),
                     ),
-                  ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: onAccept,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        minimumSize: const Size(0, 32),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Accept', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ] else ...[
+                    if (link.status.toUpperCase() == 'ACCEPTED')
+                      Consumer(
+                        builder: (context, ref, child) => TextButton.icon(
+                          onPressed: () async {
+                            final room = await ref.read(getChatRoomForUserProvider(link.caregiverId).future);
+                            if (context.mounted) {
+                              context.push('/chat/${room.id}', extra: link.caregiverName);
+                            }
+                          },
+                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
+                          label: const Text('Chat', style: TextStyle(color: AppColors.primary, fontSize: 13)),
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      onPressed: onDelete,
+                      icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
+                      label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ],

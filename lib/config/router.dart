@@ -10,6 +10,7 @@ import '../presentation/screens/auth/login_screen.dart';
 import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/role_selection_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
+import '../presentation/screens/auth/email_verification_screen.dart';
 import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/emergency/emergency_screen.dart';
@@ -39,6 +40,8 @@ import '../presentation/screens/medical/emergency_contacts_screen.dart';
 
 import '../presentation/screens/home/caregiver_shell.dart';
 import '../presentation/screens/home/responder_shell.dart';
+import '../presentation/screens/chat/chat_list_screen.dart';
+import '../presentation/screens/chat/chat_detail_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -105,6 +108,14 @@ class AppRouter {
             role: extra['role'] ?? 'PATIENT',
             patientType: extra['patientType'],
           );
+        },
+      ),
+      GoRoute(
+        path: '/verify-email',
+        name: 'verify-email',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return EmailVerificationScreen(email: extra['email'] ?? '');
         },
       ),
 
@@ -181,6 +192,15 @@ class AppRouter {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/chats',
+                name: 'chats',
+                builder: (context, state) => const ChatListScreen(),
+              ),
+            ],
+          ),
         ],
       ),
       // -----------------------------------------------------------------------
@@ -240,6 +260,15 @@ class AppRouter {
                 path: '/caregiver/profile',
                 name: 'caregiver-profile',
                 builder: (context, state) => const UserProfileScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/caregiver/chats',
+                name: 'caregiver-chats',
+                builder: (context, state) => const ChatListScreen(),
               ),
             ],
           ),
@@ -361,6 +390,16 @@ class AppRouter {
         name: 'caregiver-link-patient',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const LinkPatientScreen(),
+      ),
+      GoRoute(
+        path: '/chat/:roomId',
+        name: 'chat-detail',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) {
+          final roomId = state.pathParameters['roomId']!;
+          final otherUserName = state.extra as String?;
+          return ChatDetailScreen(roomId: roomId, otherUserName: otherUserName);
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

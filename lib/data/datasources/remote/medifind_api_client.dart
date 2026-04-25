@@ -97,7 +97,7 @@ class MediFindApiClient {
     }
   }
 
-  Future<AuthResponse> register(RegisterRequest request) async {
+  Future<RegisterResponse> register(RegisterRequest request) async {
     try {
       final response = await _dio.post(
         'auth/register',
@@ -106,14 +106,7 @@ class MediFindApiClient {
 
       if (response.statusCode == 201) {
         final data = response.data['data'] as Map<String, dynamic>;
-        // Backend register returns only user object currently in services/auth.ts line 39
-        // But login returns accessToken/refreshToken. 
-        // If register returns accessToken/refreshToken, this works.
-        // Let's assume it returns the full AuthResponse for consistency, 
-        // or we'll need to login after register.
-        final authResponse = AuthResponse.fromJson(data);
-        _authToken = authResponse.accessToken;
-        return authResponse;
+        return RegisterResponse.fromJson(data);
       }
 
       throw NetworkException(
@@ -157,6 +150,52 @@ class MediFindApiClient {
       if (response.statusCode != 200) {
         throw NetworkException(
           message: response.data['error'] ?? 'Reset failed',
+          code: response.data['code'],
+        );
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+  
+  Future<AuthResponse> verifyEmail(String email, String otp) async {
+    try {
+      final response = await _dio.post(
+        'auth/verify-email',
+        data: {
+          'email': email,
+          'otp': otp,
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] as Map<String, dynamic>;
+        final authResponse = AuthResponse.fromJson(data);
+        if (authResponse.accessToken.isNotEmpty) {
+          _authToken = authResponse.accessToken;
+        }
+        return authResponse;
+      }
+
+      throw NetworkException(
+        message: response.data['error'] ?? 'Verification failed',
+        code: response.data['code'],
+      );
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<void> resendVerificationCode(String email) async {
+    try {
+      final response = await _dio.post(
+        'auth/resend-verification',
+        data: {'email': email},
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(
+          message: response.data['error'] ?? 'Failed to resend code',
           code: response.data['code'],
         );
       }
@@ -881,6 +920,55 @@ class MediFindApiClient {
   Future<void> markAllNotificationsRead() async {
     try {
       await _dio.patch('notifications/read-all');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  // CHAT ENDPOINTS
+  Future<List<dynamic>> getChatRooms() async {
+    try {
+      final response = await _dio.get('chat/rooms');
+      if (response.statusCode == 200) {
+        return response.data as List;
+      }
+      throw NetworkException(message: 'Failed to fetch chat rooms');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<List<dynamic>> getChatMessages(String roomId) async {
+    try {
+      final response = await _dio.get('chat/messages/$roomId');
+      if (response.statusCode == 200) {
+        return response.data as List;
+      }
+      throw NetworkException(message: 'Failed to fetch messages');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<dynamic> sendMessage(Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.post('chat/messages', data: data);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return response.data;
+      }
+      throw NetworkException(message: 'Failed to send message');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<dynamic> createOrGetChatRoom(String targetUserId) async {
+    try {
+      final response = await _dio.post('chat/rooms', data: {'targetUserId': targetUserId});
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data;
+      }
+      throw NetworkException(message: 'Failed to access chat room');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

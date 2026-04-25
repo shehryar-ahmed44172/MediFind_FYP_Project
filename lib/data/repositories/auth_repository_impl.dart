@@ -33,14 +33,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AuthResponse> register(RegisterRequest request) async {
-    final response = await apiClient.register(request);
-    await localDataSource.saveAuthToken(response.accessToken);
-    await localDataSource.saveRefreshToken(response.refreshToken);
-    await localDataSource.saveCurrentUserId(response.userId);
-    await localDataSource.saveCurrentUserRole(response.role);
-    apiClient.setAuthToken(response.accessToken);
-    return response;
+  Future<RegisterResponse> register(RegisterRequest request) async {
+    return await apiClient.register(request);
   }
 
   @override
@@ -120,6 +114,23 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<void> resetPassword(String email, String token, String newPassword) async {
     await apiClient.resetPassword(email, token, newPassword);
+  }
+
+  @override
+  Future<AuthResponse> verifyEmail(String email, String otp) async {
+    final response = await apiClient.verifyEmail(email, otp);
+    if (response.accessToken.isNotEmpty) {
+      await localDataSource.saveAuthToken(response.accessToken);
+      await localDataSource.saveRefreshToken(response.refreshToken);
+      await localDataSource.saveCurrentUserId(response.userId);
+      await localDataSource.saveCurrentUserRole(response.role);
+    }
+    return response;
+  }
+
+  @override
+  Future<void> resendVerificationCode(String email) async {
+    await apiClient.resendVerificationCode(email);
   }
 
   @override

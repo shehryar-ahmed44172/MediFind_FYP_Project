@@ -162,3 +162,24 @@ final uploadProfileImageProvider = FutureProvider.family<User, File>((ref, file)
   ref.invalidate(currentUserProvider);
   return updatedUser;
 });
+
+final verifyEmailProvider = FutureProvider.family<void, VerifyEmailParams>((ref, params) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  await authRepo.verifyEmail(params.email, params.otp);
+  ref.invalidate(authStateProvider);
+  ref.invalidate(currentUserIdProvider);
+  ref.invalidate(currentUserRoleProvider);
+  ref.invalidate(currentUserProvider);
+});
+
+final resendOTPProvider = FutureProvider.family<void, String>((ref, email) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  await authRepo.resendVerificationCode(email);
+});
+
+class VerifyEmailParams {
+  final String email;
+  final String otp;
+  VerifyEmailParams({required this.email, required this.otp});
+}
+

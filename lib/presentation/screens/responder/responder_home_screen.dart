@@ -6,6 +6,7 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../../domain/entities/emergency.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
+import '../../widgets/common/emergency_timer.dart';
 
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
@@ -51,236 +52,190 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     final isConnected = ref.watch(isConnectedProvider);
     final userAsync = ref.watch(currentUserProvider);
     final emergenciesAsync = ref.watch(watchActiveEmergenciesProvider);
-    final state = GoRouterState.of(context);
-    final path = state.uri.path;
 
-    return Column(
-      children: [
-        if (!isConnected) const ConnectivityBanner(),
-        Expanded(
-          child: _buildMainContent(path, theme, userAsync, emergenciesAsync),
+    return Scaffold(
+      backgroundColor: theme.colorScheme.surface,
+      body: SafeArea(
+        child: Column(
+          children: [
+            if (!isConnected) const ConnectivityBanner(),
+            Expanded(
+              child: _buildIncomingRequests(theme, userAsync, emergenciesAsync),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 
-  Widget _buildMainContent(String path, ThemeData theme, AsyncValue userAsync, AsyncValue emergenciesAsync) {
-    if (path.contains('/responder/history')) {
-      return _buildHistoryTab(theme);
-    }
-    // Default to Dashboard (Incoming Requests)
-    return _buildIncomingRequests(theme, userAsync, emergenciesAsync);
-  }
-
   Widget _buildIncomingRequests(ThemeData theme, AsyncValue userAsync, AsyncValue emergenciesAsync) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        userAsync.when(
-          data: (user) => Padding(
-            padding: EdgeInsets.fromLTRB(2.hp, 2.hp, 2.hp, 0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Hello,',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6),
-                  ),
-                ),
-                Text(
-                  user?.fullName.split(' ')[0] ?? 'Responder',
-                  style: theme.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: theme.colorScheme.onSurface,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          loading: () => const SizedBox.shrink(),
-          error: (_, __) => const SizedBox.shrink(),
-        ),
-        
-        // Status Toggle
-        Padding(
-          padding: EdgeInsets.all(2.hp),
-          child: userAsync.when(
-            data: (user) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-              decoration: BoxDecoration(
-                color: theme.cardColor,
-                borderRadius: BorderRadius.circular(28),
-                boxShadow: AppShadows.cardShadow,
-                border: Border.all(
-                  color: (user?.isActive ?? false) 
-                    ? Colors.green.withOpacity(0.1) 
-                    : Colors.grey.withOpacity(0.1),
-                  width: 2,
-                ),
-              ),
-              child: Row(
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          userAsync.when(
+            data: (user) => Padding(
+              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: (user?.isActive ?? false) 
-                        ? Colors.green.withOpacity(0.1) 
-                        : Colors.grey.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.power_settings_new_rounded, 
-                      color: (user?.isActive ?? false) ? Colors.green : Colors.grey, 
-                      size: 28
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          (user?.isActive ?? false) ? 'Ready to Respond' : 'Currently Offline',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                            color: (user?.isActive ?? false) ? Colors.green.shade800 : Colors.grey.shade800
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          (user?.isActive ?? false) 
-                            ? 'You are active on the network' 
-                            : 'Switch on to receive alerts',
-                          style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-                        ),
-                      ],
-                    ),
-                  ),
-                  _isUpdatingStatus 
-                    ? const SizedBox(
-                        width: 48,
-                        height: 24,
-                        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                      )
-                    : Switch.adaptive(
-                        value: user?.isActive ?? false,
-                        activeTrackColor: Colors.green.shade200,
-                        activeColor: Colors.green.shade700,
-                        onChanged: (value) async {
-                          if (user != null) {
-                            setState(() => _isUpdatingStatus = true);
-                            try {
-                              await ref.read(setResponderAvailabilityProvider(value).future);
-                              
-                              if (value) {
-                                // Start tracking immediately when going online
-                                ref.read(responderLocationTrackerProvider).start();
-
-                                if (mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: const Text('You are now ONLINE and visible to patients.'),
-                                      backgroundColor: Colors.green.shade700,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    ),
-                                  );
-                                }
-                              } else {
-                                // Stop tracking when going offline
-                                ref.read(responderLocationTrackerProvider).stop();
-                              }
-                            } finally {
-                              if (mounted) setState(() => _isUpdatingStatus = false);
-                            }
-                          }
-                        },
-                      ),
+                  Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
+                  Text(user?.fullName.split(' ')[0] ?? 'Responder',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
                 ],
               ),
-            ),
-            loading: () => const LinearProgressIndicator(),
-            error: (_, __) => const Text('Failed to load status'),
-          ),
-        ),
-
-        // Header
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: emergenciesAsync.when(
-            data: (emergencies) => Row(
-              children: [
-                Text('Incoming Emergencies',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.bold)),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded, size: 18, color: Colors.grey),
-                  onPressed: () => ref.invalidate(getActiveEmergenciesProvider),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.analytics_outlined, size: 18, color: Colors.blue),
-                  onPressed: () => context.push('/diagnostics'),
-                  tooltip: 'System Diagnostics',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-                const Spacer(),
-                if (emergencies.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                        color: Colors.red,
-                        borderRadius: BorderRadius.circular(12)),
-                    child: Text(
-                      '${emergencies.length}',
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12),
-                    ),
-                  ),
-              ],
             ),
             loading: () => const SizedBox.shrink(),
             error: (_, __) => const SizedBox.shrink(),
           ),
-        ),
-        const SizedBox(height: 8),
+          
+          _buildStatusToggle(theme, userAsync),
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          ),
+          _buildQuickActionGrid(theme),
 
-        Expanded(
-          child: emergenciesAsync.when(
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Active Emergency Alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  onPressed: () => ref.invalidate(getActiveEmergenciesProvider),
+                ),
+              ],
+            ),
+          ),
+
+          emergenciesAsync.when(
             data: (emergencies) => emergencies.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded,
-                            size: 72, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        const Text('No active emergency requests',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  )
+                ? _buildEmptyEmergenciesState()
                 : ListView.builder(
-                    padding: const EdgeInsets.all(16),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
                     itemCount: emergencies.length,
-                    itemBuilder: (ctx, i) {
-                      final req = emergencies[i];
-                      return _EmergencyRequestCard(request: req);
-                    },
+                    itemBuilder: (ctx, i) => _EmergencyRequestCard(request: emergencies[i]),
                   ),
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('Error: $e')),
           ),
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickActionGrid(ThemeData theme) {
+    final actions = [
+      {'title': 'Emergencies', 'icon': Icons.emergency_rounded, 'color': Colors.red, 'route': '/responder'},
+      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/responder/history'},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': null},
+      {'title': 'Diagnostics', 'icon': Icons.analytics_rounded, 'color': Colors.blue, 'route': '/diagnostics'},
+    ];
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.4,
+      ),
+      itemCount: actions.length,
+      itemBuilder: (context, index) {
+        final action = actions[index];
+        final color = action['color'] as Color;
+        return InkWell(
+          onTap: () {
+            if (action['route'] != null) {
+              context.push(action['route'] as String);
+            }
+          },
+          borderRadius: BorderRadius.circular(24),
+          child: Container(
+            decoration: BoxDecoration(
+              color: theme.scaffoldBackgroundColor,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: AppShadows.neumorphicOut,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(action['icon'] as IconData, color: color, size: 28),
+                const SizedBox(height: 8),
+                Text(action['title'] as String,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusToggle(ThemeData theme, AsyncValue userAsync) {
+    return Padding(
+      padding: EdgeInsets.all(2.hp),
+      child: userAsync.when(
+        data: (user) => Container(
+          padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.5.hp),
+          decoration: BoxDecoration(
+            color: theme.cardColor,
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: AppShadows.cardShadow,
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.power_settings_new_rounded, 
+                   color: (user?.isActive ?? false) ? Colors.green : Colors.grey, 
+                   size: 3.hp),
+              SizedBox(width: 4.wp),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text((user?.isActive ?? false) ? 'Ready to Respond' : 'Offline',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 2.2.hp)),
+                    Text('Switch on to receive alerts', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: user?.isActive ?? false,
+                onChanged: (value) async {
+                  setState(() => _isUpdatingStatus = true);
+                  await ref.read(setResponderAvailabilityProvider(value).future);
+                  if (value) ref.read(responderLocationTrackerProvider).start();
+                  else ref.read(responderLocationTrackerProvider).stop();
+                  setState(() => _isUpdatingStatus = false);
+                },
+              ),
+            ],
+          ),
         ),
-      ],
+        loading: () => const LinearProgressIndicator(),
+        error: (_, __) => const SizedBox.shrink(),
+      ),
+    );
+  }
+
+  Widget _buildEmptyEmergenciesState() {
+    return Center(
+      child: Column(
+        children: [
+          const SizedBox(height: 32),
+          Icon(Icons.check_circle_outline_rounded, size: 72, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          const Text('No active emergency requests', style: TextStyle(color: Colors.grey)),
+        ],
+      ),
     );
   }
 
@@ -571,6 +526,33 @@ class _EmergencyRequestCard extends ConsumerWidget {
                             ),
                           ],
                         ),
+                        if (request.expiresAt != null) ...[
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.red.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.timer_outlined, size: 12, color: Colors.red.shade700),
+                                const SizedBox(width: 4),
+                                EmergencyTimer(
+                                  expiresAt: request.expiresAt!.toIso8601String(),
+                                  // We don't have serverTime here easily from the list, 
+                                  // but local time is usually fine for a 60s countdown.
+                                  style: TextStyle(
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -6,6 +6,7 @@ import '../../presentation/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import '../audio/voice_alert_service.dart';
 import '../../data/datasources/local/local_data_source.dart';
+import '../../presentation/widgets/common/emergency_timer.dart';
 
 // Top-level function for background message handling
 @pragma('vm:entry-point')
@@ -162,7 +163,17 @@ class PushNotificationService {
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
+                if (data['expiresAt'] != null) ...[
+                  const Text('REQUEST EXPIRES IN', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey)),
+                  EmergencyTimer(
+                    expiresAt: data['expiresAt'],
+                    serverTime: data['serverTime'],
+                    onExpired: () => _dismissCurrentEmergencyModal(),
+                    style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.red, fontFamily: 'monospace'),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text('Distance: $distance km', style: const TextStyle(fontSize: 16)),
                 const SizedBox(height: 12),
                 if (data['voiceSummary'] != null || data['medicalContext'] != null || data['bloodType'] != null) ...[

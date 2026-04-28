@@ -19,7 +19,7 @@ import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
 import 'core/utils/responsive.dart';
-import 'config/router.dart'; // Added for AppRouter.navigatorKey
+// Added for AppRouter.navigatorKey
 
 
 // The main entry point of the MediFind application
@@ -45,7 +45,7 @@ void main() async {
 
 // Root widget of the MediFind application
 class MediFindApp extends ConsumerStatefulWidget {
-  const MediFindApp({Key? key}) : super(key: key);
+  const MediFindApp({super.key});
 
   @override
   ConsumerState<MediFindApp> createState() => _MediFindAppState();

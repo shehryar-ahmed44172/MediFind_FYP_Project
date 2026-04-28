@@ -5,12 +5,10 @@ import '../../providers/auth_provider.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../../domain/entities/caregiver_connection.dart';
-import '../../widgets/common/app_header.dart';
-import '../../providers/navigation_provider.dart';
 import '../../../core/utils/responsive.dart';
 
 class CaregiverHomeScreen extends ConsumerStatefulWidget {
-  const CaregiverHomeScreen({Key? key}) : super(key: key);
+  const CaregiverHomeScreen({super.key});
 
   @override
   ConsumerState<CaregiverHomeScreen> createState() => _CaregiverHomeScreenState();

@@ -63,7 +63,7 @@ class LocationService {
       yield* _positionStream!;
     } catch (e) {
       if (e is LocationException) {
-        throw e;
+        rethrow;
       }
       throw LocationException(
         message: 'Failed to start location updates',
@@ -118,7 +118,7 @@ class LocationService {
       }
     } catch (e) {
       if (e is LocationException) {
-        throw e;
+        rethrow;
       }
       throw LocationException(
         message: 'Failed to access location services',

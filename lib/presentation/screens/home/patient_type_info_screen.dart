@@ -4,7 +4,7 @@ import '../../theme/app_theme.dart';
 class PatientTypeInfoScreen extends StatelessWidget {
   /// Pass a patientType to highlight one category, or null to show all.
   final String? patientType;
-  const PatientTypeInfoScreen({Key? key, this.patientType}) : super(key: key);
+  const PatientTypeInfoScreen({super.key, this.patientType});
 
   @override
   Widget build(BuildContext context) {
@@ -75,7 +75,7 @@ class PatientTypeInfoScreen extends StatelessWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.info_outline, color: AppColors.primary, size: 20),
+                const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(

@@ -1,30 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'dart:ui';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/connectivity_provider.dart';
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
-import 'package:medifind_mobile_application/services/notification/push_notification_service.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import 'package:medifind_mobile_application/presentation/services/haptic_feedback_service.dart';
-import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
-import 'package:medifind_mobile_application/presentation/widgets/emergency/emergency_overlay.dart';
-import '../../providers/emergency_provider.dart';
 import '../../providers/accessibility_provider.dart';
-import 'package:flutter/services.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
+  const HomeScreen({super.key});
 
   @override
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  int _currentIndex = 0;
+  final int _currentIndex = 0;
 
   @override
   void initState() {
@@ -144,8 +138,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final color = action['color'] as Color;
         return InkWell(
           onTap: () {
-            if (action['route'] != null) {
-              context.push(action['route'] as String);
+            final route = action['route'] as String?;
+            if (route != null) {
+              context.go(route);
             } else {
               _showFeatureComingSoon(context, action['title'] as String);
             }
@@ -201,7 +196,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => context.push('/home/medical-profile'),
+                        onTap: () => context.go('/home/medical-profile'),
                         child: Row(
                           children: [
                             Text(
@@ -278,7 +273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       onTap: () {
         HapticFeedbackService.light();
-        context.push('/home/emergency');
+        context.go('/home/emergency');
       },
       child: Center(
         child: Stack(
@@ -364,7 +359,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => context.push('/home/medical-reports'),
+          onTap: () => context.go('/home/medical-reports'),
           borderRadius: BorderRadius.circular(20),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -450,8 +445,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             return InkWell(
               onTap: () {
                 HapticFeedbackService.medium();
-                if (service['route'] != null) {
-                  context.push(service['route'] as String);
+                final route = service['route'] as String?;
+                if (route != null) {
+                  context.go(route);
                 } else {
                   _showFeatureComingSoon(context, service['title'] as String);
                 }

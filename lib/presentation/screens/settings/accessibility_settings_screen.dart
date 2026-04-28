@@ -5,7 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 
 class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
-  const AccessibilitySettingsScreen({Key? key}) : super(key: key);
+  const AccessibilitySettingsScreen({super.key});
 
   @override
   ConsumerState<AccessibilitySettingsScreen> createState() =>
@@ -37,7 +37,7 @@ class _AccessibilitySettingsScreenState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _SectionHeader('Visual Accessibility'),
+          const _SectionHeader('Visual Accessibility'),
 
           _AccessibilityTile(
             icon: Icons.contrast_rounded,
@@ -57,7 +57,7 @@ class _AccessibilitySettingsScreenState
             ),
           
           const SizedBox(height: 16),
-          _SectionHeader('Font Size'),
+          const _SectionHeader('Font Size'),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
@@ -84,7 +84,7 @@ class _AccessibilitySettingsScreenState
           ),
 
           const SizedBox(height: 16),
-          _SectionHeader('Physical Accessibility'),
+          const _SectionHeader('Physical Accessibility'),
 
           _AccessibilityTile(
             icon: Icons.zoom_in_rounded,

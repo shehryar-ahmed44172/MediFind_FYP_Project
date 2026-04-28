@@ -6,12 +6,11 @@ import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/profile/invitations_list_widget.dart';
 import '../../../core/constants/app_constants.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
-  const UserProfileScreen({Key? key, this.userId}) : super(key: key);
+  const UserProfileScreen({super.key, this.userId});
 
   @override
   ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -325,7 +324,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ).copyWith(
-                      overlayColor: MaterialStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
+                      overlayColor: WidgetStateProperty.all(theme.colorScheme.primary.withOpacity(0.05)),
                     ),
                     icon: const Icon(Icons.edit_outlined),
                     label: const Text('Edit Profile',

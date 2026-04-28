@@ -1,5 +1,4 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/datasources/remote/medifind_api_client.dart';
 import 'auth_provider.dart';
 
 final notificationsProvider = FutureProvider<List<dynamic>>((ref) async {

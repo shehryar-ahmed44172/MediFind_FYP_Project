@@ -5,13 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../services/location/location_service.dart';
 import '../../providers/connectivity_provider.dart';
-import '../../providers/emergency_provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
-  const EmergencyScreen({Key? key}) : super(key: key);
+  const EmergencyScreen({super.key});
 
   @override
   ConsumerState<EmergencyScreen> createState() => _EmergencyScreenState();
@@ -297,13 +294,13 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                             boxShadow: AppShadows.sosMassiveGlow,
                           ),
                           child: _isFetchingLocation
-                              ? Column(
+                              ? const Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    const CircularProgressIndicator(
+                                    CircularProgressIndicator(
                                         color: Colors.white, strokeWidth: 3),
-                                    const SizedBox(height: 12),
-                                    const Text(
+                                    SizedBox(height: 12),
+                                    Text(
                                       'DETECTING\nLOCATION',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(

@@ -1,5 +1,6 @@
 /// Emergency Remote Data Source
 /// Handles API communication for emergency operations
+library;
 
 import 'package:dio/dio.dart';
 import '../../../domain/entities/emergency.dart';

@@ -6,7 +6,7 @@ import '../../providers/medical_profile_provider.dart';
 import '../../theme/app_theme.dart';
 
 class EditMedicalProfileScreen extends ConsumerStatefulWidget {
-  const EditMedicalProfileScreen({Key? key}) : super(key: key);
+  const EditMedicalProfileScreen({super.key});
 
   @override
   ConsumerState<EditMedicalProfileScreen> createState() =>
@@ -137,7 +137,7 @@ class _EditMedicalProfileScreenState
             _buildSectionHeader('Blood Group', Icons.bloodtype_outlined, Colors.red),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedBloodGroup,
+              initialValue: _selectedBloodGroup,
               decoration: const InputDecoration(
                 labelText: 'Blood Group',
                 prefixIcon: Icon(Icons.bloodtype_outlined),
@@ -155,7 +155,7 @@ class _EditMedicalProfileScreenState
             _buildSectionHeader('Disability Type', Icons.accessibility_new_outlined, Colors.purple),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
-              value: _selectedDisabilityType,
+              initialValue: _selectedDisabilityType,
               decoration: const InputDecoration(
                 labelText: 'Disability Type',
                 prefixIcon: Icon(Icons.accessibility_new_outlined),
@@ -164,8 +164,9 @@ class _EditMedicalProfileScreenState
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
                   .toList(),
               onChanged: (v) {
-                if (v != null)
+                if (v != null) {
                   setState(() => _selectedDisabilityType = v);
+                }
               },
             ),
             const SizedBox(height: 24),

@@ -8,13 +8,11 @@ import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
-import '../../../domain/entities/medical_profile.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
-  const EmergencyRequestScreen({Key? key, required this.requestId})
-      : super(key: key);
+  const EmergencyRequestScreen({super.key, required this.requestId});
 
   @override
   ConsumerState<EmergencyRequestScreen> createState() =>
@@ -63,18 +61,16 @@ class _EmergencyRequestScreenState
       VoiceAlertService().speakMessage("Emergency accepted. Preparing automated analysis.");
 
       // Check if patient is deaf and play situational report
-      if (emergency != null) {
-        final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-        
-        if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
-          // Play the detailed medical report for the responder
-          await VoiceAlertService().speakAutomatedEmergencyReport(
-            emergency: emergency as emergency_entity.Emergency,
-            medical: profile,
-          );
-        }
+      final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
+      
+      if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+        // Play the detailed medical report for the responder
+        await VoiceAlertService().speakAutomatedEmergencyReport(
+          emergency: emergency,
+          medical: profile,
+        );
       }
-    } catch (e) {
+        } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to accept: $e'), backgroundColor: Colors.red),

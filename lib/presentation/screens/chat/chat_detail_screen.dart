@@ -17,10 +17,10 @@ class ChatDetailScreen extends ConsumerStatefulWidget {
   final String? otherUserName;
 
   const ChatDetailScreen({
-    Key? key,
+    super.key,
     required this.roomId,
     this.otherUserName,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<ChatDetailScreen> createState() => _ChatDetailScreenState();
@@ -203,7 +203,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     ),
                     if (isMe) ...[
                       const SizedBox(width: 4),
-                      Icon(Icons.done_all_rounded, size: 12, color: Colors.white70),
+                      const Icon(Icons.done_all_rounded, size: 12, color: Colors.white70),
                     ],
                   ],
                 ),

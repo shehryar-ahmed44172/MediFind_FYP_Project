@@ -3,13 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../../domain/entities/caregiver_connection.dart';
 import '../../theme/app_theme.dart';
-import '../../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
 import 'package:go_router/go_router.dart';
 
 class ManageCaregiversScreen extends ConsumerStatefulWidget {
-  const ManageCaregiversScreen({Key? key}) : super(key: key);
+  const ManageCaregiversScreen({super.key});
 
   @override
   ConsumerState<ManageCaregiversScreen> createState() =>
@@ -270,13 +269,12 @@ class _CaregiverCard extends StatelessWidget {
   final VoidCallback onReject;
 
   const _CaregiverCard({
-    Key? key,
     required this.link,
     required this.currentUserId,
     required this.onDelete,
     required this.onAccept,
     required this.onReject,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -374,23 +372,41 @@ class _CaregiverCard extends StatelessWidget {
               ),
               Row(
                 children: [
-                  Icon(Icons.email_outlined, size: 14, color: Colors.grey.shade400),
-                  const SizedBox(width: 6),
-                  Text(link.caregiverEmail ?? 'No email',
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 12)),
-                  const Spacer(),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Icon(Icons.email_outlined, size: 14, color: Colors.grey.shade400),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            link.caregiverEmail ?? 'No email',
+                            style: TextStyle(
+                              color: Colors.grey.shade500, 
+                              fontSize: 12,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 4),
                   if (link.status.toUpperCase() == 'PENDING' && link.requesterId != currentUserId) ...[
                     TextButton(
                       onPressed: onReject,
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                      ),
                       child: const Text('Reject', style: TextStyle(color: Colors.red, fontSize: 13)),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     ElevatedButton(
                       onPressed: onAccept,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: const Size(0, 32),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
@@ -408,15 +424,20 @@ class _CaregiverCard extends StatelessWidget {
                           },
                           icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
                           label: const Text('Chat', style: TextStyle(color: AppColors.primary, fontSize: 13)),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                          ),
                         ),
                       ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 4),
                     TextButton.icon(
                       onPressed: onDelete,
                       icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
                       label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
                       ),
                     ),
                   ],

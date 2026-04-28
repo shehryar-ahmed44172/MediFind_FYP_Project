@@ -37,6 +37,7 @@ const _$MessageTypeEnumMap = {
   MessageType.IMAGE: 'IMAGE',
   MessageType.AUDIO: 'AUDIO',
   MessageType.VOICE_ALERT: 'VOICE_ALERT',
+  MessageType.DOCUMENT: 'DOCUMENT',
 };
 
 _$ChatRoomImpl _$$ChatRoomImplFromJson(Map<String, dynamic> json) =>

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/accessibility_provider.dart';
 import '../../providers/notification_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
@@ -15,13 +14,13 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   final bool canPop; // New explicit flag
 
   const AppHeader({
-    Key? key,
+    super.key,
     this.showLogout = true,
     this.showProfile = true,
     this.greetingOverride,
     this.centerTitle = false,
     this.canPop = false, // Default to false
-  }) : super(key: key);
+  });
 
   @override
   Size get preferredSize => const Size.fromHeight(100); // Standard header height for this design
@@ -60,7 +59,14 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                       if (Navigator.of(context).canPop()) {
                         Navigator.of(context).pop();
                       } else {
-                        context.go(userAsync.valueOrNull?.role == 'CAREGIVER' ? '/caregiver' : '/home');
+                        final role = userAsync.valueOrNull?.role;
+                        if (role == 'CAREGIVER') {
+                          context.go('/caregiver');
+                        } else if (role == 'RESPONDER') {
+                          context.go('/responder');
+                        } else {
+                          context.go('/home');
+                        }
                       }
                     },
                     size: 18,
@@ -77,47 +83,8 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
               
               const SizedBox(width: 12),
 
-              // Center/Title Area
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: centerTitle ? MainAxisAlignment.center : MainAxisAlignment.start,
-                  children: [
-                    if (greetingOverride != null)
-                      Flexible(
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            greetingOverride ?? '',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              fontSize: 20 * ref.watch(fontSizeMultiplierProvider),
-                            ),
-                            maxLines: 1,
-                          ),
-                        ),
-                      ),
-                    
-                    // Accessibility Badge
-                    userAsync.when(
-                      data: (user) => user?.patientType == 'DEAF'
-                          ? Container(
-                              margin: const EdgeInsets.only(left: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.amberAccent,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Icon(Icons.visibility_rounded, size: 14, color: AppColors.primary),
-                            )
-                          : const SizedBox.shrink(),
-                      loading: () => const SizedBox.shrink(),
-                      error: (_, __) => const SizedBox.shrink(),
-                    ),
-                  ],
-                ),
-              ),
+              // Center Area - Empty as requested
+              const Spacer(),
 
               // Right: Actions
               Row(
@@ -320,7 +287,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.notifications_active_outlined, color: AppColors.primary),
+                        const Icon(Icons.notifications_active_outlined, color: AppColors.primary),
                         const SizedBox(width: 12),
                         Text(
                           'Notifications',

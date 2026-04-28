@@ -37,8 +37,8 @@ class MediFindApiClient {
     
     _dio.options = BaseOptions(
       baseUrl: AppConstants.baseUrl,
-      connectTimeout: Duration(milliseconds: AppConstants.apiTimeout),
-      receiveTimeout: Duration(milliseconds: AppConstants.apiTimeout),
+      connectTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
+      receiveTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
       headers: {
         'Content-Type': 'application/json',
       },

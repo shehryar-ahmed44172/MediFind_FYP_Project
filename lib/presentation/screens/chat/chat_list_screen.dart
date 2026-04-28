@@ -4,12 +4,10 @@ import 'package:go_router/go_router.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
-import '../../../domain/entities/chat_message.dart';
 import 'package:intl/intl.dart';
 
 class ChatListScreen extends ConsumerWidget {
-  const ChatListScreen({Key? key}) : super(key: key);
+  const ChatListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,28 +22,35 @@ class ChatListScreen extends ConsumerWidget {
           Expanded(
             child: roomsAsync.when(
               data: (rooms) {
-                if (rooms.isEmpty) {
-                  return _buildEmptyState(context, theme);
-                }
-                return ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: rooms.length,
-                  itemBuilder: (context, index) {
-                    final room = rooms[index];
-                    final isPatient = currentUser?.role == 'PATIENT';
-                    final otherUser = isPatient ? room.caregiver : room.patient;
-                    final lastMessage = room.messages?.isNotEmpty == true ? room.messages!.first : null;
+                return RefreshIndicator(
+                  onRefresh: () => ref.refresh(chatRoomsProvider.future),
+                  child: rooms.isEmpty 
+                    ? Stack(
+                        children: [
+                          ListView(), // Empty listview to enable pull-to-refresh
+                          _buildEmptyState(context, theme),
+                        ],
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: rooms.length,
+                        itemBuilder: (context, index) {
+                          final room = rooms[index];
+                          final isPatient = currentUser?.role == 'PATIENT';
+                          final otherUser = isPatient ? room.caregiver : room.patient;
+                          final lastMessage = room.messages?.isNotEmpty == true ? room.messages!.first : null;
 
-                    return _buildChatTile(
-                      context,
-                      room.id,
-                      otherUser?['fullName'] ?? 'User',
-                      otherUser?['profileImageUrl'],
-                      lastMessage?.content ?? 'No messages yet',
-                      room.updatedAt,
-                      theme,
-                    );
-                  },
+                          return _buildChatTile(
+                            context,
+                            room.id,
+                            otherUser?['fullName'] ?? 'User',
+                            otherUser?['profileImageUrl'],
+                            lastMessage?.content ?? 'No messages yet',
+                            room.updatedAt,
+                            theme,
+                          );
+                        },
+                      ),
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),

@@ -5,10 +5,9 @@ import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
 
 class MedicalProfileScreen extends ConsumerWidget {
-  const MedicalProfileScreen({Key? key}) : super(key: key);
+  const MedicalProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -236,7 +235,7 @@ class _ErrorView extends StatelessWidget {
               'Connection Issue',
               style: theme.textTheme.headlineSmall?.copyWith(
                 fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onBackground,
+                color: theme.colorScheme.onSurface,
               ),
             ),
             const SizedBox(height: 12),
@@ -246,7 +245,7 @@ class _ErrorView extends StatelessWidget {
                   : 'We encountered an error while loading your profile. Please try again.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onBackground.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withOpacity(0.6),
               ),
             ),
             const SizedBox(height: 32),
@@ -273,7 +272,7 @@ class _ErrorView extends StatelessWidget {
               child: Text(
                 'Go Back',
                 style: TextStyle(
-                  color: theme.colorScheme.onBackground.withOpacity(0.5),
+                  color: theme.colorScheme.onSurface.withOpacity(0.5),
                   fontWeight: FontWeight.w600,
                 ),
               ),

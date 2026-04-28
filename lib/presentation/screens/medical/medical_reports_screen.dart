@@ -9,7 +9,7 @@ import '../../../domain/entities/medical_report.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 
 class MedicalReportsScreen extends ConsumerStatefulWidget {
-  const MedicalReportsScreen({Key? key}) : super(key: key);
+  const MedicalReportsScreen({super.key});
 
   @override
   ConsumerState<MedicalReportsScreen> createState() => _MedicalReportsScreenState();
@@ -234,7 +234,7 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
             ),
             child: Column(
               children: [
-                Icon(Icons.upload_file_outlined,
+                const Icon(Icons.upload_file_outlined,
                     size: 40, color: AppColors.primary),
                  const SizedBox(height: 8),
                 Text('Upload Medical Reports',

@@ -3,6 +3,7 @@
 /// ⚠️  FOR LOCAL TESTING ONLY - DO NOT USE IN PRODUCTION  ⚠️
 /// 
 /// Run with: dart run test/db_test.dart
+library;
 
 import 'package:postgres/postgres.dart';
 
@@ -165,7 +166,7 @@ Future<void> _testRespondersTracking(Connection conn) async {
         cos(radians(34.0522)) * cos(radians(latitude)) * cos(radians(longitude) - radians(-118.2436))
         + sin(radians(34.0522)) * sin(radians(latitude))
       ) AS distance_km
-    FROM responders_tracking WHERE isactive = true AND status = \'AVAILABLE\'
+    FROM responders_tracking WHERE isactive = true AND status = 'AVAILABLE'
     ORDER BY distance_km ASC LIMIT 1''',
   );
   if (result.isNotEmpty) {

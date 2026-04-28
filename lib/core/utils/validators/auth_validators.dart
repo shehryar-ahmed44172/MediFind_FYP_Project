@@ -1,5 +1,6 @@
 /// Authentication Form Validators
 /// Handles email, phone, password, and other credential validations
+library;
 
 class AuthValidator {
   /// Validate email format

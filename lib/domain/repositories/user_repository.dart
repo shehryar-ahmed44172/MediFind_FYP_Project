@@ -1,4 +1,3 @@
-import '../entities/medical_profile.dart';
 import '../entities/user.dart';
 
 /// Abstract repository for user profile operations

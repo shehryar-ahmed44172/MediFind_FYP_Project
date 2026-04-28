@@ -5,12 +5,12 @@ import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../services/notification/push_notification_service.dart';
-import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
-import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/app_header.dart';
+import 'package:go_router/go_router.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
-  const DiagnosticsScreen({Key? key}) : super(key: key);
+  const DiagnosticsScreen({super.key});
 
   @override
   ConsumerState<DiagnosticsScreen> createState() => _DiagnosticsScreenState();
@@ -18,7 +18,7 @@ class DiagnosticsScreen extends ConsumerStatefulWidget {
 
 class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   String? _fcmToken;
-  List<String> _rooms = [];
+  final List<String> _rooms = [];
   bool _isPinging = false;
 
   @override
@@ -66,6 +66,11 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       backgroundColor: theme.colorScheme.surface,
       body: Column(
         children: [
+          const AppHeader(
+            greetingOverride: 'Diagnostics',
+            showProfile: false,
+            canPop: true,
+          ),
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(20),
@@ -164,7 +169,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                           Switch(
                             value: ref.watch(simulationModeProvider),
                             onChanged: (val) => ref.read(simulationModeProvider.notifier).state = val,
-                            activeColor: AppColors.primary,
+                            activeThumbColor: AppColors.primary,
                           ),
                         ],
                       ),

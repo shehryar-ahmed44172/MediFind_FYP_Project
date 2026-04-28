@@ -16,7 +16,7 @@ final chatRepositoryProvider = Provider<ChatRepository>((ref) {
 });
 
 // Chat Rooms Provider
-final chatRoomsProvider = FutureProvider<List<ChatRoom>>((ref) async {
+final chatRoomsProvider = FutureProvider.autoDispose<List<ChatRoom>>((ref) async {
   // Ensure auth is initialized
   await ref.watch(authRepositoryProvider.future);
   

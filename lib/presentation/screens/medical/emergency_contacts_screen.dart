@@ -4,11 +4,9 @@ import 'package:go_router/go_router.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
-import '../../../domain/entities/medical_profile.dart';
 
 class EmergencyContactsScreen extends ConsumerWidget {
-  const EmergencyContactsScreen({Key? key}) : super(key: key);
+  const EmergencyContactsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

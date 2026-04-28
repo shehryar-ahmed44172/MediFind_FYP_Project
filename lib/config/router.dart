@@ -26,15 +26,12 @@ import '../presentation/screens/caregiver/caregiver_home_screen.dart';
 import '../presentation/screens/caregiver/caregiver_tracking_screen.dart';
 import '../presentation/screens/caregiver/link_patient_screen.dart';
 import '../presentation/screens/caregiver/caregiver_map_screen.dart';
-import '../presentation/screens/caregiver/caregiver_history_screen.dart';
 import '../presentation/screens/caregiver/my_patients_screen.dart';
 import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
-import '../presentation/screens/settings/accessibility_settings_screen.dart';
 import '../presentation/screens/settings/diagnostics_screen.dart';
 import '../presentation/screens/home/patient_shell.dart';
-import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 import '../presentation/screens/medical/emergency_contacts_screen.dart';
 
@@ -42,6 +39,7 @@ import '../presentation/screens/home/caregiver_shell.dart';
 import '../presentation/screens/home/responder_shell.dart';
 import '../presentation/screens/chat/chat_list_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
+import '../presentation/screens/responder/responder_history_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -191,15 +189,6 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/settings',
-                name: 'settings',
-                builder: (context, state) => const SettingsScreen(showHeader: false),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/chats',
                 name: 'chats',
                 builder: (context, state) => const ChatListScreen(),
@@ -244,24 +233,6 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/caregiver/history',
-                name: 'caregiver-history',
-                builder: (context, state) => const CaregiverHistoryScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/caregiver/settings',
-                name: 'caregiver-settings',
-                builder: (context, state) => const SettingsScreen(showHeader: false),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
                 path: '/caregiver/profile',
                 name: 'caregiver-profile',
                 builder: (context, state) => const UserProfileScreen(),
@@ -300,16 +271,7 @@ class AppRouter {
               GoRoute(
                 path: '/responder/history',
                 name: 'responder-history',
-                builder: (context, state) => const ResponderHomeScreen(), // Currently home handles history
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/responder/settings',
-                name: 'responder-settings',
-                builder: (context, state) => const SettingsScreen(showHeader: false),
+                builder: (context, state) => const ResponderHistoryScreen(),
               ),
             ],
           ),
@@ -319,6 +281,15 @@ class AppRouter {
                 path: '/responder/profile',
                 name: 'responder-profile',
                 builder: (context, state) => const UserProfileScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/responder/chats',
+                name: 'responder-chats',
+                builder: (context, state) => const ChatListScreen(),
               ),
             ],
           ),
@@ -405,6 +376,12 @@ class AppRouter {
           final otherUserName = state.extra as String?;
           return ChatDetailScreen(roomId: roomId, otherUserName: otherUserName);
         },
+      ),
+      GoRoute(
+        path: '/diagnostics',
+        name: 'diagnostics',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const DiagnosticsScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

@@ -3,10 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../../domain/entities/caregiver_connection.dart';
-import '../../widgets/common/app_header.dart';
 
 class CaregiverMapScreen extends ConsumerWidget {
-  const CaregiverMapScreen({Key? key}) : super(key: key);
+  const CaregiverMapScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -54,12 +53,13 @@ class CaregiverMapScreen extends ConsumerWidget {
                 Positioned.fill(
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(24),
-                    child: Opacity(
-                      opacity: 0.1,
-                      child: Image.network(
-                        'https://api.mapbox.com/styles/v1/mapbox/light-v10/static/-122.4241,37.78,14.25,0,60/600x600?access_token=placeholder',
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) => Container(color: Colors.grey.shade200),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [AppColors.primary.withOpacity(0.1), AppColors.secondary.withOpacity(0.05)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                       ),
                     ),
                   ),

@@ -1,14 +1,15 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../domain/entities/user.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
-  const EditProfileScreen({Key? key}) : super(key: key);
+  const EditProfileScreen({super.key});
 
   @override
   ConsumerState<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -22,6 +23,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _phoneController;
   late TextEditingController _emailController;
   late TextEditingController _cnicController;
+  late TextEditingController _dobController;
+  DateTime? _selectedDob;
   
   // Responder Fields
   late TextEditingController _organizationController;
@@ -29,6 +32,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _responderTypeController;
   late TextEditingController _vehicleTypeController;
   
+  final _phoneFormatter = MaskTextInputFormatter(
+    mask: '+92-###-#######',
+    filter: {"#": RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
+
   bool _isLoading = false;
   bool _isEditing = false;
   File? _selectedImage;
@@ -42,6 +51,12 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _cnicController = TextEditingController(text: user?.cnic ?? 'N/A');
+    _selectedDob = user?.dateOfBirth;
+    _dobController = TextEditingController(
+      text: _selectedDob != null 
+        ? "${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}" 
+        : ''
+    );
     
     _organizationController = TextEditingController(text: user?.organization ?? '');
     _licenseController = TextEditingController(text: user?.licenseNumber ?? '');
@@ -59,7 +74,25 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     _licenseController.dispose();
     _responderTypeController.dispose();
     _vehicleTypeController.dispose();
+    _dobController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    if (!_isEditing) return;
+    
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDob ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDob = picked;
+        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
+      });
+    }
   }
 
   Future<void> _pickImage() async {
@@ -87,7 +120,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final user = ref.read(currentUserProvider).value;
       final updateData = {
         'fullName': _nameController.text.trim(),
-        'phoneNumber': _phoneController.text.trim(),
+        'phoneNumber': _phoneController.text.replaceAll('-', '').trim(),
+        'dateOfBirth': _selectedDob?.toIso8601String(),
       };
 
       // Add responder fields if applicable
@@ -189,6 +223,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
                     readOnly: !_isEditing,
+                    inputFormatters: [_phoneFormatter],
                     validator: (val) => val == null || val.isEmpty ? 'Phone is required' : null,
                   ),
                   const SizedBox(height: 16),
@@ -206,6 +241,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     icon: Icons.badge_outlined,
                     readOnly: true, // Always immutable
                     subtitle: 'Identity verified during registration',
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    label: 'Date of Birth',
+                    controller: _dobController,
+                    icon: Icons.calendar_today_rounded,
+                    readOnly: true,
+                    onTap: _isEditing ? _selectDate : null,
                   ),
                   
                   // Responder Professional Section
@@ -347,6 +390,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     bool readOnly = false,
     TextInputType keyboardType = TextInputType.text,
     String? subtitle,
+    VoidCallback? onTap,
+    List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
     return Column(
@@ -368,6 +413,8 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             keyboardType: keyboardType,
             validator: validator,
             readOnly: readOnly,
+            onTap: onTap,
+            inputFormatters: inputFormatters,
             style: TextStyle(
               color: readOnly ? Colors.grey.shade600 : Colors.black87,
               fontWeight: readOnly ? FontWeight.w500 : FontWeight.bold,

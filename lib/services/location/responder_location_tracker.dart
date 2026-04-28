@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'location_service.dart';
 import '../../presentation/providers/emergency_provider.dart';
 import '../../presentation/providers/auth_provider.dart';
@@ -41,6 +40,13 @@ class ResponderLocationTracker {
     final user = _ref.read(currentUserProvider).valueOrNull;
     if (user == null || user.role != 'RESPONDER' || !user.isActive) {
       if (_isTracking) stop();
+      return;
+    }
+
+    // CRITICAL: Respect Simulation Mode so we don't overwrite fake locations during physical device testing!
+    final isSimulating = _ref.read(simulationModeProvider);
+    if (isSimulating) {
+      debugPrint('📍 Auto-Sync Skipped: Simulation Mode is ON');
       return;
     }
 

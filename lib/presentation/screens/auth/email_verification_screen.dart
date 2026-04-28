@@ -10,9 +10,9 @@ class EmailVerificationScreen extends ConsumerStatefulWidget {
   final String email;
 
   const EmailVerificationScreen({
-    Key? key,
+    super.key,
     required this.email,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<EmailVerificationScreen> createState() => _EmailVerificationScreenState();

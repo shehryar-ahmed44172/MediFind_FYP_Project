@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -12,7 +11,6 @@ import '../../../core/utils/map_utils.dart';
 import '../../../services/socket/socket_service.dart';
 import 'dart:math' as math;
 import '../../../services/audio/voice_alert_service.dart';
-import '../../services/haptic_feedback_service.dart';
 
 class SosCountdownScreen extends ConsumerStatefulWidget {
   final String emergencyType;
@@ -21,12 +19,12 @@ class SosCountdownScreen extends ConsumerStatefulWidget {
   final String? additionalInfo;
 
   const SosCountdownScreen({
-    Key? key,
+    super.key,
     this.emergencyType = 'GENERAL',
     this.latitude = 0.0,
     this.longitude = 0.0,
     this.additionalInfo,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<SosCountdownScreen> createState() => _SosCountdownScreenState();
@@ -257,7 +255,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         final status = data['status']?.toString() ?? data['newStatus']?.toString();
         if (status == 'RESPONDER_ASSIGNED' || status == 'EN_ROUTE') {
           _timer.cancel();
-          context.go('/emergency/${_emergencyId}/tracking');
+          context.go('/emergency/$_emergencyId/tracking');
         }
       }
     });

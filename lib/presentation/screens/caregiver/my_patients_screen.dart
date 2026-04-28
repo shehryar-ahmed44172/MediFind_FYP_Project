@@ -3,12 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
 import '../../../domain/entities/caregiver_connection.dart';
 import '../../providers/chat_provider.dart';
 
 class MyPatientsScreen extends ConsumerStatefulWidget {
-  const MyPatientsScreen({Key? key}) : super(key: key);
+  const MyPatientsScreen({super.key});
 
   @override
   ConsumerState<MyPatientsScreen> createState() => _MyPatientsScreenState();
@@ -179,7 +178,7 @@ class _PatientManageCard extends ConsumerWidget {
               if (!isAccepted)
                 IconButton(
                   onPressed: () => _showResendConfirm(context, ref),
-                  icon: Icon(Icons.refresh_rounded, color: AppColors.primary),
+                  icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
                   tooltip: 'Resend Invitation',
                 ),
             ],

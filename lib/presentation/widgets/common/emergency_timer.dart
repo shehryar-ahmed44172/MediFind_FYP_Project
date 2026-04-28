@@ -8,12 +8,12 @@ class EmergencyTimer extends StatefulWidget {
   final TextStyle? style;
 
   const EmergencyTimer({
-    Key? key,
+    super.key,
     required this.expiresAt,
     this.serverTime,
     this.onExpired,
     this.style,
-  }) : super(key: key);
+  });
 
   @override
   State<EmergencyTimer> createState() => _EmergencyTimerState();

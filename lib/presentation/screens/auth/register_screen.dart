@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,20 +7,20 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
-import '../../../domain/entities/user.dart';
 import '../../theme/app_theme.dart';
 import '../../../services/location/location_service.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
+import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   final String role;
   final String? patientType; // NORMAL, DEAF (Passed from RoleSelection)
   
   const RegisterScreen({
-    Key? key,
+    super.key,
     required this.role,
     this.patientType,
-  }) : super(key: key);
+  });
 
   @override
   ConsumerState<RegisterScreen> createState() => _RegisterScreenState();
@@ -37,11 +36,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _cityController = TextEditingController();
   final _addressController = TextEditingController();
+  final _dobController = TextEditingController();
+  DateTime? _selectedDob;
 
   // Responder specific controllers
   final _organizationController = TextEditingController();
   final _licenseController = TextEditingController();
-  String _selectedResponderType = 'EMERGENCY_RESPONDER';
+
+  final _cnicFormatter = MaskTextInputFormatter(
+    mask: '#####-#######-#',
+    filter: {"#": RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
+
+  final _phoneFormatter = MaskTextInputFormatter(
+    mask: '+92-###-#######',
+    filter: {"#": RegExp(r'[0-9]')},
+    type: MaskAutoCompletionType.lazy,
+  );
+
+  final String _selectedResponderType = 'EMERGENCY_RESPONDER';
   String _selectedVehicleType = 'AMBULANCE';
 
   // Document uploads for Responder
@@ -79,7 +93,33 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _licenseController.dispose();
     _cityController.dispose();
     _addressController.dispose();
+    _dobController.dispose();
     super.dispose();
+  }
+
+  Future<void> _selectDate() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)), // Default 18 years ago
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: _roleTheme['color'] as Color,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+    if (picked != null) {
+      setState(() {
+        _selectedDob = picked;
+        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
+      });
+    }
   }
 
   Future<void> _pickImage(String docType) async {
@@ -182,12 +222,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final Map<String, dynamic> request = {
         'fullName': _fullNameController.text.trim(),
         'email': _emailController.text.trim(),
-        'phoneNumber': _phoneController.text.trim(),
+        'phoneNumber': _phoneController.text.replaceAll('-', '').trim(),
         'password': _passwordController.text,
         'role': widget.role,
         'city': _cityController.text.trim(),
         'address': _addressController.text.trim(),
         'cnic': _cnicController.text.trim(),
+        'dateOfBirth': _selectedDob?.toIso8601String(),
         'patientType': widget.role == 'PATIENT' ? _selectedPatientType : null,
         'organization':
             widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
@@ -206,9 +247,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       debugPrint('✅ [Register] Registration successful!');
 
       if (mounted) {
+        final String successMsg = widget.role == 'RESPONDER'
+            ? 'Registration successful! Please verify your email and wait for admin approval.'
+            : 'Registration successful! Please verify your email.';
+            
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Registration successful! Please verify your email.'),
+          SnackBar(
+            content: Text(successMsg),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
@@ -266,35 +311,26 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: roleColor),
+          onPressed: () => context.go('/select-role'),
+          tooltip: 'Go Back',
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(
               horizontal: 6.wp,
-              vertical: 3.hp,
+              vertical: 1.hp,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Back button
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: GestureDetector(
-                    onTap: () => context.go('/select-role'),
-                    child: Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: theme.scaffoldBackgroundColor,
-                        shape: BoxShape.circle,
-                        boxShadow: AppShadows.neumorphicOut,
-                      ),
-                      child: Icon(Icons.arrow_back_ios_new_rounded,
-                          size: 1.8.hp, color: roleColor),
-                    ),
-                  ),
-                ),
-                SizedBox(height: 3.hp),
 
                 // Role Badge Header
                 Row(
@@ -358,8 +394,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
+                  inputFormatters: [_phoneFormatter],
                   decoration: const InputDecoration(
                     labelText: 'Phone Number',
+                    hintText: '+92-300-1234567',
                     prefixIcon: Icon(Icons.phone_outlined),
                   ),
                   validator: (v) => StringUtils.validatePhoneNumber(v),
@@ -368,17 +406,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 TextFormField(
                   controller: _cnicController,
                   keyboardType: TextInputType.number,
+                  inputFormatters: [_cnicFormatter],
                   decoration: const InputDecoration(
                     labelText: 'CNIC Number',
                     hintText: 'e.g. 34601-1234567-1',
                     prefixIcon: Icon(Icons.credit_card_outlined),
                   ),
-                  maxLength: 15,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    _CnicFormatter(),
-                  ],
                   validator: (v) => StringUtils.validateCnic(v),
+                ),
+                SizedBox(height: 1.6.hp),
+                TextFormField(
+                  controller: _dobController,
+                  readOnly: true,
+                  onTap: _selectDate,
+                  decoration: const InputDecoration(
+                    labelText: 'Date of Birth',
+                    hintText: 'Select your birth date',
+                    prefixIcon: Icon(Icons.calendar_today_rounded),
+                  ),
+                  validator: (v) => v.isNullOrEmpty ? 'Date of birth is required' : null,
                 ),
                 SizedBox(height: 3.hp),
 
@@ -503,7 +549,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
                   // Vehicle Type (full width, Motorbike added)
                   DropdownButtonFormField<String>(
-                    value: _selectedVehicleType,
+                    initialValue: _selectedVehicleType,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Vehicle Type',
@@ -925,37 +971,6 @@ class _PatientTypeChip extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _CnicFormatter extends TextInputFormatter {
-  @override
-  TextEditingValue formatEditUpdate(
-    TextEditingValue oldValue,
-    TextEditingValue newValue,
-  ) {
-    var text = newValue.text;
-    
-    if (newValue.selection.baseOffset == 0) {
-      return newValue;
-    }
-
-    var buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      var nonHyphenCount = i + 1;
-      if (nonHyphenCount == 5 || nonHyphenCount == 12) {
-        if (i != text.length - 1) {
-          buffer.write('-');
-        }
-      }
-    }
-
-    var string = buffer.toString();
-    return newValue.copyWith(
-      text: string,
-      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }

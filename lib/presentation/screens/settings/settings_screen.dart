@@ -7,7 +7,7 @@ import '../../widgets/common/app_header.dart';
 
 class SettingsScreen extends ConsumerWidget {
   final bool showHeader;
-  const SettingsScreen({Key? key, this.showHeader = true}) : super(key: key);
+  const SettingsScreen({super.key, this.showHeader = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -17,7 +17,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return Column(
       children: [
-        if (showHeader) AppHeader(greetingOverride: 'Settings'),
+        if (showHeader) const AppHeader(greetingOverride: 'Settings'),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
@@ -167,12 +167,12 @@ class SettingsScreen extends ConsumerWidget {
                       side: BorderSide(color: Colors.red.withOpacity(0.2)),
                     ),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.logout_rounded, size: 20),
-                      const SizedBox(width: 12),
-                      const Text(
+                      Icon(Icons.logout_rounded, size: 20),
+                      SizedBox(width: 12),
+                      Text(
                         'Log Out',
                         style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       ),

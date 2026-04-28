@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/app_theme.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({Key? key}) : super(key: key);
+  const SplashScreen({super.key});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -57,7 +56,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
           children: [
             // Logo standing cleanly on the white background, just like Native splash
             Image.asset(
-              'assets/logos/Medifind_New_Logo-removebg-preview.png',
+              'assets/logos/medifind_app_icon.png',
               width: 180,
               height: 180,
               fit: BoxFit.contain,

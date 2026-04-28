@@ -1,9 +1,8 @@
 /// Responder Assignment Service
 /// Handles responder discovery, notification, and escalation logic
+library;
 
 import 'dart:math' as math show sin, cos, sqrt, atan2, pi, max;
-import 'package:geolocator/geolocator.dart';
-import '../domain/entities/emergency.dart';
 
 /// Responder matching result
 class ResponderMatchResult {
@@ -98,11 +97,11 @@ class ResponderAssignmentService {
   static Duration getEscalationTimeout(EscalationLevel level) {
     switch (level) {
       case EscalationLevel.primary:
-        return Duration(minutes: 5);
+        return const Duration(minutes: 5);
       case EscalationLevel.secondary:
-        return Duration(minutes: 5);
+        return const Duration(minutes: 5);
       case EscalationLevel.tertiary:
-        return Duration(minutes: 2);
+        return const Duration(minutes: 2);
     }
   }
 

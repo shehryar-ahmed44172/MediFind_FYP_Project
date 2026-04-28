@@ -34,8 +34,8 @@ mixin _$User {
       throw _privateConstructorUsedError; // For Responders
   String? get vehicleType =>
       throw _privateConstructorUsedError; // For Responders
-  String? get responderId => throw _privateConstructorUsedError;
   String? get cnic => throw _privateConstructorUsedError;
+  DateTime? get dateOfBirth => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
@@ -70,8 +70,8 @@ abstract class $UserCopyWith<$Res> {
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
-      String? responderId,
       String? cnic,
+      DateTime? dateOfBirth,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -109,8 +109,8 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
-    Object? responderId = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -165,14 +165,14 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
-      responderId: freezed == responderId
-          ? _value.responderId
-          : responderId // ignore: cast_nullable_to_non_nullable
-              as String?,
       cnic: freezed == cnic
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
               as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -243,8 +243,8 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       String? licenseNumber,
       String? responderType,
       String? vehicleType,
-      String? responderId,
       String? cnic,
+      DateTime? dateOfBirth,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -279,8 +279,8 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? licenseNumber = freezed,
     Object? responderType = freezed,
     Object? vehicleType = freezed,
-    Object? responderId = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -335,14 +335,14 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.vehicleType
           : vehicleType // ignore: cast_nullable_to_non_nullable
               as String?,
-      responderId: freezed == responderId
-          ? _value.responderId
-          : responderId // ignore: cast_nullable_to_non_nullable
-              as String?,
       cnic: freezed == cnic
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
               as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -409,8 +409,8 @@ class _$UserImpl implements _User {
       this.licenseNumber,
       this.responderType,
       this.vehicleType,
-      this.responderId,
       this.cnic,
+      this.dateOfBirth,
       this.verificationStatus,
       this.rating,
       this.totalResponsesHandled,
@@ -453,9 +453,9 @@ class _$UserImpl implements _User {
   final String? vehicleType;
 // For Responders
   @override
-  final String? responderId;
-  @override
   final String? cnic;
+  @override
+  final DateTime? dateOfBirth;
   @override
   final String? verificationStatus;
   @override
@@ -486,7 +486,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, responderId: $responderId, cnic: $cnic, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -511,9 +511,9 @@ class _$UserImpl implements _User {
                 other.responderType == responderType) &&
             (identical(other.vehicleType, vehicleType) ||
                 other.vehicleType == vehicleType) &&
-            (identical(other.responderId, responderId) ||
-                other.responderId == responderId) &&
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
+            (identical(other.dateOfBirth, dateOfBirth) ||
+                other.dateOfBirth == dateOfBirth) &&
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
@@ -553,8 +553,8 @@ class _$UserImpl implements _User {
         licenseNumber,
         responderType,
         vehicleType,
-        responderId,
         cnic,
+        dateOfBirth,
         verificationStatus,
         rating,
         totalResponsesHandled,
@@ -595,8 +595,8 @@ abstract class _User implements User {
       final String? licenseNumber,
       final String? responderType,
       final String? vehicleType,
-      final String? responderId,
       final String? cnic,
+      final DateTime? dateOfBirth,
       final String? verificationStatus,
       final double? rating,
       final int? totalResponsesHandled,
@@ -633,9 +633,9 @@ abstract class _User implements User {
   @override // For Responders
   String? get vehicleType;
   @override // For Responders
-  String? get responderId;
-  @override
   String? get cnic;
+  @override
+  DateTime? get dateOfBirth;
   @override
   String? get verificationStatus;
   @override
@@ -683,6 +683,7 @@ mixin _$UserProfile {
   String? get responderType => throw _privateConstructorUsedError;
   String? get vehicleType => throw _privateConstructorUsedError;
   String? get cnic => throw _privateConstructorUsedError;
+  DateTime? get dateOfBirth => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
@@ -720,6 +721,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? responderType,
       String? vehicleType,
       String? cnic,
+      DateTime? dateOfBirth,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -758,6 +760,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? responderType = freezed,
     Object? vehicleType = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -816,6 +819,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
               as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -888,6 +895,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? responderType,
       String? vehicleType,
       String? cnic,
+      DateTime? dateOfBirth,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -924,6 +932,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? responderType = freezed,
     Object? vehicleType = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -982,6 +991,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
               as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
+              as DateTime?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -1049,6 +1062,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.responderType,
       this.vehicleType,
       this.cnic,
+      this.dateOfBirth,
       this.verificationStatus,
       this.rating,
       this.totalResponsesHandled,
@@ -1088,6 +1102,8 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String? cnic;
   @override
+  final DateTime? dateOfBirth;
+  @override
   final String? verificationStatus;
   @override
   final double? rating;
@@ -1114,7 +1130,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, isActive: $isActive, lastUpdated: $lastUpdated)';
+    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, isActive: $isActive, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -1140,6 +1156,8 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.vehicleType, vehicleType) ||
                 other.vehicleType == vehicleType) &&
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
+            (identical(other.dateOfBirth, dateOfBirth) ||
+                other.dateOfBirth == dateOfBirth) &&
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
@@ -1174,6 +1192,7 @@ class _$UserProfileImpl implements _UserProfile {
         responderType,
         vehicleType,
         cnic,
+        dateOfBirth,
         verificationStatus,
         rating,
         totalResponsesHandled,
@@ -1215,6 +1234,7 @@ abstract class _UserProfile implements UserProfile {
       final String? responderType,
       final String? vehicleType,
       final String? cnic,
+      final DateTime? dateOfBirth,
       final String? verificationStatus,
       final double? rating,
       final int? totalResponsesHandled,
@@ -1253,6 +1273,8 @@ abstract class _UserProfile implements UserProfile {
   String? get vehicleType;
   @override
   String? get cnic;
+  @override
+  DateTime? get dateOfBirth;
   @override
   String? get verificationStatus;
   @override
@@ -1929,6 +1951,7 @@ mixin _$RegisterRequest {
   String? get city => throw _privateConstructorUsedError;
   String? get address => throw _privateConstructorUsedError;
   String? get cnic => throw _privateConstructorUsedError;
+  String? get dateOfBirth => throw _privateConstructorUsedError;
   String? get patientType => throw _privateConstructorUsedError;
   String? get organization => throw _privateConstructorUsedError;
   String? get licenseNumber => throw _privateConstructorUsedError;
@@ -1956,6 +1979,7 @@ abstract class $RegisterRequestCopyWith<$Res> {
       String? city,
       String? address,
       String? cnic,
+      String? dateOfBirth,
       String? patientType,
       String? organization,
       String? licenseNumber,
@@ -1984,6 +2008,7 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
     Object? city = freezed,
     Object? address = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
     Object? licenseNumber = freezed,
@@ -2022,6 +2047,10 @@ class _$RegisterRequestCopyWithImpl<$Res, $Val extends RegisterRequest>
       cnic: freezed == cnic
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
+              as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
               as String?,
       patientType: freezed == patientType
           ? _value.patientType
@@ -2064,6 +2093,7 @@ abstract class _$$RegisterRequestImplCopyWith<$Res>
       String? city,
       String? address,
       String? cnic,
+      String? dateOfBirth,
       String? patientType,
       String? organization,
       String? licenseNumber,
@@ -2090,6 +2120,7 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
     Object? city = freezed,
     Object? address = freezed,
     Object? cnic = freezed,
+    Object? dateOfBirth = freezed,
     Object? patientType = freezed,
     Object? organization = freezed,
     Object? licenseNumber = freezed,
@@ -2129,6 +2160,10 @@ class __$$RegisterRequestImplCopyWithImpl<$Res>
           ? _value.cnic
           : cnic // ignore: cast_nullable_to_non_nullable
               as String?,
+      dateOfBirth: freezed == dateOfBirth
+          ? _value.dateOfBirth
+          : dateOfBirth // ignore: cast_nullable_to_non_nullable
+              as String?,
       patientType: freezed == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
@@ -2165,6 +2200,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       this.city,
       this.address,
       this.cnic,
+      this.dateOfBirth,
       this.patientType,
       this.organization,
       this.licenseNumber,
@@ -2191,6 +2227,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
   @override
   final String? cnic;
   @override
+  final String? dateOfBirth;
+  @override
   final String? patientType;
   @override
   final String? organization;
@@ -2203,7 +2241,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
 
   @override
   String toString() {
-    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, city: $city, address: $address, cnic: $cnic, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
+    return 'RegisterRequest(fullName: $fullName, email: $email, phoneNumber: $phoneNumber, password: $password, role: $role, city: $city, address: $address, cnic: $cnic, dateOfBirth: $dateOfBirth, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType)';
   }
 
   @override
@@ -2222,6 +2260,8 @@ class _$RegisterRequestImpl implements _RegisterRequest {
             (identical(other.city, city) || other.city == city) &&
             (identical(other.address, address) || other.address == address) &&
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
+            (identical(other.dateOfBirth, dateOfBirth) ||
+                other.dateOfBirth == dateOfBirth) &&
             (identical(other.patientType, patientType) ||
                 other.patientType == patientType) &&
             (identical(other.organization, organization) ||
@@ -2246,6 +2286,7 @@ class _$RegisterRequestImpl implements _RegisterRequest {
       city,
       address,
       cnic,
+      dateOfBirth,
       patientType,
       organization,
       licenseNumber,
@@ -2277,6 +2318,7 @@ abstract class _RegisterRequest implements RegisterRequest {
       final String? city,
       final String? address,
       final String? cnic,
+      final String? dateOfBirth,
       final String? patientType,
       final String? organization,
       final String? licenseNumber,
@@ -2302,6 +2344,8 @@ abstract class _RegisterRequest implements RegisterRequest {
   String? get address;
   @override
   String? get cnic;
+  @override
+  String? get dateOfBirth;
   @override
   String? get patientType;
   @override

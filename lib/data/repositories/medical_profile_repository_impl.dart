@@ -122,7 +122,7 @@ class MedicalProfileRepositoryImpl implements MedicalProfileRepository {
   Stream<MedicalProfile> watchMedicalProfile(String userId) {
     // Basic implementation watching the local box
     // Note: This requires the local data source to expose a stream
-    return Stream.empty(); // Stub for build
+    return const Stream.empty(); // Stub for build
   }
 
   @override

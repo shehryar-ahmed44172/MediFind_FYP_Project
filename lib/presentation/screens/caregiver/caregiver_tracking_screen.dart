@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/medical_profile_provider.dart';
@@ -13,8 +14,7 @@ import 'dart:async';
 
 class CaregiverTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
-  const CaregiverTrackingScreen({Key? key, required this.emergencyId})
-      : super(key: key);
+  const CaregiverTrackingScreen({super.key, required this.emergencyId});
 
   @override
   ConsumerState<CaregiverTrackingScreen> createState() => _CaregiverTrackingScreenState();
@@ -98,11 +98,14 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
       appBar: AppBar(
         title: const Text('Live Tracking'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.go('/caregiver'),
+        ),
       ),
       body: emergencyAsync.when(
         data: (emergency) {
-          if (emergency == null) return const Center(child: Text('Emergency not found'));
-          _updateMarkers(emergency as Emergency);
+          _updateMarkers(emergency);
           return _buildDynamicContent(context, theme, emergency);
         },
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -181,7 +184,9 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
                 myLocationEnabled: false,
                 zoomControlsEnabled: false,
                 onMapCreated: (controller) {
-                  _controller.complete(controller);
+                  if (!_controller.isCompleted) {
+                    _controller.complete(controller);
+                  }
                   _mapController = controller;
                 },
               ),

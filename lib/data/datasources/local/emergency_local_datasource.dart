@@ -1,5 +1,6 @@
 /// Emergency Local Data Source
 /// Handles Hive local storage for emergencies (offline support & caching)
+library;
 
 import 'package:hive/hive.dart';
 import '../../../domain/entities/emergency.dart';

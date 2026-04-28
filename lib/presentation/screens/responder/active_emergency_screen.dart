@@ -17,7 +17,7 @@ import '../../../core/utils/map_utils.dart';
 
 class ActiveEmergencyScreen extends ConsumerStatefulWidget {
   final String emergencyId;
-  const ActiveEmergencyScreen({Key? key, required this.emergencyId}) : super(key: key);
+  const ActiveEmergencyScreen({super.key, required this.emergencyId});
 
   @override
   ConsumerState<ActiveEmergencyScreen> createState() =>
@@ -50,18 +50,16 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     _loadMarkerIcons();
     Future.microtask(() async {
       final emergency = await ref.read(getEmergencyProvider(widget.emergencyId).future);
-      if (emergency != null) {
-        final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-        if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
-           await VoiceAlertService().speakAutomatedEmergencyReport(
-             emergency: emergency as emergency_entity.Emergency,
-             medical: profile,
-           );
-        } else {
-           await VoiceAlertService().announceResponderAssigned('the Patient');
-        }
+      final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
+      if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+         await VoiceAlertService().speakAutomatedEmergencyReport(
+           emergency: emergency,
+           medical: profile,
+         );
+      } else {
+         await VoiceAlertService().announceResponderAssigned('the Patient');
       }
-    });
+        });
     _startLiveTracking();
   }
 
@@ -210,11 +208,14 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       appBar: AppBar(
         title: const Text('Active Emergency'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () => context.go('/responder'),
+        ),
       ),
       body: emergencyAsync.when(
         data: (emergency) {
-          if (emergency == null) return const Center(child: Text('Emergency not found'));
-          _updateMarkers(emergency as emergency_entity.Emergency);
+          _updateMarkers(emergency);
           
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
@@ -241,7 +242,9 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                       myLocationEnabled: true,
                       myLocationButtonEnabled: false,
                       onMapCreated: (controller) {
-                        _controller.complete(controller);
+                        if (!_controller.isCompleted) {
+                          _controller.complete(controller);
+                        }
                         _mapController = controller;
                       },
                     ),
@@ -299,11 +302,11 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
               const SizedBox(height: 12),
                 ElevatedButton(
                   onPressed: () => context.go('/responder'),
-                  child: const Text('Return to Dashboard'),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
+                  child: const Text('Return to Dashboard'),
                 ),
               ],
               const SizedBox(height: 16),
@@ -347,7 +350,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                       ? IconButton(
                           icon: const Icon(Icons.record_voice_over, color: Colors.orange),
                           onPressed: () async {
-                            await VoiceAlertService().speakAutomatedEmergencyReport(emergency: emergency as emergency_entity.Emergency, medical: profile!);
+                            await VoiceAlertService().speakAutomatedEmergencyReport(emergency: emergency, medical: profile!);
                           },
                         )
                       : const SizedBox.shrink(),
@@ -375,6 +378,10 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                     
                     final allergies = profile.allergies.isNotEmpty ? profile.allergies.join(', ') : 'None';
                     final chronic = profile.chronicDiseases.isNotEmpty ? profile.chronicDiseases.join(', ') : 'None';
+                    final medications = profile.medications.isNotEmpty ? profile.medications.map((m) => m.name).join(', ') : 'None';
+                    final history = profile.medicalHistory?.isNotEmpty == true ? profile.medicalHistory! : 'None';
+
+                    final isDeaf = profile.disabilityType?.toLowerCase().contains('deaf') == true;
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -390,20 +397,25 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                             children: [
                               Icon(Icons.medical_services, size: 18, color: Colors.blue.shade900),
                               const SizedBox(width: 8),
-                              const Text('Medical Details', style: TextStyle(fontWeight: FontWeight.bold)),
+                              const Text('Complete Medical Profile', style: TextStyle(fontWeight: FontWeight.bold)),
                             ],
                           ),
-                          const SizedBox(height: 8),
-                          _buildDetailRow('Blood Type', profile.bloodType ?? 'Unknown'),
+                          const SizedBox(height: 12),
+                          _buildDetailRow('Blood Type', profile.bloodType),
                           _buildDetailRow('Allergies', allergies),
                           _buildDetailRow('Chronic', chronic),
-                          // Manual summary since voiceSummary getter was lost
-                          const Divider(),
-                          Text('Medical Summary:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue.shade900)),
-                          Text(
-                            'Emergency reported at location. Patient has $allergies allergies and $chronic chronic conditions.',
-                            style: const TextStyle(fontSize: 12),
-                          ),
+                          _buildDetailRow('Medications', medications),
+                          _buildDetailRow('History', history),
+                          
+                          if (isDeaf) ...[
+                            const Divider(),
+                            Text('Voice Alert Summary (For Deaf Patient):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue.shade900)),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Emergency reported at location. Patient has $allergies allergies and $chronic chronic conditions.',
+                              style: const TextStyle(fontSize: 12),
+                            ),
+                          ],
                         ],
                       ),
                     );

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../../core/constants/app_constants.dart';
-import '../../domain/entities/emergency.dart';
 
 enum WebSocketEvent {
   connectionStatus,

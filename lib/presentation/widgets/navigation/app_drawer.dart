@@ -7,7 +7,7 @@ import '../../../core/utils/responsive.dart';
 import '../../../core/constants/app_constants.dart';
 
 class AppDrawer extends ConsumerWidget {
-  const AppDrawer({Key? key}) : super(key: key);
+  const AppDrawer({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -31,8 +31,9 @@ class AppDrawer extends ConsumerWidget {
                   onTap: () {
                     Navigator.pop(context);
                     final role = user?.role ?? 'PATIENT';
-                    if (role == 'PATIENT') context.go('/home');
-                    else if (role == 'CAREGIVER') context.go('/caregiver');
+                    if (role == 'PATIENT') {
+                      context.go('/home');
+                    } else if (role == 'CAREGIVER') context.go('/caregiver');
                     else context.go('/responder');
                   },
                 ),
@@ -42,7 +43,7 @@ class AppDrawer extends ConsumerWidget {
                   title: 'My Profile',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/profile');
+                    context.go('/profile');
                   },
                 ),
                 if (user?.role == 'PATIENT') ...[
@@ -52,7 +53,7 @@ class AppDrawer extends ConsumerWidget {
                     title: 'Medical Reports',
                     onTap: () {
                       Navigator.pop(context);
-                      context.push('/home/medical-reports');
+                      context.go('/home/medical-reports');
                     },
                   ),
                   _buildMenuItem(
@@ -61,7 +62,7 @@ class AppDrawer extends ConsumerWidget {
                     title: 'My Caregivers',
                     onTap: () {
                       Navigator.pop(context);
-                      context.push('/home/caregivers');
+                      context.go('/home/caregivers');
                     },
                   ),
                 ],
@@ -72,7 +73,7 @@ class AppDrawer extends ConsumerWidget {
                     title: 'My Patients',
                     onTap: () {
                       Navigator.pop(context);
-                      context.push('/caregiver/my-patients');
+                      context.go('/caregiver/my-patients');
                     },
                   ),
                   _buildMenuItem(
@@ -81,7 +82,7 @@ class AppDrawer extends ConsumerWidget {
                     title: 'Patient Tracking',
                     onTap: () {
                       Navigator.pop(context);
-                      context.push('/caregiver/maps');
+                      context.go('/caregiver/maps');
                     },
                   ),
                 ],
@@ -93,11 +94,11 @@ class AppDrawer extends ConsumerWidget {
                     final role = user?.role ?? 'PATIENT';
                     Navigator.pop(context);
                     if (role == 'PATIENT') {
-                      context.push('/home/medical-reports');
+                      context.go('/home/medical-reports');
                     } else if (role == 'CAREGIVER') {
-                      context.push('/caregiver/history');
+                      context.go('/caregiver/history');
                     } else if (role == 'RESPONDER') {
-                      context.push('/responder/history');
+                      context.go('/responder/history');
                     }
                   },
                 ),
@@ -110,9 +111,9 @@ class AppDrawer extends ConsumerWidget {
                       Navigator.pop(context);
                       final role = user?.role ?? 'PATIENT';
                       if (role == 'PATIENT') {
-                        context.push('/chats');
+                        context.go('/chats');
                       } else if (role == 'CAREGIVER') {
-                        context.push('/caregiver/chats');
+                        context.go('/caregiver/chats');
                       }
                     },
                   ),
@@ -123,7 +124,7 @@ class AppDrawer extends ConsumerWidget {
                   title: 'Settings',
                   onTap: () {
                     Navigator.pop(context);
-                    context.push('/settings');
+                    context.go('/settings');
                   },
                 ),
               ],

@@ -17,8 +17,8 @@ class User with _$User {
     String? licenseNumber, // For Responders
     String? responderType, // For Responders
     String? vehicleType, // For Responders
-    String? responderId,
     String? cnic,
+    DateTime? dateOfBirth,
     String? verificationStatus,
     double? rating,
     int? totalResponsesHandled,
@@ -50,6 +50,7 @@ class UserProfile with _$UserProfile {
     String? responderType,
     String? vehicleType,
     String? cnic,
+    DateTime? dateOfBirth,
     String? verificationStatus,
     double? rating,
     int? totalResponsesHandled,
@@ -119,6 +120,7 @@ class RegisterRequest with _$RegisterRequest {
     String? city,
     String? address,
     String? cnic,
+    String? dateOfBirth,
     String? patientType,
     String? organization,
     String? licenseNumber,

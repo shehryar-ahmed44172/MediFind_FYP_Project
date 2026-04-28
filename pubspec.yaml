@@ -15,6 +15,7 @@ dependencies:
   # State Management
   riverpod: ^2.4.0
   flutter_riverpod: ^2.4.0
+  mask_text_input_formatter: ^2.5.0
 
   # Networking
   http: ^1.1.0
@@ -107,6 +108,9 @@ dev_dependencies:
   mockito: ^5.4.0
   mocktail: ^1.0.0
 
+  # App Icon Generation
+  flutter_launcher_icons: ^0.13.1
+
   # Local DB testing ONLY — NOT for production
   postgres: ^3.5.3
 
@@ -129,9 +133,15 @@ flutter:
         - asset: assets/fonts/Montserrat-SemiBold.ttf
           weight: 600
 
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/logos/medifind_app_icon.png"
+  min_sdk_android: 21
+
 flutter_native_splash:
   color: "#FFFFFF"
-  image: "assets/logos/Medifind_New_Logo-removebg-preview.png"
+  image: "assets/logos/medifind_app_icon.png"
   android_12:
-    image: "assets/logos/Medifind_New_Logo-removebg-preview.png"
+    image: "assets/logos/medifind_app_icon.png"
     color: "#FFFFFF"

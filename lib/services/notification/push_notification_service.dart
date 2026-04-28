@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -138,9 +137,9 @@ class PushNotificationService {
                   child: const Icon(Icons.warning_rounded, color: Colors.white, size: 40),
                 ),
                 const SizedBox(height: 16),
-                Text(
+                const Text(
                   'Emergency Request!',
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),

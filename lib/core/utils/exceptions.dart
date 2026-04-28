@@ -16,60 +16,48 @@ class AppException implements Exception {
 
 class NetworkException extends AppException {
   NetworkException({
-    required String message,
-    String? code,
-    dynamic originalException,
-  }) : super(
-    message: message,
-    code: code,
-    originalException: originalException,
-  );
+    required super.message,
+    super.code,
+    super.originalException,
+  });
 }
 
 class AuthenticationException extends AppException {
   AuthenticationException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic originalException,
+    super.originalException,
   }) : super(
-    message: message,
     code: code ?? 'AUTH_FAILED',
-    originalException: originalException,
   );
 }
 
 class ValidationException extends AppException {
   ValidationException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic originalException,
+    super.originalException,
   }) : super(
-    message: message,
     code: code ?? 'VALIDATION_ERROR',
-    originalException: originalException,
   );
 }
 
 class DatabaseException extends AppException {
   DatabaseException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic originalException,
+    super.originalException,
   }) : super(
-    message: message,
     code: code ?? 'DATABASE_ERROR',
-    originalException: originalException,
   );
 }
 
 class LocationException extends AppException {
   LocationException({
-    required String message,
+    required super.message,
     String? code,
-    dynamic originalException,
+    super.originalException,
   }) : super(
-    message: message,
     code: code ?? 'LOCATION_ERROR',
-    originalException: originalException,
   );
 }

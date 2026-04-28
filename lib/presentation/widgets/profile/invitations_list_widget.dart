@@ -4,7 +4,7 @@ import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
 
 class InvitationsListWidget extends ConsumerWidget {
-  const InvitationsListWidget({Key? key}) : super(key: key);
+  const InvitationsListWidget({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -70,7 +70,7 @@ class InvitationsListWidget extends ConsumerWidget {
                       ],
                     ),
                   ),
-                )).toList(),
+                )),
             const SizedBox(height: 16),
           ],
         );

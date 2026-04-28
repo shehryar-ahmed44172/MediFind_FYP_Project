@@ -25,7 +25,7 @@ extension DateTimeExtension on DateTime {
   }
   
   bool get isYesterday {
-    final yesterday = DateTime.now().subtract(Duration(days: 1));
+    final yesterday = DateTime.now().subtract(const Duration(days: 1));
     return year == yesterday.year && month == yesterday.month && day == yesterday.day;
   }
   

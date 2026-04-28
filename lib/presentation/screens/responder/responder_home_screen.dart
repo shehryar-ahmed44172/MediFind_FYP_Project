@@ -10,16 +10,11 @@ import '../../widgets/common/emergency_timer.dart';
 
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
-import 'package:medifind_mobile_application/presentation/widgets/common/app_header.dart';
-import '../settings/settings_screen.dart';
-import '../profile/user_profile_screen.dart';
-import '../../../services/location/location_service.dart';
 import '../../../services/location/responder_location_tracker.dart';
 
-import '../../providers/navigation_provider.dart';
 
 class ResponderHomeScreen extends ConsumerStatefulWidget {
-  const ResponderHomeScreen({Key? key}) : super(key: key);
+  const ResponderHomeScreen({super.key});
 
   @override
   ConsumerState<ResponderHomeScreen> createState() => _ResponderHomeScreenState();
@@ -75,7 +70,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
         children: [
           userAsync.when(
             data: (user) => Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -91,9 +86,9 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
           
           _buildStatusToggle(theme, userAsync),
           
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-            child: const Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+            child: Text('Quick Actions', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
           _buildQuickActionGrid(theme),
 
@@ -105,7 +100,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                 const Text('Active Emergency Alerts', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
-                  onPressed: () => ref.invalidate(getActiveEmergenciesProvider),
+                  onPressed: () => ref.invalidate(watchActiveEmergenciesProvider),
                 ),
               ],
             ),
@@ -134,7 +129,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     final actions = [
       {'title': 'Emergencies', 'icon': Icons.emergency_rounded, 'color': Colors.red, 'route': '/responder'},
       {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/responder/history'},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': null},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/responder/chats'},
       {'title': 'Diagnostics', 'icon': Icons.analytics_rounded, 'color': Colors.blue, 'route': '/diagnostics'},
     ];
 
@@ -154,8 +149,9 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
         final color = action['color'] as Color;
         return InkWell(
           onTap: () {
-            if (action['route'] != null) {
-              context.push(action['route'] as String);
+            final route = action['route'] as String?;
+            if (route != null) {
+              context.go(route);
             }
           },
           borderRadius: BorderRadius.circular(24),
@@ -203,7 +199,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                   children: [
                     Text((user?.isActive ?? false) ? 'Ready to Respond' : 'Offline',
                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 2.2.hp)),
-                    Text('Switch on to receive alerts', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    const Text('Switch on to receive alerts', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   ],
                 ),
               ),
@@ -212,8 +208,11 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                 onChanged: (value) async {
                   setState(() => _isUpdatingStatus = true);
                   await ref.read(setResponderAvailabilityProvider(value).future);
-                  if (value) ref.read(responderLocationTrackerProvider).start();
-                  else ref.read(responderLocationTrackerProvider).stop();
+                  if (value) {
+                    ref.read(responderLocationTrackerProvider).start();
+                  } else {
+                    ref.read(responderLocationTrackerProvider).stop();
+                  }
                   setState(() => _isUpdatingStatus = false);
                 },
               ),
@@ -238,64 +237,12 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
       ),
     );
   }
-
-  Widget _buildHistoryTab(ThemeData theme) {
-    final historyAsync = ref.watch(getResponderHistoryProvider);
-
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Text('Response History',
-                  style: theme.textTheme.titleMedium
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.refresh_rounded),
-                onPressed: () => ref.invalidate(getResponderHistoryProvider),
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: historyAsync.when(
-            data: (history) => history.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.history_rounded,
-                            size: 72, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        const Text('No past records found',
-                            style: TextStyle(color: Colors.grey)),
-                      ],
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: history.length,
-                    itemBuilder: (ctx, i) {
-                      final item = history[i] as Map<String, dynamic>;
-                      return _HistoryItemCard(item: item);
-                    },
-                  ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('Error: $e')),
-          ),
-        ),
-      ],
-    );
-  }
-
 }
 
 class _HistoryItemCard extends StatelessWidget {
   final Map<String, dynamic> item;
 
-  const _HistoryItemCard({Key? key, required this.item}) : super(key: key);
+  const _HistoryItemCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +509,7 @@ class _EmergencyRequestCard extends ConsumerWidget {
                       color: AppColors.primary.withOpacity(0.05),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                    child: const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
                   ),
                 ],
               ),

@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import '../../../domain/entities/medical_profile.dart';
 import '../../../core/utils/exceptions.dart';
-import 'medifind_api_client.dart';
 
 class MedicalProfileRemoteDataSource {
   final Dio _dio;

@@ -2,10 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/caregiver_providers.dart';
-import '../../widgets/common/app_header.dart';
 
 class CaregiverHistoryScreen extends ConsumerWidget {
-  const CaregiverHistoryScreen({Key? key}) : super(key: key);
+  const CaregiverHistoryScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

@@ -7,7 +7,7 @@ import '../../theme/app_theme.dart';
 import '../../widgets/common/app_header.dart';
 
 class LinkPatientScreen extends ConsumerStatefulWidget {
-  const LinkPatientScreen({Key? key}) : super(key: key);
+  const LinkPatientScreen({super.key});
 
   @override
   ConsumerState<LinkPatientScreen> createState() => _LinkPatientScreenState();
@@ -93,7 +93,7 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedRelationship,
+              initialValue: _selectedRelationship,
               decoration: InputDecoration(
                 labelText: 'Relationship to Patient',
                 prefixIcon: const Icon(Icons.family_restroom),

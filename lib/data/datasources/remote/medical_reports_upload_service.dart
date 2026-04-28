@@ -1,6 +1,7 @@
 /// Medical Reports Upload Service
 /// Handles medical report file uploads to cloud storage
 /// Supports both Azure Blob Storage and generic HTTP upload
+library;
 
 import 'dart:io';
 import 'package:dio/dio.dart';

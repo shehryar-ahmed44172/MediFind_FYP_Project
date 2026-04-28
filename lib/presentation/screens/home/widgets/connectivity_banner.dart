@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class ConnectivityBanner extends StatelessWidget {
-  const ConnectivityBanner({Key? key}) : super(key: key);
+  const ConnectivityBanner({super.key});
 
   @override
   Widget build(BuildContext context) {

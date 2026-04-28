@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -9,8 +8,6 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
-import 'dart:math' as math;
-import '../../../services/audio/voice_alert_service.dart';
 import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../domain/entities/emergency.dart';
@@ -20,7 +17,7 @@ import '../../../core/utils/map_utils.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
-  const EmergencyTrackingScreen({Key? key, required this.emergencyId}) : super(key: key);
+  const EmergencyTrackingScreen({super.key, required this.emergencyId});
 
   @override
   ConsumerState<EmergencyTrackingScreen> createState() => _EmergencyTrackingScreenState();
@@ -147,9 +144,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         backgroundColor: theme.scaffoldBackgroundColor,
         body: emergencyAsync.when(
           data: (emergency) {
-            if (emergency == null) return const Center(child: Text('Emergency not found'));
-            _updateMarkers(emergency as Emergency);
-            return _buildModernBody(context, theme, emergency as Emergency, settings, isDeafPatient);
+            _updateMarkers(emergency);
+            return _buildModernBody(context, theme, emergency, settings, isDeafPatient);
           },
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(child: Text('Error: $e')),
@@ -516,8 +512,7 @@ class _ModernTimelineItem extends StatelessWidget {
     required this.isDone,
     this.isCurrent = false,
     required this.isLast,
-    Key? key,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -562,7 +557,7 @@ class _ModernTimelineItem extends StatelessWidget {
               ),
               Text(
                 time,
-                style: TextStyle(color: Colors.white24, fontSize: 11),
+                style: const TextStyle(color: Colors.white24, fontSize: 11),
               ),
             ],
           ),

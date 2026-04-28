@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
-import '../../theme/app_theme.dart';
-import '../../services/haptic_feedback_service.dart';
 
 class EmergencyOverlay extends StatelessWidget {
   final String title;
@@ -10,12 +8,12 @@ class EmergencyOverlay extends StatelessWidget {
   final VoidCallback onDismiss;
 
   const EmergencyOverlay({
-    Key? key,
+    super.key,
     required this.title,
     required this.message,
     this.responderName,
     required this.onDismiss,
-  }) : super(key: key);
+  });
 
   static void show(BuildContext context, {
     required String title,

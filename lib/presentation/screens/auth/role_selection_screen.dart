@@ -4,7 +4,7 @@ import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
-  const RoleSelectionScreen({Key? key}) : super(key: key);
+  const RoleSelectionScreen({super.key});
 
   @override
   State<RoleSelectionScreen> createState() => _RoleSelectionScreenState();
@@ -21,6 +21,15 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.primary),
+          onPressed: () => context.go('/login'),
+          tooltip: 'Go Back',
+        ),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.symmetric(
@@ -30,25 +39,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(height: 2.hp),
-              // Back button
-              Align(
-                alignment: Alignment.centerLeft,
-                child: GestureDetector(
-                  onTap: () => context.go('/login'),
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
-                      shape: BoxShape.circle,
-                      boxShadow: AppShadows.neumorphicOut,
-                    ),
-                    child: Icon(Icons.arrow_back_ios_new_rounded,
-                        size: 1.8.hp, color: theme.colorScheme.primary),
-                  ),
-                ),
-              ),
-              SizedBox(height: 4.hp),
+              SizedBox(height: 1.hp),
 
               // Header
               Container(

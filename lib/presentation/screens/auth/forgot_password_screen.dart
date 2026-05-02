@@ -40,16 +40,36 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        
+
         final errorStr = e.toString();
-        // Check if backend returned 404/Email not registered
-        if (errorStr.contains('404') || errorStr.contains('registered')) {
+        if (errorStr.contains('404') || errorStr.contains('registered') || errorStr.contains('not found')) {
           _showNotRegisteredDialog(email);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Error: ${errorStr.replaceAll('Exception:', '').trim()}'),
-              backgroundColor: Colors.red,
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.error_outline_rounded, color: Colors.red, size: 28),
+                  SizedBox(width: 10),
+                  Text('Request Failed'),
+                ],
+              ),
+              content: const Text(
+                'Unable to send the reset link at this time. Please check your internet connection and try again.',
+              ),
+              actions: [
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  child: const Text('OK'),
+                ),
+              ],
             ),
           );
         }
@@ -185,7 +205,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             size: 80, color: Colors.green),
         const SizedBox(height: 24),
         Text(
-          'Email Sent!',
+          'Reset Link Sent!',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.bold,
@@ -194,7 +214,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
         ),
         const SizedBox(height: 12),
         Text(
-          'We sent a password reset link to ${_emailController.text}. Please check your inbox.',
+          'A password reset link has been sent to\n${_emailController.text}\n\nPlease check your inbox (and spam folder). The link will expire in 30 minutes.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium,
         ),

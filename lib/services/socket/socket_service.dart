@@ -9,6 +9,7 @@ enum SocketEvent {
   emergencyStatusChange,
   responderArrived,
   newMessage,
+  notification,
   unknown
 }
 
@@ -74,7 +75,7 @@ class SocketService {
     // Generic notification listener (Plan v4)
     _socket!.on('notification', (data) {
       print('🔔 Global Socket Notification Received: $data');
-      _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
+      _messageController.add(SocketMessage(SocketEvent.notification, data));
     });
 
     // Map guide events
@@ -82,8 +83,10 @@ class SocketService {
       _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
     });
 
-    _socket!.on('RESPONDER_LOCATION_UPDATE', (data) {
-      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, data));
+    _socket!.on('LOCATION_UPDATE', (data) {
+      // Unpack nested data if it exists (Backend sends { type: '...', data: { ... } })
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpackedData));
     });
 
     _socket!.on('EMERGENCY_STATUS_CHANGE', (data) {
@@ -97,6 +100,22 @@ class SocketService {
     _socket!.on('message:new', (data) {
       print('💬 New Chat Message Received: $data');
       _messageController.add(SocketMessage(SocketEvent.newMessage, data));
+    });
+
+    // Server asks this client to join an emergency room (used for caregivers)
+    _socket!.on('JOIN_EMERGENCY_ROOM', (data) {
+      final emergencyId = (data is Map ? data['emergencyId'] : null)?.toString();
+      if (emergencyId != null && emergencyId.isNotEmpty) {
+        joinEmergencyRoom(emergencyId);
+        joinLocationRoom(emergencyId);
+        print('🏥 Auto-joined emergency room: $emergencyId (server-requested)');
+      }
+    });
+
+    // Also listen for the RESPONDER_LOCATION_UPDATE event name the backend uses
+    _socket!.on('RESPONDER_LOCATION_UPDATE', (data) {
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpackedData));
     });
   }
 

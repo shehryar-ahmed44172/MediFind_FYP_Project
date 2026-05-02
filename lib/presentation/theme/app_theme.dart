@@ -317,11 +317,15 @@ class AppTheme {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        borderSide: settings.highContrast 
+            ? const BorderSide(color: Colors.black, width: 2) 
+            : BorderSide(color: Colors.grey.shade300, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast ? const BorderSide(color: Colors.black, width: 2) : BorderSide.none,
+        borderSide: settings.highContrast 
+            ? const BorderSide(color: Colors.black, width: 2) 
+            : BorderSide(color: Colors.grey.shade300, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -330,6 +334,25 @@ class AppTheme {
           width: 2,
         ),
       ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(16),
+        borderSide: const BorderSide(color: AppColors.error, width: 2),
+      ),
+      errorStyle: const TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 11,
+      ),
+      labelStyle: const TextStyle(fontSize: 14),
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+        if (states.contains(WidgetState.error)) {
+          return const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold);
+        }
+        return const TextStyle(color: AppColors.primary);
+      }),
     );
   }
 }

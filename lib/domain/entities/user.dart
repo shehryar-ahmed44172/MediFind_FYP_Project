@@ -19,6 +19,7 @@ class User with _$User {
     String? vehicleType, // For Responders
     String? cnic,
     DateTime? dateOfBirth,
+    @Default(false) bool isEmailVerified,
     String? verificationStatus,
     double? rating,
     int? totalResponsesHandled,
@@ -28,6 +29,7 @@ class User with _$User {
     @Default('NORMAL') String priority,
     DateTime? expiresAt,
     String? profileImageUrl,
+    @Default('FREE') String subscriptionPlan,
     @Default(true) bool isActive,
     required DateTime createdAt,
     required DateTime updatedAt,
@@ -51,6 +53,7 @@ class UserProfile with _$UserProfile {
     String? vehicleType,
     String? cnic,
     DateTime? dateOfBirth,
+    bool? isEmailVerified,
     String? verificationStatus,
     double? rating,
     int? totalResponsesHandled,
@@ -61,6 +64,7 @@ class UserProfile with _$UserProfile {
     String? state,
     String? country,
     String? zipCode,
+    String? subscriptionPlan,
     bool? isActive,
     DateTime? lastUpdated,
   }) = _UserProfile;

@@ -108,7 +108,12 @@ class AuthRepositoryImpl implements AuthRepository {
       licenseNumber: profile.licenseNumber,
       responderType: profile.responderType,
       vehicleType: profile.vehicleType,
+      isEmailVerified: profile.isEmailVerified ?? false,
+      verificationStatus: profile.verificationStatus,
+      rating: profile.rating,
+      totalResponsesHandled: profile.totalResponsesHandled,
       profileImageUrl: profile.profileImageUrl,
+      subscriptionPlan: profile.subscriptionPlan ?? 'FREE',
       isActive: profile.isActive ?? true,
       createdAt: profile.lastUpdated ?? DateTime.now(),
       updatedAt: profile.lastUpdated ?? DateTime.now(),
@@ -153,7 +158,19 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<String> uploadDocument(File file) async {
-    final response = await apiClient.uploadChatFile(file);
+    final response = await apiClient.uploadRegistrationDocument(file);
     return response['url'] as String;
+  }
+  @override
+  Future<User> upgradeSubscription(String plan) async {
+    return await apiClient.upgradeSubscription(plan);
+  }
+
+  @override
+  Future<bool> processPayment(double amount, String method) async {
+    // Simulate network delay for payment processing
+    await Future.delayed(const Duration(seconds: 2));
+    debugPrint('💰 [MockPayment] Processed $amount via $method successfully.');
+    return true;
   }
 }

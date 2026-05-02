@@ -36,6 +36,7 @@ mixin _$User {
       throw _privateConstructorUsedError; // For Responders
   String? get cnic => throw _privateConstructorUsedError;
   DateTime? get dateOfBirth => throw _privateConstructorUsedError;
+  bool get isEmailVerified => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
@@ -45,6 +46,7 @@ mixin _$User {
   String get priority => throw _privateConstructorUsedError;
   DateTime? get expiresAt => throw _privateConstructorUsedError;
   String? get profileImageUrl => throw _privateConstructorUsedError;
+  String get subscriptionPlan => throw _privateConstructorUsedError;
   bool get isActive => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
@@ -72,6 +74,7 @@ abstract class $UserCopyWith<$Res> {
       String? vehicleType,
       String? cnic,
       DateTime? dateOfBirth,
+      bool isEmailVerified,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -81,6 +84,7 @@ abstract class $UserCopyWith<$Res> {
       String priority,
       DateTime? expiresAt,
       String? profileImageUrl,
+      String subscriptionPlan,
       bool isActive,
       DateTime createdAt,
       DateTime updatedAt});
@@ -111,6 +115,7 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? vehicleType = freezed,
     Object? cnic = freezed,
     Object? dateOfBirth = freezed,
+    Object? isEmailVerified = null,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -120,6 +125,7 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? priority = null,
     Object? expiresAt = freezed,
     Object? profileImageUrl = freezed,
+    Object? subscriptionPlan = null,
     Object? isActive = null,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -173,6 +179,10 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.dateOfBirth
           : dateOfBirth // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      isEmailVerified: null == isEmailVerified
+          ? _value.isEmailVerified
+          : isEmailVerified // ignore: cast_nullable_to_non_nullable
+              as bool,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -209,6 +219,10 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscriptionPlan: null == subscriptionPlan
+          ? _value.subscriptionPlan
+          : subscriptionPlan // ignore: cast_nullable_to_non_nullable
+              as String,
       isActive: null == isActive
           ? _value.isActive
           : isActive // ignore: cast_nullable_to_non_nullable
@@ -245,6 +259,7 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       String? vehicleType,
       String? cnic,
       DateTime? dateOfBirth,
+      bool isEmailVerified,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -254,6 +269,7 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       String priority,
       DateTime? expiresAt,
       String? profileImageUrl,
+      String subscriptionPlan,
       bool isActive,
       DateTime createdAt,
       DateTime updatedAt});
@@ -281,6 +297,7 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? vehicleType = freezed,
     Object? cnic = freezed,
     Object? dateOfBirth = freezed,
+    Object? isEmailVerified = null,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -290,6 +307,7 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? priority = null,
     Object? expiresAt = freezed,
     Object? profileImageUrl = freezed,
+    Object? subscriptionPlan = null,
     Object? isActive = null,
     Object? createdAt = null,
     Object? updatedAt = null,
@@ -343,6 +361,10 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.dateOfBirth
           : dateOfBirth // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      isEmailVerified: null == isEmailVerified
+          ? _value.isEmailVerified
+          : isEmailVerified // ignore: cast_nullable_to_non_nullable
+              as bool,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -379,6 +401,10 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.profileImageUrl
           : profileImageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscriptionPlan: null == subscriptionPlan
+          ? _value.subscriptionPlan
+          : subscriptionPlan // ignore: cast_nullable_to_non_nullable
+              as String,
       isActive: null == isActive
           ? _value.isActive
           : isActive // ignore: cast_nullable_to_non_nullable
@@ -411,6 +437,7 @@ class _$UserImpl implements _User {
       this.vehicleType,
       this.cnic,
       this.dateOfBirth,
+      this.isEmailVerified = false,
       this.verificationStatus,
       this.rating,
       this.totalResponsesHandled,
@@ -420,6 +447,7 @@ class _$UserImpl implements _User {
       this.priority = 'NORMAL',
       this.expiresAt,
       this.profileImageUrl,
+      this.subscriptionPlan = 'FREE',
       this.isActive = true,
       required this.createdAt,
       required this.updatedAt});
@@ -457,6 +485,9 @@ class _$UserImpl implements _User {
   @override
   final DateTime? dateOfBirth;
   @override
+  @JsonKey()
+  final bool isEmailVerified;
+  @override
   final String? verificationStatus;
   @override
   final double? rating;
@@ -478,6 +509,9 @@ class _$UserImpl implements _User {
   final String? profileImageUrl;
   @override
   @JsonKey()
+  final String subscriptionPlan;
+  @override
+  @JsonKey()
   final bool isActive;
   @override
   final DateTime createdAt;
@@ -486,7 +520,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, subscriptionPlan: $subscriptionPlan, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -514,6 +548,8 @@ class _$UserImpl implements _User {
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
             (identical(other.dateOfBirth, dateOfBirth) ||
                 other.dateOfBirth == dateOfBirth) &&
+            (identical(other.isEmailVerified, isEmailVerified) ||
+                other.isEmailVerified == isEmailVerified) &&
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
@@ -531,6 +567,8 @@ class _$UserImpl implements _User {
                 other.expiresAt == expiresAt) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
                 other.profileImageUrl == profileImageUrl) &&
+            (identical(other.subscriptionPlan, subscriptionPlan) ||
+                other.subscriptionPlan == subscriptionPlan) &&
             (identical(other.isActive, isActive) ||
                 other.isActive == isActive) &&
             (identical(other.createdAt, createdAt) ||
@@ -555,6 +593,7 @@ class _$UserImpl implements _User {
         vehicleType,
         cnic,
         dateOfBirth,
+        isEmailVerified,
         verificationStatus,
         rating,
         totalResponsesHandled,
@@ -564,6 +603,7 @@ class _$UserImpl implements _User {
         priority,
         expiresAt,
         profileImageUrl,
+        subscriptionPlan,
         isActive,
         createdAt,
         updatedAt
@@ -597,6 +637,7 @@ abstract class _User implements User {
       final String? vehicleType,
       final String? cnic,
       final DateTime? dateOfBirth,
+      final bool isEmailVerified,
       final String? verificationStatus,
       final double? rating,
       final int? totalResponsesHandled,
@@ -606,6 +647,7 @@ abstract class _User implements User {
       final String priority,
       final DateTime? expiresAt,
       final String? profileImageUrl,
+      final String subscriptionPlan,
       final bool isActive,
       required final DateTime createdAt,
       required final DateTime updatedAt}) = _$UserImpl;
@@ -637,6 +679,8 @@ abstract class _User implements User {
   @override
   DateTime? get dateOfBirth;
   @override
+  bool get isEmailVerified;
+  @override
   String? get verificationStatus;
   @override
   double? get rating;
@@ -654,6 +698,8 @@ abstract class _User implements User {
   DateTime? get expiresAt;
   @override
   String? get profileImageUrl;
+  @override
+  String get subscriptionPlan;
   @override
   bool get isActive;
   @override
@@ -684,6 +730,7 @@ mixin _$UserProfile {
   String? get vehicleType => throw _privateConstructorUsedError;
   String? get cnic => throw _privateConstructorUsedError;
   DateTime? get dateOfBirth => throw _privateConstructorUsedError;
+  bool? get isEmailVerified => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
@@ -694,6 +741,7 @@ mixin _$UserProfile {
   String? get state => throw _privateConstructorUsedError;
   String? get country => throw _privateConstructorUsedError;
   String? get zipCode => throw _privateConstructorUsedError;
+  String? get subscriptionPlan => throw _privateConstructorUsedError;
   bool? get isActive => throw _privateConstructorUsedError;
   DateTime? get lastUpdated => throw _privateConstructorUsedError;
 
@@ -722,6 +770,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? vehicleType,
       String? cnic,
       DateTime? dateOfBirth,
+      bool? isEmailVerified,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -732,6 +781,7 @@ abstract class $UserProfileCopyWith<$Res> {
       String? state,
       String? country,
       String? zipCode,
+      String? subscriptionPlan,
       bool? isActive,
       DateTime? lastUpdated});
 }
@@ -761,6 +811,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? vehicleType = freezed,
     Object? cnic = freezed,
     Object? dateOfBirth = freezed,
+    Object? isEmailVerified = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -771,6 +822,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? state = freezed,
     Object? country = freezed,
     Object? zipCode = freezed,
+    Object? subscriptionPlan = freezed,
     Object? isActive = freezed,
     Object? lastUpdated = freezed,
   }) {
@@ -823,6 +875,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.dateOfBirth
           : dateOfBirth // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      isEmailVerified: freezed == isEmailVerified
+          ? _value.isEmailVerified
+          : isEmailVerified // ignore: cast_nullable_to_non_nullable
+              as bool?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -863,6 +919,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.zipCode
           : zipCode // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscriptionPlan: freezed == subscriptionPlan
+          ? _value.subscriptionPlan
+          : subscriptionPlan // ignore: cast_nullable_to_non_nullable
+              as String?,
       isActive: freezed == isActive
           ? _value.isActive
           : isActive // ignore: cast_nullable_to_non_nullable
@@ -896,6 +956,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? vehicleType,
       String? cnic,
       DateTime? dateOfBirth,
+      bool? isEmailVerified,
       String? verificationStatus,
       double? rating,
       int? totalResponsesHandled,
@@ -906,6 +967,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       String? state,
       String? country,
       String? zipCode,
+      String? subscriptionPlan,
       bool? isActive,
       DateTime? lastUpdated});
 }
@@ -933,6 +995,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? vehicleType = freezed,
     Object? cnic = freezed,
     Object? dateOfBirth = freezed,
+    Object? isEmailVerified = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
     Object? totalResponsesHandled = freezed,
@@ -943,6 +1006,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? state = freezed,
     Object? country = freezed,
     Object? zipCode = freezed,
+    Object? subscriptionPlan = freezed,
     Object? isActive = freezed,
     Object? lastUpdated = freezed,
   }) {
@@ -995,6 +1059,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.dateOfBirth
           : dateOfBirth // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      isEmailVerified: freezed == isEmailVerified
+          ? _value.isEmailVerified
+          : isEmailVerified // ignore: cast_nullable_to_non_nullable
+              as bool?,
       verificationStatus: freezed == verificationStatus
           ? _value.verificationStatus
           : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -1035,6 +1103,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.zipCode
           : zipCode // ignore: cast_nullable_to_non_nullable
               as String?,
+      subscriptionPlan: freezed == subscriptionPlan
+          ? _value.subscriptionPlan
+          : subscriptionPlan // ignore: cast_nullable_to_non_nullable
+              as String?,
       isActive: freezed == isActive
           ? _value.isActive
           : isActive // ignore: cast_nullable_to_non_nullable
@@ -1063,6 +1135,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.vehicleType,
       this.cnic,
       this.dateOfBirth,
+      this.isEmailVerified,
       this.verificationStatus,
       this.rating,
       this.totalResponsesHandled,
@@ -1073,6 +1146,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.state,
       this.country,
       this.zipCode,
+      this.subscriptionPlan,
       this.isActive,
       this.lastUpdated});
 
@@ -1104,6 +1178,8 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final DateTime? dateOfBirth;
   @override
+  final bool? isEmailVerified;
+  @override
   final String? verificationStatus;
   @override
   final double? rating;
@@ -1124,13 +1200,15 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final String? zipCode;
   @override
+  final String? subscriptionPlan;
+  @override
   final bool? isActive;
   @override
   final DateTime? lastUpdated;
 
   @override
   String toString() {
-    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, isActive: $isActive, lastUpdated: $lastUpdated)';
+    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, subscriptionPlan: $subscriptionPlan, isActive: $isActive, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -1158,6 +1236,8 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.cnic, cnic) || other.cnic == cnic) &&
             (identical(other.dateOfBirth, dateOfBirth) ||
                 other.dateOfBirth == dateOfBirth) &&
+            (identical(other.isEmailVerified, isEmailVerified) ||
+                other.isEmailVerified == isEmailVerified) &&
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
@@ -1171,6 +1251,8 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.state, state) || other.state == state) &&
             (identical(other.country, country) || other.country == country) &&
             (identical(other.zipCode, zipCode) || other.zipCode == zipCode) &&
+            (identical(other.subscriptionPlan, subscriptionPlan) ||
+                other.subscriptionPlan == subscriptionPlan) &&
             (identical(other.isActive, isActive) ||
                 other.isActive == isActive) &&
             (identical(other.lastUpdated, lastUpdated) ||
@@ -1193,6 +1275,7 @@ class _$UserProfileImpl implements _UserProfile {
         vehicleType,
         cnic,
         dateOfBirth,
+        isEmailVerified,
         verificationStatus,
         rating,
         totalResponsesHandled,
@@ -1203,6 +1286,7 @@ class _$UserProfileImpl implements _UserProfile {
         state,
         country,
         zipCode,
+        subscriptionPlan,
         isActive,
         lastUpdated
       ]);
@@ -1235,6 +1319,7 @@ abstract class _UserProfile implements UserProfile {
       final String? vehicleType,
       final String? cnic,
       final DateTime? dateOfBirth,
+      final bool? isEmailVerified,
       final String? verificationStatus,
       final double? rating,
       final int? totalResponsesHandled,
@@ -1245,6 +1330,7 @@ abstract class _UserProfile implements UserProfile {
       final String? state,
       final String? country,
       final String? zipCode,
+      final String? subscriptionPlan,
       final bool? isActive,
       final DateTime? lastUpdated}) = _$UserProfileImpl;
 
@@ -1276,6 +1362,8 @@ abstract class _UserProfile implements UserProfile {
   @override
   DateTime? get dateOfBirth;
   @override
+  bool? get isEmailVerified;
+  @override
   String? get verificationStatus;
   @override
   double? get rating;
@@ -1295,6 +1383,8 @@ abstract class _UserProfile implements UserProfile {
   String? get country;
   @override
   String? get zipCode;
+  @override
+  String? get subscriptionPlan;
   @override
   bool? get isActive;
   @override

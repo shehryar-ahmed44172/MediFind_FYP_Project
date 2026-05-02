@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../services/location/location_service.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../theme/app_theme.dart';
+import '../../widgets/common/app_header.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({super.key});
@@ -21,6 +22,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
   bool _isFetchingLocation = false;
+  final FocusNode _otherFocusNode = FocusNode();
 
   static const List<Map<String, dynamic>> _emergencyTypes = [
     {'value': 'CARDIAC', 'label': 'Cardiac Emergency', 'icon': Icons.favorite_rounded},
@@ -46,6 +48,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
   void dispose() {
     _pulseController.dispose();
     _additionalInfoController.dispose();
+    _otherFocusNode.dispose();
     super.dispose();
   }
 
@@ -74,7 +77,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
       final position = await locationService.getCurrentLocation();
 
       if (mounted) {
-        context.go('/home/sos-countdown', extra: {
+        context.push('/home/sos-countdown', extra: {
           'emergencyType': _selectedEmergencyType,
           'latitude': position.latitude,
           'longitude': position.longitude,
@@ -177,10 +180,23 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
 
-    return Scaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        context.go('/home');
+      },
+      child: Scaffold(
+        appBar: const AppHeader(
+          greetingOverride: 'Emergency Help',
+          canPop: true,
+          backPathOverride: '/home',
+          showProfile: false,
+          showLogout: false,
+        ),
+        body: SafeArea(
+          child: Column(
+            children: [
             if (!isConnected)
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -226,6 +242,9 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                           onTap: () {
                             HapticFeedback.lightImpact();
                             setState(() => _selectedEmergencyType = type['value']);
+                            if (type['value'] == 'OTHER') {
+                              _otherFocusNode.requestFocus();
+                            }
                           },
                           borderRadius: BorderRadius.circular(24),
                           child: AnimatedContainer(
@@ -332,19 +351,32 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
                       style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
                     ),
                     const SizedBox(height: 32),
-                    Container(
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
                       decoration: BoxDecoration(
                         color: theme.scaffoldBackgroundColor,
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: AppShadows.neumorphicIn,
+                        border: _selectedEmergencyType == 'OTHER'
+                            ? Border.all(color: AppColors.primary, width: 2)
+                            : null,
                       ),
                       child: TextField(
                         controller: _additionalInfoController,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: 'Additional Information (optional)',
-                          hintText: 'Describe your situation briefly...',
+                        focusNode: _otherFocusNode,
+                        maxLines: _selectedEmergencyType == 'OTHER' ? 4 : 2,
+                        decoration: InputDecoration(
+                          labelText: _selectedEmergencyType == 'OTHER'
+                              ? 'Specify Emergency Details (Required)'
+                              : 'Additional Information (optional)',
+                          hintText: _selectedEmergencyType == 'OTHER'
+                              ? 'Describe your emergency here...'
+                              : 'Describe your situation briefly...',
                           fillColor: Colors.transparent,
+                          prefixIcon: _selectedEmergencyType == 'OTHER'
+                              ? const Icon(Icons.edit_note_rounded,
+                                  color: AppColors.primary)
+                              : null,
                         ),
                       ),
                     ),
@@ -355,6 +387,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen>
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

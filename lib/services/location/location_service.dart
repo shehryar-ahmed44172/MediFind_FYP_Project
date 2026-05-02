@@ -20,17 +20,31 @@ class LocationService {
     int intervalInSeconds = 10,
   }) async* {
     try {
+      // Check service enabled
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw LocationException(
+          message: 'Location services are disabled.',
+          code: 'LOCATION_DISABLED',
+        );
+      }
+
       // Check permissions
-      final permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        final newPermission = await Geolocator.requestPermission();
-        if (newPermission == LocationPermission.denied ||
-            newPermission == LocationPermission.deniedForever) {
-          throw LocationException(
-            message: 'Location permission denied',
-            code: 'PERMISSION_DENIED',
-          );
-        }
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw LocationException(
+          message: 'Location permission is permanently denied.',
+          code: 'PERMISSION_PERMANENTLY_DENIED',
+        );
+      }
+      if (permission == LocationPermission.denied) {
+        throw LocationException(
+          message: 'Location permission denied.',
+          code: 'PERMISSION_DENIED',
+        );
       }
 
       // Define location settings based on platform
@@ -75,16 +89,31 @@ class LocationService {
   /// Get current location once with fallback
   Future<Position> getCurrentLocation() async {
     try {
-      final permission = await Geolocator.checkPermission();
+      // Step 1: Check if location service (GPS) is enabled at the OS level
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        throw LocationException(
+          message: 'Location services are disabled. Please enable GPS.',
+          code: 'LOCATION_DISABLED',
+        );
+      }
+
+      // Step 2: Check / request permission
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        final newPermission = await Geolocator.requestPermission();
-        if (newPermission == LocationPermission.denied ||
-            newPermission == LocationPermission.deniedForever) {
-          throw LocationException(
-            message: 'Location permission denied',
-            code: 'PERMISSION_DENIED',
-          );
-        }
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.deniedForever) {
+        throw LocationException(
+          message: 'Location permission is permanently denied.',
+          code: 'PERMISSION_PERMANENTLY_DENIED',
+        );
+      }
+      if (permission == LocationPermission.denied) {
+        throw LocationException(
+          message: 'Location permission denied.',
+          code: 'PERMISSION_DENIED',
+        );
       }
 
       // 1. Try to get current position with short timeout
@@ -152,9 +181,14 @@ class LocationService {
     return Geolocator.distanceBetween(lat1, lon1, lat2, lon2);
   }
 
-  /// Open location settings
+  /// Open location settings (so the user can enable GPS)
   Future<bool> openLocationSettings() async {
     return await Geolocator.openLocationSettings();
+  }
+
+  /// Open app settings (so the user can grant permanently-denied permission)
+  Future<bool> openAppSettings() async {
+    return await Geolocator.openAppSettings();
   }
 
   /// Get City and Area from coordinates

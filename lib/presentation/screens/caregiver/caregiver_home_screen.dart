@@ -104,7 +104,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     final actions = [
       {'title': 'My Patients', 'icon': Icons.people_rounded, 'color': AppColors.primary, 'route': '/caregiver/my-patients'},
       {'title': 'Live Map', 'icon': Icons.map_rounded, 'color': Colors.blue, 'route': '/caregiver/maps'},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/chats'},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/caregiver/chats'},
       {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/caregiver/history'},
     ];
 
@@ -124,8 +124,9 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
         final color = action['color'] as Color;
         return InkWell(
           onTap: () {
-            if (action['route'] != null) {
-              context.push(action['route'] as String);
+            final route = action['route'] as String?;
+            if (route != null) {
+              context.go(route);
             }
           },
           borderRadius: BorderRadius.circular(24),

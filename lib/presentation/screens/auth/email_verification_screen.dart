@@ -35,11 +35,53 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     super.dispose();
   }
 
+  void _showInfoDialog({
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String message,
+    String buttonLabel = 'OK',
+    VoidCallback? onConfirm,
+  }) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 28),
+            const SizedBox(width: 10),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirm?.call();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: iconColor,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            child: Text(buttonLabel),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _onVerify() async {
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the complete 6-digit code')),
+      _showInfoDialog(
+        icon: Icons.info_outline_rounded,
+        iconColor: Colors.orange,
+        title: 'Incomplete Code',
+        message: 'Please enter the complete 6-digit verification code.',
       );
       return;
     }
@@ -48,16 +90,23 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     try {
       await ref.read(verifyEmailProvider(VerifyEmailParams(email: widget.email, otp: otp)).future);
       if (mounted) {
-        // Success - Auth state will update and router will redirect to home
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Email verified successfully!'), backgroundColor: Colors.green),
+        _showInfoDialog(
+          icon: Icons.verified_rounded,
+          iconColor: Colors.green,
+          title: 'Account Verified Successfully',
+          message: 'Your account has been verified. You can now use MediFind.',
+          buttonLabel: 'Continue',
+          onConfirm: () => context.go('/splash'),
         );
-        context.go('/splash');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Verification failed: $e'), backgroundColor: Colors.red),
+        final msg = e.toString().replaceAll('Exception:', '').trim();
+        _showInfoDialog(
+          icon: Icons.error_outline_rounded,
+          iconColor: Colors.red,
+          title: 'Verification Failed',
+          message: msg.isNotEmpty ? msg : 'Invalid or expired code. Please try again.',
         );
       }
     } finally {
@@ -71,17 +120,38 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
       await ref.read(resendOTPProvider(widget.email).future);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A new code has been sent to your email.')),
+          const SnackBar(
+            content: Text('A new code has been sent to your email.'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to resend code: $e'), backgroundColor: Colors.red),
+        final msg = e.toString().replaceAll('Exception:', '').trim();
+        _showInfoDialog(
+          icon: Icons.error_outline_rounded,
+          iconColor: Colors.red,
+          title: 'Resend Failed',
+          message: msg.isNotEmpty ? msg : 'Unable to resend the code. Please wait a moment and try again.',
         );
       }
     } finally {
       if (mounted) setState(() => _isResending = false);
+    }
+  }
+
+  String _maskEmail(String email) {
+    try {
+      final parts = email.split('@');
+      if (parts.length != 2) return email;
+      final username = parts[0];
+      final domain = parts[1];
+      if (username.length <= 2) return '${username[0]}***@$domain';
+      return '${username[0]}${'*' * (username.length - 2)}${username[username.length - 1]}@$domain';
+    } catch (e) {
+      return email;
     }
   }
 
@@ -90,7 +160,13 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: const AppHeader(greetingOverride: 'Verify Email', canPop: true, showLogout: false, showProfile: false),
+      appBar: const AppHeader(
+        greetingOverride: 'Verify Email',
+        canPop: true,
+        backPathOverride: '/login',
+        showLogout: false,
+        showProfile: false,
+      ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(3.hp),
         child: Column(
@@ -115,7 +191,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
               style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
             ),
             Text(
-              widget.email,
+              _maskEmail(widget.email),
               style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 6.hp),

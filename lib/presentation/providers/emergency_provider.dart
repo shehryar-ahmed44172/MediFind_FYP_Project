@@ -221,30 +221,58 @@ class AcceptRejectParams {
 final socketNotificationHandlerProvider = Provider<void>((ref) {
   ref.listen<AsyncValue<SocketMessage>>(socketStreamProvider, (previous, next) {
     next.whenData((message) async {
+      final data = message.data;
+      if (data is! Map<String, dynamic>) return;
+      
+      final user = ref.read(currentUserProvider).valueOrNull;
+      if (user == null) return;
+
+      // --- SELF-FILTER: Never alert a user about their own SOS ---
+      final targetPatientId = (data['patientId'] ?? data['userId'] ?? data['id'])?.toString();
+      final currentUserId = user.id.toString();
+      
+      if (targetPatientId != null && targetPatientId == currentUserId) {
+        debugPrint('🛡️ [Filter] Self-SOS Detected ($targetPatientId). Blocking alert for Patient.');
+        return;
+      }
+      
+      debugPrint('📩 [Socket] Event: ${message.event}, Type: ${data['type']}, Target: $targetPatientId, Me: $currentUserId');
+
+      // --- 1. Handle NEW_EMERGENCY (Responder Only) ---
       if (message.event == SocketEvent.newEmergency) {
-        final data = message.data;
-        if (data is Map<String, dynamic>) {
+        if (user.role == 'RESPONDER') {
           final repo = await ref.read(emergencyRepositoryProvider.future);
-          // Cast the dynamic map to the format expected by saveEmergency (via repo.getEmergency update)
-          // In this architecture, it's safer to use the repo to handle the persistence logic.
-          // Since getEmergency(id) fetches from remote and saves to local, we can trigger it.
-          // Or we can save directly if data is complete.
-          
           final emergencyId = data['id'] ?? data['emergencyId'];
           if (emergencyId != null) {
             try {
-              // Plan v5: Unified visual alert + persistence
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
-              
-              // Trigger the visual modal immediately from the socket
               PushNotificationService.showEmergencyAlert(data);
-              
-              debugPrint('✅ Socket Notification: Persisted and Alerted $emergencyId');
+              debugPrint('✅ Socket: Responder Alerted for $emergencyId');
             } catch (e) {
-              debugPrint('❌ Failed to handle socket notification: $e');
+              debugPrint('❌ Socket Error: $e');
             }
           }
+        }
+      }
+
+      // --- 2. Handle Generic NOTIFICATION (Caregivers Only) ---
+      else if (message.event == SocketEvent.notification) {
+        final type = data['type'];
+        
+        // PRIVACY FIX: Responders should NEVER receive chat notifications
+        if (type == 'CHAT_MESSAGE' && user.role == 'RESPONDER') {
+          debugPrint('🛡️ [Privacy] Blocked chat notification for Responder');
+          return;
+        }
+
+        if (type == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
+          debugPrint('🚨 Caregiver SOS Notification Received!');
+          PushNotificationService.showEmergencyAlert({
+            ...data,
+            'isCaregiverAlert': true,
+          });
+          ref.invalidate(getActiveEmergenciesProvider);
         }
       }
     });
@@ -276,4 +304,17 @@ final socketStreamProvider = StreamProvider<SocketMessage>((ref) {
   });
   
   return socketService.messageStream;
+});
+
+// Stream provider for tracking a specific responder's location (NEW)
+final responderLocationProvider = StreamProvider.family<Map<String, dynamic>, String>((ref, emergencyId) {
+  final socketService = SocketService.instance;
+  
+  // CRITICAL: Join the location room for this specific emergency
+  socketService.joinLocationRoom(emergencyId);
+  
+  return socketService.messageStream
+      .where((msg) => msg.event == SocketEvent.responderLocationUpdate)
+      .map((msg) => msg.data as Map<String, dynamic>)
+      .where((data) => data['emergencyId'] == emergencyId);
 });

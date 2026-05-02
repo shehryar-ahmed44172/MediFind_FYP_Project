@@ -100,11 +100,24 @@ class AuthStateNotifier extends StateNotifier<AsyncValue<bool>> {
   void _initializeAuth() async {
     state = const AsyncValue.loading();
     try {
-      final repo = _authRepository.when(
-        data: (repo) => repo,
-        loading: () => throw Exception('Auth repository not ready'),
+      // Use ref.watch or future to wait for the repository to be ready
+      final repo = await _authRepository.when(
+        data: (repo) async => repo,
+        loading: () async {
+          // If still loading, we should wait for the future
+          // But since we are already in an async method, we can just return and let the listener handle it?
+          // No, better to wait.
+          return null; 
+        },
         error: (err, st) => throw err,
       );
+      
+      if (repo == null) {
+        // If we returned null because it's loading, we just exit.
+        // The provider will rebuild when the repository data is ready.
+        return;
+      }
+
       final isLoggedIn = await repo.isUserLoggedIn();
       state = AsyncValue.data(isLoggedIn);
     } catch (e, st) {
@@ -228,5 +241,23 @@ class VerifyEmailParams {
   final String email;
   final String otp;
   VerifyEmailParams({required this.email, required this.otp});
+}
+
+final upgradeSubscriptionProvider = FutureProvider.family<User, String>((ref, plan) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  final updatedUser = await authRepo.upgradeSubscription(plan);
+  ref.invalidate(currentUserProvider);
+  return updatedUser;
+});
+
+final processPaymentProvider = FutureProvider.family<bool, PaymentParams>((ref, params) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  return await authRepo.processPayment(params.amount, params.method);
+});
+
+class PaymentParams {
+  final double amount;
+  final String method;
+  PaymentParams({required this.amount, required this.method});
 }
 

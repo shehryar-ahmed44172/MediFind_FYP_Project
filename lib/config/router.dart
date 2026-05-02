@@ -11,6 +11,7 @@ import '../presentation/screens/auth/register_screen.dart';
 import '../presentation/screens/auth/role_selection_screen.dart';
 import '../presentation/screens/auth/forgot_password_screen.dart';
 import '../presentation/screens/auth/email_verification_screen.dart';
+import '../presentation/providers/auth_provider.dart';
 import '../presentation/screens/splash/splash_screen.dart';
 import '../presentation/screens/home/home_screen.dart';
 import '../presentation/screens/emergency/emergency_screen.dart';
@@ -27,10 +28,12 @@ import '../presentation/screens/caregiver/caregiver_tracking_screen.dart';
 import '../presentation/screens/caregiver/link_patient_screen.dart';
 import '../presentation/screens/caregiver/caregiver_map_screen.dart';
 import '../presentation/screens/caregiver/my_patients_screen.dart';
+import '../presentation/screens/caregiver/caregiver_history_screen.dart';
 import '../presentation/screens/responder/responder_home_screen.dart';
 import '../presentation/screens/responder/emergency_request_screen.dart';
 import '../presentation/screens/responder/active_emergency_screen.dart';
 import '../presentation/screens/settings/diagnostics_screen.dart';
+import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/home/patient_shell.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 import '../presentation/screens/medical/emergency_contacts_screen.dart';
@@ -40,6 +43,9 @@ import '../presentation/screens/home/responder_shell.dart';
 import '../presentation/screens/chat/chat_list_screen.dart';
 import '../presentation/screens/chat/chat_detail_screen.dart';
 import '../presentation/screens/responder/responder_history_screen.dart';
+import '../presentation/screens/settings/subscription_plans_screen.dart';
+import '../presentation/screens/settings/checkout_screen.dart';
+import '../presentation/screens/settings/payment_success_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -81,6 +87,33 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _navigatorKey,
     initialLocation: AppConfig.initialRoute,
+    redirect: (context, state) {
+      if (_container == null) return null;
+      
+      final authState = _container!.read(authStateProvider);
+      
+      // If auth state is still loading or has an error, don't redirect yet
+      if (authState.isLoading || authState.hasError) return null;
+      
+      final isLoggedIn = authState.value ?? false;
+      final isGoingToLogin = state.uri.path == '/login' || 
+                             state.uri.path == '/register' || 
+                             state.uri.path == '/select-role' ||
+                             state.uri.path == '/forgot-password';
+      final isGoingToSplash = state.uri.path == '/splash';
+
+      if (isGoingToSplash) return null;
+
+      if (!isLoggedIn && !isGoingToLogin) {
+        return '/login';
+      }
+
+      if (isLoggedIn && isGoingToLogin) {
+        return '/splash'; // Let splash handle the correct home path
+      }
+
+      return null;
+    },
     routes: [
       GoRoute(
         path: '/splash',
@@ -209,6 +242,13 @@ class AppRouter {
                 path: '/caregiver',
                 name: 'caregiver-home',
                 builder: (context, state) => const CaregiverHomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'history',
+                    name: 'caregiver-history',
+                    builder: (context, state) => const CaregiverHistoryScreen(),
+                  ),
+                ],
               ),
             ],
           ),
@@ -366,6 +406,30 @@ class AppRouter {
         name: 'caregiver-link-patient',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const LinkPatientScreen(),
+      ),
+      GoRoute(
+        path: '/subscription-plans',
+        name: 'subscription-plans',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const SubscriptionPlansScreen(),
+      ),
+      GoRoute(
+        path: '/checkout/:planId',
+        name: 'checkout',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => CheckoutScreen(planId: state.pathParameters['planId']!),
+      ),
+      GoRoute(
+        path: '/payment-success',
+        name: 'payment-success',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => PaymentSuccessScreen(planName: state.extra as String? ?? 'Premium'),
+      ),
+      GoRoute(
+        path: '/settings',
+        name: 'settings',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const SettingsScreen(),
       ),
       GoRoute(
         path: '/chat/:roomId',

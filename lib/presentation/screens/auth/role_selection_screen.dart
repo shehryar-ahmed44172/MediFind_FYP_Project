@@ -65,7 +65,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
               ),
               SizedBox(height: 1.hp),
               Text(
-                'Who are you? Select your role to continue.',
+                'Select your role to get started.',
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: Colors.grey.shade600,

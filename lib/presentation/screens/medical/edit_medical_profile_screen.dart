@@ -81,11 +81,32 @@ class _EditMedicalProfileScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Save failed: $e'),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating),
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.error_outline_rounded, color: Colors.red, size: 28),
+                SizedBox(width: 10),
+                Text('Save Failed'),
+              ],
+            ),
+            content: const Text(
+              'Unable to save your medical profile. Please check your internet connection and try again.',
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
         );
       }
     } finally {
@@ -134,13 +155,12 @@ class _EditMedicalProfileScreenState
           padding: const EdgeInsets.all(16),
           children: [
             // Blood Group
-            _buildSectionHeader('Blood Group', Icons.bloodtype_outlined, Colors.red),
+            _buildSectionHeader('Blood Group', Icons.bloodtype_rounded, Colors.red),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _selectedBloodGroup,
               decoration: const InputDecoration(
                 labelText: 'Blood Group',
-                prefixIcon: Icon(Icons.bloodtype_outlined),
               ),
               items: _bloodGroups
                   .map((g) => DropdownMenuItem(value: g, child: Text(g)))
@@ -152,13 +172,12 @@ class _EditMedicalProfileScreenState
             const SizedBox(height: 24),
 
             // Disability Type
-            _buildSectionHeader('Disability Type', Icons.accessibility_new_outlined, Colors.purple),
+            _buildSectionHeader('Disability Type', Icons.accessible_forward_rounded, Colors.purple),
             const SizedBox(height: 8),
             DropdownButtonFormField<String>(
               initialValue: _selectedDisabilityType,
               decoration: const InputDecoration(
                 labelText: 'Disability Type',
-                prefixIcon: Icon(Icons.accessibility_new_outlined),
               ),
               items: _disabilityTypes
                   .map((d) => DropdownMenuItem(value: d, child: Text(d)))
@@ -172,30 +191,38 @@ class _EditMedicalProfileScreenState
             const SizedBox(height: 24),
 
             // Allergies
-            _buildSectionHeader('Allergies', Icons.warning_amber_outlined, Colors.orange),
+            _buildSectionHeader('Allergies', Icons.science_outlined, Colors.orange),
             const SizedBox(height: 8),
             TextFormField(
               controller: _allergiesController,
               maxLines: 2,
+              maxLength: 300,
               decoration: const InputDecoration(
                 labelText: 'Allergies',
                 hintText: 'e.g. Penicillin, Peanuts (comma-separated)',
-                prefixIcon: Icon(Icons.warning_amber_outlined),
               ),
+              validator: (v) {
+                if (v != null && v.trim().length > 300) return 'Maximum 300 characters';
+                return null;
+              },
             ),
             const SizedBox(height: 24),
 
             // Chronic Diseases
-            _buildSectionHeader('Chronic Diseases', Icons.healing_outlined, Colors.pink),
+            _buildSectionHeader('Chronic Diseases', Icons.health_and_safety_outlined, Colors.pink),
             const SizedBox(height: 8),
             TextFormField(
               controller: _diseasesController,
               maxLines: 2,
+              maxLength: 300,
               decoration: const InputDecoration(
                 labelText: 'Chronic Diseases',
                 hintText: 'e.g. Diabetes, Hypertension (comma-separated)',
-                prefixIcon: Icon(Icons.healing_outlined),
               ),
+              validator: (v) {
+                if (v != null && v.trim().length > 300) return 'Maximum 300 characters';
+                return null;
+              },
             ),
             const SizedBox(height: 24),
 
@@ -205,11 +232,15 @@ class _EditMedicalProfileScreenState
             TextFormField(
               controller: _medicationsController,
               maxLines: 3,
+              maxLength: 500,
               decoration: const InputDecoration(
                 labelText: 'Medications',
                 hintText: 'e.g. Metformin 500mg, Lisinopril 10mg (comma-separated)',
-                prefixIcon: Icon(Icons.medication_outlined),
               ),
+              validator: (v) {
+                if (v != null && v.trim().length > 500) return 'Maximum 500 characters';
+                return null;
+              },
             ),
             const SizedBox(height: 24),
 
@@ -219,11 +250,15 @@ class _EditMedicalProfileScreenState
             TextFormField(
               controller: _additionalNotesController,
               maxLines: 4,
+              maxLength: 500,
               decoration: const InputDecoration(
                 labelText: 'Additional Medical Information',
                 hintText: 'Any other important medical information',
-                prefixIcon: Icon(Icons.notes_outlined),
               ),
+              validator: (v) {
+                if (v != null && v.trim().length > 500) return 'Maximum 500 characters';
+                return null;
+              },
             ),
             const SizedBox(height: 32),
 

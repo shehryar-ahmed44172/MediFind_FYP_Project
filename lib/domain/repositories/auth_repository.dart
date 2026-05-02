@@ -21,4 +21,6 @@ abstract class AuthRepository {
   Future<User> updateProfile(Map<String, dynamic> data);
   Future<User> uploadProfileImage(File imageFile);
   Future<String> uploadDocument(File file);
+  Future<User> upgradeSubscription(String plan);
+  Future<bool> processPayment(double amount, String method);
 }

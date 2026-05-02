@@ -49,12 +49,29 @@ class PushNotificationService {
         
         // Match either the new SOS_TRIGGERED or the legacy EMERGENCY_REQUEST
         if (type == 'SOS_TRIGGERED' || type == 'EMERGENCY_REQUEST' || legacyType == 'EMERGENCY_REQUEST') {
-          debugPrint('🚨 SOS Triggered! Triggering Visual Alert...');
           
+          // --- CRITICAL SECURITY CHECK ---
           if (_localDataSource != null) {
+            final currentUserId = await _localDataSource!.getCurrentUserId();
+            final currentUserRole = await _localDataSource!.getCurrentUserRole();
+            final targetPatientId = (message.data['patientId'] ?? message.data['userId'])?.toString();
+            
+            // 1. Role Check: Only Responders should see this request
+            if (currentUserRole != 'RESPONDER') {
+              debugPrint('🛡️ [FCM Filter] Blocking SOS Alert: User is not a Responder ($currentUserRole)');
+              return;
+            }
+
+            // 2. Self-SOS Filter: Never alert about own SOS
+            if (targetPatientId != null && targetPatientId == currentUserId) {
+              debugPrint('🛡️ [FCM Filter] Blocking SOS Alert: Self-SOS Detected ($targetPatientId)');
+              return;
+            }
+            
             await _localDataSource!.saveEmergency(message.data);
           }
           
+          debugPrint('🚨 SOS Verified! Triggering Visual Alert for Responder...');
           showEmergencyAlert(message.data);
         } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED') {
           _dismissCurrentEmergencyModal();
@@ -62,9 +79,14 @@ class PushNotificationService {
       });
 
       // Handle message tapped when app is in background but opened
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (message.data['type'] == 'EMERGENCY_REQUEST') {
-          final requestId = message.data['emergencyId'] ?? '';
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+        if (message.data['type'] == 'EMERGENCY_REQUEST' || message.data['type'] == 'SOS_TRIGGERED') {
+          if (_localDataSource != null) {
+            final role = await _localDataSource!.getCurrentUserRole();
+            if (role != 'RESPONDER') return; // Ignore if not a responder
+          }
+
+          final requestId = message.data['emergencyId'] ?? message.data['id'] ?? '';
           if (requestId.isNotEmpty && _navigatorKey?.currentContext != null) {
             _navigatorKey!.currentContext!.push('/responder/emergency/$requestId');
           }

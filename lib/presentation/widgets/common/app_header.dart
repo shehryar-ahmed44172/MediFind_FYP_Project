@@ -12,6 +12,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   final String? greetingOverride;
   final bool centerTitle;
   final bool canPop; // New explicit flag
+  final String? backPathOverride; // New path override for back button
 
   const AppHeader({
     super.key,
@@ -20,6 +21,7 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
     this.greetingOverride,
     this.centerTitle = false,
     this.canPop = false, // Default to false
+    this.backPathOverride,
   });
 
   @override
@@ -56,6 +58,11 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                     icon: Icons.arrow_back_ios_new_rounded,
                     theme: theme,
                     onTap: () {
+                      if (backPathOverride != null) {
+                        context.go(backPathOverride!);
+                        return;
+                      }
+
                       if (Navigator.of(context).canPop()) {
                         Navigator.of(context).pop();
                       } else {
@@ -97,9 +104,11 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                         final user = userAsync.valueOrNull;
                         final role = user?.role ?? 'PATIENT';
                         if (role == 'PATIENT') {
-                          context.push('/chats');
+                          context.go('/chats');
                         } else if (role == 'CAREGIVER') {
-                          context.push('/caregiver/chats');
+                          context.go('/caregiver/chats');
+                        } else if (role == 'RESPONDER') {
+                          context.go('/responder/chats');
                         }
                       },
                       color: Colors.white,
@@ -156,7 +165,16 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                     const SizedBox(width: 8),
                     userAsync.when(
                       data: (user) => GestureDetector(
-                        onTap: () => context.push('/profile'),
+                        onTap: () {
+                          final role = user?.role ?? 'PATIENT';
+                          if (role == 'CAREGIVER') {
+                            context.go('/caregiver/profile');
+                          } else if (role == 'RESPONDER') {
+                            context.go('/responder/profile');
+                          } else {
+                            context.go('/profile');
+                          }
+                        },
                         child: _buildAvatar(user?.profileImageUrl, theme),
                       ),
                       loading: () => CircleAvatar(radius: 20, backgroundColor: Colors.white.withOpacity(0.2)),

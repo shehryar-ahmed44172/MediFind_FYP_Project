@@ -80,22 +80,10 @@ class _EmergencyRequestScreenState
       return;
     }
     
-    // Start countdown for auto-call
-    _countdown = 60;
-    _callTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) return;
-      setState(() {
-        if (_countdown > 1) {
-          _countdown--;
-        } else {
-          timer.cancel();
-          _makePhoneCall('+1234567890'); // Auto-dial placeholder
-          if (mounted) {
-            context.go('/responder/active/${widget.requestId}');
-          }
-        }
-      });
-    });
+    // Navigate immediately to active emergency screen
+    if (mounted) {
+      context.go('/responder/active/${widget.requestId}');
+    }
   }
 
   Future<void> _reject() async {
@@ -332,17 +320,17 @@ class _EmergencyRequestScreenState
                         borderRadius: BorderRadius.circular(12)),
                   ),
                   child: _isAccepting
-                      ? Column(
+                      ? const Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const SizedBox(
+                            SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
                                     strokeWidth: 2, color: Colors.white)),
-                            const SizedBox(height: 8),
-                            Text('Calling patient in $_countdown...',
-                                style: const TextStyle(
+                            SizedBox(height: 8),
+                            Text('Preparing Navigation...',
+                                style: TextStyle(
                                     color: Colors.white, fontSize: 12)),
                           ],
                         )

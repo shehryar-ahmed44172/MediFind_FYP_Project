@@ -55,7 +55,7 @@ class MedicalProfileScreen extends ConsumerWidget {
             children: [
               _SectionCard(
                 title: 'Blood Group',
-                icon: Icons.bloodtype_outlined,
+                icon: Icons.bloodtype_rounded,
                 iconColor: Colors.red,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -78,7 +78,7 @@ class MedicalProfileScreen extends ConsumerWidget {
 
               _SectionCard(
                 title: 'Disability Type',
-                icon: Icons.accessibility_new_outlined,
+                icon: Icons.accessible_forward_rounded,
                 iconColor: Colors.purple,
                 child: Text(
                   profile.disabilityType?.isNotEmpty == true
@@ -91,7 +91,7 @@ class MedicalProfileScreen extends ConsumerWidget {
 
               _ChipListSection(
                 title: 'Allergies',
-                icon: Icons.warning_amber_outlined,
+                icon: Icons.science_outlined,
                 iconColor: Colors.orange,
                 items: profile.allergies,
                 color: Colors.orange,
@@ -100,7 +100,7 @@ class MedicalProfileScreen extends ConsumerWidget {
 
               _ChipListSection(
                 title: 'Chronic Diseases',
-                icon: Icons.healing_outlined,
+                icon: Icons.health_and_safety_outlined,
                 iconColor: Colors.pink,
                 items: profile.chronicDiseases,
                 color: Colors.pink,

@@ -64,6 +64,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 16),
                     _buildQuickActionGrid(theme),
                     const SizedBox(height: 32),
+                    _buildPremiumCard(theme, userAsync.valueOrNull),
+                    const SizedBox(height: 32),
                   ],
                 ),
               ),
@@ -200,13 +202,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         child: Row(
                           children: [
                             Text(
-                              'View all ',
+                              'View Profile',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            Icon(Icons.arrow_forward_ios_rounded, 
+                            const SizedBox(width: 4),
+                            Icon(Icons.arrow_forward_ios_rounded,
                               size: 14, color: theme.colorScheme.primary),
                           ],
                         ),
@@ -268,12 +271,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (isDeaf) HapticFeedbackService.heavy();
       },
       onLongPress: () {
-         if (isDeaf) HapticFeedbackService.sosPattern();
-         context.go('/home/emergency');
+        if (isDeaf) HapticFeedbackService.sosPattern();
+        context.push('/home/emergency');
       },
       onTap: () {
         HapticFeedbackService.light();
-        context.go('/home/emergency');
+        context.push('/home/emergency');
       },
       child: Center(
         child: Stack(
@@ -318,24 +321,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      isDeaf ? Icons.wifi_tethering_rounded : Icons.fingerprint_rounded,
-                      size: isDeaf ? 90 : 80,
+                    const Icon(
+                      Icons.emergency_rounded,
+                      size: 72,
                       color: Colors.white,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'SOS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                        letterSpacing: 3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        isDeaf ? 'TAP OR HOLD' : 'PRESS & HOLD',
+                        isDeaf ? 'TAP OR HOLD FOR EMERGENCY' : 'PRESS & HOLD FOR EMERGENCY',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
-                          letterSpacing: 1.2,
+                          fontSize: 11,
+                          letterSpacing: 1.0,
                         ),
                       ),
                     ),
@@ -494,6 +508,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildPremiumCard(ThemeData theme, dynamic user) {
+    // Only show for Free users
+    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0C637E).withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/subscription-plans'),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Unlock MediFind Premium',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Get live tracking & priority dispatch',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.7), size: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

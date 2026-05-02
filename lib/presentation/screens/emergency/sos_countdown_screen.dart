@@ -160,6 +160,11 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         if (mounted) {
           setState(() => _secondsLeft--);
           HapticFeedback.lightImpact();
+          
+          // HEARTBEAT POLLING: Every 5 seconds, manually refresh status as a fallback
+          if (_secondsLeft % 5 == 0 && _emergencyId != null) {
+            ref.invalidate(getEmergencyProvider(_emergencyId!));
+          }
         }
       }
     });
@@ -193,11 +198,19 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       );
 
       final emergency = await ref.read(createEmergencyProvider(params).future);
-      _emergencyId = emergency.id;
       
-      // Join Socket room to listen for acceptance
-      SocketService.instance.joinEmergencyRoom(emergency.id);
-      VoiceAlertService().speakMessage("Emergency request sent. Searching for nearby responders.");
+      if (mounted) {
+        setState(() {
+          _emergencyId = emergency.id;
+        });
+        
+        // Small delay to ensure socket is ready
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) SocketService.instance.joinEmergencyRoom(emergency.id);
+        });
+        
+        VoiceAlertService().speakMessage("Emergency request sent. Searching for nearby responders.");
+      }
       
     } catch (e) {
       debugPrint('❌ [SOS] Failed: $e');
@@ -248,14 +261,37 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     final settings = ref.watch(accessibilityProvider);
     final theme = Theme.of(context);
 
-    // Listen for responder assigned event
+    // Robust fallback: Watch the actual emergency state for status changes
+    final emergencyState = ref.watch(getEmergencyProvider(_emergencyId ?? ''));
+    emergencyState.whenData((emergency) {
+      if (emergency != null) {
+        final status = emergency.status.toString().toUpperCase();
+        if (status == 'ASSIGNED' ||
+            status == 'ACCEPTED' ||
+            status == 'RESPONDER_ASSIGNED' ||
+            status == 'EN_ROUTE') {
+          _timer.cancel();
+          if (mounted) context.go('/emergency/$_emergencyId/tracking');
+        }
+      }
+    });
+
+    // Listen for responder assigned event via socket
     ref.listen(socketStreamProvider, (previous, next) {
       if (next.hasValue && next.value!.event == SocketEvent.emergencyStatusChange) {
-        final data = next.value!.data as Map<String, dynamic>;
-        final status = data['status']?.toString() ?? data['newStatus']?.toString();
-        if (status == 'RESPONDER_ASSIGNED' || status == 'EN_ROUTE') {
-          _timer.cancel();
-          context.go('/emergency/$_emergencyId/tracking');
+        final rawData = next.value!.data;
+        // Handle both flat and nested data structures from backend
+        final data = (rawData is Map && rawData.containsKey('data')) ? rawData['data'] : rawData;
+
+        if (data is Map) {
+          final status = (data['status'] ?? data['newStatus'] ?? '').toString().toUpperCase();
+          if (status == 'ASSIGNED' ||
+              status == 'ACCEPTED' ||
+              status == 'RESPONDER_ASSIGNED' ||
+              status == 'EN_ROUTE') {
+            _timer.cancel();
+            if (mounted) context.go('/emergency/$_emergencyId/tracking');
+          }
         }
       }
     });

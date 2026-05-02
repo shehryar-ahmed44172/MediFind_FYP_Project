@@ -296,6 +296,23 @@ class MediFindApiClient {
     }
   }
 
+  Future<User> upgradeSubscription(String plan) async {
+    try {
+      final response = await _dio.patch(
+        'users/upgrade',
+        data: {'plan': plan},
+      );
+
+      if (response.statusCode == 200) {
+        return User.fromJson(response.data['data'] as Map<String, dynamic>);
+      }
+
+      throw NetworkException(message: 'Failed to upgrade subscription');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<User> updateProfile(Map<String, dynamic> data) async {
     try {
       final response = await _dio.put(
@@ -1080,9 +1097,28 @@ class MediFindApiClient {
       });
       final response = await _dio.post('chat/upload', data: formData);
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data as Map<String, dynamic>;
+        return response.data['data'] as Map<String, dynamic>;
       }
       throw NetworkException(message: 'Failed to upload chat file');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  Future<Map<String, dynamic>> uploadRegistrationDocument(File file) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': await MultipartFile.fromFile(
+          file.path,
+          filename: file.path.split(RegExp(r'[/\\]')).last,
+        ),
+      });
+      // NO AUTH REQUIRED for this specific endpoint
+      final response = await _dio.post('auth/upload-document', data: formData);
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data['data'] as Map<String, dynamic>;
+      }
+      throw NetworkException(message: 'Failed to upload registration document');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

@@ -9,6 +9,7 @@ import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../services/location/location_service.dart';
+import '../../../core/utils/exceptions.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
@@ -35,7 +36,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _cityController = TextEditingController();
+  final _houseNoController = TextEditingController();
   final _addressController = TextEditingController();
+  final _additionalAddressController = TextEditingController();
   final _dobController = TextEditingController();
   DateTime? _selectedDob;
 
@@ -71,6 +74,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   String _selectedPatientType = 'NORMAL';
   bool _isLoading = false;
   bool _isFetchingLocation = false;
+  int _locationAttempts = 0;
+  static const int _maxLocationAttempts = 3;
 
   @override
   void initState() {
@@ -92,7 +97,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _organizationController.dispose();
     _licenseController.dispose();
     _cityController.dispose();
+    _houseNoController.dispose();
     _addressController.dispose();
+    _additionalAddressController.dispose();
     _dobController.dispose();
     super.dispose();
   }
@@ -147,8 +154,128 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  void _showLocationLimitDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_off_rounded, color: Colors.orange),
+            SizedBox(width: 10),
+            Text('Location Unavailable'),
+          ],
+        ),
+        content: const Text(
+          'Unable to fetch your location after 3 attempts.\n\nPlease ensure location services and internet are enabled, or enter your address manually.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _locationAttempts = 0);
+            },
+            child: const Text('Try Again'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Enter Manually'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shown when the device GPS/location service is turned off.
+  /// Opens Location Settings once and resets the attempt counter.
+  void _showLocationServiceDialog() {
+    setState(() => _locationAttempts = _maxLocationAttempts);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_off_rounded, color: Colors.orange),
+            SizedBox(width: 10),
+            Expanded(child: Text('Location Turned Off')),
+          ],
+        ),
+        content: const Text(
+          'Your device\'s location (GPS) is currently disabled.\n\nPlease turn it on in Settings, then come back and try again.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _locationAttempts = 0);
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _locationAttempts = 0);
+              await LocationService().openLocationSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Shown when location permission was permanently denied.
+  /// Routes the user to App Settings to grant permission manually.
+  void _showPermissionPermanentlyDeniedDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.location_disabled_rounded, color: Colors.red),
+            SizedBox(width: 10),
+            Expanded(child: Text('Permission Denied')),
+          ],
+        ),
+        content: const Text(
+          'Location permission was permanently denied.\n\nPlease open App Settings and grant location access to MediFind.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _locationAttempts = 0);
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              setState(() => _locationAttempts = 0);
+              await LocationService().openAppSettings();
+            },
+            child: const Text('App Settings'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _fetchLocation() async {
-    setState(() => _isFetchingLocation = true);
+    if (_locationAttempts >= _maxLocationAttempts) {
+      _showLocationLimitDialog();
+      return;
+    }
+
+    setState(() {
+      _isFetchingLocation = true;
+      _locationAttempts++;
+    });
+
     try {
       final locationService = LocationService();
       final position = await locationService.getCurrentLocation();
@@ -161,6 +288,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         setState(() {
           _cityController.text = place['city'] ?? '';
           _addressController.text = place['address'] ?? '';
+          _locationAttempts = 0;
         });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -172,13 +300,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to fetch location: $e'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        final remaining = _maxLocationAttempts - _locationAttempts;
+        if (remaining <= 0) {
+          _showLocationLimitDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } finally {
       if (mounted) setState(() => _isFetchingLocation = false);
@@ -219,6 +354,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       }
 
       debugPrint('📡 [Register] Sending registration request to API...');
+      final composedAddress = [
+        _houseNoController.text.trim(),
+        _addressController.text.trim(),
+        _additionalAddressController.text.trim(),
+      ].where((s) => s.isNotEmpty).join(', ');
+
       final Map<String, dynamic> request = {
         'fullName': _fullNameController.text.trim(),
         'email': _emailController.text.trim(),
@@ -226,7 +367,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         'password': _passwordController.text,
         'role': widget.role,
         'city': _cityController.text.trim(),
-        'address': _addressController.text.trim(),
+        'address': composedAddress,
         'cnic': _cnicController.text.trim(),
         'dateOfBirth': _selectedDob?.toIso8601String(),
         'patientType': widget.role == 'PATIENT' ? _selectedPatientType : null,
@@ -247,18 +388,44 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       debugPrint('✅ [Register] Registration successful!');
 
       if (mounted) {
-        final String successMsg = widget.role == 'RESPONDER'
-            ? 'Registration successful! Please verify your email and wait for admin approval.'
-            : 'Registration successful! Please verify your email.';
-            
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+        final bool isResponder = widget.role == 'RESPONDER';
+        final String successMsg = isResponder
+            ? 'Your account has been created successfully. Please wait for admin approval. You will receive an email with your verification code once your documents are reviewed.'
+            : 'Your account has been created. Please enter the 6-digit code sent to your email to verify your account.';
+
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: isResponder ? Colors.orange : Colors.green, size: 28),
+                const SizedBox(width: 10),
+                const Text('Registration Successful'),
+              ],
+            ),
             content: Text(successMsg),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isResponder ? Colors.orange : Colors.green,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: Text(isResponder ? 'Got it' : 'Verify Email'),
+              ),
+            ],
           ),
         );
-        context.go('/verify-email', extra: {'email': _emailController.text.trim()});
+        if (mounted) {
+          if (isResponder) {
+            context.go('/login');
+          } else {
+            context.go('/verify-email', extra: {'email': _emailController.text.trim()});
+          }
+        }
       }
     } catch (e) {
       debugPrint('❌ [Register] Registration failed: $e');
@@ -368,8 +535,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 SizedBox(height: 4.hp),
 
-                // ─── Personal Information ───────────────────────────
-                _SectionHeader(title: 'Personal Information', color: roleColor),
+                // ─── Demographic Information ───────────────────────
+                _SectionHeader(title: 'Demographic Information', color: roleColor),
                 SizedBox(height: 2.hp),
                 TextFormField(
                   controller: _fullNameController,
@@ -377,7 +544,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Full Name',
                     prefixIcon: Icon(Icons.person_outline_rounded),
+                    errorMaxLines: 2,
                   ),
+                  autofillHints: const [AutofillHints.name],
+                  textInputAction: TextInputAction.next,
                   validator: (v) => StringUtils.validateName(v),
                 ),
                 SizedBox(height: 1.6.hp),
@@ -387,7 +557,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: const InputDecoration(
                     labelText: 'Email Address',
                     prefixIcon: Icon(Icons.email_outlined),
+                    errorMaxLines: 2,
                   ),
+                  autofillHints: const [AutofillHints.email],
+                  textInputAction: TextInputAction.next,
                   validator: (v) => StringUtils.validateEmail(v),
                 ),
                 SizedBox(height: 1.6.hp),
@@ -399,7 +572,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'Phone Number',
                     hintText: '+92-300-1234567',
                     prefixIcon: Icon(Icons.phone_outlined),
+                    errorMaxLines: 2,
                   ),
+                  autofillHints: const [AutofillHints.telephoneNumber],
+                  textInputAction: TextInputAction.next,
                   validator: (v) => StringUtils.validatePhoneNumber(v),
                 ),
                 SizedBox(height: 1.6.hp),
@@ -411,7 +587,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     labelText: 'CNIC Number',
                     hintText: 'e.g. 34601-1234567-1',
                     prefixIcon: Icon(Icons.credit_card_outlined),
+                    errorMaxLines: 2,
                   ),
+                  textInputAction: TextInputAction.next,
                   validator: (v) => StringUtils.validateCnic(v),
                 ),
                 SizedBox(height: 1.6.hp),
@@ -424,7 +602,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     hintText: 'Select your birth date',
                     prefixIcon: Icon(Icons.calendar_today_rounded),
                   ),
-                  validator: (v) => v.isNullOrEmpty ? 'Date of birth is required' : null,
+                  validator: (v) => v.isNullOrEmpty ? '⚠ Date of birth is required' : null,
                 ),
                 SizedBox(height: 3.hp),
 
@@ -459,27 +637,64 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _cityController,
+                        textCapitalization: TextCapitalization.words,
+                        maxLength: 50,
                         decoration: const InputDecoration(
                           labelText: 'City',
                           prefixIcon: Icon(Icons.location_city_rounded),
+                          counterText: '',
+                          errorMaxLines: 2,
                         ),
-                        validator: (v) =>
-                            v.isNullOrEmpty ? 'City is required' : null,
+                        textInputAction: TextInputAction.next,
+                        validator: (v) {
+                          if (v.isNullOrEmpty) return '⚠ City is required';
+                          if (v!.trim().length < 2) return '⚠ Min 2 characters';
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: TextFormField(
-                        controller: _addressController,
+                        controller: _houseNoController,
+                        maxLength: 20,
                         decoration: const InputDecoration(
-                          labelText: 'Address / Area',
-                          prefixIcon: Icon(Icons.map_rounded),
+                          labelText: 'House / Flat',
+                          prefixIcon: Icon(Icons.home_outlined),
+                          counterText: '',
+                          errorMaxLines: 2,
                         ),
+                        textInputAction: TextInputAction.next,
                         validator: (v) =>
-                            v.isNullOrEmpty ? 'Address is required' : null,
+                            v.isNullOrEmpty ? '⚠ House number is required' : null,
                       ),
                     ),
                   ],
+                ),
+                SizedBox(height: 1.6.hp),
+                TextFormField(
+                  controller: _addressController,
+                  maxLength: 100,
+                  decoration: const InputDecoration(
+                    labelText: 'Street / Area',
+                    prefixIcon: Icon(Icons.map_rounded),
+                    counterText: '',
+                  ),
+                  validator: (v) {
+                    if (v.isNullOrEmpty) return 'Street / Area is required';
+                    if (v!.trim().length < 3) return 'Min 3 characters';
+                    return null;
+                  },
+                ),
+                SizedBox(height: 1.6.hp),
+                TextFormField(
+                  controller: _additionalAddressController,
+                  maxLength: 100,
+                  decoration: const InputDecoration(
+                    labelText: 'Additional Address (Optional)',
+                    prefixIcon: Icon(Icons.add_location_alt_outlined),
+                    counterText: '',
+                  ),
                 ),
                 SizedBox(height: 3.hp),
 
@@ -525,22 +740,32 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   TextFormField(
                     controller: _organizationController,
                     textCapitalization: TextCapitalization.words,
+                    maxLength: 100,
                     decoration: const InputDecoration(
                       labelText: 'Organization / Hospital Name',
                       prefixIcon: Icon(Icons.business_rounded),
+                      counterText: '',
                     ),
-                    validator: (v) =>
-                        v.isNullOrEmpty ? 'Required for verification' : null,
+                    validator: (v) {
+                      if (v.isNullOrEmpty) return 'Organization name is required';
+                      if (v!.trim().length < 3) return 'Min 3 characters';
+                      return null;
+                    },
                   ),
                   SizedBox(height: 1.6.hp),
                   TextFormField(
                     controller: _licenseController,
+                    maxLength: 30,
                     decoration: const InputDecoration(
                       labelText: 'Medical License Number',
                       prefixIcon: Icon(Icons.badge_rounded),
+                      counterText: '',
                     ),
-                    validator: (v) =>
-                        v.isNullOrEmpty ? 'Required for verification' : null,
+                    validator: (v) {
+                      if (v.isNullOrEmpty) return 'License number is required';
+                      if (v!.trim().length < 5) return 'Min 5 characters';
+                      return null;
+                    },
                   ),
                   SizedBox(height: 1.6.hp),
 
@@ -653,6 +878,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: InputDecoration(
                     labelText: 'Password',
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    errorMaxLines: 2,
                     suffixIcon: IconButton(
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_outlined
@@ -661,6 +887,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
+                  autofillHints: const [AutofillHints.newPassword],
+                  textInputAction: TextInputAction.next,
                   validator: (v) => StringUtils.validatePassword(v),
                 ),
                 SizedBox(height: 1.6.hp),
@@ -670,6 +898,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   decoration: InputDecoration(
                     labelText: 'Confirm Password',
                     prefixIcon: const Icon(Icons.lock_outline_rounded),
+                    errorMaxLines: 2,
                     suffixIcon: IconButton(
                       icon: Icon(_obscureConfirmPassword
                           ? Icons.visibility_outlined
@@ -678,8 +907,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                           _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                   ),
+                  autofillHints: const [AutofillHints.password],
+                  textInputAction: TextInputAction.done,
                   validator: (v) {
-                    if (v.isNullOrEmpty) return 'Confirm password is required';
+                    if (v.isNullOrEmpty) return '⚠ Confirm password is required';
                     if (v != _passwordController.text) {
                       return 'Passwords do not match';
                     }

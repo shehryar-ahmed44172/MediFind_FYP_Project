@@ -19,6 +19,7 @@ import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
 import 'core/utils/responsive.dart';
+import 'presentation/widgets/connectivity_overlay.dart';
 // Added for AppRouter.navigatorKey
 
 
@@ -55,6 +56,8 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
   @override
   void initState() {
     super.initState();
+    // Initialize AppRouter with provider container for redirects
+    AppRouter.setContainer(ProviderScope.containerOf(context, listen: false));
     // Initialize Push Notifications and FCM Handlers after app mounts
     _setupPushNotifications();
   }
@@ -122,11 +125,13 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
 
     // Returning MaterialApp with routing capabilities configured
     return MaterialApp.router(
-      title: 'MediFind', // Application title
-      debugShowCheckedModeBanner: AppConfig.showDebugBanner, // Controls debug banner visibility
+      title: 'MediFind',
+      debugShowCheckedModeBanner: AppConfig.showDebugBanner,
       theme: AppTheme.buildTheme(accessibilitySettings),
       themeMode: ThemeMode.light,
       routerConfig: AppRouter.router,
+      // Wrap every screen with the global connectivity overlay
+      builder: (context, child) => ConnectivityOverlay(child: child ?? const SizedBox.shrink()),
     );
   }
 }

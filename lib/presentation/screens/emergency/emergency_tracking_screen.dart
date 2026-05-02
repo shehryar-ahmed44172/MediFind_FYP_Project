@@ -11,6 +11,7 @@ import '../../theme/app_theme.dart';
 import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../domain/entities/emergency.dart';
+import '../../../services/audio/voice_alert_service.dart';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/utils/map_utils.dart';
@@ -111,6 +112,16 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
 
         if (message.event == SocketEvent.emergencyStatusChange) {
           final newStatus = data['status']?.toString() ?? data['newStatus']?.toString() ?? _currentStatus;
+          
+          if (newStatus != _currentStatus) {
+            // Voice Alerts for progress
+            if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
+              VoiceAlertService().speakMessage("A responder has been assigned and is on the way.");
+            } else if (newStatus == 'ARRIVED') {
+              VoiceAlertService().speakMessage("The responder has arrived at your location.");
+            }
+          }
+
           setState(() {
             _currentStatus = newStatus;
             if (data['responderName'] != null) _responderName = data['responderName'];

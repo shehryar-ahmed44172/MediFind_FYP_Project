@@ -70,43 +70,47 @@ class StringUtils {
 
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Email is required';
+      return '⚠ Email is required';
     }
     if (!isValidEmail(value)) {
-      return 'Please enter a valid email address';
+      return '⚠ Please enter a valid email address';
     }
     return null;
   }
 
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return '⚠ Password is required';
     }
     if (value.length < 8) {
-      return 'Password must be at least 8 characters';
+      return '⚠ Password must be at least 8 characters';
     }
     if (!isValidPassword(value)) {
-      return 'Password must contain uppercase, lowercase, number, and special character';
+      return '⚠ Password must contain uppercase, lowercase, number, and special character';
     }
     return null;
   }
 
   static String? validatePhoneNumber(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Phone number is required';
+      return '⚠ Phone number is required';
     }
     if (!isValidPhoneNumber(value)) {
-      return 'Please enter a valid phone number';
+      return '⚠ Please enter a valid phone number';
     }
     return null;
   }
 
   static String? validateName(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Name is required';
+      return '⚠ Name is required';
     }
     if (value.length < 2) {
-      return 'Name must be at least 2 characters';
+      return '⚠ Name must be at least 2 characters';
+    }
+    final nameRegex = RegExp(r"^[a-zA-Z\s']+$");
+    if (!nameRegex.hasMatch(value)) {
+      return '⚠ Name must contain only letters';
     }
     return null;
   }
@@ -114,12 +118,12 @@ class StringUtils {
   /// Validates Pakistan CNIC — accepts both plain 13 digits and XXXXX-XXXXXXX-X format
   static String? validateCnic(String? value) {
     if (value == null || value.isEmpty) {
-      return 'CNIC is required';
+      return '⚠ CNIC is required';
     }
     // Strict pattern: 5 digits - 7 digits - 1 digit
     final cnicRegex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
     if (!cnicRegex.hasMatch(value)) {
-      return 'Enter a valid CNIC (XXXXX-XXXXXXX-X)';
+      return '⚠ Enter a valid CNIC (XXXXX-XXXXXXX-X)';
     }
     return null;
   }

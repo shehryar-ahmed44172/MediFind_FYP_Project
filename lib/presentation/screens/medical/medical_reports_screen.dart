@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
@@ -30,6 +31,46 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
   }
 
   Future<void> _takeCameraPhoto(String reportType) async {
+    final status = await Permission.camera.request();
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Row(
+              children: [
+                Icon(Icons.camera_alt_outlined, color: Colors.orange, size: 28),
+                SizedBox(width: 10),
+                Text('Camera Permission'),
+              ],
+            ),
+            content: const Text(
+              'Camera access is required to take photos of your reports. Please enable it in your device settings.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  openAppSettings();
+                },
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Go to Settings'),
+              ),
+            ],
+          ),
+        );
+      }
+      return;
+    }
+    if (!status.isGranted) return;
+
     final picked = await _picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
@@ -188,14 +229,6 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Rename'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _renameReport(report);
-              },
-            ),
-            ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
               title: const Text('Delete', style: TextStyle(color: Colors.red)),
               onTap: () {
@@ -292,12 +325,26 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                    const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
                     const SizedBox(height: 16),
-                    Text('Error: $err'),
-                    TextButton(
+                    const Text(
+                      'Unable to load reports',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please check your internet connection\nand try again.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
                       onPressed: () => userId != null ? ref.invalidate(medicalReportsProvider(userId)) : null,
-                      child: const Text('Retry'),
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
                     ),
                   ],
                 ),

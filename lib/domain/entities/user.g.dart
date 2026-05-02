@@ -21,6 +21,7 @@ _$UserImpl _$$UserImplFromJson(Map<String, dynamic> json) => _$UserImpl(
       dateOfBirth: json['dateOfBirth'] == null
           ? null
           : DateTime.parse(json['dateOfBirth'] as String),
+      isEmailVerified: json['isEmailVerified'] as bool? ?? false,
       verificationStatus: json['verificationStatus'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       totalResponsesHandled: (json['totalResponsesHandled'] as num?)?.toInt(),
@@ -34,6 +35,7 @@ _$UserImpl _$$UserImplFromJson(Map<String, dynamic> json) => _$UserImpl(
           ? null
           : DateTime.parse(json['expiresAt'] as String),
       profileImageUrl: json['profileImageUrl'] as String?,
+      subscriptionPlan: json['subscriptionPlan'] as String? ?? 'FREE',
       isActive: json['isActive'] as bool? ?? true,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
@@ -53,6 +55,7 @@ Map<String, dynamic> _$$UserImplToJson(_$UserImpl instance) =>
       'vehicleType': instance.vehicleType,
       'cnic': instance.cnic,
       'dateOfBirth': instance.dateOfBirth?.toIso8601String(),
+      'isEmailVerified': instance.isEmailVerified,
       'verificationStatus': instance.verificationStatus,
       'rating': instance.rating,
       'totalResponsesHandled': instance.totalResponsesHandled,
@@ -62,6 +65,7 @@ Map<String, dynamic> _$$UserImplToJson(_$UserImpl instance) =>
       'priority': instance.priority,
       'expiresAt': instance.expiresAt?.toIso8601String(),
       'profileImageUrl': instance.profileImageUrl,
+      'subscriptionPlan': instance.subscriptionPlan,
       'isActive': instance.isActive,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
@@ -83,6 +87,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       dateOfBirth: json['dateOfBirth'] == null
           ? null
           : DateTime.parse(json['dateOfBirth'] as String),
+      isEmailVerified: json['isEmailVerified'] as bool?,
       verificationStatus: json['verificationStatus'] as String?,
       rating: (json['rating'] as num?)?.toDouble(),
       totalResponsesHandled: (json['totalResponsesHandled'] as num?)?.toInt(),
@@ -93,6 +98,7 @@ _$UserProfileImpl _$$UserProfileImplFromJson(Map<String, dynamic> json) =>
       state: json['state'] as String?,
       country: json['country'] as String?,
       zipCode: json['zipCode'] as String?,
+      subscriptionPlan: json['subscriptionPlan'] as String?,
       isActive: json['isActive'] as bool?,
       lastUpdated: json['lastUpdated'] == null
           ? null
@@ -113,6 +119,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'vehicleType': instance.vehicleType,
       'cnic': instance.cnic,
       'dateOfBirth': instance.dateOfBirth?.toIso8601String(),
+      'isEmailVerified': instance.isEmailVerified,
       'verificationStatus': instance.verificationStatus,
       'rating': instance.rating,
       'totalResponsesHandled': instance.totalResponsesHandled,
@@ -123,6 +130,7 @@ Map<String, dynamic> _$$UserProfileImplToJson(_$UserProfileImpl instance) =>
       'state': instance.state,
       'country': instance.country,
       'zipCode': instance.zipCode,
+      'subscriptionPlan': instance.subscriptionPlan,
       'isActive': instance.isActive,
       'lastUpdated': instance.lastUpdated?.toIso8601String(),
     };

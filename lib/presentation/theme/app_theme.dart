@@ -58,6 +58,11 @@ class AppColors {
   static const Color primaryTeal = Color(0xFF2496A7);
   static const Color primaryNavy = Color(0xFF0C637E);
 
+  // Dark Mode specific
+  static const Color darkBackground = Color(0xFF0F172A);
+  static const Color darkSurface = Color(0xFF1E293B);
+  static const Color darkOnSurface = Color(0xFFF1F5F9);
+
   // High Contrast overrides
   static const Color hcBackground = Colors.white;
   static const Color hcSurface = Colors.white;
@@ -118,16 +123,14 @@ class AppShadows {
   static List<BoxShadow> get sosMassiveGlow {
     return [
       BoxShadow(
-        color: AppColors.error.withOpacity(0.4),
-        blurRadius: 30,
-        spreadRadius: 5,
-        offset: const Offset(5, 5),
+        color: AppColors.error.withOpacity(0.3),
+        blurRadius: 40,
+        spreadRadius: 8,
       ),
-      const BoxShadow(
-        color: Colors.white,
-        blurRadius: 30,
-        spreadRadius: 5,
-        offset: Offset(-5, -5),
+      BoxShadow(
+        color: AppColors.error.withOpacity(0.15),
+        blurRadius: 20,
+        spreadRadius: 2,
       ),
     ];
   }
@@ -255,17 +258,43 @@ class AppTheme {
         seedColor: AppColors.primary,
         brightness: Brightness.dark,
         primary: AppColors.primaryLight,
-        secondary: AppColors.secondary,
-        surface: const Color(0xFF1E293B),
-        background: const Color(0xFF0F172A),
+        onPrimary: Colors.white,
+        secondary: AppColors.secondaryTeal,
+        surface: AppColors.darkSurface,
+        onSurface: AppColors.darkOnSurface,
+        background: AppColors.darkBackground,
+        onBackground: Colors.white,
+        error: AppColors.error,
       ),
-      scaffoldBackgroundColor: const Color(0xFF0F172A),
+      scaffoldBackgroundColor: AppColors.darkBackground,
       fontFamily: 'Montserrat',
       textTheme: _buildTextTheme(settings).apply(
-        bodyColor: Colors.white,
+        bodyColor: AppColors.darkOnSurface,
         displayColor: Colors.white,
       ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.darkBackground,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.darkSurface,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
       elevatedButtonTheme: _buildElevatedButtonTheme(settings),
+      inputDecorationTheme: _buildInputDecorationTheme(settings).copyWith(
+        fillColor: AppColors.darkSurface,
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1.5),
+        ),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withOpacity(0.1),
+        thickness: 1,
+      ),
     );
   }
 

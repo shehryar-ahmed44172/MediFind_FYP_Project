@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
-import '../../providers/connectivity_provider.dart';
-import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import 'package:medifind_mobile_application/presentation/services/haptic_feedback_service.dart';
@@ -36,7 +34,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isConnected = ref.watch(isConnectedProvider);
     final settings = ref.watch(accessibilityProvider);
     final isDeafMode = settings.textOnlyMode;
     final userAsync = ref.watch(currentUserProvider);
@@ -46,9 +43,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            if (isDeafMode) _buildAccessibilityBanner(context),
-            if (!isConnected) const ConnectivityBanner(),
-            
             Expanded(
               child: SingleChildScrollView(
                 padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.hp),
@@ -77,17 +71,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAccessibilityBanner(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: BoxDecoration(color: Colors.amber.shade700),
-      child: const Row(
-        children: [
-          Icon(Icons.visibility, color: Colors.white, size: 18),
-          SizedBox(width: 8),
-          Text('Visual Accessibility Mode Active', 
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-        ],
+    return Padding(
+      padding: EdgeInsets.fromLTRB(5.wp, 10, 5.wp, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue.shade800, Colors.blue.shade600],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.accessibility_new_rounded, color: Colors.white, size: 18),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Accessibility Active', 
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  Text('Optimized for Deaf communication', 
+                    style: TextStyle(color: Colors.white70, fontSize: 11)),
+                ],
+              ),
+            ),
+            Icon(Icons.info_outline_rounded, color: Colors.white.withOpacity(0.6), size: 20),
+          ],
+        ),
       ),
     );
   }
@@ -100,8 +127,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
-            Text(user?.fullName.split(' ')[0] ?? 'User',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+            Row(
+              children: [
+                Text(user?.fullName.split(' ')[0] ?? 'User',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+                if (ref.watch(accessibilityProvider).textOnlyMode) ...[
+                  const SizedBox(width: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.accessibility_new_rounded, size: 14, color: Colors.blue.shade700),
+                        const SizedBox(width: 4),
+                        Text('DEAF MODE', style: TextStyle(color: Colors.blue.shade700, fontSize: 10, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -118,11 +167,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildQuickActionGrid(ThemeData theme) {
+    // push: true = nested sub-screen (back button returns here)
+    // push: false/absent = tab switch (context.go)
     final actions = [
-      {'title': 'Medical Records', 'icon': Icons.assignment_rounded, 'color': AppColors.primary, 'route': '/home/medical-reports'},
-      {'title': 'My Caregivers', 'icon': Icons.people_alt_rounded, 'color': AppColors.secondary, 'route': '/home/caregivers'},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.blue, 'route': '/chats'},
-      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_rounded, 'color': Colors.orange, 'route': '/home/emergency-contacts'},
+      {'title': 'Medical Records', 'icon': Icons.assignment_rounded, 'color': AppColors.primary, 'route': '/home/medical-reports', 'push': false},
+      {'title': 'My Caregivers', 'icon': Icons.people_alt_rounded, 'color': AppColors.secondary, 'route': '/home/caregivers', 'push': false},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.blue, 'route': '/chats', 'push': false},
+      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_rounded, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
     ];
 
     return GridView.builder(
@@ -142,7 +193,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           onTap: () {
             final route = action['route'] as String?;
             if (route != null) {
-              context.go(route);
+              final shouldPush = action['push'] == true;
+              if (shouldPush) {
+                context.push(route);
+              } else {
+                context.go(route);
+              }
             } else {
               _showFeatureComingSoon(context, action['title'] as String);
             }
@@ -198,7 +254,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         ),
                       ),
                       InkWell(
-                        onTap: () => context.go('/home/medical-profile'),
+                        onTap: () => context.push('/home/medical-profile'),
                         child: Row(
                           children: [
                             Text(
@@ -279,85 +335,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         context.push('/home/emergency');
       },
       child: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            if (isDeaf)
-              TweenAnimationBuilder<double>(
-                tween: Tween(begin: 1.0, end: 1.2),
-                duration: const Duration(seconds: 1),
-                curve: Curves.easeInOut,
-                builder: (context, value, child) {
-                  return Container(
-                    width: 65.wp * value,
-                    height: 65.wp * value,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.red.withOpacity(0.1),
-                    ),
-                  );
-                },
-                onEnd: () {}, // Pulse could be repeated with a stateful animation if needed
-              ),
-            Container(
-              width: 65.wp,
-              height: 65.wp,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: theme.scaffoldBackgroundColor,
-                boxShadow: AppShadows.neumorphicOut,
-              ),
-              child: Container(
-                margin: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFFFF4D4D), Color(0xFFD32F2F)],
-                  ),
-                  boxShadow: AppShadows.sosMassiveGlow,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+        child: SizedBox(
+          width: 75.wp,
+          height: 75.wp,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Animated Outer Ripples (Wrapped in RepaintBoundary for performance)
+              RepaintBoundary(
+                child: Stack(
+                  alignment: Alignment.center,
                   children: [
-                    const Icon(
-                      Icons.emergency_rounded,
-                      size: 72,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'SOS',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 22,
-                        letterSpacing: 3,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.15),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        isDeaf ? 'TAP OR HOLD FOR EMERGENCY' : 'PRESS & HOLD FOR EMERGENCY',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                    ),
+                    _PulseCircle(delay: 0, size: 75.wp, color: Colors.red.withOpacity(0.1)),
+                    _PulseCircle(delay: 1, size: 75.wp, color: Colors.red.withOpacity(0.05)),
                   ],
                 ),
               ),
-            ),
-          ],
+              
+              // Main Button Container
+              Container(
+                width: 62.wp,
+                height: 62.wp,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.scaffoldBackgroundColor,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.4 : 0.1),
+                      blurRadius: 30,
+                      offset: const Offset(0, 15),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  margin: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFF5252), Color(0xFFD32F2F)],
+                    ),
+                    boxShadow: AppShadows.sosMassiveGlow,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.emergency_rounded,
+                        size: 80,
+                        color: Colors.white,
+                      ),
+                      const Text(
+                        'SOS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 26,
+                          letterSpacing: 4,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withOpacity(0.3)),
+                        ),
+                        child: Text(
+                          isDeaf ? 'TAP FOR EMERGENCY' : 'PRESS & HOLD',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 10,
+                            letterSpacing: 1.2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -414,12 +475,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildQuickServices(ThemeData theme, bool isDeaf) {
     final services = [
-      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile'},
-      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports'},
-      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers'},
-      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null},
-      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null},
-      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts'},
+      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile', 'push': true},
+      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports', 'push': false},
+      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers', 'push': false},
+      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null, 'push': false},
+      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null, 'push': false},
+      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
     ];
 
     return Column(
@@ -461,7 +522,298 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 HapticFeedbackService.medium();
                 final route = service['route'] as String?;
                 if (route != null) {
-                  context.go(route);
+                  final shouldPush = service['push'] == true;
+                  if (shouldPush) {
+                    context.push(route);
+                  } else {
+                    context.go(route);
+                  }
+                } else {
+                  _showFeatureComingSoon(context, service['title'] as String);
+                }
+              },
+              borderRadius: BorderRadius.circular(24),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: theme.scaffoldBackgroundColor,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: AppShadows.neumorphicOut,
+                ),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.all(isDeaf ? 20 : 16),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        service['icon'] as IconData, 
+                        color: color, 
+                        size: isDeaf ? 44 : 32,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text(
+                        service['title'] as String,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          fontSize: isDeaf ? 14 : 13,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPremiumCard(ThemeData theme, dynamic user) {
+    // Only show for Free users
+    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0C637E).withOpacity(0.2),
+            blurRadius: 15,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.push('/subscription-plans'),
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Unlock MediFind Premium',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Get live tracking & priority dispatch',
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.7), size: 14),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFeatureComingSoon(BuildContext context, String feature) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$feature feature coming soon!'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Colors.indigo.shade700,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
+class _PulseCircle extends StatefulWidget {
+  final double delay;
+  final double size;
+  final Color color;
+
+  const _PulseCircle({required this.delay, required this.size, required this.color});
+
+  @override
+  State<_PulseCircle> createState() => _PulseCircleState();
+}
+
+class _PulseCircleState extends State<_PulseCircle> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+
+    Future.delayed(Duration(milliseconds: (widget.delay * 1000).toInt()), () {
+      if (mounted) _controller.repeat();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Container(
+          width: widget.size * _controller.value,
+          height: widget.size * _controller.value,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: widget.color.withOpacity(widget.color.opacity * (1 - _controller.value)),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAttachReportOption(ThemeData theme) {
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => context.go('/home/medical-reports'),
+          borderRadius: BorderRadius.circular(20),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.note_add_outlined, color: theme.colorScheme.primary),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Medical Records',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Attach or view your reports',
+                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickServices(ThemeData theme, bool isDeaf) {
+    final services = [
+      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile', 'push': true},
+      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports', 'push': false},
+      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers', 'push': false},
+      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null, 'push': false},
+      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null, 'push': false},
+      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Quick Services',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                HapticFeedbackService.light();
+              }, 
+              child: const Text('See All', style: TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            childAspectRatio: isDeaf ? (SizeConfig.screenWidth > 600 ? 1.2 : 0.9) : (SizeConfig.screenWidth > 600 ? 1.4 : 1.1),
+          ),
+          itemCount: services.length,
+          itemBuilder: (context, index) {
+            final service = services[index];
+            final color = service['color'] as Color;
+            return InkWell(
+              onTap: () {
+                HapticFeedbackService.medium();
+                final route = service['route'] as String?;
+                if (route != null) {
+                  final shouldPush = service['push'] == true;
+                  if (shouldPush) {
+                    context.push(route);
+                  } else {
+                    context.go(route);
+                  }
                 } else {
                   _showFeatureComingSoon(context, service['title'] as String);
                 }

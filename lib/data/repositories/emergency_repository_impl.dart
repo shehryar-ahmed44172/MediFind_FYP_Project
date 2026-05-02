@@ -91,9 +91,11 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
         .map((e) => _mapToEmergency(e))
         .where((e) => 
             e.status != 'COMPLETED' && 
+            e.status != 'RESOLVED' && 
             e.status != 'CANCELLED' && 
             e.status != 'REJECTED' && 
-            e.status != 'RESPONDER_ASSIGNED')
+            e.status != 'RESPONDER_ASSIGNED' &&
+            e.status != 'ASSIGNED')
         .toList();
 
     // 2. Then listen for updates
@@ -103,9 +105,11 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
           .map((e) => _mapToEmergency(e))
           .where((e) => 
               e.status != 'COMPLETED' && 
+              e.status != 'RESOLVED' && 
               e.status != 'CANCELLED' && 
               e.status != 'REJECTED' && 
-              e.status != 'RESPONDER_ASSIGNED')
+              e.status != 'RESPONDER_ASSIGNED' &&
+              e.status != 'ASSIGNED')
           .toList();
     }
   }

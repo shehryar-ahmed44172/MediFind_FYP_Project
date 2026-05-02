@@ -37,6 +37,7 @@ mixin _$Emergency {
   DateTime? get completedAt => throw _privateConstructorUsedError;
   String get priority => throw _privateConstructorUsedError;
   DateTime? get expiresAt => throw _privateConstructorUsedError;
+  String get patientType => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
   @JsonKey(ignore: true)
@@ -63,7 +64,8 @@ abstract class $EmergencyCopyWith<$Res> {
       String? additionalInfo,
       DateTime? completedAt,
       String priority,
-      DateTime? expiresAt});
+      DateTime? expiresAt,
+      String patientType});
 }
 
 /// @nodoc
@@ -93,6 +95,7 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
     Object? completedAt = freezed,
     Object? priority = null,
     Object? expiresAt = freezed,
+    Object? patientType = null,
   }) {
     return _then(_value.copyWith(
       id: null == id
@@ -151,6 +154,10 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
           ? _value.expiresAt
           : expiresAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      patientType: null == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String,
     ) as $Val);
   }
 }
@@ -177,7 +184,8 @@ abstract class _$$EmergencyImplCopyWith<$Res>
       String? additionalInfo,
       DateTime? completedAt,
       String priority,
-      DateTime? expiresAt});
+      DateTime? expiresAt,
+      String patientType});
 }
 
 /// @nodoc
@@ -205,6 +213,7 @@ class __$$EmergencyImplCopyWithImpl<$Res>
     Object? completedAt = freezed,
     Object? priority = null,
     Object? expiresAt = freezed,
+    Object? patientType = null,
   }) {
     return _then(_$EmergencyImpl(
       id: null == id
@@ -263,6 +272,10 @@ class __$$EmergencyImplCopyWithImpl<$Res>
           ? _value.expiresAt
           : expiresAt // ignore: cast_nullable_to_non_nullable
               as DateTime?,
+      patientType: null == patientType
+          ? _value.patientType
+          : patientType // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -284,7 +297,8 @@ class _$EmergencyImpl implements _Emergency {
       this.additionalInfo,
       this.completedAt,
       this.priority = 'NORMAL',
-      this.expiresAt});
+      this.expiresAt,
+      this.patientType = 'NORMAL'});
 
   factory _$EmergencyImpl.fromJson(Map<String, dynamic> json) =>
       _$$EmergencyImplFromJson(json);
@@ -325,10 +339,13 @@ class _$EmergencyImpl implements _Emergency {
   final String priority;
   @override
   final DateTime? expiresAt;
+  @override
+  @JsonKey()
+  final String patientType;
 
   @override
   String toString() {
-    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt)';
+    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, patientType: $patientType)';
   }
 
   @override
@@ -360,7 +377,9 @@ class _$EmergencyImpl implements _Emergency {
             (identical(other.priority, priority) ||
                 other.priority == priority) &&
             (identical(other.expiresAt, expiresAt) ||
-                other.expiresAt == expiresAt));
+                other.expiresAt == expiresAt) &&
+            (identical(other.patientType, patientType) ||
+                other.patientType == patientType));
   }
 
   @JsonKey(ignore: true)
@@ -380,7 +399,8 @@ class _$EmergencyImpl implements _Emergency {
       additionalInfo,
       completedAt,
       priority,
-      expiresAt);
+      expiresAt,
+      patientType);
 
   @JsonKey(ignore: true)
   @override
@@ -411,7 +431,8 @@ abstract class _Emergency implements Emergency {
       final String? additionalInfo,
       final DateTime? completedAt,
       final String priority,
-      final DateTime? expiresAt}) = _$EmergencyImpl;
+      final DateTime? expiresAt,
+      final String patientType}) = _$EmergencyImpl;
 
   factory _Emergency.fromJson(Map<String, dynamic> json) =
       _$EmergencyImpl.fromJson;
@@ -447,6 +468,8 @@ abstract class _Emergency implements Emergency {
   String get priority;
   @override
   DateTime? get expiresAt;
+  @override
+  String get patientType;
   @override
   @JsonKey(ignore: true)
   _$$EmergencyImplCopyWith<_$EmergencyImpl> get copyWith =>

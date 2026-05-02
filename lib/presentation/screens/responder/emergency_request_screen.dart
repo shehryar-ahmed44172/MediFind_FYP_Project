@@ -63,7 +63,7 @@ class _EmergencyRequestScreenState
       // Check if patient is deaf and play situational report
       final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
       
-      if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+      if (profile != null && (profile.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF')) {
         // Play the detailed medical report for the responder
         await VoiceAlertService().speakAutomatedEmergencyReport(
           emergency: emergency,
@@ -147,6 +147,7 @@ class _EmergencyRequestScreenState
           allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
           conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
           priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+          isDeaf: (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF'),
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -173,6 +174,7 @@ class _EmergencyRequestScreenState
     required String allergies,
     required String conditions,
     String priority = 'NORMAL',
+    bool isDeaf = false,
   }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -220,6 +222,28 @@ class _EmergencyRequestScreenState
               ],
             ),
           ),
+          if (isDeaf) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade900,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.hearing_disabled, color: Colors.white),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'ACCESSIBILITY ALERT: DEAF PATIENT',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
 
           // Voice Alert Button
@@ -232,6 +256,7 @@ class _EmergencyRequestScreenState
                  VoiceAlertService().stop();
               } else {
                  final message = "Emergency Alert: ${emergencyType.replaceAll('_', ' ')}. "
+                     "${isDeaf ? 'Attention: This is a Deaf Patient. Use visual cues and text chat. ' : ''}"
                      "Patient: $patientName. "
                      "Blood Group: $bloodGroup. "
                      "Allergies: $allergies. "

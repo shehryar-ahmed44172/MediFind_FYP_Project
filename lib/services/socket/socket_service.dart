@@ -60,7 +60,7 @@ class SocketService {
     _socket!.onConnect((_) {
       _isConnected = true;
       _messageController.add(SocketMessage(SocketEvent.connectionStatus, {'status': 'connected'}));
-      print('Socket connected to ${AppConstants.socketUrl}');
+      print('✅ Socket connected to ${AppConstants.socketUrl} for user: $userId');
     });
 
     _socket!.onDisconnect((_) {
@@ -74,12 +74,14 @@ class SocketService {
 
     // Generic notification listener (Plan v4)
     _socket!.on('notification', (data) {
-      print('🔔 Global Socket Notification Received: $data');
-      _messageController.add(SocketMessage(SocketEvent.notification, data));
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      print('🔔 Global Socket Notification Received: $unpackedData');
+      _messageController.add(SocketMessage(SocketEvent.notification, unpackedData));
     });
 
     // Map guide events
     _socket!.on('NEW_EMERGENCY', (data) {
+      print('🚨 NEW_EMERGENCY event received: $data');
       _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
     });
 
@@ -90,16 +92,20 @@ class SocketService {
     });
 
     _socket!.on('EMERGENCY_STATUS_CHANGE', (data) {
-      _messageController.add(SocketMessage(SocketEvent.emergencyStatusChange, data));
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      print('🔄 EMERGENCY_STATUS_CHANGE received: $unpackedData');
+      _messageController.add(SocketMessage(SocketEvent.emergencyStatusChange, unpackedData));
     });
 
     _socket!.on('RESPONDER_ARRIVED', (data) {
-      _messageController.add(SocketMessage(SocketEvent.responderArrived, data));
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      _messageController.add(SocketMessage(SocketEvent.responderArrived, unpackedData));
     });
 
     _socket!.on('message:new', (data) {
-      print('💬 New Chat Message Received: $data');
-      _messageController.add(SocketMessage(SocketEvent.newMessage, data));
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      print('💬 New Chat Message Received: $unpackedData');
+      _messageController.add(SocketMessage(SocketEvent.newMessage, unpackedData));
     });
 
     // Server asks this client to join an emergency room (used for caregivers)

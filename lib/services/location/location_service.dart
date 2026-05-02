@@ -13,6 +13,26 @@ class LocationService {
   LocationService._internal();
 
   Stream<Position>? _positionStream;
+  
+  // Debug offsets for testing distance between devices
+  static double debugLatOffset = 0.0;
+  static double debugLngOffset = 0.0;
+
+  Position _applyDebugOffset(Position pos) {
+    if (debugLatOffset == 0 && debugLngOffset == 0) return pos;
+    return Position(
+      latitude: pos.latitude + debugLatOffset,
+      longitude: pos.longitude + debugLngOffset,
+      timestamp: pos.timestamp,
+      accuracy: pos.accuracy,
+      altitude: pos.altitude,
+      heading: pos.heading,
+      speed: pos.speed,
+      speedAccuracy: pos.speedAccuracy,
+      altitudeAccuracy: pos.altitudeAccuracy,
+      headingAccuracy: pos.headingAccuracy,
+    );
+  }
 
   /// Start real-time location updates
   Stream<Position> startLocationUpdates({
@@ -72,7 +92,7 @@ class LocationService {
       // Start position updates
       _positionStream = Geolocator.getPositionStream(
         locationSettings: locationSettings,
-      );
+      ).map((pos) => _applyDebugOffset(pos));
 
       yield* _positionStream!;
     } catch (e) {
@@ -118,21 +138,22 @@ class LocationService {
 
       // 1. Try to get current position with short timeout
       try {
-        return await Geolocator.getCurrentPosition(
+        final pos = await Geolocator.getCurrentPosition(
           timeLimit: const Duration(seconds: 5),
         );
+        return _applyDebugOffset(pos);
       } catch (e) {
         debugPrint('Geolocator.getCurrentPosition failed/timed out: $e');
         
         // 2. Fallback to last known position
         final lastKnown = await Geolocator.getLastKnownPosition();
         if (lastKnown != null) {
-          return lastKnown;
+          return _applyDebugOffset(lastKnown);
         }
 
         // 3. If in development, return a hardcoded Karachi coordinate
         // This prevents the SOS button from being stuck on the emulator
-        return Position(
+        return _applyDebugOffset(Position(
           latitude: 24.8607,
           longitude: 67.0011,
           timestamp: DateTime.now(),
@@ -143,7 +164,7 @@ class LocationService {
           speedAccuracy: 0.0,
           altitudeAccuracy: 0.0,
           headingAccuracy: 0.0,
-        );
+        ));
       }
     } catch (e) {
       if (e is LocationException) {

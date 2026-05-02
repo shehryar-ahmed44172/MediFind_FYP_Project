@@ -29,6 +29,7 @@ _$MedicalProfileImpl _$$MedicalProfileImplFromJson(Map<String, dynamic> json) =>
           const [],
       medicalHistory: json['medicalHistory'] as String?,
       disabilityType: json['disabilityType'] as String?,
+      patientType: json['patientType'] as String? ?? 'NORMAL',
       additionalNotes: json['additionalNotes'] as String?,
       lastUpdated: json['lastUpdated'] == null
           ? null
@@ -47,6 +48,7 @@ Map<String, dynamic> _$$MedicalProfileImplToJson(
       'emergencyContacts': instance.emergencyContacts,
       'medicalHistory': instance.medicalHistory,
       'disabilityType': instance.disabilityType,
+      'patientType': instance.patientType,
       'additionalNotes': instance.additionalNotes,
       'lastUpdated': instance.lastUpdated?.toIso8601String(),
     };
@@ -100,6 +102,7 @@ _$UpdateMedicalProfileRequestImpl _$$UpdateMedicalProfileRequestImplFromJson(
           .toList(),
       medicalHistory: json['medicalHistory'] as String?,
       disabilityType: json['disabilityType'] as String?,
+      patientType: json['patientType'] as String? ?? 'NORMAL',
       additionalNotes: json['additionalNotes'] as String?,
     );
 
@@ -113,5 +116,6 @@ Map<String, dynamic> _$$UpdateMedicalProfileRequestImplToJson(
       'emergencyContacts': instance.emergencyContacts,
       'medicalHistory': instance.medicalHistory,
       'disabilityType': instance.disabilityType,
+      'patientType': instance.patientType,
       'additionalNotes': instance.additionalNotes,
     };

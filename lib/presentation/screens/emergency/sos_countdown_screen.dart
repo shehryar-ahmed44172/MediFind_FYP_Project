@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/accessibility_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/utils/map_utils.dart';
@@ -159,7 +160,13 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       } else {
         if (mounted) {
           setState(() => _secondsLeft--);
-          HapticFeedback.lightImpact();
+          
+          final user = ref.read(currentUserProvider).valueOrNull;
+          if (user?.patientType == 'DEAF') {
+            HapticFeedback.heavyImpact(); // Stronger feedback for Deaf patients
+          } else {
+            HapticFeedback.lightImpact();
+          }
           
           // HEARTBEAT POLLING: Every 5 seconds, manually refresh status as a fallback
           if (_secondsLeft % 5 == 0 && _emergencyId != null) {
@@ -343,6 +350,42 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
               ],
             ),
           ),
+
+          // Deaf Patient Mode Banner
+          if (ref.watch(currentUserProvider).valueOrNull?.patientType == 'DEAF')
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 10,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade900,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.hearing_disabled, color: Colors.white, size: 20),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'DEAF PATIENT MODE ACTIVE',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                    ),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('VISUAL ALERTS ON', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ],
+                ),
+              ),
+            ),
 
           // Main Countdown Body Surface
           Positioned(

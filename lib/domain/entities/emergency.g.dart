@@ -32,6 +32,7 @@ _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
       expiresAt: json['expiresAt'] == null
           ? null
           : DateTime.parse(json['expiresAt'] as String),
+      patientType: json['patientType'] as String? ?? 'NORMAL',
     );
 
 Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
@@ -50,6 +51,7 @@ Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
       'completedAt': instance.completedAt?.toIso8601String(),
       'priority': instance.priority,
       'expiresAt': instance.expiresAt?.toIso8601String(),
+      'patientType': instance.patientType,
     };
 
 _$CreateEmergencyRequestImpl _$$CreateEmergencyRequestImplFromJson(

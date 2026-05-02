@@ -21,6 +21,7 @@ class Emergency with _$Emergency {
     DateTime? completedAt,
     @Default('NORMAL') String priority,
     DateTime? expiresAt,
+    @Default('NORMAL') String patientType,
   }) = _Emergency;
 
   factory Emergency.fromJson(Map<String, dynamic> json) =>

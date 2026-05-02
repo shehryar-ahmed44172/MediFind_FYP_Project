@@ -51,7 +51,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     Future.microtask(() async {
       final emergency = await ref.read(getEmergencyProvider(widget.emergencyId).future);
       final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-      if (profile != null && profile.disabilityType?.toLowerCase().contains('deaf') == true) {
+      if (profile != null && (profile.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF')) {
          await VoiceAlertService().speakAutomatedEmergencyReport(
            emergency: emergency,
            medical: profile,
@@ -346,7 +346,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
               children: [
                 const Row(children: [Icon(Icons.person_outlined, color: AppColors.primary), SizedBox(width: 8), Text('Patient Info', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))]),
                 profileAsync.when(
-                  data: (profile) => (profile?.disabilityType?.toLowerCase().contains('deaf') == true)
+                  data: (profile) => (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF')
                       ? IconButton(
                           icon: const Icon(Icons.record_voice_over, color: Colors.orange),
                           onPressed: () async {
@@ -381,7 +381,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                     final medications = profile.medications.isNotEmpty ? profile.medications.map((m) => m.name).join(', ') : 'None';
                     final history = profile.medicalHistory?.isNotEmpty == true ? profile.medicalHistory! : 'None';
 
-                    final isDeaf = profile.disabilityType?.toLowerCase().contains('deaf') == true;
+                    final isDeaf = profile.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF';
 
                     return Container(
                       padding: const EdgeInsets.all(12),
@@ -409,11 +409,17 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                           
                           if (isDeaf) ...[
                             const Divider(),
-                            Text('Voice Alert Summary (For Deaf Patient):', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue.shade900)),
+                            Row(
+                              children: [
+                                Icon(Icons.hearing_disabled, size: 16, color: Colors.blue.shade900),
+                                const SizedBox(width: 8),
+                                Text('ACCESSIBILITY ALERT: DEAF PATIENT', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Colors.blue.shade900)),
+                              ],
+                            ),
                             const SizedBox(height: 4),
                             Text(
-                              'Emergency reported at location. Patient has $allergies allergies and $chronic chronic conditions.',
-                              style: const TextStyle(fontSize: 12),
+                              'Patient is deaf. Please use text chat for communication. Avoid calling unless absolutely necessary.',
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
                             ),
                           ],
                         ],

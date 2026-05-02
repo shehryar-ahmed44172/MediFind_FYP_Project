@@ -73,8 +73,8 @@ class PushNotificationService {
           
           debugPrint('🚨 SOS Verified! Triggering Visual Alert for Responder...');
           showEmergencyAlert(message.data);
-        } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED') {
-          _dismissCurrentEmergencyModal();
+        } else if (type == 'EMERGENCY_ACCEPTED_BY_OTHER' || type == 'EMERGENCY_CANCELLED' || type == 'EMERGENCY_RESOLVED') {
+          dismissCurrentEmergencyModal();
         }
       });
 
@@ -102,7 +102,7 @@ class PushNotificationService {
     return await _firebaseMessaging.getToken();
   }
 
-  static void _dismissCurrentEmergencyModal() {
+  static void dismissCurrentEmergencyModal() {
     if (_currentDialogContext != null) {
       if (Navigator.of(_currentDialogContext!).canPop()) {
         Navigator.of(_currentDialogContext!).pop();
@@ -120,7 +120,7 @@ class PushNotificationService {
     final context = _navigatorKey!.currentContext!;
 
     // If another modal is somehow open, close it
-    _dismissCurrentEmergencyModal();
+    dismissCurrentEmergencyModal();
 
     final emergencyType = data['emergencyType'] ?? 'Unknown Emergency';
     final distance = data['distanceKm'] ?? data['distance'] ?? 'Calculating...';
@@ -190,7 +190,7 @@ class PushNotificationService {
                   EmergencyTimer(
                     expiresAt: data['expiresAt'],
                     serverTime: data['serverTime'],
-                    onExpired: () => _dismissCurrentEmergencyModal(),
+                    onExpired: () => dismissCurrentEmergencyModal(),
                     style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.red, fontFamily: 'monospace'),
                   ),
                   const SizedBox(height: 12),

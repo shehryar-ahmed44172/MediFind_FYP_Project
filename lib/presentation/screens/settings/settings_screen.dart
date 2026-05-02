@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../widgets/common/app_header.dart';
+import '../../../services/location/location_service.dart';
 
 class SettingsScreen extends ConsumerWidget {
   final bool showHeader;
@@ -34,12 +36,8 @@ class SettingsScreen extends ConsumerWidget {
                     'App Theme',
                     'Switch between Light, Dark and System modes',
                     const Color(0xFF6366F1),
-                    () {
-                      // Placeholder for theme selection
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Theme settings coming soon!')),
-                      );
-                    },
+                    theme,
+                    () => _showThemeDialog(context, ref),
                   ),
                   const SizedBox(height: 16),
                   _buildSettingsTile(
@@ -48,6 +46,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Text & Appearance',
                     'Adjust font sizes and visual elements',
                     const Color(0xFF8B5CF6),
+                    theme,
                     () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text('Appearance settings coming soon!')),
@@ -62,6 +61,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Medical Profile',
                     'Update blood group, allergies & conditions',
                     const Color(0xFFEF4444),
+                    theme,
                     () => context.go('/home/medical-profile'),
                   ),
                   const SizedBox(height: 16),
@@ -71,6 +71,7 @@ class SettingsScreen extends ConsumerWidget {
                     'My Caregivers',
                     'Manage trusted caregiver accounts',
                     const Color(0xFFF59E0B),
+                    theme,
                     () => context.go('/home/caregivers'),
                   ),
                   const SizedBox(height: 16),
@@ -80,6 +81,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Subscription Plans',
                     'Upgrade your plan for premium features',
                     const Color(0xFF10B981),
+                    theme,
                     () => context.push('/subscription-plans'),
                   ),
                 ],
@@ -93,7 +95,8 @@ class SettingsScreen extends ConsumerWidget {
                     'Theme & Appearance',
                     'Customize the look and feel of your dashboard',
                     const Color(0xFF6366F1),
-                    () {},
+                    theme,
+                    () => _showThemeDialog(context, ref),
                   ),
                   const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'Response History'),
@@ -103,6 +106,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Emergency Logs',
                     'Review your past emergency responses',
                     const Color(0xFF4F46E5),
+                    theme,
                     () => context.go('/responder/history'),
                   ),
                   const SizedBox(height: 32),
@@ -113,6 +117,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Diagnostics',
                     'Socket status, FCM & system monitoring',
                     const Color(0xFF64748B),
+                    theme,
                     () => context.go('/diagnostics'),
                   ),
                 ],
@@ -126,7 +131,8 @@ class SettingsScreen extends ConsumerWidget {
                     'Theme & Appearance',
                     'Customize colors and layout preferences',
                     const Color(0xFF6366F1),
-                    () {},
+                    theme,
+                    () => _showThemeDialog(context, ref),
                   ),
                   const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'Account & Patients'),
@@ -136,6 +142,7 @@ class SettingsScreen extends ConsumerWidget {
                     'My Patients',
                     'View and manage your linked patients',
                     const Color(0xFF8B5CF6),
+                    theme,
                     () => context.go('/caregiver/my-patients'),
                   ),
                   const SizedBox(height: 16),
@@ -145,10 +152,45 @@ class SettingsScreen extends ConsumerWidget {
                     'Link New Patient',
                     'Connect with a new patient via email',
                     const Color(0xFFEC4899),
+                    theme,
                     () => context.go('/caregiver/my-patients/link-patient'),
                   ),
                 ],
   
+                const SizedBox(height: 32),
+                _buildSectionHeader(theme, 'Testing Tools'),
+                _buildSettingsTile(
+                  context,
+                  Icons.location_searching_rounded,
+                  'Simulate Distance',
+                  LocationService.debugLatOffset == 0 ? 'Disabled' : 'Active (500m Offset)',
+                  Colors.teal,
+                  theme,
+                  () {
+                    // Toggle 500m offset (~0.005 degrees)
+                    if (LocationService.debugLatOffset == 0) {
+                      LocationService.debugLatOffset = 0.005;
+                      LocationService.debugLngOffset = 0.005;
+                    } else {
+                      LocationService.debugLatOffset = 0.0;
+                      LocationService.debugLngOffset = 0.0;
+                    }
+                    
+                    // Force rebuild of settings screen to update subtitle
+                    (context as Element).markNeedsBuild();
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(LocationService.debugLatOffset == 0 
+                          ? 'Location spoofing disabled' 
+                          : 'Location spoofed (500m offset applied)'),
+                        backgroundColor: Colors.teal,
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+
                 const SizedBox(height: 48),
                 
                 // Premium Logout Button
@@ -169,7 +211,7 @@ class SettingsScreen extends ConsumerWidget {
                       if (context.mounted) context.go('/login');
                     },
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
+                      backgroundColor: theme.colorScheme.surface,
                       foregroundColor: Colors.red,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 18),
@@ -222,6 +264,43 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
+
+  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        final currentMode = ref.watch(accessibilityProvider).themeMode;
+        return AlertDialog(
+          title: const Text('Select App Theme'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildThemeOption(context, ref, 'System Default', Icons.brightness_auto, ThemeMode.system, currentMode),
+              _buildThemeOption(context, ref, 'Light Mode', Icons.light_mode_rounded, ThemeMode.light, currentMode),
+              _buildThemeOption(context, ref, 'Dark Mode', Icons.dark_mode_rounded, ThemeMode.dark, currentMode),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildThemeOption(BuildContext context, WidgetRef ref, String label, IconData icon, ThemeMode mode, ThemeMode currentMode) {
+    final isSelected = mode == currentMode;
+    return ListTile(
+      leading: Icon(icon, color: isSelected ? AppColors.primary : Colors.grey),
+      title: Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
+      trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
+      onTap: () {
+        ref.read(accessibilityProvider.notifier).setThemeMode(mode);
+        Navigator.pop(context);
+      },
+    );
+  }
+
   Widget _buildSectionHeader(ThemeData theme, String title) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 16),
@@ -256,21 +335,22 @@ class SettingsScreen extends ConsumerWidget {
     String title,
     String subtitle,
     Color color,
+    ThemeData theme,
     VoidCallback onTap,
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: theme.cardTheme.color ?? theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.2 : 0.03),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
-        border: Border.all(color: Colors.grey.withOpacity(0.05)),
+        border: Border.all(color: Colors.grey.withOpacity(0.1)),
       ),
       child: ListTile(
         onTap: onTap,
@@ -303,7 +383,7 @@ class SettingsScreen extends ConsumerWidget {
         trailing: Container(
           padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
             shape: BoxShape.circle,
           ),
           child: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),

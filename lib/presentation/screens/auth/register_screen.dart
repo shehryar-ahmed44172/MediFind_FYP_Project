@@ -298,6 +298,30 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         );
       }
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      // Route to a targeted dialog based on the specific failure reason
+      if (e.code == 'LOCATION_DISABLED') {
+        _showLocationServiceDialog();
+      } else if (e.code == 'PERMISSION_PERMANENTLY_DENIED') {
+        _showPermissionPermanentlyDeniedDialog();
+      } else {
+        // Generic permission denied or other location error — show attempt count
+        final remaining = _maxLocationAttempts - _locationAttempts;
+        if (remaining <= 0) {
+          _showLocationLimitDialog();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
+              ),
+              backgroundColor: Colors.orange,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      }
     } catch (e) {
       if (mounted) {
         final remaining = _maxLocationAttempts - _locationAttempts;

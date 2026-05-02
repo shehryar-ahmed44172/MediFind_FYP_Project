@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/audio/voice_alert_service.dart';
 
@@ -9,6 +10,7 @@ class AccessibilitySettings {
   final bool highContrast;
   final bool vibrationFeedback;
   final double fontSizeMultiplier; // 1.0 = normal, 1.2 = 20% larger, etc.
+  final ThemeMode themeMode;
 
   AccessibilitySettings({
     this.voiceGuidanceEnabled = false,
@@ -17,6 +19,7 @@ class AccessibilitySettings {
     this.highContrast = false,
     this.vibrationFeedback = true,
     this.fontSizeMultiplier = 1.0,
+    this.themeMode = ThemeMode.system,
   });
 
   /// Create a copy with modified fields
@@ -27,6 +30,7 @@ class AccessibilitySettings {
     bool? highContrast,
     bool? vibrationFeedback,
     double? fontSizeMultiplier,
+    ThemeMode? themeMode,
   }) {
     return AccessibilitySettings(
       voiceGuidanceEnabled: voiceGuidanceEnabled ?? this.voiceGuidanceEnabled,
@@ -35,6 +39,7 @@ class AccessibilitySettings {
       highContrast: highContrast ?? this.highContrast,
       vibrationFeedback: vibrationFeedback ?? this.vibrationFeedback,
       fontSizeMultiplier: fontSizeMultiplier ?? this.fontSizeMultiplier,
+      themeMode: themeMode ?? this.themeMode,
     );
   }
 
@@ -48,7 +53,8 @@ class AccessibilitySettings {
           largeButtons == other.largeButtons &&
           highContrast == other.highContrast &&
           vibrationFeedback == other.vibrationFeedback &&
-          fontSizeMultiplier == other.fontSizeMultiplier;
+          fontSizeMultiplier == other.fontSizeMultiplier &&
+          themeMode == other.themeMode;
 
   @override
   int get hashCode =>
@@ -57,7 +63,8 @@ class AccessibilitySettings {
       largeButtons.hashCode ^
       highContrast.hashCode ^
       vibrationFeedback.hashCode ^
-      fontSizeMultiplier.hashCode;
+      fontSizeMultiplier.hashCode ^
+      themeMode.hashCode;
 }
 
 /// Accessibility Settings Notifier - manages state changes
@@ -106,6 +113,11 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
     state = state.copyWith(
       fontSizeMultiplier: clampedMultiplier,
     );
+  }
+
+  /// Update theme mode
+  void setThemeMode(ThemeMode mode) {
+    state = state.copyWith(themeMode: mode);
   }
 
   String? _initializedFromUserId;

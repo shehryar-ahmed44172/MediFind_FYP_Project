@@ -471,6 +471,24 @@ class _EmergencyRequestCard extends ConsumerWidget {
                               'Incoming Request',
                               style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
                             ),
+                            if (request.patientType.toUpperCase() == 'DEAF') ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.shade100,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'DEAF',
+                                  style: TextStyle(
+                                    color: Colors.blue.shade900,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                         if (request.expiresAt != null) ...[

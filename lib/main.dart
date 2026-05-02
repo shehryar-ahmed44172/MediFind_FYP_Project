@@ -128,7 +128,8 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
       title: 'MediFind',
       debugShowCheckedModeBanner: AppConfig.showDebugBanner,
       theme: AppTheme.buildTheme(accessibilitySettings),
-      themeMode: ThemeMode.light,
+      darkTheme: AppTheme.buildDarkTheme(accessibilitySettings),
+      themeMode: accessibilitySettings.themeMode,
       routerConfig: AppRouter.router,
       // Wrap every screen with the global connectivity overlay
       builder: (context, child) => ConnectivityOverlay(child: child ?? const SizedBox.shrink()),

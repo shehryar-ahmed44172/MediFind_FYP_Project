@@ -256,9 +256,10 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
         }
       }
 
-      // --- 2. Handle Generic NOTIFICATION (Caregivers Only) ---
+      // --- 2. Handle Generic NOTIFICATION (Responders & Caregivers) ---
       else if (message.event == SocketEvent.notification) {
         final type = data['type'];
+        debugPrint('🔔 Notification Type: $type for Role: ${user.role}');
         
         // PRIVACY FIX: Responders should NEVER receive chat notifications
         if (type == 'CHAT_MESSAGE' && user.role == 'RESPONDER') {
@@ -266,13 +267,84 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
           return;
         }
 
-        if (type == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
+        // --- RESPONDER LOGIC: SOS Triggered ---
+        if ((type == 'SOS_TRIGGERED' || type == 'EMERGENCY_REQUEST') && user.role == 'RESPONDER') {
+          final repo = await ref.read(emergencyRepositoryProvider.future);
+          final emergencyId = data['id'] ?? data['emergencyId'];
+          if (emergencyId != null) {
+            try {
+              // Pre-fetch emergency details to ensure they are in cache
+              await repo.getEmergency(emergencyId.toString());
+              ref.invalidate(getActiveEmergenciesProvider);
+              
+              // Trigger Visual & Voice Alert
+              PushNotificationService.showEmergencyAlert(data);
+              debugPrint('🚨 Socket: Responder Alerted for $emergencyId via generic notification');
+            } catch (e) {
+              debugPrint('❌ Socket Error pre-fetching emergency: $e');
+            }
+          }
+        }
+
+        // --- RESPONDER LOGIC: Emergency Cancelled/Resolved by others ---
+        else if ((type == 'EMERGENCY_RESOLVED' || type == 'EMERGENCY_CANCELLED' || type == 'EMERGENCY_ACCEPTED_BY_OTHER') && user.role == 'RESPONDER') {
+          debugPrint('🧹 SOS Request no longer active: $type');
+          // This will dismiss the dialog if it's currently showing
+          PushNotificationService.dismissCurrentEmergencyModal();
+          ref.invalidate(getActiveEmergenciesProvider);
+        }
+
+        // --- CAREGIVER LOGIC: Patient SOS ---
+        else if (type == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
           debugPrint('🚨 Caregiver SOS Notification Received!');
           PushNotificationService.showEmergencyAlert({
             ...data,
             'isCaregiverAlert': true,
           });
           ref.invalidate(getActiveEmergenciesProvider);
+        }
+      }
+
+      // --- 3. Handle EMERGENCY_STATUS_CHANGE (Patient & Responder) ---
+      else if (message.event == SocketEvent.emergencyStatusChange) {
+        final rawData = message.data;
+        final data = (rawData is Map && rawData.containsKey('data')) ? rawData['data'] : rawData;
+        if (data is! Map<String, dynamic>) return;
+
+        final emergencyId = data['emergencyId']?.toString();
+        final newStatus = (data['status'] ?? data['newStatus'] ?? '').toString().toUpperCase();
+        
+        debugPrint('🔄 Status Change for $emergencyId: $newStatus');
+
+        if (emergencyId != null) {
+          final repo = await ref.read(emergencyRepositoryProvider.future);
+          
+          // Force refresh the emergency in cache
+          try {
+            await repo.getEmergency(emergencyId);
+            ref.invalidate(getEmergencyProvider(emergencyId));
+            ref.invalidate(getActiveEmergenciesProvider);
+            
+            // --- ACCESSIBILITY LOGIC: DEAF Patient Feedback ---
+            if (user.role == 'PATIENT' && user.patientType == 'DEAF') {
+              if (newStatus == 'ASSIGNED' || newStatus == 'RESPONDER_ASSIGNED') {
+                HapticFeedbackService.sosPattern();
+                ref.read(visualEmergencyAlertProvider.notifier).state = 
+                    "HELP IS ON THE WAY: ${data['responderName'] ?? 'A responder'} has accepted your request.";
+              } else if (newStatus == 'ARRIVED') {
+                HapticFeedbackService.heavy();
+                ref.read(visualEmergencyAlertProvider.notifier).state = 
+                    "RESPONDER ARRIVED: Look around for ${data['responderName'] ?? 'help'}.";
+              }
+            } else if (user.role == 'PATIENT') {
+              // Voice feedback for normal patients
+              if (newStatus == 'ASSIGNED' || newStatus == 'RESPONDER_ASSIGNED') {
+                VoiceAlertService().speakMessage("Help is on the way. ${data['responderName'] ?? 'A responder'} has accepted your request.");
+              }
+            }
+          } catch (e) {
+            debugPrint('❌ Error updating emergency status: $e');
+          }
         }
       }
     });

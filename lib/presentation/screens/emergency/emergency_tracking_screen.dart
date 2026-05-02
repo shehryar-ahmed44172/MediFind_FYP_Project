@@ -254,8 +254,37 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         // 4. Modern Draggable Bottom Sheet
         _buildDraggableBottomSheet(context, theme, emergency, settings, isDeafPatient),
 
+        // Deaf Patient Mode Banner
+        if (isDeafPatient)
+          Positioned(
+            top: MediaQuery.of(context).padding.top + 80,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade900.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.hearing_disabled, color: Colors.white, size: 18),
+                  SizedBox(width: 12),
+                  Text(
+                    'DEAF MODE: VISUAL UPDATES ACTIVE',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
         if (_currentStatus == 'ARRIVED' && isDeafPatient)
           _buildArrivedVisualAlert(theme),
+
+        // 5. Resolution / Completion Overlay
+        if (_currentStatus == 'RESOLVED' || _currentStatus == 'COMPLETED')
+          _buildResolutionOverlay(context, theme),
       ],
     );
   }
@@ -442,15 +471,21 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   }
 
   Widget _buildModernStatusTimeline(ThemeData theme, AccessibilitySettings settings) {
-    final statusOrder = ['PENDING', 'RESPONDER_ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED'];
-    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, 4);
+    final statusOrder = ['PENDING', 'ACTIVE', 'ASSIGNED', 'RESPONDER_ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED', 'COMPLETED'];
+    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, statusOrder.length - 1);
+    
+    // Normalize index for a 4-step UI
+    int uiIndex = 0;
+    if (currentIndex >= 1 && currentIndex <= 4) uiIndex = 1;
+    if (currentIndex == 5) uiIndex = 2;
+    if (currentIndex >= 6) uiIndex = 3;
 
     return Column(
       children: [
-        _ModernTimelineItem(label: 'SOS Signal Received', time: '1:42 PM', isDone: currentIndex >= 0, isLast: false),
-        _ModernTimelineItem(label: 'Responder Dispatched', time: '1:44 PM', isDone: currentIndex >= 1, isLast: false),
-        _ModernTimelineItem(label: 'En Route to Location', time: 'ETA 4 min', isDone: currentIndex > 2, isCurrent: currentIndex == 2, isLast: false),
-        _ModernTimelineItem(label: 'Arrived at Destination', time: '--:--', isDone: currentIndex >= 3, isLast: true),
+        _ModernTimelineItem(label: 'SOS Signal Received', time: 'LIVE', isDone: uiIndex >= 0, isLast: false),
+        _ModernTimelineItem(label: 'Responder Dispatched', time: uiIndex >= 1 ? 'CONFIRMED' : '--:--', isDone: uiIndex >= 1, isCurrent: uiIndex == 1, isLast: false),
+        _ModernTimelineItem(label: 'En Route to Location', time: uiIndex >= 2 ? 'TRACKING' : '--:--', isDone: uiIndex >= 2, isCurrent: uiIndex == 2, isLast: false),
+        _ModernTimelineItem(label: 'Arrived at Destination', time: uiIndex >= 3 ? 'HERE' : '--:--', isDone: uiIndex >= 3, isCurrent: uiIndex == 3, isLast: true),
       ],
     );
   }
@@ -478,6 +513,57 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
               child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildResolutionOverlay(BuildContext context, ThemeData theme) {
+    return Positioned.fill(
+      child: Container(
+        color: const Color(0xFF1E293B).withOpacity(0.95),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.greenAccent, width: 2),
+              ),
+              child: const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 80),
+            ),
+            const SizedBox(height: 32),
+            const Text(
+              'EMERGENCY RESOLVED',
+              style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 48),
+              child: Text(
+                'Help has been provided and the situation is now under control.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70, fontSize: 15),
+              ),
+            ),
+            const SizedBox(height: 64),
+            SizedBox(
+              width: 200,
+              child: ElevatedButton(
+                onPressed: () => context.go('/home'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 18),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 8,
+                ),
+                child: const Text('RETURN HOME', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
             ),
           ],
         ),

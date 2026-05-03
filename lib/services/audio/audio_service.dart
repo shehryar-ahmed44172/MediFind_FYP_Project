@@ -7,7 +7,6 @@ class AudioService {
   factory AudioService() {
     return _instance;
   }
-
   AudioService._internal();
 
   late AudioPlayer _audioPlayer;

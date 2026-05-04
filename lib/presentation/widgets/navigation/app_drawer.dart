@@ -92,13 +92,13 @@ class AppDrawer extends ConsumerWidget {
                   title: 'History',
                   onTap: () {
                     final role = user?.role ?? 'PATIENT';
-                    Navigator.pop(context);
+                    Navigator.pop(context); // close drawer first
                     if (role == 'PATIENT') {
-                      context.go('/home/medical-reports');
+                      context.go('/home/medical-reports'); // tab switch — go() OK
                     } else if (role == 'CAREGIVER') {
-                      context.go('/caregiver/history');
+                      context.push('/caregiver/history'); // overlay — push() required
                     } else if (role == 'RESPONDER') {
-                      context.go('/responder/history');
+                      context.go('/responder/history'); // tab switch — go() OK
                     }
                   },
                 ),

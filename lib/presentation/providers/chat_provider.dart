@@ -132,7 +132,15 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
 final getChatRoomForUserProvider = FutureProvider.family<ChatRoom, String>((ref, targetUserId) async {
   // Ensure auth is initialized
   await ref.watch(authRepositoryProvider.future);
-  
+
   final repo = ref.watch(chatRepositoryProvider);
   return repo.createOrGetChatRoom(targetUserId);
+});
+
+// Provider to get/create an emergency chat room (patient ↔ responder)
+// Arg is the emergencyId. Backend auto-resolves the assigned responder.
+final getEmergencyChatRoomProvider = FutureProvider.family<ChatRoom, String>((ref, emergencyId) async {
+  await ref.watch(authRepositoryProvider.future);
+  final repo = ref.watch(chatRepositoryProvider);
+  return repo.createOrGetEmergencyChatRoom(emergencyId);
 });

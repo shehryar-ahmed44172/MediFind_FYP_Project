@@ -44,7 +44,7 @@ class MedicalProfileScreen extends ConsumerWidget {
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add),
                     label: const Text('Create Medical Profile'),
-                    onPressed: () => context.go('/home/medical-profile/edit'),
+                    onPressed: () => context.push('/home/medical-profile/edit'),
                   ),
                 ],
               ),
@@ -159,7 +159,7 @@ class MedicalProfileScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               ElevatedButton.icon(
-                onPressed: () => context.go('/home/medical-profile/edit'),
+                onPressed: () => context.push('/home/medical-profile/edit'),
                 icon: const Icon(Icons.edit_outlined),
                 label: const Text('Edit Medical Profile'),
                 style: ElevatedButton.styleFrom(

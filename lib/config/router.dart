@@ -1,4 +1,4 @@
-// Importing required Flutter materials and Riverpod for state management
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing GoRouter for handling app navigation and routing
@@ -46,6 +46,7 @@ import '../presentation/screens/responder/responder_history_screen.dart';
 import '../presentation/screens/settings/subscription_plans_screen.dart';
 import '../presentation/screens/settings/checkout_screen.dart';
 import '../presentation/screens/settings/payment_success_screen.dart';
+import '../presentation/screens/patient/predefined_messages_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -87,6 +88,9 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _navigatorKey,
     initialLocation: AppConfig.initialRoute,
+    refreshListenable: _container != null 
+        ? GoRouterRefreshStream(_container!.listen(authStateProvider, (prev, next) {}).stream)
+        : null,
     redirect: (context, state) {
       if (_container == null) return null;
       
@@ -167,28 +171,8 @@ class AppRouter {
                 path: '/home',
                 name: 'home',
                 builder: (context, state) => const HomeScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'medical-profile',
-                    name: 'medical-profile',
-                    builder: (context, state) => const MedicalProfileScreen(),
-                  ),
-                  GoRoute(
-                    path: 'medical-profile/edit',
-                    name: 'edit-medical-profile',
-                    builder: (context, state) => const EditMedicalProfileScreen(),
-                  ),
-                  GoRoute(
-                    path: 'patient-type-info',
-                    name: 'patient-type-info',
-                    builder: (context, state) => const PatientTypeInfoScreen(),
-                  ),
-                  GoRoute(
-                    path: 'emergency-contacts',
-                    name: 'emergency-contacts',
-                    builder: (context, state) => const EmergencyContactsScreen(),
-                  ),
-                ],
+                // Sub-pages are top-level routes with parentNavigatorKey so they
+                // render ABOVE the shell and get automatic back-button behaviour.
               ),
             ],
           ),
@@ -242,13 +226,7 @@ class AppRouter {
                 path: '/caregiver',
                 name: 'caregiver-home',
                 builder: (context, state) => const CaregiverHomeScreen(),
-                routes: [
-                  GoRoute(
-                    path: 'history',
-                    name: 'caregiver-history',
-                    builder: (context, state) => const CaregiverHistoryScreen(),
-                  ),
-                ],
+                // caregiver/history is a top-level overlay route (see below)
               ),
             ],
           ),
@@ -334,6 +312,46 @@ class AppRouter {
             ],
           ),
         ],
+      ),
+
+      // -----------------------------------------------------------------------
+      // Patient Sub-Pages (Full Screen overlays above shell)
+      // Lifted out of StatefulShellBranch so they render above the shell and
+      // get automatic back-navigation (AppBar leading arrow / system back).
+      // -----------------------------------------------------------------------
+      GoRoute(
+        path: '/home/medical-profile',
+        name: 'medical-profile',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const MedicalProfileScreen(),
+      ),
+      GoRoute(
+        path: '/home/medical-profile/edit',
+        name: 'edit-medical-profile',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const EditMedicalProfileScreen(),
+      ),
+      GoRoute(
+        path: '/home/patient-type-info',
+        name: 'patient-type-info',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const PatientTypeInfoScreen(),
+      ),
+      GoRoute(
+        path: '/home/emergency-contacts',
+        name: 'emergency-contacts',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const EmergencyContactsScreen(),
+      ),
+
+      // -----------------------------------------------------------------------
+      // Caregiver Sub-Pages (Full Screen overlays above shell)
+      // -----------------------------------------------------------------------
+      GoRoute(
+        path: '/caregiver/history',
+        name: 'caregiver-history',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const CaregiverHistoryScreen(),
       ),
 
       // -----------------------------------------------------------------------
@@ -447,12 +465,37 @@ class AppRouter {
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const DiagnosticsScreen(),
       ),
+      GoRoute(
+        path: '/predefined-messages',
+        name: 'predefined-messages',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const PredefinedMessagesScreen(),
+      ),
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Error')),
       body: Center(child: Text('Page not found: ${state.uri}')),
     ),
   );
+}
+
+/// A Listenable that notifies its listeners when a [Stream] emits a value.
+/// Used to refresh the [GoRouter] when the auth state changes.
+class GoRouterRefreshStream extends ChangeNotifier {
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    notifyListeners();
+    _subscription = stream.asBroadcastStream().listen(
+          (dynamic _) => notifyListeners(),
+        );
+  }
+
+  late final StreamSubscription<dynamic> _subscription;
+
+  @override
+  void dispose() {
+    _subscription.cancel();
+    super.dispose();
+  }
 }
 
 // Temporary placeholder since history is currently part of the dashboard view

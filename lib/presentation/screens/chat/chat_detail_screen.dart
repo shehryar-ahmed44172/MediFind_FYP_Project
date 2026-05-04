@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../domain/entities/chat_message.dart';
+import '../patient/predefined_messages_screen.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
 import '../../../services/audio/voice_recorder_service.dart';
@@ -215,10 +217,90 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  void _showQuickPhrases() {
+    final messages = ref.read(predefinedMessagesProvider);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(24),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.hearing_disabled, color: Color(0xFF0C637E)),
+                const SizedBox(width: 8),
+                const Text('Quick Phrases', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () => Navigator.pop(ctx),
+                  child: const Icon(Icons.close),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (messages.isEmpty)
+              const Center(
+                child: Text('No phrases saved. Go to Settings → Quick Phrases to add them.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey)),
+              )
+            else
+              ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: messages.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (_, i) => ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C637E).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF0C637E), fontWeight: FontWeight.bold, fontSize: 12)),
+                    ),
+                    title: Text(messages[i], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _messageController.text = messages[i];
+                      _messageController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: messages[i].length),
+                      );
+                    },
+                    trailing: IconButton(
+                      icon: const Icon(Icons.send_rounded, color: Color(0xFF0C637E), size: 20),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        ref.read(chatMessagesProvider(widget.roomId).notifier)
+                            .sendMessage(messages[i]);
+                      },
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildMessageInput(ThemeData theme) {
     if (_isRecording) {
       return _buildRecordingOverlay(theme);
     }
+
+    final settings = ref.watch(accessibilityProvider);
+    final isDeaf = settings.textOnlyMode;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 24),
@@ -232,12 +314,57 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isDeaf) ...[
+            // Deaf mode: quick phrases shortcut bar
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                itemCount: ref.watch(predefinedMessagesProvider).take(5).length,
+                separatorBuilder: (_, __) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final msg = ref.watch(predefinedMessagesProvider)[i];
+                  return GestureDetector(
+                    onTap: () {
+                      _messageController.text = msg;
+                      _messageController.selection = TextSelection.fromPosition(
+                        TextPosition(offset: msg.length),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0C637E).withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF0C637E).withOpacity(0.2)),
+                      ),
+                      child: Text(
+                        msg.length > 25 ? '${msg.substring(0, 25)}…' : msg,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF0C637E), fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
         children: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
             onPressed: _showAttachmentOptions,
           ),
+          if (isDeaf)
+            IconButton(
+              icon: const Icon(Icons.hearing_disabled_rounded, color: Color(0xFF2496A7)),
+              tooltip: 'Quick Phrases',
+              onPressed: _showQuickPhrases,
+            ),
           Expanded(
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -283,6 +410,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   );
                 },
               ),
+        ],
+      ),
         ],
       ),
     );

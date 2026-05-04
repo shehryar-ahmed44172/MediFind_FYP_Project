@@ -144,6 +144,23 @@ class MediFindApiClient {
     _dio.options.headers.remove('Authorization');
   }
 
+  Future<void> logout(String refreshToken) async {
+    try {
+      final response = await _dio.post(
+        'auth/logout',
+        data: {
+          'refreshToken': refreshToken,
+        },
+      );
+
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to logout from server');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<Response<dynamic>> _retry(RequestOptions requestOptions) {
     final options = Options(
       method: requestOptions.method,
@@ -676,25 +693,11 @@ class MediFindApiClient {
     }
   }
 
-  Future<MedicalProfile> updateMedicalProfile({
-    required String bloodType,
-    required List<String> chronicDiseases,
-    required List<String> allergies,
-    required List<Map<String, dynamic>> medications,
-    required List<Map<String, dynamic>> emergencyContacts,
-    String? medicalHistory,
-  }) async {
+  Future<MedicalProfile> updateMedicalProfile(Map<String, dynamic> data) async {
     try {
       final response = await _dio.put(
         'medical-profile',
-        data: {
-          'bloodType': bloodType,
-          'chronicDiseases': chronicDiseases,
-          'allergies': allergies,
-          'medications': medications,
-          'emergencyContacts': emergencyContacts,
-          'medicalHistory': medicalHistory,
-        },
+        data: data,
       );
 
       if (response.statusCode == 200) {
@@ -1075,13 +1078,29 @@ class MediFindApiClient {
     }
   }
 
-  Future<dynamic> createOrGetChatRoom(String targetUserId) async {
+  Future<dynamic> createOrGetChatRoom(String targetUserId, {String? emergencyId}) async {
     try {
-      final response = await _dio.post('chat/rooms', data: {'targetUserId': targetUserId});
+      final data = <String, dynamic>{'targetUserId': targetUserId};
+      if (emergencyId != null) data['emergencyId'] = emergencyId;
+      final response = await _dio.post('chat/rooms', data: data);
       if (response.statusCode == 200 || response.statusCode == 201) {
         return response.data;
       }
       throw NetworkException(message: 'Failed to access chat room');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Create or get an emergency chat room — patient side, no responderId needed.
+  /// Backend auto-resolves the assigned responder from the emergency record.
+  Future<dynamic> createOrGetEmergencyChatRoom(String emergencyId) async {
+    try {
+      final response = await _dio.post('chat/rooms', data: {'emergencyId': emergencyId});
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return response.data;
+      }
+      throw NetworkException(message: 'Failed to access emergency chat room');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }

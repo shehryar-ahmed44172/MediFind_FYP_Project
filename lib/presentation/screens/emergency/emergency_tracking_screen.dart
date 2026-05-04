@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
@@ -460,14 +461,33 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     }
   }
 
-  void _openChat() {
-    // Navigate to Chat Screen (Planned Feature)
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Chat feature is coming soon!'),
-        behavior: SnackBarBehavior.floating,
-      ),
+  void _openChat() async {
+    // Show a loading indicator while we create/get the chat room
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
     );
+
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      final room = await repo.createOrGetEmergencyChatRoom(widget.emergencyId);
+      if (mounted) {
+        Navigator.pop(context); // dismiss loading
+        context.push('/chat/${room.id}', extra: _responderName ?? 'Responder');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // dismiss loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not open chat: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Widget _buildModernStatusTimeline(ThemeData theme, AccessibilitySettings settings) {

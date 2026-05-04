@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/audio/voice_alert_service.dart';
 
 /// Represents accessibility settings for the entire application
@@ -19,7 +20,7 @@ class AccessibilitySettings {
     this.highContrast = false,
     this.vibrationFeedback = true,
     this.fontSizeMultiplier = 1.0,
-    this.themeMode = ThemeMode.system,
+    this.themeMode = ThemeMode.light, // Default light — user can change in Settings
   });
 
   /// Create a copy with modified fields
@@ -67,57 +68,106 @@ class AccessibilitySettings {
       themeMode.hashCode;
 }
 
+// ── SharedPreferences keys ────────────────────────────────────────────────
+const _kVoiceGuidance    = 'acc_voiceGuidance';
+const _kTextOnly         = 'acc_textOnly';
+const _kLargeButtons     = 'acc_largeButtons';
+const _kHighContrast     = 'acc_highContrast';
+const _kVibration        = 'acc_vibration';
+const _kFontMultiplier   = 'acc_fontMultiplier';
+const _kThemeMode        = 'acc_themeMode'; // 0=system, 1=light, 2=dark
+
 /// Accessibility Settings Notifier - manages state changes
 class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
-  AccessibilityNotifier() : super(AccessibilitySettings());
+  AccessibilityNotifier() : super(AccessibilitySettings()) {
+    _loadFromPrefs();
+  }
+
+  // ── Persistence helpers ──────────────────────────────────────────────────
+
+  Future<void> _loadFromPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Only apply if there are persisted values (first run returns null)
+    if (!prefs.containsKey(_kVoiceGuidance)) return;
+
+    // 0=light (default), 1=light, 2=dark, 3=system
+    final themeModeIdx = prefs.getInt(_kThemeMode) ?? 0;
+    final themeMode = themeModeIdx == 2
+        ? ThemeMode.dark
+        : themeModeIdx == 3
+            ? ThemeMode.system
+            : ThemeMode.light; // default to light
+
+    state = AccessibilitySettings(
+      voiceGuidanceEnabled: prefs.getBool(_kVoiceGuidance) ?? false,
+      textOnlyMode:         prefs.getBool(_kTextOnly)      ?? false,
+      largeButtons:         prefs.getBool(_kLargeButtons)  ?? false,
+      highContrast:         prefs.getBool(_kHighContrast)  ?? false,
+      vibrationFeedback:    prefs.getBool(_kVibration)     ?? true,
+      fontSizeMultiplier:   prefs.getDouble(_kFontMultiplier) ?? 1.0,
+      themeMode:            themeMode,
+    );
+  }
+
+  Future<void> _saveToPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_kVoiceGuidance,   state.voiceGuidanceEnabled);
+    await prefs.setBool(_kTextOnly,         state.textOnlyMode);
+    await prefs.setBool(_kLargeButtons,     state.largeButtons);
+    await prefs.setBool(_kHighContrast,     state.highContrast);
+    await prefs.setBool(_kVibration,        state.vibrationFeedback);
+    await prefs.setDouble(_kFontMultiplier, state.fontSizeMultiplier);
+    // 0=light, 1=light, 2=dark, 3=system
+    final themeModeIdx = state.themeMode == ThemeMode.dark
+        ? 2
+        : state.themeMode == ThemeMode.system
+            ? 3
+            : 0; // light
+    await prefs.setInt(_kThemeMode, themeModeIdx);
+  }
 
   /// Toggle voice guidance
   void toggleVoiceGuidance() {
-    state = state.copyWith(
-      voiceGuidanceEnabled: !state.voiceGuidanceEnabled,
-    );
+    state = state.copyWith(voiceGuidanceEnabled: !state.voiceGuidanceEnabled);
+    _saveToPrefs();
   }
 
   /// Toggle text-only mode
   void toggleTextOnlyMode() {
-    state = state.copyWith(
-      textOnlyMode: !state.textOnlyMode,
-    );
+    state = state.copyWith(textOnlyMode: !state.textOnlyMode);
+    _saveToPrefs();
   }
 
   /// Toggle large buttons
   void toggleLargeButtons() {
-    state = state.copyWith(
-      largeButtons: !state.largeButtons,
-    );
+    state = state.copyWith(largeButtons: !state.largeButtons);
+    _saveToPrefs();
   }
 
   /// Toggle high contrast
   void toggleHighContrast() {
-    state = state.copyWith(
-      highContrast: !state.highContrast,
-    );
+    state = state.copyWith(highContrast: !state.highContrast);
+    _saveToPrefs();
   }
 
   /// Toggle vibration feedback
   void toggleVibrationFeedback() {
-    state = state.copyWith(
-      vibrationFeedback: !state.vibrationFeedback,
-    );
+    state = state.copyWith(vibrationFeedback: !state.vibrationFeedback);
+    _saveToPrefs();
   }
 
   /// Update font size multiplier
   void setFontSizeMultiplier(double multiplier) {
     // Clamp between 0.8 (20% smaller) and 1.5 (50% larger)
     final clampedMultiplier = multiplier.clamp(0.8, 1.5);
-    state = state.copyWith(
-      fontSizeMultiplier: clampedMultiplier,
-    );
+    state = state.copyWith(fontSizeMultiplier: clampedMultiplier);
+    _saveToPrefs();
   }
 
   /// Update theme mode
   void setThemeMode(ThemeMode mode) {
     state = state.copyWith(themeMode: mode);
+    _saveToPrefs();
   }
 
   String? _initializedFromUserId;
@@ -133,13 +183,15 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
       state = AccessibilitySettings(
         textOnlyMode: true,
         vibrationFeedback: true,
-        highContrast: true, // Now ON by default to show clear difference
-        fontSizeMultiplier: 1.15, // Noticeably larger
+        highContrast: true,
+        fontSizeMultiplier: 1.15,
       );
     } else {
       state = AccessibilitySettings();
     }
-    
+
+    _saveToPrefs();
+
     if (userId != null) {
       _initializedFromUserId = userId;
     }
@@ -168,6 +220,7 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
       vibrationFeedback: vibration,
       fontSizeMultiplier: fontSize,
     );
+    _saveToPrefs();
   }
 }
 

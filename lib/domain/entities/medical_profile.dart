@@ -15,7 +15,9 @@ class MedicalProfile with _$MedicalProfile {
     @Default([]) List<EmergencyContact> emergencyContacts,
     String? medicalHistory,
     String? disabilityType,
+    @Default([]) List<String> disabilities,
     @Default('NORMAL') String patientType,
+    @Default([]) List<String> predefinedMessages,
     String? additionalNotes,
     DateTime? lastUpdated,
   }) = _MedicalProfile;
@@ -59,7 +61,9 @@ class UpdateMedicalProfileRequest with _$UpdateMedicalProfileRequest {
     required List<Map<String, dynamic>> emergencyContacts,
     String? medicalHistory,
     String? disabilityType,
+    @Default([]) List<String> disabilities,
     @Default('NORMAL') String patientType,
+    @Default([]) List<String> predefinedMessages,
     String? additionalNotes,
   }) = _UpdateMedicalProfileRequest;
 

@@ -218,39 +218,113 @@ class AppTextStyles {
 
 class AppTheme {
   static ThemeData buildTheme(AccessibilitySettings settings) {
-    final baseTheme = ThemeData(
+    final hc = settings.highContrast;
+    final bg     = hc ? AppColors.hcBackground : AppColors.background;
+    final surf   = hc ? AppColors.hcSurface    : AppColors.surface;
+    final onSurf = hc ? AppColors.hcOnSurface  : AppColors.onSurface;
+    final prim   = hc ? AppColors.hcPrimary    : AppColors.primary;
+
+    return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.primary,
-        primary: settings.highContrast ? AppColors.hcPrimary : AppColors.primary,
-        onPrimary: settings.highContrast ? AppColors.hcOnPrimary : AppColors.onPrimary,
-        secondary: AppColors.secondary,
-        surface: settings.highContrast ? AppColors.hcSurface : AppColors.surface,
-        onSurface: settings.highContrast ? AppColors.hcOnSurface : AppColors.onSurface,
-        background: settings.highContrast ? AppColors.hcBackground : AppColors.background,
-        error: settings.highContrast ? AppColors.hcAccent : AppColors.error,
+        brightness: Brightness.light,
+        primary:    prim,
+        onPrimary:  hc ? AppColors.hcOnPrimary : Colors.white,
+        secondary:  AppColors.secondaryTeal,
+        surface:    surf,
+        onSurface:  onSurf,
+        error:      hc ? AppColors.hcAccent : AppColors.error,
       ),
-      scaffoldBackgroundColor: settings.highContrast ? AppColors.hcBackground : AppColors.background,
+      scaffoldBackgroundColor: bg,
       fontFamily: 'Montserrat',
       textTheme: _buildTextTheme(settings),
-      elevatedButtonTheme: _buildElevatedButtonTheme(settings),
+
+      // ── AppBar ─────────────────────────────────────────────────────
+      appBarTheme: AppBarTheme(
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.onSurface,
+        elevation: 0,
+        centerTitle: true,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: AppColors.onSurface),
+        titleTextStyle: TextStyle(
+          fontFamily: 'Montserrat',
+          fontSize: 18 * settings.fontSizeMultiplier,
+          fontWeight: FontWeight.w700,
+          color: AppColors.onSurface,
+        ),
+      ),
+
+      // ── Card ───────────────────────────────────────────────────────
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      ),
+
+      // ── Bottom Navigation ──────────────────────────────────────────
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: Color(0xFF94A3B8),
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w700, fontSize: 11),
+        unselectedLabelStyle: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w500, fontSize: 11),
+      ),
+
+      // ── Divider ────────────────────────────────────────────────────
+      dividerTheme: DividerThemeData(
+        color: Colors.grey.shade200,
+        thickness: 1,
+        space: 0,
+      ),
+
+      // ── Icon ───────────────────────────────────────────────────────
+      iconTheme: const IconThemeData(color: AppColors.primary),
+
+      // ── Dialog ─────────────────────────────────────────────────────
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Montserrat',
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+          color: AppColors.onSurface,
+        ),
+      ),
+
+      // ── Chip ───────────────────────────────────────────────────────
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.background,
+        labelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w600, fontSize: 13),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+
+      // ── ListTile ───────────────────────────────────────────────────
+      listTileTheme: const ListTileThemeData(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+
+      elevatedButtonTheme: _buildElevatedButtonTheme(settings, isDark: false),
       inputDecorationTheme: _buildInputDecorationTheme(settings),
+
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: ZoomPageTransitionsBuilder(
-            allowEnterRouteSnapshotting: false,
-          ),
+          TargetPlatform.android: ZoomPageTransitionsBuilder(allowEnterRouteSnapshotting: false),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
           TargetPlatform.windows: ZoomPageTransitionsBuilder(),
         },
       ),
     );
-
-    return baseTheme;
   }
 
   static ThemeData buildDarkTheme(AccessibilitySettings settings) {
-    final m = settings.fontSizeMultiplier;
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
@@ -262,8 +336,6 @@ class AppTheme {
         secondary: AppColors.secondaryTeal,
         surface: AppColors.darkSurface,
         onSurface: AppColors.darkOnSurface,
-        background: AppColors.darkBackground,
-        onBackground: Colors.white,
         error: AppColors.error,
       ),
       scaffoldBackgroundColor: AppColors.darkBackground,
@@ -273,27 +345,62 @@ class AppTheme {
         displayColor: Colors.white,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.darkBackground,
+        backgroundColor: Color(0xFF1E293B),
         foregroundColor: Colors.white,
         elevation: 0,
         centerTitle: true,
+        shadowColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: TextStyle(
+          fontFamily: 'Montserrat',
+          fontSize: 18,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
       ),
       cardTheme: CardThemeData(
         color: AppColors.darkSurface,
         elevation: 0,
+        margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
-      elevatedButtonTheme: _buildElevatedButtonTheme(settings),
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: AppColors.darkSurface,
+        selectedItemColor: AppColors.primaryLight,
+        unselectedItemColor: Colors.white.withOpacity(0.4),
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w700, fontSize: 11),
+        unselectedLabelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w500, fontSize: 11),
+      ),
+      dividerTheme: DividerThemeData(
+        color: Colors.white.withOpacity(0.08),
+        thickness: 1,
+        space: 0,
+      ),
+      iconTheme: const IconThemeData(color: AppColors.primaryLight),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.darkSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        titleTextStyle: const TextStyle(
+          fontFamily: 'Montserrat',
+          fontWeight: FontWeight.w800,
+          fontSize: 18,
+          color: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: _buildElevatedButtonTheme(settings, isDark: true),
       inputDecorationTheme: _buildInputDecorationTheme(settings).copyWith(
         fillColor: AppColors.darkSurface,
+        hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1.5),
         ),
-      ),
-      dividerTheme: DividerThemeData(
-        color: Colors.white.withOpacity(0.1),
-        thickness: 1,
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
+        ),
       ),
     );
   }
@@ -318,11 +425,24 @@ class AppTheme {
     );
   }
 
-  static ElevatedButtonThemeData _buildElevatedButtonTheme(AccessibilitySettings settings) {
+  // isDark = true  → renders on a dark scaffold (use sky blue for contrast)
+  // isDark = false → renders on a light scaffold (use sky blue; primary navy is too dark)
+  static ElevatedButtonThemeData _buildElevatedButtonTheme(
+    AccessibilitySettings settings, {
+    bool isDark = false,
+  }) {
+    final Color bgColor = settings.highContrast
+        ? Colors.black
+        : isDark
+            ? AppColors.primaryLight   // #2891C2 Sky Blue on dark background
+            : AppColors.primaryLight;  // #2891C2 Sky Blue on light background (primary navy is too dark)
+
     return ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: settings.highContrast ? Colors.black : AppColors.primary,
+        backgroundColor: bgColor,
         foregroundColor: Colors.white,
+        elevation: 0,
+        shadowColor: Colors.transparent,
         padding: EdgeInsets.symmetric(
           vertical: settings.largeButtons ? 24 : 16,
           horizontal: 24,
@@ -331,6 +451,7 @@ class AppTheme {
           fontSize: 16 * settings.fontSizeMultiplier,
           fontWeight: FontWeight.bold,
           fontFamily: 'Montserrat',
+          letterSpacing: 0.3,
         ),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),

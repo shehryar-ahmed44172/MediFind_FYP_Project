@@ -77,7 +77,8 @@ class _EditMedicalProfileScreenState
               backgroundColor: Colors.green,
               behavior: SnackBarBehavior.floating),
         );
-        context.go('/home/medical-profile');
+        // Pop back to MedicalProfileScreen — it rebuilds from the Riverpod cache
+        context.pop();
       }
     } catch (e) {
       if (mounted) {

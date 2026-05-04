@@ -101,11 +101,13 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
   }
 
   Widget _buildQuickActionGrid(ThemeData theme) {
+    // 'push': true  → opens as a full-screen overlay above the shell (context.push)
+    // 'push': false → switches tab via shell (context.go)
     final actions = [
-      {'title': 'My Patients', 'icon': Icons.people_rounded, 'color': AppColors.primary, 'route': '/caregiver/my-patients'},
-      {'title': 'Live Map', 'icon': Icons.map_rounded, 'color': Colors.blue, 'route': '/caregiver/maps'},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/caregiver/chats'},
-      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/caregiver/history'},
+      {'title': 'My Patients', 'icon': Icons.people_rounded, 'color': AppColors.primary, 'route': '/caregiver/my-patients', 'push': false},
+      {'title': 'Live Map', 'icon': Icons.map_rounded, 'color': Colors.blue, 'route': '/caregiver/maps', 'push': false},
+      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/caregiver/chats', 'push': false},
+      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/caregiver/history', 'push': true},
     ];
 
     return GridView.builder(
@@ -126,7 +128,12 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
           onTap: () {
             final route = action['route'] as String?;
             if (route != null) {
-              context.go(route);
+              final shouldPush = action['push'] as bool? ?? false;
+              if (shouldPush) {
+                context.push(route);
+              } else {
+                context.go(route);
+              }
             }
           },
           borderRadius: BorderRadius.circular(24),

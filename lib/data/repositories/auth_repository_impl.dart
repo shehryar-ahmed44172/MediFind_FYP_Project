@@ -56,8 +56,20 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> logout() async {
-    await localDataSource.clearAuthToken();
-    apiClient.clearAuthToken();
+    try {
+      final refreshToken = await localDataSource.getRefreshToken();
+      if (refreshToken != null && refreshToken.isNotEmpty) {
+        debugPrint('🚪 AuthRepository: Calling backend logout API');
+        await apiClient.logout(refreshToken);
+      }
+    } catch (e) {
+      debugPrint('⚠️ AuthRepository: Backend logout failed (ignoring to ensure local cleanup): $e');
+    } finally {
+      debugPrint('🚪 AuthRepository: Clearing local auth data');
+      await localDataSource.clearAuthToken();
+      apiClient.clearAuthToken();
+      SocketService.instance.disconnect();
+    }
   }
 
   @override

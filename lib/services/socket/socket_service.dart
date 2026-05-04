@@ -149,15 +149,18 @@ class SocketService {
     print('Left chat room: $roomId');
   }
 
-  void sendLocationUpdate(double latitude, double longitude) {
+  void sendLocationUpdate(
+    String emergencyId,
+    double latitude,
+    double longitude,
+    String status,
+  ) {
     if (!_isConnected || _socket == null) return;
-    
-    // The guide says POST /api/responders/location for general, 
-    // but often sockets are used for frequent updates.
-    // If the backend expects a specific event for live tracking, we add it here.
     _socket!.emit('update_location', {
+      'emergencyId': emergencyId,
       'latitude': latitude,
       'longitude': longitude,
+      'status': status,
       'timestamp': DateTime.now().toIso8601String(),
     });
   }

@@ -9,6 +9,7 @@ import '../../../services/audio/voice_alert_service.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../services/location/location_service.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
+import '../../providers/chat_provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'dart:async';
 
@@ -84,8 +85,10 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         
         if (_currentStatus != 'RESOLVED') {
           SocketService.instance.sendLocationUpdate(
+            widget.emergencyId,
             position.latitude,
             position.longitude,
+            _currentStatus,
           );
         }
         
@@ -166,6 +169,33 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to cancel: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _openEmergencyChat(BuildContext context, emergency_entity.Emergency emergency) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      // Responder creates room with patientId as targetUserId + emergencyId
+      final room = await repo.createOrGetChatRoom(
+        emergency.userId, // patientId
+        emergencyId: widget.emergencyId,
+      );
+      if (mounted) {
+        Navigator.pop(context);
+        context.push('/chat/${room.id}', extra: 'Patient');
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open chat: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -292,6 +322,17 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                 ),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.green, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () => _openEmergencyChat(context, emergency),
+                icon: const Icon(Icons.chat_bubble_outline_rounded, color: Color(0xFF0C637E)),
+                label: const Text('Message Patient', style: TextStyle(color: Color(0xFF0C637E), fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  side: const BorderSide(color: Color(0xFF0C637E), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ] else ...[
               Container(

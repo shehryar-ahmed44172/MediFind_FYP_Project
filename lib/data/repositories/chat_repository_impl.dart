@@ -32,8 +32,14 @@ class ChatRepositoryImpl implements ChatRepository {
   }
 
   @override
-  Future<ChatRoom> createOrGetChatRoom(String targetUserId) async {
-    final response = await apiClient.createOrGetChatRoom(targetUserId);
+  Future<ChatRoom> createOrGetChatRoom(String targetUserId, {String? emergencyId}) async {
+    final response = await apiClient.createOrGetChatRoom(targetUserId, emergencyId: emergencyId);
+    return ChatRoom.fromJson(response as Map<String, dynamic>);
+  }
+
+  @override
+  Future<ChatRoom> createOrGetEmergencyChatRoom(String emergencyId) async {
+    final response = await apiClient.createOrGetEmergencyChatRoom(emergencyId);
     return ChatRoom.fromJson(response as Map<String, dynamic>);
   }
 

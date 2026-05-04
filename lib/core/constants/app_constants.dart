@@ -1,20 +1,33 @@
 /// API and app configuration constants
 class AppConstants {
-  // Environment Flag
+  // ── Environment Flag ──────────────────────────────────────────────────────
+  // true  = use LAN IP below (local testing, phone + PC on same WiFi)
+  // false = use production URLs
   static const bool isDevelopment = true;
-  
-  // Base URLs (Android Emulator uses 10.0.2.2, iOS uses localhost)
-  static const String _devBaseUrl = 'https://wastingly-glariest-gearldine.ngrok-free.dev/api/';
-  static const String _prodBaseUrl = 'https://api.medifind.com/api/';
-  static String get baseUrl => isDevelopment ? _devBaseUrl : _prodBaseUrl;
 
-  // WebSocket & Socket.io Configuration
-  static const String _devWsUrl = 'wss://wastingly-glariest-gearldine.ngrok-free.dev/';
-  static const String _prodWsUrl = 'wss://api.medifind.com/';
-  static String get wsUrl => isDevelopment ? _devWsUrl : _prodWsUrl;
+  // ── LAN / Local Testing ───────────────────────────────────────────────────
+  // Your PC's local IP address. To find it:
+  //   Windows → open CMD → type `ipconfig` → look for "IPv4 Address"
+  //   It usually looks like 192.168.x.x
+  //
+  // Requirements:
+  //   • Phone and PC must be on the SAME WiFi network
+  //   • Backend must be running: `npm run dev` in medifind-backend
+  //   • Windows Firewall must allow port 3000 (see README if blocked)
+  static const String _lanIp       = '192.168.100.86'; // ← your PC's IPv4
+  static const int    _backendPort = 3000;
 
-  static const String _devSocketUrl = 'https://wastingly-glariest-gearldine.ngrok-free.dev/';
+  static const String _devBaseUrl   = 'http://$_lanIp:$_backendPort/api/';
+  static const String _devWsUrl     = 'ws://$_lanIp:$_backendPort/';
+  static const String _devSocketUrl = 'http://$_lanIp:$_backendPort';
+
+  // ── Production URLs ───────────────────────────────────────────────────────
+  static const String _prodBaseUrl   = 'https://api.medifind.com/api/';
+  static const String _prodWsUrl     = 'wss://api.medifind.com/';
   static const String _prodSocketUrl = 'https://api.medifind.com';
+
+  static String get baseUrl   => isDevelopment ? _devBaseUrl   : _prodBaseUrl;
+  static String get wsUrl     => isDevelopment ? _devWsUrl     : _prodWsUrl;
   static String get socketUrl => isDevelopment ? _devSocketUrl : _prodSocketUrl;
 
   static const String apiVersion = 'v1';

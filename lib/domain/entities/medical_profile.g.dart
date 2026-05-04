@@ -29,7 +29,15 @@ _$MedicalProfileImpl _$$MedicalProfileImplFromJson(Map<String, dynamic> json) =>
           const [],
       medicalHistory: json['medicalHistory'] as String?,
       disabilityType: json['disabilityType'] as String?,
+      disabilities: (json['disabilities'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       patientType: json['patientType'] as String? ?? 'NORMAL',
+      predefinedMessages: (json['predefinedMessages'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       additionalNotes: json['additionalNotes'] as String?,
       lastUpdated: json['lastUpdated'] == null
           ? null
@@ -48,7 +56,9 @@ Map<String, dynamic> _$$MedicalProfileImplToJson(
       'emergencyContacts': instance.emergencyContacts,
       'medicalHistory': instance.medicalHistory,
       'disabilityType': instance.disabilityType,
+      'disabilities': instance.disabilities,
       'patientType': instance.patientType,
+      'predefinedMessages': instance.predefinedMessages,
       'additionalNotes': instance.additionalNotes,
       'lastUpdated': instance.lastUpdated?.toIso8601String(),
     };
@@ -102,7 +112,15 @@ _$UpdateMedicalProfileRequestImpl _$$UpdateMedicalProfileRequestImplFromJson(
           .toList(),
       medicalHistory: json['medicalHistory'] as String?,
       disabilityType: json['disabilityType'] as String?,
+      disabilities: (json['disabilities'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       patientType: json['patientType'] as String? ?? 'NORMAL',
+      predefinedMessages: (json['predefinedMessages'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const [],
       additionalNotes: json['additionalNotes'] as String?,
     );
 
@@ -116,6 +134,8 @@ Map<String, dynamic> _$$UpdateMedicalProfileRequestImplToJson(
       'emergencyContacts': instance.emergencyContacts,
       'medicalHistory': instance.medicalHistory,
       'disabilityType': instance.disabilityType,
+      'disabilities': instance.disabilities,
       'patientType': instance.patientType,
+      'predefinedMessages': instance.predefinedMessages,
       'additionalNotes': instance.additionalNotes,
     };

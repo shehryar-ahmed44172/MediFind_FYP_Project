@@ -6,13 +6,17 @@ import 'package:go_router/go_router.dart';
 import '../audio/voice_alert_service.dart';
 import '../../data/datasources/local/local_data_source.dart';
 import '../../presentation/widgets/common/emergency_timer.dart';
+import '../../firebase_options.dart';
 
-// Top-level function for background message handling
+// Top-level background handler — MUST use DefaultFirebaseOptions so Firebase
+// can init correctly in the separate background isolate.
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-  print('Handling a background message: ${message.messageId}');
-  // Implement background fallback logic if needed
+  // Guard: only init if not already initialized (background isolate starts fresh)
+  if (Firebase.apps.isEmpty) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  }
+  debugPrint('📨 FCM Background message received: ${message.messageId}');
 }
 
 class PushNotificationService {
@@ -21,12 +25,20 @@ class PushNotificationService {
   static BuildContext? _currentDialogContext;
   static LocalDataSource? _localDataSource;
 
+  // Callback set by main.dart so token refresh can reach Riverpod providers
+  static Future<void> Function(String token)? _onTokenRefreshCallback;
+
+  static void setTokenRefreshCallback(Future<void> Function(String token) cb) {
+    _onTokenRefreshCallback = cb;
+  }
+
   static Future<void> initialize(GlobalKey<NavigatorState> navigatorKey, LocalDataSource localDataSource) async {
     try {
       _navigatorKey = navigatorKey;
       _localDataSource = localDataSource;
-      await Firebase.initializeApp();
-      
+      // Firebase is already initialized in main() with DefaultFirebaseOptions.
+      // Do NOT call initializeApp() again — it throws on some Android versions.
+
       // Request permissions
       NotificationSettings settings = await _firebaseMessaging.requestPermission(
         alert: true,
@@ -39,6 +51,20 @@ class PushNotificationService {
       }
 
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+      // Auto-refresh: when FCM rotates the token (every ~30 days) send the
+      // new token to the backend so push delivery never breaks silently.
+      _firebaseMessaging.onTokenRefresh.listen((newToken) async {
+        debugPrint('🔄 FCM token rotated — syncing to backend...');
+        if (_onTokenRefreshCallback != null) {
+          try {
+            await _onTokenRefreshCallback!(newToken);
+            debugPrint('✅ Refreshed FCM token synced to backend');
+          } catch (e) {
+            debugPrint('❌ Failed to sync refreshed FCM token: $e');
+          }
+        }
+      });
 
       // Handle foreground messages
       FirebaseMessaging.onMessage.listen((RemoteMessage message) async {

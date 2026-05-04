@@ -66,6 +66,17 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
     await Future.microtask(() async {
       // 2. Initialize Push Notification Service (Plan v5: Passed localDataSource)
       final localDataSource = await ref.read(localDataSourceProvider.future);
+
+      // Wire token-refresh callback BEFORE initialize() so the listener is set
+      // when Firebase fires it during the initialize() call itself.
+      PushNotificationService.setTokenRefreshCallback((newToken) async {
+        try {
+          await ref.read(updateFcmTokenProvider(newToken).future);
+        } catch (e) {
+          debugPrint('❌ Token refresh sync failed: $e');
+        }
+      });
+
       if (context.mounted) {
         await PushNotificationService.initialize(AppRouter.navigatorKey, localDataSource);
       }
@@ -76,10 +87,10 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
       // Fetch the FCM token
       final token = await PushNotificationService.getToken();
       if (token != null) {
-        print('\n\n======================================================');
-        print('🚀 YOUR FCM DEVICE TOKEN FOR BACKEND TESTING 🚀');
-        print(token);
-        print('======================================================\n\n');
+        debugPrint('\n======================================================');
+        debugPrint('🚀 FCM DEVICE TOKEN (for backend testing):');
+        debugPrint(token);
+        debugPrint('======================================================\n');
       }
     });
 

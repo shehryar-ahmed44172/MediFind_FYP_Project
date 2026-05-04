@@ -7,6 +7,7 @@ import '../../domain/repositories/auth_repository.dart';
 import '../../domain/entities/user.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/location/responder_location_tracker.dart';
 
 // API Client Provider
 final dioProvider = Provider<Dio>((ref) {
@@ -56,6 +57,7 @@ final Provider<MediFindApiClient> apiClientProvider = Provider<MediFindApiClient
     Future.delayed(Duration.zero, () {
       ref.read(localDataSourceProvider.future).then((ds) {
         ds.clearAuthToken();
+        ref.read(apiClientProvider).clearAuthToken();
         ref.invalidate(authStateProvider);
       });
     });
@@ -152,16 +154,8 @@ final logoutProvider = FutureProvider<void>((ref) async {
   ref.invalidate(currentUserRoleProvider);
   ref.invalidate(currentUserProvider);
   
-  // Invalidate all connection/patient data to prevent leakage
-  // We use a broader approach by invalidating the repository-linked providers
-  // Search for these in caregiver_providers.dart if needed, but we can explicitly list them
-  // Note: Since we can't easily import all if they are in other files without cross-imports,
-  // we invalidate the ones we know are common.
-  
-  // These are from caregiver_providers.dart
-  // We don't strictly need to import them to invalidate them if we have the reference,
-  // but it's better to ensure they are available or use more generic reset if possible.
-  // Actually, Riverpod's ref.invalidate works with the provider variable.
+  // Stop background tracking for Responders
+  ref.invalidate(responderLocationTrackerProvider);
 });
 
 // Update FCM Token provider

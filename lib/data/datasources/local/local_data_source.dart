@@ -71,8 +71,8 @@ class LocalDataSource {
 
   Future<void> clearAuthToken() async {
     try {
-      await _authBox.delete(AppConstants.jwtTokenKey);
-      await _authBox.delete('refresh_token');
+      // Clear entire box to remove token, refresh_token, current_user_id, and current_user_role
+      await _authBox.clear();
     } catch (e) {
       throw DatabaseException(message: 'Failed to clear tokens', originalException: e);
     }

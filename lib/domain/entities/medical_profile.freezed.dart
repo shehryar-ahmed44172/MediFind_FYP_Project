@@ -30,7 +30,9 @@ mixin _$MedicalProfile {
       throw _privateConstructorUsedError;
   String? get medicalHistory => throw _privateConstructorUsedError;
   String? get disabilityType => throw _privateConstructorUsedError;
+  List<String> get disabilities => throw _privateConstructorUsedError;
   String get patientType => throw _privateConstructorUsedError;
+  List<String> get predefinedMessages => throw _privateConstructorUsedError;
   String? get additionalNotes => throw _privateConstructorUsedError;
   DateTime? get lastUpdated => throw _privateConstructorUsedError;
 
@@ -56,7 +58,9 @@ abstract class $MedicalProfileCopyWith<$Res> {
       List<EmergencyContact> emergencyContacts,
       String? medicalHistory,
       String? disabilityType,
+      List<String> disabilities,
       String patientType,
+      List<String> predefinedMessages,
       String? additionalNotes,
       DateTime? lastUpdated});
 }
@@ -83,7 +87,9 @@ class _$MedicalProfileCopyWithImpl<$Res, $Val extends MedicalProfile>
     Object? emergencyContacts = null,
     Object? medicalHistory = freezed,
     Object? disabilityType = freezed,
+    Object? disabilities = null,
     Object? patientType = null,
+    Object? predefinedMessages = null,
     Object? additionalNotes = freezed,
     Object? lastUpdated = freezed,
   }) {
@@ -124,10 +130,18 @@ class _$MedicalProfileCopyWithImpl<$Res, $Val extends MedicalProfile>
           ? _value.disabilityType
           : disabilityType // ignore: cast_nullable_to_non_nullable
               as String?,
+      disabilities: null == disabilities
+          ? _value.disabilities
+          : disabilities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       patientType: null == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
               as String,
+      predefinedMessages: null == predefinedMessages
+          ? _value.predefinedMessages
+          : predefinedMessages // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       additionalNotes: freezed == additionalNotes
           ? _value.additionalNotes
           : additionalNotes // ignore: cast_nullable_to_non_nullable
@@ -158,7 +172,9 @@ abstract class _$$MedicalProfileImplCopyWith<$Res>
       List<EmergencyContact> emergencyContacts,
       String? medicalHistory,
       String? disabilityType,
+      List<String> disabilities,
       String patientType,
+      List<String> predefinedMessages,
       String? additionalNotes,
       DateTime? lastUpdated});
 }
@@ -183,7 +199,9 @@ class __$$MedicalProfileImplCopyWithImpl<$Res>
     Object? emergencyContacts = null,
     Object? medicalHistory = freezed,
     Object? disabilityType = freezed,
+    Object? disabilities = null,
     Object? patientType = null,
+    Object? predefinedMessages = null,
     Object? additionalNotes = freezed,
     Object? lastUpdated = freezed,
   }) {
@@ -224,10 +242,18 @@ class __$$MedicalProfileImplCopyWithImpl<$Res>
           ? _value.disabilityType
           : disabilityType // ignore: cast_nullable_to_non_nullable
               as String?,
+      disabilities: null == disabilities
+          ? _value._disabilities
+          : disabilities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       patientType: null == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
               as String,
+      predefinedMessages: null == predefinedMessages
+          ? _value._predefinedMessages
+          : predefinedMessages // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       additionalNotes: freezed == additionalNotes
           ? _value.additionalNotes
           : additionalNotes // ignore: cast_nullable_to_non_nullable
@@ -253,13 +279,17 @@ class _$MedicalProfileImpl implements _MedicalProfile {
       final List<EmergencyContact> emergencyContacts = const [],
       this.medicalHistory,
       this.disabilityType,
+      final List<String> disabilities = const [],
       this.patientType = 'NORMAL',
+      final List<String> predefinedMessages = const [],
       this.additionalNotes,
       this.lastUpdated})
       : _chronicDiseases = chronicDiseases,
         _allergies = allergies,
         _medications = medications,
-        _emergencyContacts = emergencyContacts;
+        _emergencyContacts = emergencyContacts,
+        _disabilities = disabilities,
+        _predefinedMessages = predefinedMessages;
 
   factory _$MedicalProfileImpl.fromJson(Map<String, dynamic> json) =>
       _$$MedicalProfileImplFromJson(json);
@@ -311,9 +341,28 @@ class _$MedicalProfileImpl implements _MedicalProfile {
   final String? medicalHistory;
   @override
   final String? disabilityType;
+  final List<String> _disabilities;
+  @override
+  @JsonKey()
+  List<String> get disabilities {
+    if (_disabilities is EqualUnmodifiableListView) return _disabilities;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_disabilities);
+  }
+
   @override
   @JsonKey()
   final String patientType;
+  final List<String> _predefinedMessages;
+  @override
+  @JsonKey()
+  List<String> get predefinedMessages {
+    if (_predefinedMessages is EqualUnmodifiableListView)
+      return _predefinedMessages;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_predefinedMessages);
+  }
+
   @override
   final String? additionalNotes;
   @override
@@ -321,7 +370,7 @@ class _$MedicalProfileImpl implements _MedicalProfile {
 
   @override
   String toString() {
-    return 'MedicalProfile(id: $id, userId: $userId, bloodType: $bloodType, chronicDiseases: $chronicDiseases, allergies: $allergies, medications: $medications, emergencyContacts: $emergencyContacts, medicalHistory: $medicalHistory, disabilityType: $disabilityType, patientType: $patientType, additionalNotes: $additionalNotes, lastUpdated: $lastUpdated)';
+    return 'MedicalProfile(id: $id, userId: $userId, bloodType: $bloodType, chronicDiseases: $chronicDiseases, allergies: $allergies, medications: $medications, emergencyContacts: $emergencyContacts, medicalHistory: $medicalHistory, disabilityType: $disabilityType, disabilities: $disabilities, patientType: $patientType, predefinedMessages: $predefinedMessages, additionalNotes: $additionalNotes, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -345,8 +394,12 @@ class _$MedicalProfileImpl implements _MedicalProfile {
                 other.medicalHistory == medicalHistory) &&
             (identical(other.disabilityType, disabilityType) ||
                 other.disabilityType == disabilityType) &&
+            const DeepCollectionEquality()
+                .equals(other._disabilities, _disabilities) &&
             (identical(other.patientType, patientType) ||
                 other.patientType == patientType) &&
+            const DeepCollectionEquality()
+                .equals(other._predefinedMessages, _predefinedMessages) &&
             (identical(other.additionalNotes, additionalNotes) ||
                 other.additionalNotes == additionalNotes) &&
             (identical(other.lastUpdated, lastUpdated) ||
@@ -366,7 +419,9 @@ class _$MedicalProfileImpl implements _MedicalProfile {
       const DeepCollectionEquality().hash(_emergencyContacts),
       medicalHistory,
       disabilityType,
+      const DeepCollectionEquality().hash(_disabilities),
       patientType,
+      const DeepCollectionEquality().hash(_predefinedMessages),
       additionalNotes,
       lastUpdated);
 
@@ -396,7 +451,9 @@ abstract class _MedicalProfile implements MedicalProfile {
       final List<EmergencyContact> emergencyContacts,
       final String? medicalHistory,
       final String? disabilityType,
+      final List<String> disabilities,
       final String patientType,
+      final List<String> predefinedMessages,
       final String? additionalNotes,
       final DateTime? lastUpdated}) = _$MedicalProfileImpl;
 
@@ -422,7 +479,11 @@ abstract class _MedicalProfile implements MedicalProfile {
   @override
   String? get disabilityType;
   @override
+  List<String> get disabilities;
+  @override
   String get patientType;
+  @override
+  List<String> get predefinedMessages;
   @override
   String? get additionalNotes;
   @override
@@ -819,7 +880,9 @@ mixin _$UpdateMedicalProfileRequest {
       throw _privateConstructorUsedError;
   String? get medicalHistory => throw _privateConstructorUsedError;
   String? get disabilityType => throw _privateConstructorUsedError;
+  List<String> get disabilities => throw _privateConstructorUsedError;
   String get patientType => throw _privateConstructorUsedError;
+  List<String> get predefinedMessages => throw _privateConstructorUsedError;
   String? get additionalNotes => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -844,7 +907,9 @@ abstract class $UpdateMedicalProfileRequestCopyWith<$Res> {
       List<Map<String, dynamic>> emergencyContacts,
       String? medicalHistory,
       String? disabilityType,
+      List<String> disabilities,
       String patientType,
+      List<String> predefinedMessages,
       String? additionalNotes});
 }
 
@@ -869,7 +934,9 @@ class _$UpdateMedicalProfileRequestCopyWithImpl<$Res,
     Object? emergencyContacts = null,
     Object? medicalHistory = freezed,
     Object? disabilityType = freezed,
+    Object? disabilities = null,
     Object? patientType = null,
+    Object? predefinedMessages = null,
     Object? additionalNotes = freezed,
   }) {
     return _then(_value.copyWith(
@@ -901,10 +968,18 @@ class _$UpdateMedicalProfileRequestCopyWithImpl<$Res,
           ? _value.disabilityType
           : disabilityType // ignore: cast_nullable_to_non_nullable
               as String?,
+      disabilities: null == disabilities
+          ? _value.disabilities
+          : disabilities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       patientType: null == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
               as String,
+      predefinedMessages: null == predefinedMessages
+          ? _value.predefinedMessages
+          : predefinedMessages // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       additionalNotes: freezed == additionalNotes
           ? _value.additionalNotes
           : additionalNotes // ignore: cast_nullable_to_non_nullable
@@ -930,7 +1005,9 @@ abstract class _$$UpdateMedicalProfileRequestImplCopyWith<$Res>
       List<Map<String, dynamic>> emergencyContacts,
       String? medicalHistory,
       String? disabilityType,
+      List<String> disabilities,
       String patientType,
+      List<String> predefinedMessages,
       String? additionalNotes});
 }
 
@@ -954,7 +1031,9 @@ class __$$UpdateMedicalProfileRequestImplCopyWithImpl<$Res>
     Object? emergencyContacts = null,
     Object? medicalHistory = freezed,
     Object? disabilityType = freezed,
+    Object? disabilities = null,
     Object? patientType = null,
+    Object? predefinedMessages = null,
     Object? additionalNotes = freezed,
   }) {
     return _then(_$UpdateMedicalProfileRequestImpl(
@@ -986,10 +1065,18 @@ class __$$UpdateMedicalProfileRequestImplCopyWithImpl<$Res>
           ? _value.disabilityType
           : disabilityType // ignore: cast_nullable_to_non_nullable
               as String?,
+      disabilities: null == disabilities
+          ? _value._disabilities
+          : disabilities // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       patientType: null == patientType
           ? _value.patientType
           : patientType // ignore: cast_nullable_to_non_nullable
               as String,
+      predefinedMessages: null == predefinedMessages
+          ? _value._predefinedMessages
+          : predefinedMessages // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       additionalNotes: freezed == additionalNotes
           ? _value.additionalNotes
           : additionalNotes // ignore: cast_nullable_to_non_nullable
@@ -1010,12 +1097,16 @@ class _$UpdateMedicalProfileRequestImpl
       required final List<Map<String, dynamic>> emergencyContacts,
       this.medicalHistory,
       this.disabilityType,
+      final List<String> disabilities = const [],
       this.patientType = 'NORMAL',
+      final List<String> predefinedMessages = const [],
       this.additionalNotes})
       : _chronicDiseases = chronicDiseases,
         _allergies = allergies,
         _medications = medications,
-        _emergencyContacts = emergencyContacts;
+        _emergencyContacts = emergencyContacts,
+        _disabilities = disabilities,
+        _predefinedMessages = predefinedMessages;
 
   factory _$UpdateMedicalProfileRequestImpl.fromJson(
           Map<String, dynamic> json) =>
@@ -1060,15 +1151,34 @@ class _$UpdateMedicalProfileRequestImpl
   final String? medicalHistory;
   @override
   final String? disabilityType;
+  final List<String> _disabilities;
+  @override
+  @JsonKey()
+  List<String> get disabilities {
+    if (_disabilities is EqualUnmodifiableListView) return _disabilities;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_disabilities);
+  }
+
   @override
   @JsonKey()
   final String patientType;
+  final List<String> _predefinedMessages;
+  @override
+  @JsonKey()
+  List<String> get predefinedMessages {
+    if (_predefinedMessages is EqualUnmodifiableListView)
+      return _predefinedMessages;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_predefinedMessages);
+  }
+
   @override
   final String? additionalNotes;
 
   @override
   String toString() {
-    return 'UpdateMedicalProfileRequest(bloodType: $bloodType, chronicDiseases: $chronicDiseases, allergies: $allergies, medications: $medications, emergencyContacts: $emergencyContacts, medicalHistory: $medicalHistory, disabilityType: $disabilityType, patientType: $patientType, additionalNotes: $additionalNotes)';
+    return 'UpdateMedicalProfileRequest(bloodType: $bloodType, chronicDiseases: $chronicDiseases, allergies: $allergies, medications: $medications, emergencyContacts: $emergencyContacts, medicalHistory: $medicalHistory, disabilityType: $disabilityType, disabilities: $disabilities, patientType: $patientType, predefinedMessages: $predefinedMessages, additionalNotes: $additionalNotes)';
   }
 
   @override
@@ -1090,8 +1200,12 @@ class _$UpdateMedicalProfileRequestImpl
                 other.medicalHistory == medicalHistory) &&
             (identical(other.disabilityType, disabilityType) ||
                 other.disabilityType == disabilityType) &&
+            const DeepCollectionEquality()
+                .equals(other._disabilities, _disabilities) &&
             (identical(other.patientType, patientType) ||
                 other.patientType == patientType) &&
+            const DeepCollectionEquality()
+                .equals(other._predefinedMessages, _predefinedMessages) &&
             (identical(other.additionalNotes, additionalNotes) ||
                 other.additionalNotes == additionalNotes));
   }
@@ -1107,7 +1221,9 @@ class _$UpdateMedicalProfileRequestImpl
       const DeepCollectionEquality().hash(_emergencyContacts),
       medicalHistory,
       disabilityType,
+      const DeepCollectionEquality().hash(_disabilities),
       patientType,
+      const DeepCollectionEquality().hash(_predefinedMessages),
       additionalNotes);
 
   @JsonKey(ignore: true)
@@ -1135,7 +1251,9 @@ abstract class _UpdateMedicalProfileRequest
       required final List<Map<String, dynamic>> emergencyContacts,
       final String? medicalHistory,
       final String? disabilityType,
+      final List<String> disabilities,
       final String patientType,
+      final List<String> predefinedMessages,
       final String? additionalNotes}) = _$UpdateMedicalProfileRequestImpl;
 
   factory _UpdateMedicalProfileRequest.fromJson(Map<String, dynamic> json) =
@@ -1156,7 +1274,11 @@ abstract class _UpdateMedicalProfileRequest
   @override
   String? get disabilityType;
   @override
+  List<String> get disabilities;
+  @override
   String get patientType;
+  @override
+  List<String> get predefinedMessages;
   @override
   String? get additionalNotes;
   @override

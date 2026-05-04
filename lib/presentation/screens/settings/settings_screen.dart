@@ -62,7 +62,7 @@ class SettingsScreen extends ConsumerWidget {
                     'Update blood group, allergies & conditions',
                     const Color(0xFFEF4444),
                     theme,
-                    () => context.go('/home/medical-profile'),
+                    () => context.push('/home/medical-profile'),
                   ),
                   const SizedBox(height: 16),
                   _buildSettingsTile(
@@ -75,6 +75,19 @@ class SettingsScreen extends ConsumerWidget {
                     () => context.go('/home/caregivers'),
                   ),
                   const SizedBox(height: 16),
+                  // Deaf Patient — predefined messages
+                  if ((user?.patientType?.toUpperCase() ?? '') == 'DEAF') ...[
+                    _buildSettingsTile(
+                      context,
+                      Icons.hearing_disabled_rounded,
+                      'Quick Phrases',
+                      'Set up pre-written phrases for silent SOS communication',
+                      const Color(0xFF2496A7),
+                      theme,
+                      () => context.push('/predefined-messages'),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _buildSettingsTile(
                     context,
                     Icons.card_membership_rounded,

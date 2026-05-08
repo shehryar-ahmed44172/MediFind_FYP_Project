@@ -17,15 +17,16 @@ class PatientShell extends ConsumerStatefulWidget {
 
 class _PatientShellState extends ConsumerState<PatientShell> {
   Future<bool?> _showExitDialog() {
+    final theme = Theme.of(context);
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.exit_to_app_rounded, color: Colors.orange),
-            SizedBox(width: 10),
-            Expanded(child: Text('Exit MediFind?')),
+            Icon(Icons.exit_to_app_rounded, color: theme.colorScheme.tertiary),
+            const SizedBox(width: 10),
+            const Expanded(child: Text('Exit MediFind?')),
           ],
         ),
         content: const Text(
@@ -37,7 +38,7 @@ class _PatientShellState extends ConsumerState<PatientShell> {
             child: const Text('Stay'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Exit', style: TextStyle(color: Colors.white)),
           ),
@@ -112,8 +113,6 @@ class _PatientShellState extends ConsumerState<PatientShell> {
                 currentIndex: currentIndex,
                 onTap: (index) => widget.navigationShell.goBranch(index),
                 type: BottomNavigationBarType.fixed,
-                selectedItemColor: AppColors.primary,
-                unselectedItemColor: Colors.grey,
                 showUnselectedLabels: true,
                 items: const [
                   BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),

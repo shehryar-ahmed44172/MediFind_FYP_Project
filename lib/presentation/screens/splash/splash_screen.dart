@@ -90,14 +90,20 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProvider
             context.go('/home');
           }
           return;
+        } else {
+          // If user is null but we were supposedly logged in, it's a stale session
+          debugPrint('⚠️ Splash: User profile is null but authState is true. Clearing stale session.');
+          await ref.read(logoutProvider.future).catchError((_) => null);
         }
       }
       
       // Default fallback to login
-      context.go('/login');
+      if (mounted) context.go('/login');
     } catch (e) {
-      // On error, fallback to login
-      context.go('/login');
+      debugPrint('⚠️ Splash: Initial profile fetch failed. Forcing logout to clear stale session.');
+      // Explicitly logout to clear Hive tokens and avoid infinite loop in router
+      await ref.read(logoutProvider.future).catchError((_) => null);
+      if (mounted) context.go('/login');
     }
   }
 

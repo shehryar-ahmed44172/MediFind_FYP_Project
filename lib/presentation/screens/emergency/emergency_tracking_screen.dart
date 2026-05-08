@@ -190,6 +190,170 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     });
   }
 
+  // ── AAC Communication Board ─────────────────────────────────────────────────
+  // Eight universal emergency phrases with icons.
+  // Tapping one sends it instantly to the assigned responder via emergency chat.
+
+  static const List<Map<String, dynamic>> _emergencyPhrases = [
+    {'icon': Icons.emergency_rounded,        'text': 'I need immediate help!'},
+    {'icon': Icons.hearing_disabled_rounded, 'text': 'I am Deaf — use text chat.'},
+    {'icon': Icons.favorite_rounded,         'text': 'I have chest pain.'},
+    {'icon': Icons.air_rounded,              'text': 'I cannot breathe.'},
+    {'icon': Icons.bolt_rounded,             'text': 'I am having a seizure.'},
+    {'icon': Icons.local_hospital_rounded,   'text': 'Please call an ambulance.'},
+    {'icon': Icons.monitor_heart_rounded,    'text': 'I am diabetic — feeling faint.'},
+    {'icon': Icons.warning_amber_rounded,    'text': 'I have a drug allergy.'},
+  ];
+
+  Widget _buildQuickMessageButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showQuickMessageBoard(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: AppColors.medifindGradient),
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: [
+            BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4)),
+          ],
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.message_rounded, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Text('Quick Message', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showQuickMessageBoard(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E293B),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Row(
+              children: [
+                Icon(Icons.message_rounded, color: Colors.white70, size: 20),
+                SizedBox(width: 10),
+                Text('Quick Emergency Messages',
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Tap a phrase to send instantly to your responder',
+              style: TextStyle(color: Colors.white.withOpacity(0.5), fontSize: 12),
+            ),
+            const SizedBox(height: 16),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              crossAxisSpacing: 10,
+              mainAxisSpacing: 10,
+              childAspectRatio: 2.6,
+              children: _emergencyPhrases.map((phrase) {
+                return GestureDetector(
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _sendQuickMessage(phrase['text'] as String);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.white.withOpacity(0.12)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(phrase['icon'] as IconData, color: AppColors.primaryLight, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            phrase['text'] as String,
+                            style: const TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.w600),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _sendQuickMessage(String message) async {
+    try {
+      final repo = ref.read(chatRepositoryProvider);
+      final room = await repo.createOrGetEmergencyChatRoom(widget.emergencyId);
+      ref.read(chatMessagesProvider(room.id).notifier).sendMessage(message);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Sent: $message',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.green.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not send: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Widget _buildModernBody(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings, bool isDeafPatient) {
     return Stack(
       children: [
@@ -239,10 +403,10 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           ),
         ),
 
-        // 3. Floating Action Buttons
+        // 3. Floating Action Buttons (right side — map controls)
         Positioned(
           right: 16,
-          bottom: 120, // Above bottom sheet
+          bottom: 120,
           child: Column(
             children: [
               _buildFloatingMapButton(Icons.my_location, () => _animateToResponder()),
@@ -251,6 +415,16 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             ],
           ),
         ),
+
+        // 3b. AAC Quick Message Button (left side — deaf patients only)
+        if (isDeafPatient &&
+            _currentStatus != 'RESOLVED' &&
+            _currentStatus != 'COMPLETED')
+          Positioned(
+            left: 16,
+            bottom: 120,
+            child: _buildQuickMessageButton(context),
+          ),
 
         // 4. Modern Draggable Bottom Sheet
         _buildDraggableBottomSheet(context, theme, emergency, settings, isDeafPatient),
@@ -280,6 +454,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             ),
           ),
 
+        if (isDeafPatient && (_currentStatus == 'EN_ROUTE' || _currentStatus == 'ARRIVED'))
+          _buildDeafVisualPulse(theme),
+
         if (_currentStatus == 'ARRIVED' && isDeafPatient)
           _buildArrivedVisualAlert(theme),
 
@@ -294,24 +471,31 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     return ClipRRect(
       borderRadius: BorderRadius.circular(24),
       child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.3),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.12),
+                Colors.white.withOpacity(0.04),
+              ],
+            ),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            border: Border.all(color: Colors.white.withOpacity(0.15)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              )
+            ],
           ),
           child: Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.emergency_share_rounded, color: Colors.greenAccent, size: 22),
-              ),
+              _buildPulseIndicator(Colors.greenAccent),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -319,28 +503,74 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Help arriving in',
-                      style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 13),
+                      'ESTIMATED ARRIVAL',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.5),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                      ),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       _eta,
-                      style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.5,
+                      ),
                     ),
                   ],
                 ),
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
+                  color: Colors.red.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
                 ),
-                child: const Text('LIVE', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 10)),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Text(
+                      'LIVE',
+                      style: TextStyle(
+                        color: Colors.redAccent,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 10,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildPulseIndicator(Color color) {
+    return Container(
+      width: 44,
+      height: 44,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+      ),
+      child: Icon(Icons.emergency_share_rounded, color: color, size: 22),
     );
   }
 
@@ -367,89 +597,142 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       minChildSize: 0.35,
       maxChildSize: 0.85,
       builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: const Color(0xFF1E293B),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.3), blurRadius: 20, offset: const Offset(0, -5))
-            ],
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.all(24),
-            children: [
-              Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 30,
-                    backgroundColor: AppColors.primary.withOpacity(0.2),
-                    child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 32),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(_responderName ?? 'Assigning Responder...', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20, color: Colors.white)),
-                        Text('${_currentStatus.replaceAll('_', ' ')} • Active Response', style: const TextStyle(color: Colors.grey, fontSize: 13)),
-                      ],
-                    ),
-                  ),
-                  if (!isDeafPatient) ...[
-                    _buildCircleAction(Icons.phone_rounded, Colors.green, () {
-                      if (_responderPhone != null) {
-                        _makePhoneCall(_responderPhone!);
-                      }
-                    }),
-                    const SizedBox(width: 12),
-                  ],
-                  _buildCircleAction(Icons.chat_bubble_rounded, Colors.blue, () {
-                    _openChat();
-                  }),
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E293B).withOpacity(0.85),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.4), blurRadius: 30, offset: const Offset(0, -10))
                 ],
               ),
-              const SizedBox(height: 24),
-              const Divider(color: Colors.white10),
-              const SizedBox(height: 24),
-              const Text('Live Status Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-              const SizedBox(height: 20),
-              _buildModernStatusTimeline(theme, settings),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _showCancelDialog(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.withOpacity(0.1),
-                    foregroundColor: Colors.redAccent,
-                    side: const BorderSide(color: Colors.redAccent, width: 1),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: ListView(
+                controller: scrollController,
+                padding: const EdgeInsets.all(24),
+                children: [
+                  Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [AppColors.primary.withOpacity(0.2), AppColors.primary.withOpacity(0.05)],
+                          ),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                        ),
+                        child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 32),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _responderName ?? 'Assigning...',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                                fontSize: 22,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blueAccent.withOpacity(0.15),
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    _currentStatus.replaceAll('_', ' '),
+                                    style: const TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Verified Responder',
+                                  style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isDeafPatient) ...[
+                        _buildPremiumAction(Icons.phone_rounded, Colors.greenAccent, () {
+                          if (_responderPhone != null) _makePhoneCall(_responderPhone!);
+                        }),
+                        const SizedBox(width: 12),
+                      ],
+                      _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, () {
+                        _openChat();
+                      }),
+                    ],
                   ),
-                  child: const Text('CANCEL EMERGENCY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                ),
+                  const SizedBox(height: 24),
+                  const Divider(color: Colors.white10),
+                  const SizedBox(height: 24),
+                  const Text('Live Status Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                  const SizedBox(height: 20),
+                  _buildModernStatusTimeline(theme, settings),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => _showCancelDialog(context),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.withOpacity(0.1),
+                        foregroundColor: Colors.redAccent,
+                        side: const BorderSide(color: Colors.redAccent, width: 1),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                      child: const Text('CANCEL EMERGENCY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
               ),
-              const SizedBox(height: 24),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  Widget _buildCircleAction(IconData icon, Color color, VoidCallback onTap) {
+  Widget _buildPremiumAction(IconData icon, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withOpacity(0.08),
           shape: BoxShape.circle,
+          border: Border.all(color: color.withOpacity(0.2), width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.05),
+              blurRadius: 10,
+              spreadRadius: 2,
+            )
+          ],
         ),
-        child: Icon(icon, color: color, size: 22),
+        child: Icon(icon, color: color, size: 24),
       ),
     );
   }
@@ -502,37 +785,89 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
 
     return Column(
       children: [
-        _ModernTimelineItem(label: 'SOS Signal Received', time: 'LIVE', isDone: uiIndex >= 0, isLast: false),
-        _ModernTimelineItem(label: 'Responder Dispatched', time: uiIndex >= 1 ? 'CONFIRMED' : '--:--', isDone: uiIndex >= 1, isCurrent: uiIndex == 1, isLast: false),
-        _ModernTimelineItem(label: 'En Route to Location', time: uiIndex >= 2 ? 'TRACKING' : '--:--', isDone: uiIndex >= 2, isCurrent: uiIndex == 2, isLast: false),
-        _ModernTimelineItem(label: 'Arrived at Destination', time: uiIndex >= 3 ? 'HERE' : '--:--', isDone: uiIndex >= 3, isCurrent: uiIndex == 3, isLast: true),
+        _ModernTimelineItem(label: 'SOS Signal Received', time: 'LIVE', isDone: uiIndex >= 0, isLast: false, color: Colors.blueAccent),
+        _ModernTimelineItem(label: 'Responder Assigned', time: uiIndex >= 1 ? 'SUCCESS' : '--:--', isDone: uiIndex >= 1, isCurrent: uiIndex == 1, isLast: false, color: Colors.orangeAccent),
+        _ModernTimelineItem(label: 'En Route to You', time: uiIndex >= 2 ? 'TRACKING' : '--:--', isDone: uiIndex >= 2, isCurrent: uiIndex == 2, isLast: false, color: Colors.purpleAccent),
+        _ModernTimelineItem(label: 'Arrived at Destination', time: uiIndex >= 3 ? 'HERE' : '--:--', isDone: uiIndex >= 3, isCurrent: uiIndex == 3, isLast: true, color: Colors.greenAccent),
       ],
     );
   }
 
 
+  Widget _buildDeafVisualPulse(ThemeData theme) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: _AnimatedPulseBorder(
+          color: _currentStatus == 'ARRIVED' ? Colors.greenAccent : Colors.blueAccent,
+        ),
+      ),
+    );
+  }
+
   Widget _buildArrivedVisualAlert(ThemeData theme) {
     return Positioned.fill(
       child: Container(
-        color: Colors.green.withOpacity(0.9),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.green.withOpacity(0.95),
+              Colors.green.shade900.withOpacity(0.98),
+            ],
+          ),
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_rounded, color: Colors.white, size: 100),
-            const SizedBox(height: 24),
-            const Text('HELP IS HERE!', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 2)),
-            const SizedBox(height: 16),
-            const Text('The responder has arrived at your location.', style: TextStyle(color: Colors.white, fontSize: 18)),
-            const SizedBox(height: 48),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.elasticOut,
+              builder: (context, value, child) => Transform.scale(scale: value, child: child),
+              child: Container(
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 4),
+                ),
+                child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 100),
+              ),
+            ),
+            const SizedBox(height: 40),
+            const Text(
+              'HELP IS HERE',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 42,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black26,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Text(
+                'LOOK FOR THE RESPONDER NOW',
+                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 1),
+              ),
+            ),
+            const SizedBox(height: 64),
             ElevatedButton(
               onPressed: () => setState(() => _currentStatus = 'RESOLVED'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
-                foregroundColor: Colors.green,
-                padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 16),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                foregroundColor: Colors.green.shade900,
+                elevation: 10,
+                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
               ),
-              child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.bold)),
+              child: const Text('I SEE THEM / DISMISS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
             ),
           ],
         ),
@@ -623,33 +958,39 @@ class _ModernTimelineItem extends StatelessWidget {
   final bool isCurrent;
   final bool isLast;
 
+  final Color color;
+
   const _ModernTimelineItem({
     required this.label,
     required this.time,
     required this.isDone,
     this.isCurrent = false,
     required this.isLast,
+    required this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = isDone ? Colors.greenAccent : (isCurrent ? Colors.blueAccent : Colors.grey.withOpacity(0.3));
+    final statusColor = isDone ? color : (isCurrent ? color : Colors.white10);
     
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Column(
           children: [
-            Container(
-              width: 14,
-              height: 14,
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              width: 16,
+              height: 16,
               decoration: BoxDecoration(
-                color: isDone ? Colors.greenAccent : Colors.transparent,
+                color: isDone ? statusColor : Colors.transparent,
                 shape: BoxShape.circle,
-                border: Border.all(color: color, width: 2),
-                boxShadow: isCurrent ? [BoxShadow(color: color.withOpacity(0.5), blurRadius: 8)] : null,
+                border: Border.all(color: statusColor, width: 2),
+                boxShadow: isCurrent ? [
+                  BoxShadow(color: statusColor.withOpacity(0.5), blurRadius: 10, spreadRadius: 2)
+                ] : [],
               ),
-              child: isDone ? const Icon(Icons.check, size: 8, color: Colors.black) : null,
+              child: isDone ? const Icon(Icons.check, size: 10, color: Colors.black) : null,
             ),
             if (!isLast)
               Container(
@@ -680,6 +1021,47 @@ class _ModernTimelineItem extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AnimatedPulseBorder extends StatefulWidget {
+  final Color color;
+  const _AnimatedPulseBorder({required this.color});
+
+  @override
+  State<_AnimatedPulseBorder> createState() => _AnimatedPulseBorderState();
+}
+
+class _AnimatedPulseBorderState extends State<_AnimatedPulseBorder> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
+    _opacity = Tween<double>(begin: 0.1, end: 0.6).animate(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, child) => Container(
+        decoration: BoxDecoration(
+          border: Border.all(
+            color: widget.color.withOpacity(_opacity.value),
+            width: 12,
+          ),
+        ),
+      ),
     );
   }
 }

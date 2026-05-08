@@ -219,15 +219,27 @@ class LocationService {
       
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
+        
+        // Greedily try to find a house/flat number
+        String houseNo = place.subThoroughfare ?? '';
+        String street = place.thoroughfare ?? '';
+        String name = place.name ?? '';
+        
+        // Fallback: If subThoroughfare is empty, check if 'name' looks like a number or building name
+        if (houseNo.isEmpty && name.isNotEmpty && name != street) {
+          houseNo = name;
+        }
+
         return {
           'city': place.locality ?? place.subAdministrativeArea ?? '',
-          'address': place.subLocality ?? place.name ?? '',
+          'address': street.isNotEmpty ? street : (place.subLocality ?? name),
+          'houseNumber': houseNo,
         };
       }
-      return {'city': '', 'address': ''};
+      return {'city': '', 'address': '', 'houseNumber': ''};
     } catch (e) {
       debugPrint('Error in reverse geocoding: $e');
-      return {'city': '', 'address': ''};
+      return {'city': '', 'address': '', 'houseNumber': ''};
     }
   }
 }

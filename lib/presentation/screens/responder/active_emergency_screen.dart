@@ -246,12 +246,18 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       body: emergencyAsync.when(
         data: (emergency) {
           _updateMarkers(emergency);
-          
+          final isDeafPatient = emergency.patientType.toUpperCase() == 'DEAF';
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // ── DEAF PATIENT alert — shown prominently at top ──────
+                if (isDeafPatient) ...[
+                  _buildDeafAlertBanner(context, theme, emergency),
+                  const SizedBox(height: 12),
+                ],
                 _buildPatientInfo(context, theme, emergency),
                 const SizedBox(height: 16),
                 Container(
@@ -367,6 +373,78 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
+      ),
+    );
+  }
+
+  /// Prominent banner shown when patient is deaf — tells responder to switch
+  /// to text communication and gives a 1-tap shortcut to open the chat.
+  Widget _buildDeafAlertBanner(BuildContext context, ThemeData theme, emergency_entity.Emergency emergency) {
+    final isDark = theme.brightness == Brightness.dark;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? Colors.orange.withOpacity(0.12) : Colors.orange.shade50,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.orange.withOpacity(0.45) : Colors.orange.shade300,
+          width: 1.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(9),
+            decoration: BoxDecoration(
+              color: isDark ? Colors.orange.withOpacity(0.2) : Colors.orange.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.hearing_disabled_rounded,
+                color: isDark ? Colors.orange : Colors.deepOrange, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '⚠️  DEAF / MUTE PATIENT',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 13,
+                    color: isDark ? Colors.orange : Colors.deepOrange,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Use text chat only. Avoid voice calls.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: isDark
+                        ? Colors.orange.withOpacity(0.75)
+                        : Colors.orange.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton.icon(
+            onPressed: () => _openEmergencyChat(context, emergency),
+            icon: const Icon(Icons.chat_bubble_rounded, size: 14),
+            label: const Text('Chat', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
       ),
     );
   }

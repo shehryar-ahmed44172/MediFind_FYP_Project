@@ -80,6 +80,9 @@ dependencies:
   # File picker for medical uploads
   file_picker: ^8.0.0+1
 
+  # QR Code generation (Medical ID card)
+  qr_flutter: ^4.1.0
+
   # Intl (date formatting)
   intl: ^0.20.2
   google_fonts: ^8.0.2

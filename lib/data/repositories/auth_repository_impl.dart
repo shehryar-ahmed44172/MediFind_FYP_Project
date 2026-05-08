@@ -108,6 +108,8 @@ class AuthRepositoryImpl implements AuthRepository {
   @override
   Future<User?> getUser(String userId) async {
     final profile = await apiClient.getUserProfile(userId);
+    if (profile == null) return null;
+
     // Map UserProfile to User
     return User(
       id: profile.userId,

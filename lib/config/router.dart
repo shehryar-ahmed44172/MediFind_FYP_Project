@@ -47,6 +47,7 @@ import '../presentation/screens/settings/subscription_plans_screen.dart';
 import '../presentation/screens/settings/checkout_screen.dart';
 import '../presentation/screens/settings/payment_success_screen.dart';
 import '../presentation/screens/patient/predefined_messages_screen.dart';
+import '../presentation/screens/auth/pending_approval_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -89,7 +90,7 @@ class AppRouter {
     navigatorKey: _navigatorKey,
     initialLocation: AppConfig.initialRoute,
     refreshListenable: _container != null 
-        ? GoRouterRefreshStream(_container!.listen(authStateProvider, (prev, next) {}).stream)
+        ? GoRouterRefreshStream(_container!.read(authStateProvider.notifier).stream)
         : null,
     redirect: (context, state) {
       if (_container == null) return null;
@@ -100,10 +101,12 @@ class AppRouter {
       if (authState.isLoading || authState.hasError) return null;
       
       final isLoggedIn = authState.value ?? false;
-      final isGoingToLogin = state.uri.path == '/login' || 
-                             state.uri.path == '/register' || 
+      final isGoingToLogin = state.uri.path == '/login' ||
+                             state.uri.path == '/register' ||
                              state.uri.path == '/select-role' ||
-                             state.uri.path == '/forgot-password';
+                             state.uri.path == '/forgot-password' ||
+                             state.uri.path == '/verify-email' ||
+                             state.uri.path == '/pending-approval';
       final isGoingToSplash = state.uri.path == '/splash';
 
       if (isGoingToSplash) return null;
@@ -156,6 +159,14 @@ class AppRouter {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return EmailVerificationScreen(email: extra['email'] ?? '');
+        },
+      ),
+      GoRoute(
+        path: '/pending-approval',
+        name: 'pending-approval',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return PendingApprovalScreen(email: extra['email'] ?? '');
         },
       ),
 

@@ -13,10 +13,33 @@ import '../../../core/utils/exceptions.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 
+// ─── Responder Type Options ──────────────────────────────────────────────────
+// Matches ResponderType enum — field emergency responders (1122-style)
+const _responderTypeOptions = [
+  {'value': 'RESCUE_OFFICER',  'label': 'Rescue Officer (e.g. 1122)',         'sub': 'Rescue & emergency first aid trained'},
+  {'value': 'PARAMEDIC',       'label': 'Paramedic',                          'sub': 'Advanced life support (ALS)'},
+  {'value': 'EMT',             'label': 'Emergency Medical Technician (EMT)', 'sub': 'Basic / intermediate emergency care'},
+  {'value': 'FIRST_RESPONDER', 'label': 'First Responder',                   'sub': 'Basic first aid & CPR trained'},
+  {'value': 'VOLUNTEER',       'label': 'Community Volunteer',                'sub': 'Basic aid, no formal certification required'},
+];
+
+// ─── Predefined Specializations ─────────────────────────────────────────────
+const _allSpecializations = [
+  'General Emergency',
+  'Cardiology',
+  'Trauma & Surgery',
+  'Neurology',
+  'Pediatrics',
+  'Burns & Critical Care',
+  'Toxicology',
+  'Orthopedics',
+  'Obstetrics',
+];
+
 class RegisterScreen extends ConsumerStatefulWidget {
   final String role;
   final String? patientType; // NORMAL, DEAF (Passed from RoleSelection)
-  
+
   const RegisterScreen({
     super.key,
     required this.role,
@@ -28,59 +51,61 @@ class RegisterScreen extends ConsumerStatefulWidget {
 }
 
 class _RegisterScreenState extends ConsumerState<RegisterScreen> {
-  // Common Controllers
-  final _fullNameController = TextEditingController();
-  final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
-  final _cnicController = TextEditingController();
-  final _passwordController = TextEditingController();
+  // ── Common Controllers ──────────────────────────────────────────────────
+  final _fullNameController        = TextEditingController();
+  final _emailController           = TextEditingController();
+  final _phoneController           = TextEditingController();
+  final _cnicController            = TextEditingController();
+  final _passwordController        = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _cityController = TextEditingController();
-  final _houseNoController = TextEditingController();
-  final _addressController = TextEditingController();
+  final _cityController            = TextEditingController();
+  final _houseNoController         = TextEditingController();
+  final _addressController         = TextEditingController();
   final _additionalAddressController = TextEditingController();
-  final _dobController = TextEditingController();
+  final _dobController             = TextEditingController();
   DateTime? _selectedDob;
 
-  // Responder specific controllers
+  // ── Responder-specific Controllers ─────────────────────────────────────
   final _organizationController = TextEditingController();
-  final _licenseController = TextEditingController();
+  final _licenseController      = TextEditingController();
 
+  // ── Masked Formatters ──────────────────────────────────────────────────
   final _cnicFormatter = MaskTextInputFormatter(
     mask: '#####-#######-#',
-    filter: {"#": RegExp(r'[0-9]')},
+    filter: {'#': RegExp(r'[0-9]')},
     type: MaskAutoCompletionType.lazy,
   );
-
   final _phoneFormatter = MaskTextInputFormatter(
     mask: '+92-###-#######',
-    filter: {"#": RegExp(r'[0-9]')},
+    filter: {'#': RegExp(r'[0-9]')},
     type: MaskAutoCompletionType.lazy,
   );
 
-  final String _selectedResponderType = 'EMERGENCY_RESPONDER';
-  String _selectedVehicleType = 'AMBULANCE';
+  // ── Responder Selections ───────────────────────────────────────────────
+  String _selectedResponderType   = 'RESCUE_OFFICER'; // mutable, user-selectable
+  String _selectedVehicleType     = 'AMBULANCE';
+  final List<String> _selectedSpecializations = [];
 
-  // Document uploads for Responder
+  // ── Document Uploads ───────────────────────────────────────────────────
   XFile? _cnicFront;
   XFile? _cnicBack;
   XFile? _employeeCardFront;
-  XFile? _employeeCardBack;
+  XFile? _employeeCardBack;       // optional
   final _imagePicker = ImagePicker();
 
-  final _formKey = GlobalKey<FormState>();
-  bool _obscurePassword = true;
+  // ── State ──────────────────────────────────────────────────────────────
+  final _formKey              = GlobalKey<FormState>();
+  bool _obscurePassword       = true;
   bool _obscureConfirmPassword = true;
   String _selectedPatientType = 'NORMAL';
-  bool _isLoading = false;
-  bool _isFetchingLocation = false;
-  int _locationAttempts = 0;
+  bool _isLoading             = false;
+  bool _isFetchingLocation    = false;
+  int  _locationAttempts      = 0;
   static const int _maxLocationAttempts = 3;
 
   @override
   void initState() {
     super.initState();
-    // Initialize from widget parameter if available
     if (widget.patientType != null) {
       _selectedPatientType = widget.patientType!;
     }
@@ -104,31 +129,29 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     super.dispose();
   }
 
+  // ── Date Picker ────────────────────────────────────────────────────────
   Future<void> _selectDate() async {
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)), // Default 18 years ago
+      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      builder: (context, child) {
-        return Theme(
-          data: Theme.of(context).copyWith(
-            colorScheme: ColorScheme.light(
-              primary: _roleTheme['color'] as Color,
-            ),
-          ),
-          child: child!,
-        );
-      },
+      builder: (context, child) => Theme(
+        data: Theme.of(context).copyWith(
+          colorScheme: ColorScheme.light(primary: _roleTheme['color'] as Color),
+        ),
+        child: child!,
+      ),
     );
     if (picked != null) {
       setState(() {
         _selectedDob = picked;
-        _dobController.text = "${picked.day}/${picked.month}/${picked.year}";
+        _dobController.text = '${picked.day}/${picked.month}/${picked.year}';
       });
     }
   }
 
+  // ── Image Picker ───────────────────────────────────────────────────────
   Future<void> _pickImage(String docType) async {
     final picked = await _imagePicker.pickImage(
       source: ImageSource.gallery,
@@ -137,44 +160,34 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (picked != null) {
       setState(() {
         switch (docType) {
-          case 'CNIC_FRONT':
-            _cnicFront = picked;
-            break;
-          case 'CNIC_BACK':
-            _cnicBack = picked;
-            break;
-          case 'EMP_FRONT':
-            _employeeCardFront = picked;
-            break;
-          case 'EMP_BACK':
-            _employeeCardBack = picked;
-            break;
+          case 'CNIC_FRONT': _cnicFront = picked;          break;
+          case 'CNIC_BACK':  _cnicBack  = picked;          break;
+          case 'EMP_FRONT':  _employeeCardFront = picked;  break;
+          case 'EMP_BACK':   _employeeCardBack  = picked;  break;
         }
       });
     }
   }
 
+  // ── Location Dialogs ───────────────────────────────────────────────────
   void _showLocationLimitDialog() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.location_off_rounded, color: Colors.orange),
-            SizedBox(width: 10),
-            Text('Location Unavailable'),
-          ],
-        ),
+        title: const Row(children: [
+          Icon(Icons.location_off_rounded, color: Colors.orange),
+          SizedBox(width: 10),
+          Text('Location Unavailable'),
+        ]),
         content: const Text(
-          'Unable to fetch your location after 3 attempts.\n\nPlease ensure location services and internet are enabled, or enter your address manually.',
+          'Unable to fetch your location after 3 attempts.\n\n'
+          'Please ensure location services and internet are enabled, '
+          'or enter your address manually.',
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _locationAttempts = 0);
-            },
+            onPressed: () { Navigator.pop(ctx); setState(() => _locationAttempts = 0); },
             child: const Text('Try Again'),
           ),
           ElevatedButton(
@@ -186,8 +199,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  /// Shown when the device GPS/location service is turned off.
-  /// Opens Location Settings once and resets the attempt counter.
   void _showLocationServiceDialog() {
     setState(() => _locationAttempts = _maxLocationAttempts);
     showDialog(
@@ -195,22 +206,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.location_off_rounded, color: Colors.orange),
-            SizedBox(width: 10),
-            Expanded(child: Text('Location Turned Off')),
-          ],
-        ),
+        title: const Row(children: [
+          Icon(Icons.location_off_rounded, color: Colors.orange),
+          SizedBox(width: 10),
+          Expanded(child: Text('Location Turned Off')),
+        ]),
         content: const Text(
-          'Your device\'s location (GPS) is currently disabled.\n\nPlease turn it on in Settings, then come back and try again.',
+          'Your device\'s location (GPS) is currently disabled.\n\n'
+          'Please turn it on in Settings, then come back and try again.',
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _locationAttempts = 0);
-            },
+            onPressed: () { Navigator.pop(ctx); setState(() => _locationAttempts = 0); },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -226,30 +233,24 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
-  /// Shown when location permission was permanently denied.
-  /// Routes the user to App Settings to grant permission manually.
   void _showPermissionPermanentlyDeniedDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(Icons.location_disabled_rounded, color: Colors.red),
-            SizedBox(width: 10),
-            Expanded(child: Text('Permission Denied')),
-          ],
-        ),
+        title: const Row(children: [
+          Icon(Icons.location_disabled_rounded, color: Colors.red),
+          SizedBox(width: 10),
+          Expanded(child: Text('Permission Denied')),
+        ]),
         content: const Text(
-          'Location permission was permanently denied.\n\nPlease open App Settings and grant location access to MediFind.',
+          'Location permission was permanently denied.\n\n'
+          'Please open App Settings and grant location access to MediFind.',
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _locationAttempts = 0);
-            },
+            onPressed: () { Navigator.pop(ctx); setState(() => _locationAttempts = 0); },
             child: const Text('Cancel'),
           ),
           ElevatedButton(
@@ -265,78 +266,59 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  // ── Fetch Location ─────────────────────────────────────────────────────
   Future<void> _fetchLocation() async {
     if (_locationAttempts >= _maxLocationAttempts) {
       _showLocationLimitDialog();
       return;
     }
-
-    setState(() {
-      _isFetchingLocation = true;
-      _locationAttempts++;
-    });
-
+    setState(() { _isFetchingLocation = true; _locationAttempts++; });
     try {
       final locationService = LocationService();
       final position = await locationService.getCurrentLocation();
       final place = await locationService.getPlaceFromCoordinates(
-        position.latitude,
-        position.longitude,
+        position.latitude, position.longitude,
       );
-
       if (mounted) {
         setState(() {
-          _cityController.text = place['city'] ?? '';
+          _cityController.text    = place['city'] ?? '';
           _addressController.text = place['address'] ?? '';
+          _houseNoController.text = place['houseNumber'] ?? '';
           _locationAttempts = 0;
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Location fetched successfully!'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Location fetched successfully!'),
+          backgroundColor: Colors.green,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } on LocationException catch (e) {
       if (!mounted) return;
-      // Route to a targeted dialog based on the specific failure reason
       if (e.code == 'LOCATION_DISABLED') {
         _showLocationServiceDialog();
       } else if (e.code == 'PERMISSION_PERMANENTLY_DENIED') {
         _showPermissionPermanentlyDeniedDialog();
       } else {
-        // Generic permission denied or other location error — show attempt count
         final remaining = _maxLocationAttempts - _locationAttempts;
-        if (remaining <= 0) {
-          _showLocationLimitDialog();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
-              ),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        if (remaining <= 0) { _showLocationLimitDialog(); }
+        else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ));
         }
       }
     } catch (e) {
       if (mounted) {
         final remaining = _maxLocationAttempts - _locationAttempts;
-        if (remaining <= 0) {
-          _showLocationLimitDialog();
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.',
-              ),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+        if (remaining <= 0) { _showLocationLimitDialog(); }
+        else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ));
         }
       }
     } finally {
@@ -344,67 +326,93 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     }
   }
 
+  // ── Register ───────────────────────────────────────────────────────────
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() => _isLoading = true);
+    // ── Document validation for Responders ──────────────────────────────
+    if (widget.role == 'RESPONDER') {
+      if (_cnicFront == null || _cnicBack == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('⚠ Please upload both sides of your CNIC before submitting.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+      if (_employeeCardFront == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('⚠ Please upload the front of your Employee Card before submitting.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+    }
 
+    setState(() => _isLoading = true);
     try {
-      debugPrint('📝 [Register] Starting registration process for role: ${widget.role}');
+      debugPrint('📝 [Register] Starting registration for role: ${widget.role}');
+
+      // ── Upload Responder Documents ─────────────────────────────────────
       String? cnicFrontUrl;
       String? cnicBackUrl;
       String? empFrontUrl;
       String? empBackUrl;
 
       if (widget.role == 'RESPONDER') {
-        debugPrint('📤 [Register] Uploading responder documents...');
         final authRepo = await ref.read(authRepositoryProvider.future);
         if (_cnicFront != null) {
-          debugPrint('   - Uploading CNIC Front: ${_cnicFront!.path}');
+          debugPrint('   Uploading CNIC Front...');
           cnicFrontUrl = await authRepo.uploadDocument(File(_cnicFront!.path));
         }
         if (_cnicBack != null) {
-          debugPrint('   - Uploading CNIC Back: ${_cnicBack!.path}');
+          debugPrint('   Uploading CNIC Back...');
           cnicBackUrl = await authRepo.uploadDocument(File(_cnicBack!.path));
         }
         if (_employeeCardFront != null) {
-          debugPrint('   - Uploading Employee Card Front: ${_employeeCardFront!.path}');
+          debugPrint('   Uploading Employee Card Front...');
           empFrontUrl = await authRepo.uploadDocument(File(_employeeCardFront!.path));
         }
         if (_employeeCardBack != null) {
-          debugPrint('   - Uploading Employee Card Back: ${_employeeCardBack!.path}');
+          debugPrint('   Uploading Employee Card Back...');
           empBackUrl = await authRepo.uploadDocument(File(_employeeCardBack!.path));
         }
       }
 
-      debugPrint('📡 [Register] Sending registration request to API...');
+      // ── Compose Address ────────────────────────────────────────────────
       final composedAddress = [
         _houseNoController.text.trim(),
         _addressController.text.trim(),
         _additionalAddressController.text.trim(),
       ].where((s) => s.isNotEmpty).join(', ');
 
+      // ── Build Request ──────────────────────────────────────────────────
       final Map<String, dynamic> request = {
-        'fullName': _fullNameController.text.trim(),
-        'email': _emailController.text.trim(),
+        'fullName':    _fullNameController.text.trim(),
+        'email':       _emailController.text.trim(),
         'phoneNumber': _phoneController.text.replaceAll('-', '').trim(),
-        'password': _passwordController.text,
-        'role': widget.role,
-        'city': _cityController.text.trim(),
-        'address': composedAddress,
-        'cnic': _cnicController.text.trim(),
+        'password':    _passwordController.text,
+        'role':        widget.role,
+        'city':        _cityController.text.trim(),
+        'address':     composedAddress,
+        'cnic':        _cnicController.text.trim().isEmpty ? null : _cnicController.text.trim(),
         'dateOfBirth': _selectedDob?.toIso8601String(),
+
+        // Patient-specific
         'patientType': widget.role == 'PATIENT' ? _selectedPatientType : null,
-        'organization':
-            widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
-        'licenseNumber':
-            widget.role == 'RESPONDER' ? _licenseController.text.trim() : null,
-        'responderType':
-            widget.role == 'RESPONDER' ? _selectedResponderType : null,
-        'vehicleType': widget.role == 'RESPONDER' ? _selectedVehicleType : null,
-        'cnicImageUrl': cnicFrontUrl,
-        'cnicBackImageUrl': cnicBackUrl,
-        'employeeCardImageUrl': empFrontUrl,
+
+        // Responder-specific
+        'organization':   widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
+        'licenseNumber':  widget.role == 'RESPONDER' ? _licenseController.text.trim() : null,
+        'responderType':  widget.role == 'RESPONDER' ? _selectedResponderType : null,
+        'vehicleType':    widget.role == 'RESPONDER' ? _selectedVehicleType : null,
+        'specialization': widget.role == 'RESPONDER' ? _selectedSpecializations : null,
+
+        // Document URLs
+        'cnicImageUrl':             cnicFrontUrl,
+        'cnicBackImageUrl':         cnicBackUrl,
+        'employeeCardImageUrl':     empFrontUrl,
         'employeeCardBackImageUrl': empBackUrl,
       };
 
@@ -422,13 +430,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           barrierDismissible: false,
           builder: (ctx) => AlertDialog(
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: isResponder ? Colors.orange : Colors.green, size: 28),
-                const SizedBox(width: 10),
-                const Text('Registration Successful'),
-              ],
-            ),
+            title: Row(children: [
+              Icon(
+                Icons.check_circle_rounded,
+                color: isResponder ? Colors.orange : Colors.green,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              const Text('Registration Successful'),
+            ]),
             content: Text(successMsg),
             actions: [
               ElevatedButton(
@@ -443,9 +453,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             ],
           ),
         );
+
         if (mounted) {
           if (isResponder) {
-            context.go('/login');
+            context.go('/pending-approval', extra: {'email': _emailController.text.trim()});
           } else {
             context.go('/verify-email', extra: {'email': _emailController.text.trim()});
           }
@@ -454,51 +465,38 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (e) {
       debugPrint('❌ [Register] Registration failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-                'Registration failed: ${e.toString().replaceAll('Exception:', '').trim()}'),
-            backgroundColor: Colors.red.shade700,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Registration failed: ${e.toString().replaceAll('Exception:', '').trim()}'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  // Returns a color/icon based on the user's role
+  // ── Role Theme ─────────────────────────────────────────────────────────
   Map<String, dynamic> get _roleTheme {
     switch (widget.role) {
       case 'RESPONDER':
-        return {
-          'color': const Color(0xFFD32F2F),
-          'icon': Icons.local_hospital_rounded,
-          'label': 'Emergency Responder',
-        };
+        return {'color': const Color(0xFFD32F2F), 'icon': Icons.local_hospital_rounded, 'label': 'Emergency Responder'};
       case 'CAREGIVER':
-        return {
-          'color': const Color(0xFF00897B),
-          'icon': Icons.favorite_rounded,
-          'label': 'Caregiver',
-        };
+        return {'color': const Color(0xFF00897B), 'icon': Icons.favorite_rounded, 'label': 'Caregiver'};
       default:
-        return {
-          'color': AppColors.primary, // MediFind primary logo color
-          'icon': Icons.person_rounded,
-          'label': 'Patient',
-        };
+        return {'color': AppColors.primary, 'icon': Icons.person_rounded, 'label': 'Patient'};
     }
   }
 
+  // ── Build ──────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
+    final theme     = Theme.of(context);
     final roleColor = _roleTheme['color'] as Color;
-    final roleIcon = _roleTheme['icon'] as IconData;
+    final roleIcon  = _roleTheme['icon'] as IconData;
     final roleLabel = _roleTheme['label'] as String;
+    final isResponder  = widget.role == 'RESPONDER';
+    final isPatient    = widget.role == 'PATIENT';
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
@@ -515,53 +513,81 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         child: Form(
           key: _formKey,
           child: SingleChildScrollView(
-            padding: EdgeInsets.symmetric(
-              horizontal: 6.wp,
-              vertical: 1.hp,
-            ),
+            padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 1.hp),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
 
-                // Role Badge Header
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: roleColor.withOpacity(0.12),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(roleIcon, color: roleColor, size: 28),
+                // ── Role Badge Header ──────────────────────────────────
+                Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: roleColor.withOpacity(0.12),
+                      shape: BoxShape.circle,
                     ),
-                    const SizedBox(width: 14),
-                    Column(
+                    child: Icon(roleIcon, color: roleColor, size: 28),
+                  ),
+                  const SizedBox(width: 14),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Create Account',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold, fontSize: 2.4.hp,
+                        )),
+                      Text('Registering as: $roleLabel',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: roleColor, fontWeight: FontWeight.w600, fontSize: 1.4.hp,
+                        )),
+                    ],
+                  ),
+                ]),
+                SizedBox(height: 4.hp),
+
+                // ── Responder Pending-Approval Notice ─────────────────
+                if (isResponder) ...[
+                  Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.shade300),
+                    ),
+                    child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Create Account',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 2.4.hp,
-                          ),
-                        ),
-                        Text(
-                          'Registering as: $roleLabel',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: roleColor,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 1.4.hp,
+                        Icon(Icons.info_outline_rounded, color: Colors.orange.shade700, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Account Pending Admin Approval',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade800,
+                                  fontSize: 1.4.hp,
+                                )),
+                              const SizedBox(height: 4),
+                              Text(
+                                'After submitting, your credentials will be reviewed by an admin. '
+                                'You will receive an activation email with a verification code once approved.',
+                                style: TextStyle(color: Colors.orange.shade700, fontSize: 1.2.hp),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-                SizedBox(height: 4.hp),
+                  ),
+                  SizedBox(height: 3.hp),
+                ],
 
-                // ─── Demographic Information ───────────────────────
+                // ─── Demographic Information ───────────────────────────
                 _SectionHeader(title: 'Demographic Information', color: roleColor),
                 SizedBox(height: 2.hp),
+
                 TextFormField(
                   controller: _fullNameController,
                   textCapitalization: TextCapitalization.words,
@@ -575,6 +601,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => StringUtils.validateName(v),
                 ),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -588,6 +615,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => StringUtils.validateEmail(v),
                 ),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _phoneController,
                   keyboardType: TextInputType.phone,
@@ -603,20 +631,31 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => StringUtils.validatePhoneNumber(v),
                 ),
                 SizedBox(height: 1.6.hp),
+
+                // CNIC: Required for Responder (identity verification), optional for others
                 TextFormField(
                   controller: _cnicController,
                   keyboardType: TextInputType.number,
                   inputFormatters: [_cnicFormatter],
-                  decoration: const InputDecoration(
-                    labelText: 'CNIC Number',
+                  decoration: InputDecoration(
+                    labelText: isResponder ? 'CNIC Number' : 'CNIC Number (Optional)',
                     hintText: 'e.g. 34601-1234567-1',
-                    prefixIcon: Icon(Icons.credit_card_outlined),
+                    prefixIcon: const Icon(Icons.credit_card_outlined),
+                    helperText: isResponder
+                        ? 'Required for identity verification'
+                        : 'Used for identity purposes — you may skip this',
                     errorMaxLines: 2,
                   ),
                   textInputAction: TextInputAction.next,
-                  validator: (v) => StringUtils.validateCnic(v),
+                  validator: (v) {
+                    if (isResponder) return StringUtils.validateCnic(v);
+                    // Optional for Patient/Caregiver: only validate format if provided
+                    if (v != null && v.trim().isNotEmpty) return StringUtils.validateCnic(v);
+                    return null;
+                  },
                 ),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _dobController,
                   readOnly: true,
@@ -630,7 +669,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 SizedBox(height: 3.hp),
 
-                // ─── Location Information ───────────────────────────
+                // ─── Location Information ─────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -639,63 +678,57 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onPressed: _isFetchingLocation ? null : _fetchLocation,
                       icon: _isFetchingLocation
                           ? SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: roleColor))
-                          : Icon(Icons.my_location_rounded,
-                              size: 18, color: roleColor),
+                              width: 14, height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: roleColor),
+                            )
+                          : Icon(Icons.my_location_rounded, size: 18, color: roleColor),
                       label: Text(
                         _isFetchingLocation ? 'Fetching...' : 'Get My Location',
-                        style: TextStyle(
-                            color: roleColor,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 1.4.hp),
+                        style: TextStyle(color: roleColor, fontWeight: FontWeight.bold, fontSize: 1.4.hp),
                       ),
                     ),
                   ],
                 ),
                 SizedBox(height: 2.hp),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _cityController,
-                        textCapitalization: TextCapitalization.words,
-                        maxLength: 50,
-                        decoration: const InputDecoration(
-                          labelText: 'City',
-                          prefixIcon: Icon(Icons.location_city_rounded),
-                          counterText: '',
-                          errorMaxLines: 2,
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: (v) {
-                          if (v.isNullOrEmpty) return '⚠ City is required';
-                          if (v!.trim().length < 2) return '⚠ Min 2 characters';
-                          return null;
-                        },
+
+                Row(children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _cityController,
+                      textCapitalization: TextCapitalization.words,
+                      maxLength: 50,
+                      decoration: const InputDecoration(
+                        labelText: 'City',
+                        prefixIcon: Icon(Icons.location_city_rounded),
+                        counterText: '',
+                        errorMaxLines: 2,
                       ),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) {
+                        if (v.isNullOrEmpty) return '⚠ City is required';
+                        if (v!.trim().length < 2) return '⚠ Min 2 characters';
+                        return null;
+                      },
                     ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: TextFormField(
-                        controller: _houseNoController,
-                        maxLength: 20,
-                        decoration: const InputDecoration(
-                          labelText: 'House / Flat',
-                          prefixIcon: Icon(Icons.home_outlined),
-                          counterText: '',
-                          errorMaxLines: 2,
-                        ),
-                        textInputAction: TextInputAction.next,
-                        validator: (v) =>
-                            v.isNullOrEmpty ? '⚠ House number is required' : null,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _houseNoController,
+                      maxLength: 20,
+                      decoration: const InputDecoration(
+                        labelText: 'House / Flat',
+                        prefixIcon: Icon(Icons.home_outlined),
+                        counterText: '',
+                        errorMaxLines: 2,
                       ),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) => v.isNullOrEmpty ? '⚠ House number is required' : null,
                     ),
-                  ],
-                ),
+                  ),
+                ]),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _addressController,
                   maxLength: 100,
@@ -711,6 +744,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   },
                 ),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _additionalAddressController,
                   maxLength: 100,
@@ -722,45 +756,42 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 SizedBox(height: 3.hp),
 
-                // ─── Role Specific Fields ───────────────────────────
-                // We only show Accessibility Mode if it wasn't pre-selected in Role Selection
-                if (widget.role == 'PATIENT' && widget.patientType == null) ...[
+                // ─── Accessibility Mode (Patient only, if not pre-selected) ──
+                if (isPatient && widget.patientType == null) ...[
                   _SectionHeader(title: 'Accessibility Mode', color: roleColor),
                   SizedBox(height: 1.hp),
                   Text(
                     'Select your accessibility needs.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.grey.shade600, fontSize: 1.2.hp),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600, fontSize: 1.2.hp,
+                    ),
                   ),
                   SizedBox(height: 2.hp),
-                  Row(
-                    children: [
-                      _PatientTypeChip(
-                        label: 'Standard Mode',
-                        icon: Icons.person_rounded,
-                        color: roleColor,
-                        selected: _selectedPatientType == 'NORMAL',
-                        onTap: () =>
-                            setState(() => _selectedPatientType = 'NORMAL'),
-                      ),
-                      const SizedBox(width: 12),
-                      _PatientTypeChip(
-                        label: 'Deaf Mode',
-                        icon: Icons.hearing_disabled_rounded,
-                        color: const Color(0xFF00897B),
-                        selected: _selectedPatientType == 'DEAF',
-                        onTap: () =>
-                            setState(() => _selectedPatientType = 'DEAF'),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    _PatientTypeChip(
+                      label: 'Standard Mode',
+                      icon: Icons.person_rounded,
+                      color: roleColor,
+                      selected: _selectedPatientType == 'NORMAL',
+                      onTap: () => setState(() => _selectedPatientType = 'NORMAL'),
+                    ),
+                    const SizedBox(width: 12),
+                    _PatientTypeChip(
+                      label: 'Deaf & Mute Mode',
+                      icon: Icons.hearing_disabled_rounded,
+                      color: const Color(0xFF00897B),
+                      selected: _selectedPatientType == 'DEAF',
+                      onTap: () => setState(() => _selectedPatientType = 'DEAF'),
+                    ),
+                  ]),
                   SizedBox(height: 3.hp),
                 ],
 
-                if (widget.role == 'RESPONDER') ...[
-                  _SectionHeader(
-                      title: 'Responder Credentials', color: roleColor),
+                // ─── Responder Credentials ────────────────────────────
+                if (isResponder) ...[
+                  _SectionHeader(title: 'Responder Credentials', color: roleColor),
                   SizedBox(height: 2.hp),
+
                   TextFormField(
                     controller: _organizationController,
                     textCapitalization: TextCapitalization.words,
@@ -777,12 +808,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     },
                   ),
                   SizedBox(height: 1.6.hp),
+
                   TextFormField(
                     controller: _licenseController,
                     maxLength: 30,
                     decoration: const InputDecoration(
                       labelText: 'Medical License Number',
                       prefixIcon: Icon(Icons.badge_rounded),
+                      helperText: 'Your official medical or professional license ID',
                       counterText: '',
                     ),
                     validator: (v) {
@@ -793,109 +826,197 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   SizedBox(height: 1.6.hp),
 
-                  // Responder Type is fixed to 'Emergency Responder' as per requirements
+                  // Responder Type — dropdown with description subtitle
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedResponderType,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Responder Type',
+                      prefixIcon: Icon(Icons.medical_services_rounded),
+                      helperText: 'Select the role that best matches your training',
+                    ),
+                    items: _responderTypeOptions.map((opt) => DropdownMenuItem<String>(
+                      value: opt['value'],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(opt['label']!,
+                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          Text(opt['sub']!,
+                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                        ],
+                      ),
+                    )).toList(),
+                    onChanged: (v) { if (v != null) setState(() => _selectedResponderType = v); },
+                    validator: (v) => v == null ? 'Please select your responder type' : null,
+                  ),
                   SizedBox(height: 1.6.hp),
 
-                  // Vehicle Type (full width, Motorbike added)
+                  // Vehicle Type
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedVehicleType,
+                    value: _selectedVehicleType,
                     isExpanded: true,
                     decoration: const InputDecoration(
                       labelText: 'Vehicle Type',
                       prefixIcon: Icon(Icons.directions_car_rounded),
                     ),
                     items: const [
-                      DropdownMenuItem(
-                          value: 'AMBULANCE', child: Text('Ambulance')),
-                      DropdownMenuItem(
-                          value: 'MOTORBIKE', child: Text('Motorbike')),
+                      DropdownMenuItem(value: 'AMBULANCE', child: Text('Ambulance')),
+                      DropdownMenuItem(value: 'MOTORBIKE', child: Text('Motorbike')),
+                      DropdownMenuItem(value: 'CAR',       child: Text('Car')),
+                      DropdownMenuItem(value: 'ON_FOOT',   child: Text('On Foot / No Vehicle')),
                     ],
-                    onChanged: (v) {
-                      if (v != null) {
-                        setState(() => _selectedVehicleType = v);
-                      }
-                    },
+                    onChanged: (v) { if (v != null) setState(() => _selectedVehicleType = v); },
                   ),
                   SizedBox(height: 3.hp),
 
-                  // ─── Document Uploads ───────────────────────────
-                  _SectionHeader(title: 'Identity Documents', color: roleColor),
+                  // ─── Specializations (multi-select) ─────────────────
+                  _SectionHeader(title: 'Medical Specializations', color: roleColor),
                   SizedBox(height: 1.hp),
                   Text(
-                    'Upload your CNIC and Employee Card for admin verification.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: Colors.grey.shade600, fontSize: 1.2.hp),
+                    'Select all areas that apply to your practice (optional but recommended).',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600, fontSize: 1.2.hp,
+                    ),
+                  ),
+                  SizedBox(height: 1.5.hp),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _allSpecializations.map((spec) {
+                      final selected = _selectedSpecializations.contains(spec);
+                      return GestureDetector(
+                        onTap: () => setState(() {
+                          if (selected) {
+                            _selectedSpecializations.remove(spec);
+                          } else {
+                            _selectedSpecializations.add(spec);
+                          }
+                        }),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected ? roleColor : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: selected ? roleColor : Colors.grey.shade300,
+                              width: selected ? 2 : 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (selected) ...[
+                                const Icon(Icons.check_circle, color: Colors.white, size: 14),
+                                const SizedBox(width: 5),
+                              ],
+                              Text(
+                                spec,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                                  color: selected ? Colors.white : Colors.grey.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  if (_selectedSpecializations.isNotEmpty) ...[
+                    SizedBox(height: 1.hp),
+                    Text(
+                      '${_selectedSpecializations.length} selected',
+                      style: TextStyle(color: roleColor, fontWeight: FontWeight.w600, fontSize: 1.2.hp),
+                    ),
+                  ],
+                  SizedBox(height: 3.hp),
+
+                  // ─── Identity Documents ──────────────────────────────
+                  _SectionHeader(title: 'Identity Documents', color: roleColor),
+                  SizedBox(height: 1.hp),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: roleColor.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: roleColor.withOpacity(0.2)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.verified_user_outlined, color: roleColor, size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'CNIC (both sides) and Employee Card (front) are required. '
+                            'Employee Card back side is optional.',
+                            style: TextStyle(color: roleColor, fontSize: 1.2.hp),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   SizedBox(height: 2.hp),
 
                   // CNIC Row
-                  Text(
-                    'CNIC',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+                  Text('CNIC',
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 1.hp),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DocumentUploadCard(
-                          label: 'Front Side',
-                          icon: Icons.credit_card_rounded,
-                          color: roleColor,
-                          file: _cnicFront,
-                          onTap: () => _pickImage('CNIC_FRONT'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _DocumentUploadCard(
-                          label: 'Back Side',
-                          icon: Icons.credit_card_rounded,
-                          color: roleColor,
-                          file: _cnicBack,
-                          onTap: () => _pickImage('CNIC_BACK'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Expanded(child: _DocumentUploadCard(
+                      label: 'Front Side',
+                      icon: Icons.credit_card_rounded,
+                      color: roleColor,
+                      file: _cnicFront,
+                      isRequired: true,
+                      onTap: () => _pickImage('CNIC_FRONT'),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _DocumentUploadCard(
+                      label: 'Back Side',
+                      icon: Icons.credit_card_rounded,
+                      color: roleColor,
+                      file: _cnicBack,
+                      isRequired: true,
+                      onTap: () => _pickImage('CNIC_BACK'),
+                    )),
+                  ]),
                   SizedBox(height: 2.hp),
 
                   // Employee Card Row
-                  Text(
-                    'Employee Card',
-                    style: theme.textTheme.labelLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
+                  Text('Employee Card',
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
                   SizedBox(height: 1.hp),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _DocumentUploadCard(
-                          label: 'Front Side',
-                          icon: Icons.badge_rounded,
-                          color: roleColor,
-                          file: _employeeCardFront,
-                          onTap: () => _pickImage('EMP_FRONT'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: _DocumentUploadCard(
-                          label: 'Back Side',
-                          icon: Icons.badge_rounded,
-                          color: roleColor,
-                          file: _employeeCardBack,
-                          onTap: () => _pickImage('EMP_BACK'),
-                        ),
-                      ),
-                    ],
-                  ),
+                  Row(children: [
+                    Expanded(child: _DocumentUploadCard(
+                      label: 'Front Side',
+                      icon: Icons.badge_rounded,
+                      color: roleColor,
+                      file: _employeeCardFront,
+                      isRequired: true,
+                      onTap: () => _pickImage('EMP_FRONT'),
+                    )),
+                    const SizedBox(width: 12),
+                    Expanded(child: _DocumentUploadCard(
+                      label: 'Back (Optional)',
+                      icon: Icons.badge_rounded,
+                      color: roleColor,
+                      file: _employeeCardBack,
+                      isRequired: false,
+                      onTap: () => _pickImage('EMP_BACK'),
+                    )),
+                  ]),
                   SizedBox(height: 3.hp),
                 ],
 
-                // ─── Security ───────────────────────────────────────
+                // ─── Security ─────────────────────────────────────────
                 _SectionHeader(title: 'Security', color: roleColor),
                 SizedBox(height: 2.hp),
+
                 TextFormField(
                   controller: _passwordController,
                   obscureText: _obscurePassword,
@@ -907,8 +1028,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       icon: Icon(_obscurePassword
                           ? Icons.visibility_outlined
                           : Icons.visibility_off_outlined),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
+                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                   ),
                   autofillHints: const [AutofillHints.newPassword],
@@ -916,6 +1036,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   validator: (v) => StringUtils.validatePassword(v),
                 ),
                 SizedBox(height: 1.6.hp),
+
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: _obscureConfirmPassword,
@@ -927,23 +1048,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       icon: Icon(_obscureConfirmPassword
                           ? Icons.visibility_outlined
                           : Icons.visibility_off_outlined),
-                      onPressed: () => setState(() =>
-                          _obscureConfirmPassword = !_obscureConfirmPassword),
+                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                     ),
                   ),
                   autofillHints: const [AutofillHints.password],
                   textInputAction: TextInputAction.done,
                   validator: (v) {
                     if (v.isNullOrEmpty) return '⚠ Confirm password is required';
-                    if (v != _passwordController.text) {
-                      return 'Passwords do not match';
-                    }
+                    if (v != _passwordController.text) return 'Passwords do not match';
                     return null;
                   },
                 ),
                 SizedBox(height: 4.hp),
 
-                // Submit Button
+                // ─── Submit Button ────────────────────────────────────
                 Container(
                   decoration: BoxDecoration(
                     color: roleColor,
@@ -967,17 +1085,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       padding: EdgeInsets.symmetric(vertical: 2.hp),
                       backgroundColor: Colors.transparent,
                       shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                       elevation: 0,
                     ),
                     child: _isLoading
                         ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
+                            height: 24, width: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
                         : Text(
                             'Create Account',
@@ -997,7 +1111,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     Text('Already have an account? ', style: TextStyle(fontSize: 1.4.hp)),
                     TextButton(
                       onPressed: () => context.go('/login'),
-                      child: Text('Login', style: TextStyle(fontSize: 1.4.hp, fontWeight: FontWeight.bold)),
+                      child: Text('Login',
+                        style: TextStyle(fontSize: 1.4.hp, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -1020,22 +1135,15 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-            width: 4,
-            height: 18,
-            margin: const EdgeInsets.only(right: 10),
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(4),
-            )),
-        Text(title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                )),
-      ],
-    );
+    return Row(children: [
+      Container(
+        width: 4, height: 18,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+      ),
+      Text(title,
+        style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+    ]);
   }
 }
 
@@ -1044,6 +1152,7 @@ class _DocumentUploadCard extends StatefulWidget {
   final IconData icon;
   final Color color;
   final XFile? file;
+  final bool isRequired;
   final VoidCallback onTap;
 
   const _DocumentUploadCard({
@@ -1051,6 +1160,7 @@ class _DocumentUploadCard extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.file,
+    required this.isRequired,
     required this.onTap,
   });
 
@@ -1070,9 +1180,7 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
   @override
   void didUpdateWidget(covariant _DocumentUploadCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.file != oldWidget.file && widget.file != null) {
-      _loadBytes();
-    }
+    if (widget.file != oldWidget.file && widget.file != null) _loadBytes();
   }
 
   Future<void> _loadBytes() async {
@@ -1082,7 +1190,7 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme   = Theme.of(context);
     final hasFile = widget.file != null;
 
     return GestureDetector(
@@ -1096,9 +1204,12 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
               : theme.scaffoldBackgroundColor,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: hasFile ? widget.color : Colors.grey.shade400,
+            color: hasFile
+                ? widget.color
+                : widget.isRequired
+                    ? Colors.grey.shade400
+                    : Colors.grey.shade300,
             width: hasFile ? 2.0 : 1.5,
-            // Simulated dashed look via strokeAlign and style
           ),
         ),
         child: hasFile && _imageBytes != null
@@ -1108,22 +1219,15 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
                   fit: StackFit.expand,
                   children: [
                     Image.memory(_imageBytes!, fit: BoxFit.cover),
-                    // Overlay label at bottom
                     Positioned(
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
+                      bottom: 0, left: 0, right: 0,
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 5),
                         color: Colors.black.withOpacity(0.55),
                         child: Text(
                           '✓ ${widget.label}',
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                          ),
+                          style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -1154,19 +1258,33 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
                         ),
                       ),
                       const SizedBox(height: 3),
+                      // Show required/optional badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: widget.isRequired
+                              ? Colors.red.shade50
+                              : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          widget.isRequired ? 'Required' : 'Optional',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.bold,
+                            color: widget.isRequired ? Colors.red.shade400 : Colors.grey.shade500,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.upload_file_outlined,
-                              size: 12, color: widget.color),
+                          Icon(Icons.upload_file_outlined, size: 12, color: widget.color),
                           const SizedBox(width: 4),
                           Text(
                             'Tap to upload',
-                            style: TextStyle(
-                              color: widget.color,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                            ),
+                            style: TextStyle(color: widget.color, fontSize: 11, fontWeight: FontWeight.w600),
                           ),
                         ],
                       ),
@@ -1185,11 +1303,8 @@ class _PatientTypeChip extends StatelessWidget {
   final VoidCallback onTap;
 
   const _PatientTypeChip({
-    required this.label,
-    required this.icon,
-    required this.color,
-    required this.selected,
-    required this.onTap,
+    required this.label, required this.icon,
+    required this.color, required this.selected, required this.onTap,
   });
 
   @override
@@ -1203,10 +1318,7 @@ class _PatientTypeChip extends StatelessWidget {
           decoration: BoxDecoration(
             color: selected ? color.withOpacity(0.12) : Colors.grey.shade50,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: selected ? color : Colors.grey.shade300,
-              width: selected ? 2 : 1,
-            ),
+            border: Border.all(color: selected ? color : Colors.grey.shade300, width: selected ? 2 : 1),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,

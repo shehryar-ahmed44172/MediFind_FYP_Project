@@ -253,20 +253,20 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
   }
 
   Widget _buildHeaderSkeleton(ThemeData theme) {
+    final shimmer = theme.colorScheme.surfaceContainerHighest;
     return Row(
       children: [
-        CircleAvatar(radius: 26, backgroundColor: Colors.grey.shade200),
+        CircleAvatar(radius: 26, backgroundColor: shimmer),
         const SizedBox(width: 16),
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(width: 60, height: 12, color: Colors.grey.shade200),
+            Container(width: 60, height: 12, color: shimmer),
             const SizedBox(height: 8),
-            Container(width: 100, height: 20, color: Colors.grey.shade200),
+            Container(width: 100, height: 20, color: shimmer),
           ],
         ),
       ],
-
     );
   }
 
@@ -295,7 +295,9 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: theme.brightness == Brightness.dark
+                        ? Colors.white.withOpacity(0.25)
+                        : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -339,12 +341,14 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
                             leading: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: isRead ? Colors.grey.shade100 : AppColors.primary.withOpacity(0.1),
+                                color: isRead
+                                    ? theme.colorScheme.surfaceContainerHighest
+                                    : AppColors.primary.withOpacity(0.1),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
                                 isRead ? Icons.notifications_none : Icons.notifications_active,
-                                color: isRead ? Colors.grey : AppColors.primary,
+                                color: isRead ? theme.colorScheme.onSurfaceVariant : AppColors.primary,
                                 size: 20,
                               ),
                             ),

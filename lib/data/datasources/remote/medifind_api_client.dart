@@ -719,7 +719,7 @@ class MediFindApiClient {
     }
   }
 
-  Future<UserProfile> getUserProfile(String userId) async {
+  Future<UserProfile?> getUserProfile(String userId) async {
     try {
       final response = await _dio.get('users/$userId');
 
@@ -727,8 +727,11 @@ class MediFindApiClient {
         return UserProfile.fromJson(response.data['data'] as Map<String, dynamic>);
       }
 
-      throw NetworkException(message: 'Failed to fetch user profile');
+      return null;
     } on DioException catch (e) {
+      if (e.response?.statusCode == 404) {
+        return null;
+      }
       throw _handleDioException(e);
     }
   }

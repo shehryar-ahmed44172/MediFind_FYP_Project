@@ -1,6 +1,8 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../theme/app_theme.dart';
@@ -34,199 +36,121 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final settings = ref.watch(accessibilityProvider);
     final isDeafMode = settings.textOnlyMode;
     final userAsync = ref.watch(currentUserProvider);
 
     return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.hp),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildWelcomeHeader(userAsync, theme),
-                    _buildMedicalProfileSnapshot(theme),
-                    const SizedBox(height: 24),
-                    _buildMassiveSOSButton(theme, isDeafMode),
-                    const SizedBox(height: 32),
-                    _buildSectionHeader(theme, 'Quick Actions'),
-                    const SizedBox(height: 16),
-                    _buildQuickActionGrid(theme),
-                    const SizedBox(height: 32),
-                    _buildPremiumCard(theme, userAsync.valueOrNull),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccessibilityBanner(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(5.wp, 10, 5.wp, 0),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Colors.blue.shade800, Colors.blue.shade600],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.blue.withOpacity(0.3),
-              blurRadius: 15,
-              offset: const Offset(0, 5),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
+      backgroundColor: theme.scaffoldBackgroundColor,
+      body: Stack(
+        children: [
+          // Background ambient glow — adapts to theme
+          Positioned(
+            top: -100,
+            right: -100,
+            child: Container(
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
                 shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.accessibility_new_rounded, color: Colors.white, size: 18),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Accessibility Active', 
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                  Text('Optimized for Deaf communication', 
-                    style: TextStyle(color: Colors.white70, fontSize: 11)),
-                ],
+                color: AppColors.primary.withOpacity(isDark ? 0.08 : 0.05),
               ),
             ),
-            Icon(Icons.info_outline_rounded, color: Colors.white.withOpacity(0.6), size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildWelcomeHeader(AsyncValue<dynamic> userAsync, ThemeData theme) {
-    return userAsync.when(
-      data: (user) => Padding(
-        padding: EdgeInsets.only(bottom: 3.hp, left: 1.wp),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
-            Row(
+          ),
+          SafeArea(
+            child: Column(
               children: [
-                Text(user?.fullName.split(' ')[0] ?? 'User',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
-                if (ref.watch(accessibilityProvider).textOnlyMode) ...[
-                  const SizedBox(width: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.blue.withOpacity(0.2)),
-                    ),
-                    child: Row(
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 2.hp),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Icon(Icons.accessibility_new_rounded, size: 14, color: Colors.blue.shade700),
-                        const SizedBox(width: 4),
-                        Text('DEAF MODE', style: TextStyle(color: Colors.blue.shade700, fontSize: 10, fontWeight: FontWeight.bold)),
+                        _buildProfessionalHeader(userAsync, theme, isDark),
+                        const SizedBox(height: 24),
+                        _buildDigitalMedicalID(theme, isDark),
+                        const SizedBox(height: 40),
+                        _buildAdvancedSOSCenter(theme, isDeafMode, isDark),
+                        const SizedBox(height: 48),
+                        _buildGlassServiceGrid(theme, isDark),
+                        const SizedBox(height: 32),
+                        _buildPremiumUpgradeCard(theme, userAsync.valueOrNull),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   ),
-                ],
+                ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfessionalHeader(AsyncValue<dynamic> userAsync, ThemeData theme, bool isDark) {
+    final textColor = isDark ? Colors.white : theme.colorScheme.onSurface;
+    return userAsync.when(
+      data: (user) => Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('MediFind Hub',
+                style: TextStyle(
+                  color: AppColors.primaryLight.withOpacity(0.85),
+                  fontWeight: FontWeight.w900,
+                  fontSize: 12,
+                  letterSpacing: 2,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                user?.fullName.split(' ')[0] ?? 'User',
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.w900,
+                  fontSize: 32,
+                  letterSpacing: -1,
+                ),
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.success.withOpacity(0.5),
+                width: 1.5,
+              ),
+            ),
+            child: CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.primary.withOpacity(0.12),
+              child: Text(
+                user?.fullName.substring(0, 1) ?? 'U',
+                style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ],
       ),
       loading: () => const SizedBox(height: 60),
       error: (_, __) => const SizedBox.shrink(),
     );
   }
 
-  Widget _buildSectionHeader(ThemeData theme, String title) {
-    return Text(
-      title,
-      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-    );
-  }
-
-  Widget _buildQuickActionGrid(ThemeData theme) {
-    // push: true = nested sub-screen (back button returns here)
-    // push: false/absent = tab switch (context.go)
-    final actions = [
-      {'title': 'Medical Records', 'icon': Icons.assignment_rounded, 'color': AppColors.primary, 'route': '/home/medical-reports', 'push': false},
-      {'title': 'My Caregivers', 'icon': Icons.people_alt_rounded, 'color': AppColors.secondary, 'route': '/home/caregivers', 'push': false},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.blue, 'route': '/chats', 'push': false},
-      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_rounded, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
-    ];
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.3,
-      ),
-      itemCount: actions.length,
-      itemBuilder: (context, index) {
-        final action = actions[index];
-        final color = action['color'] as Color;
-        return InkWell(
-          onTap: () {
-            final route = action['route'] as String?;
-            if (route != null) {
-              final shouldPush = action['push'] == true;
-              if (shouldPush) {
-                context.push(route);
-              } else {
-                context.go(route);
-              }
-            } else {
-              _showFeatureComingSoon(context, action['title'] as String);
-            }
-          },
-          borderRadius: BorderRadius.circular(24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: AppShadows.neumorphicOut,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(action['icon'] as IconData, color: color, size: 32),
-                const SizedBox(height: 8),
-                Text(action['title'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMedicalProfileSnapshot(ThemeData theme) {
+  Widget _buildDigitalMedicalID(ThemeData theme, bool isDark) {
     final userIdAsync = ref.watch(currentUserIdProvider);
+    final glassColor1 = isDark ? Colors.white.withOpacity(0.1)  : theme.colorScheme.primary.withOpacity(0.07);
+    final glassColor2 = isDark ? Colors.white.withOpacity(0.03) : theme.colorScheme.primary.withOpacity(0.02);
+    final borderColor = isDark ? Colors.white.withOpacity(0.1)  : theme.colorScheme.outline.withOpacity(0.2);
+    final labelColor  = isDark ? Colors.white70                  : theme.colorScheme.onSurface.withOpacity(0.6);
+    final iconColor   = isDark ? Colors.white.withOpacity(0.3)   : theme.colorScheme.onSurface.withOpacity(0.3);
 
     return userIdAsync.when(
       data: (userId) {
@@ -235,64 +159,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         return profileAsync.when(
           data: (profile) {
-            return Container(
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppShadows.neumorphicOut,
-              ),
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            return GestureDetector(
+              onTap: () => _showMedicalQRSheet(profile, theme, isDark),
+              child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [glassColor1, glassColor2],
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: borderColor, width: 1),
+                  ),
+                  child: Column(
                     children: [
-                      Text(
-                        'Medical Profile',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      InkWell(
-                        onTap: () => context.push('/home/medical-profile'),
-                        child: Row(
-                          children: [
-                            Text(
-                              'View Profile',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.primary,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: Colors.redAccent.withOpacity(0.15),
+                              shape: BoxShape.circle,
                             ),
-                            const SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_ios_rounded,
-                              size: 14, color: theme.colorScheme.primary),
-                          ],
-                        ),
+                            child: const Icon(Icons.health_and_safety_rounded, color: Colors.redAccent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'DIGITAL MEDICAL ID',
+                              style: TextStyle(color: labelColor, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.5),
+                            ),
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.qr_code_2_rounded, color: iconColor, size: 20),
+                              const SizedBox(width: 4),
+                              Text('TAP', style: TextStyle(color: iconColor, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 24),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _buildIDStat('BLOOD', profile?.bloodType ?? '--', Colors.redAccent, labelColor),
+                          _buildIDStat('ALLERGIES', (profile?.allergies.isNotEmpty == true) ? 'ACTIVE' : 'NONE', Colors.orangeAccent, labelColor),
+                          _buildIDStat('STATUS', 'VERIFIED', Colors.greenAccent, labelColor),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildProfileStat(theme, 'Blood', profile?.bloodType ?? '--', Icons.bloodtype, Colors.red),
-                      Container(width: 1, height: 40, color: Colors.grey.shade200),
-                      _buildProfileStat(theme, 'Allergies', 
-                        (profile?.allergies.isNotEmpty == true) ? profile!.allergies.first : 'None', 
-                        Icons.warning_amber_rounded, Colors.orange),
-                      Container(width: 1, height: 40, color: Colors.grey.shade200),
-                      _buildProfileStat(theme, 'Meds', 
-                        (profile?.medications.isNotEmpty == true) ? '${profile!.medications.length} Active' : 'None', 
-                        Icons.medication_liquid_rounded, AppColors.primary),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            );
+            ), // ClipRRect
+            ); // GestureDetector
           },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => const Text('Tap to refresh profile'),
+          loading: () => const SizedBox(height: 100),
+          error: (e, _) => const SizedBox.shrink(),
         );
       },
       loading: () => const SizedBox.shrink(),
@@ -300,353 +230,283 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildProfileStat(ThemeData theme, String title, String value, IconData icon, Color color) {
+  /// Shows a QR code bottom-sheet so first responders (or bystanders) can
+  /// scan the patient's critical medical info without needing the app.
+  void _showMedicalQRSheet(dynamic profile, ThemeData theme, bool isDark) {
+    final user = ref.read(currentUserProvider).valueOrNull;
+    final name  = user?.fullName ?? 'Unknown';
+    final blood = profile?.bloodType ?? 'Unknown';
+    final allergies = (profile?.allergies as List?)?.isNotEmpty == true
+        ? (profile!.allergies as List).join(', ')
+        : 'None';
+    final conditions = (profile?.chronicDiseases as List?)?.isNotEmpty == true
+        ? (profile!.chronicDiseases as List).join(', ')
+        : 'None';
+    final isDeaf = profile?.patientType?.toString().toUpperCase() == 'DEAF';
+
+    final qrData = 'MEDIFIND MEDICAL ID\n'
+        'Name: $name\n'
+        'Blood Type: $blood\n'
+        'Allergies: $allergies\n'
+        'Conditions: $conditions\n'
+        'DEAF/MUTE: ${isDeaf ? "YES" : "NO"}';
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // drag handle
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Icon(Icons.qr_code_2_rounded, color: AppColors.primary, size: 26),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Emergency Medical ID',
+                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
+                      Text('Tap to show — anyone can scan',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurface.withOpacity(0.5))),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // QR Code
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: AppShadows.cardShadow,
+              ),
+              child: QrImageView(
+                data: qrData,
+                version: QrVersions.auto,
+                size: 210,
+                backgroundColor: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 16),
+            // DEAF badge
+            if (isDeaf)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.hearing_disabled, color: Colors.orange, size: 16),
+                    SizedBox(width: 8),
+                    Text('DEAF / MUTE status included in QR',
+                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                  ],
+                ),
+              ),
+            if (!isDeaf) const SizedBox(height: 4),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIDStat(String label, String value, Color color, Color labelColor) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, color: color, size: 24),
-        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: labelColor, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1)),
+        const SizedBox(height: 4),
         Text(
           value,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Text(
-          title,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: Colors.grey.shade500,
-          ),
+          style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
         ),
       ],
     );
   }
 
-  Widget _buildMassiveSOSButton(ThemeData theme, bool isDeaf) {
-    return GestureDetector(
-      onLongPressStart: (_) {
-        if (isDeaf) HapticFeedbackService.heavy();
-      },
-      onLongPress: () {
-        if (isDeaf) HapticFeedbackService.sosPattern();
-        context.push('/home/emergency');
-      },
-      onTap: () {
-        HapticFeedbackService.light();
-        context.push('/home/emergency');
-      },
-      child: Center(
-        child: SizedBox(
-          width: 75.wp,
-          height: 75.wp,
+  Widget _buildAdvancedSOSCenter(ThemeData theme, bool isDeaf, bool isDark) {
+    final subtitleColor = isDark
+        ? Colors.white.withOpacity(0.4)
+        : theme.colorScheme.onSurface.withOpacity(0.5);
+
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => context.push('/home/emergency'),
           child: Stack(
             alignment: Alignment.center,
             children: [
-              // Animated Outer Ripples (Wrapped in RepaintBoundary for performance)
-              RepaintBoundary(
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    _PulseCircle(delay: 0, size: 75.wp, color: Colors.red.withOpacity(0.1)),
-                    _PulseCircle(delay: 1, size: 75.wp, color: Colors.red.withOpacity(0.05)),
-                  ],
-                ),
-              ),
-              
-              // Main Button Container
+              // Multiple Glow Layers
+              _buildSOSGlow(0, 180, Colors.redAccent.withOpacity(0.12)),
+              _buildSOSGlow(0.5, 220, Colors.redAccent.withOpacity(0.06)),
+
               Container(
-                width: 62.wp,
-                height: 62.wp,
+                width: 160,
+                height: 160,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: theme.scaffoldBackgroundColor,
+                  gradient: const RadialGradient(
+                    colors: [Color(0xFFFF5252), Color(0xFF991B1B)],
+                  ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.4 : 0.1),
-                      blurRadius: 30,
-                      offset: const Offset(0, 15),
+                      color: Colors.red.withOpacity(0.45),
+                      blurRadius: 40,
+                      spreadRadius: 5,
                     ),
                   ],
                 ),
-                child: Container(
-                  margin: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFFF5252), Color(0xFFD32F2F)],
-                    ),
-                    boxShadow: AppShadows.sosMassiveGlow,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.emergency_rounded,
-                        size: 80,
-                        color: Colors.white,
-                      ),
-                      const Text(
-                        'SOS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 26,
-                          letterSpacing: 4,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withOpacity(0.3)),
-                        ),
-                        child: Text(
-                          isDeaf ? 'TAP FOR EMERGENCY' : 'PRESS & HOLD',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 10,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                child: const Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.emergency_rounded, size: 54, color: Colors.white),
+                    SizedBox(height: 4),
+                    Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 2)),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildAttachReportOption(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go('/home/medical-reports'),
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.note_add_outlined, color: theme.colorScheme.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Medical Records',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Attach or view your reports',
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
-              ],
-            ),
+        const SizedBox(height: 24),
+        Text(
+          isDeaf ? 'TAP TO TRIGGER EMERGENCY' : 'PRESS AND HOLD FOR HELP',
+          style: TextStyle(
+            color: subtitleColor,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.5,
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickServices(ThemeData theme, bool isDeaf) {
-    final services = [
-      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile', 'push': true},
-      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports', 'push': false},
-      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers', 'push': false},
-      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null, 'push': false},
-      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null, 'push': false},
-      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Quick Services',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                HapticFeedbackService.light();
-              }, 
-              child: const Text('See All', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: isDeaf ? (SizeConfig.screenWidth > 600 ? 1.2 : 0.9) : (SizeConfig.screenWidth > 600 ? 1.4 : 1.1),
-          ),
-          itemCount: services.length,
-          itemBuilder: (context, index) {
-            final service = services[index];
-            final color = service['color'] as Color;
-            return InkWell(
-              onTap: () {
-                HapticFeedbackService.medium();
-                final route = service['route'] as String?;
-                if (route != null) {
-                  final shouldPush = service['push'] == true;
-                  if (shouldPush) {
-                    context.push(route);
-                  } else {
-                    context.go(route);
-                  }
-                } else {
-                  _showFeatureComingSoon(context, service['title'] as String);
-                }
-              },
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: AppShadows.neumorphicOut,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(isDeaf ? 20 : 16),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        service['icon'] as IconData, 
-                        color: color, 
-                        size: isDeaf ? 44 : 32,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        service['title'] as String,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: isDeaf ? 14 : 13,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
         ),
       ],
     );
   }
 
-  Widget _buildPremiumCard(ThemeData theme, dynamic user) {
-    // Only show for Free users
-    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
+  Widget _buildSOSGlow(double delay, double size, Color color) {
+    return _PulseCircle(delay: delay, size: size, color: color);
+  }
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0C637E).withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
+  Widget _buildGlassServiceGrid(ThemeData theme, bool isDark) {
+    final services = [
+      {'title': 'Medical Records', 'icon': Icons.folder_copy_rounded, 'color': Colors.blueAccent,   'route': '/home/medical-reports'},
+      {'title': 'Caregivers',      'icon': Icons.people_alt_rounded,  'color': Colors.orangeAccent, 'route': '/home/caregivers'},
+      {'title': 'Messages',        'icon': Icons.chat_bubble_rounded,  'color': Colors.purpleAccent, 'route': '/chats'},
+      {'title': 'Responders',      'icon': Icons.security_rounded,     'color': Colors.greenAccent,  'route': null},
+    ];
+
+    final tileBg     = isDark ? Colors.white.withOpacity(0.05) : theme.colorScheme.surfaceContainer;
+    final tileBorder = isDark ? Colors.white.withOpacity(0.08) : theme.colorScheme.outline.withOpacity(0.15);
+    final textColor  = isDark ? Colors.white                    : theme.colorScheme.onSurface;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.4,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.push('/subscription-plans'),
+      itemCount: services.length,
+      itemBuilder: (context, index) {
+        final service = services[index];
+        final color = service['color'] as Color;
+        return ClipRRect(
           borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
+          child: BackdropFilter(
+            filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+            child: Container(
+              decoration: BoxDecoration(
+                color: tileBg,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: tileBorder),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () {
+                    if (service['route'] != null) {
+                      context.go(service['route'] as String);
+                    }
+                  },
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
-                        'Unlock MediFind Premium',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
+                      Icon(service['icon'] as IconData, color: color, size: 28),
+                      const SizedBox(height: 10),
                       Text(
-                        'Get live tracking & priority dispatch',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 12,
-                        ),
+                        service['title'] as String,
+                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                     ],
                   ),
                 ),
-                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.7), size: 14),
-              ],
+              ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildPremiumUpgradeCard(ThemeData theme, dynamic user) {
+    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          colors: AppColors.medifindGradient,
+        ),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.circular(23),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome_rounded, color: theme.colorScheme.primary),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                'Upgrade to Premium',
+                style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios_rounded, color: theme.colorScheme.onSurface.withOpacity(0.3), size: 14),
+          ],
         ),
       ),
     );
   }
+
 
   void _showFeatureComingSoon(BuildContext context, String feature) {
     ScaffoldMessenger.of(context).showSnackBar(

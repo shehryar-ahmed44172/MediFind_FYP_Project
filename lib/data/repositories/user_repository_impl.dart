@@ -2,6 +2,7 @@ import '../../domain/entities/user.dart';
 import '../../domain/repositories/user_repository.dart';
 import '../datasources/local/local_data_source.dart';
 import '../datasources/remote/medifind_api_client.dart';
+import '../../core/utils/exceptions.dart';
 
 class UserRepositoryImpl implements UserRepository {
   final MediFindApiClient apiClient;
@@ -46,6 +47,9 @@ class UserRepositoryImpl implements UserRepository {
   Future<UserProfile> getUserProfile(String userId) async {
     try {
       final profile = await apiClient.getUserProfile(userId);
+      if (profile == null) {
+        throw NetworkException(message: 'User profile not found');
+      }
       return profile;
     } catch (e) {
       rethrow;

@@ -461,21 +461,29 @@ class AppTheme {
   }
 
   static InputDecorationTheme _buildInputDecorationTheme(AccessibilitySettings settings) {
+    // Colors reused in multiple places
+    const normalBorderColor = Color(0xFFCFD8DC); // blue-grey 100 — soft, neutral
+    const errorBorderColor  = Color(0xFFEF9A9A); // red 200 — light pink, not alarming
+    const labelGrey         = Color(0xFF78909C); // blue-grey 400
+    const iconGrey          = Color(0xFF90A4AE); // blue-grey 300
+
     return InputDecorationTheme(
       filled: true,
-      fillColor: AppColors.background,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      fillColor: Colors.white,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+
+      // ── Normal border ──────────────────────────────────────────────────
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast 
-            ? const BorderSide(color: Colors.black, width: 2) 
-            : BorderSide(color: Colors.grey.shade300, width: 1.5),
+        borderSide: settings.highContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : const BorderSide(color: normalBorderColor, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast 
-            ? const BorderSide(color: Colors.black, width: 2) 
-            : BorderSide(color: Colors.grey.shade300, width: 1.5),
+        borderSide: settings.highContrast
+            ? const BorderSide(color: Colors.black, width: 2)
+            : const BorderSide(color: normalBorderColor, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
@@ -484,24 +492,49 @@ class AppTheme {
           width: 2,
         ),
       ),
+
+      // ── Error border — soft pink, NOT full red ─────────────────────────
+      // Only the border changes subtly; the label and icon do NOT turn red.
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+        borderSide: const BorderSide(color: errorBorderColor, width: 1.5),
       ),
       focusedErrorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.error, width: 2),
+        borderSide: const BorderSide(color: errorBorderColor, width: 2),
       ),
+
+      // ── Error message — small, clear, below the field only ─────────────
       errorStyle: const TextStyle(
-        fontWeight: FontWeight.bold,
-        fontSize: 11,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w500,
+        color: Color(0xFFC62828), // deep red — readable but compact
+        height: 1.4,
       ),
-      labelStyle: const TextStyle(fontSize: 14),
-      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
-        if (states.contains(WidgetState.error)) {
-          return const TextStyle(color: AppColors.error, fontWeight: FontWeight.bold);
+
+      // ── Label — stays grey at ALL times, never turns red ───────────────
+      labelStyle: WidgetStateTextStyle.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
+          return const TextStyle(fontSize: 14, color: AppColors.primary);
         }
-        return const TextStyle(color: AppColors.primary);
+        return const TextStyle(fontSize: 14, color: labelGrey);
+      }),
+      floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) {
+          return const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500);
+        }
+        // error state AND normal floating: both stay grey — no red label
+        return const TextStyle(color: labelGrey, fontWeight: FontWeight.w500);
+      }),
+
+      // ── Icons — stay grey at ALL times, never turn red ─────────────────
+      prefixIconColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) return AppColors.primary;
+        return iconGrey;
+      }),
+      suffixIconColor: WidgetStateColor.resolveWith((states) {
+        if (states.contains(WidgetState.focused)) return AppColors.primary;
+        return iconGrey;
       }),
     );
   }

@@ -249,6 +249,17 @@ final processPaymentProvider = FutureProvider.family<bool, PaymentParams>((ref, 
   return await authRepo.processPayment(params.amount, params.method);
 });
 
+final deleteAccountProvider = FutureProvider<void>((ref) async {
+  final authRepo = await ref.watch(authRepositoryProvider.future);
+  await authRepo.deleteAccount();
+  // Invalidate all auth state so the app redirects to login
+  ref.invalidate(authStateProvider);
+  ref.invalidate(currentUserIdProvider);
+  ref.invalidate(currentUserRoleProvider);
+  ref.invalidate(currentUserProvider);
+  ref.invalidate(responderLocationTrackerProvider);
+});
+
 class PaymentParams {
   final double amount;
   final String method;

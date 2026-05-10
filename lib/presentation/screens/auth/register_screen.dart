@@ -512,6 +512,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       body: SafeArea(
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: SingleChildScrollView(
             padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 1.hp),
             child: Column(
@@ -665,7 +666,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     hintText: 'Select your birth date',
                     prefixIcon: Icon(Icons.calendar_today_rounded),
                   ),
-                  validator: (v) => v.isNullOrEmpty ? '⚠ Date of birth is required' : null,
+                  validator: (v) => v.isNullOrEmpty ? 'Please select your date of birth' : null,
                 ),
                 SizedBox(height: 3.hp),
 
@@ -705,8 +706,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       ),
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v.isNullOrEmpty) return '⚠ City is required';
-                        if (v!.trim().length < 2) return '⚠ Min 2 characters';
+                        if (v.isNullOrEmpty) return 'City is required';
+                        if (v!.trim().length < 2) return 'Minimum 2 characters required';
                         return null;
                       },
                     ),
@@ -723,7 +724,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         errorMaxLines: 2,
                       ),
                       textInputAction: TextInputAction.next,
-                      validator: (v) => v.isNullOrEmpty ? '⚠ House number is required' : null,
+                      validator: (v) => v.isNullOrEmpty ? 'House or flat number is required' : null,
                     ),
                   ),
                 ]),
@@ -738,8 +739,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     counterText: '',
                   ),
                   validator: (v) {
-                    if (v.isNullOrEmpty) return 'Street / Area is required';
-                    if (v!.trim().length < 3) return 'Min 3 characters';
+                    if (v.isNullOrEmpty) return 'Street or area is required';
+                    if (v!.trim().length < 3) return 'Minimum 3 characters required';
                     return null;
                   },
                 ),
@@ -802,8 +803,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       counterText: '',
                     ),
                     validator: (v) {
-                      if (v.isNullOrEmpty) return 'Organization name is required';
-                      if (v!.trim().length < 3) return 'Min 3 characters';
+                      if (v.isNullOrEmpty) return 'Organization or hospital name is required';
+                      if (v!.trim().length < 3) return 'Minimum 3 characters required';
                       return null;
                     },
                   ),
@@ -819,8 +820,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       counterText: '',
                     ),
                     validator: (v) {
-                      if (v.isNullOrEmpty) return 'License number is required';
-                      if (v!.trim().length < 5) return 'Min 5 characters';
+                      if (v.isNullOrEmpty) return 'Medical license number is required';
+                      if (v!.trim().length < 5) return 'License number must be at least 5 characters';
                       return null;
                     },
                   ),
@@ -1054,8 +1055,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   autofillHints: const [AutofillHints.password],
                   textInputAction: TextInputAction.done,
                   validator: (v) {
-                    if (v.isNullOrEmpty) return '⚠ Confirm password is required';
-                    if (v != _passwordController.text) return 'Passwords do not match';
+                    if (v.isNullOrEmpty) return 'Please confirm your password';
+                    if (v != _passwordController.text) return 'Passwords do not match — please re-enter';
                     return null;
                   },
                 ),

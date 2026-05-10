@@ -32,7 +32,7 @@ class ChatRoom with _$ChatRoom {
   const factory ChatRoom({
     required String id,
     required String patientId,
-    required String caregiverId,
+    String? caregiverId,
     required DateTime createdAt,
     required DateTime updatedAt,
     Map<String, dynamic>? patient,

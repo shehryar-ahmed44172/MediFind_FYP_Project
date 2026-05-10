@@ -69,61 +69,60 @@ class StringUtils {
   }
 
   static String? validateEmail(String? value) {
-    if (value == null || value.isEmpty) {
-      return '⚠ Email is required';
+    if (value == null || value.trim().isEmpty) {
+      return 'Email address is required';
     }
-    if (!isValidEmail(value)) {
-      return '⚠ Please enter a valid email address';
+    if (!isValidEmail(value.trim())) {
+      return 'Enter a valid email address (e.g. name@example.com)';
     }
     return null;
   }
 
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
-      return '⚠ Password is required';
+      return 'Password is required';
     }
     if (value.length < 8) {
-      return '⚠ Password must be at least 8 characters';
+      return 'Password must be at least 8 characters long';
     }
     if (!isValidPassword(value)) {
-      return '⚠ Password must contain uppercase, lowercase, number, and special character';
+      return 'Include uppercase, lowercase, a number, and a special character';
     }
     return null;
   }
 
   static String? validatePhoneNumber(String? value) {
-    if (value == null || value.isEmpty) {
-      return '⚠ Phone number is required';
+    if (value == null || value.trim().isEmpty) {
+      return 'Phone number is required';
     }
     if (!isValidPhoneNumber(value)) {
-      return '⚠ Please enter a valid phone number';
+      return 'Enter a valid number (e.g. +92-300-1234567)';
     }
     return null;
   }
 
   static String? validateName(String? value) {
-    if (value == null || value.isEmpty) {
-      return '⚠ Name is required';
+    if (value == null || value.trim().isEmpty) {
+      return 'Full name is required';
     }
-    if (value.length < 2) {
-      return '⚠ Name must be at least 2 characters';
+    if (value.trim().length < 2) {
+      return 'Name must be at least 2 characters';
     }
     final nameRegex = RegExp(r"^[a-zA-Z\s']+$");
-    if (!nameRegex.hasMatch(value)) {
-      return '⚠ Name must contain only letters';
+    if (!nameRegex.hasMatch(value.trim())) {
+      return 'Name can only contain letters and spaces';
     }
     return null;
   }
 
-  /// Validates Pakistan CNIC — accepts both plain 13 digits and XXXXX-XXXXXXX-X format
+  /// Validates Pakistan CNIC — format: XXXXX-XXXXXXX-X
   static String? validateCnic(String? value) {
-    if (value == null || value.isEmpty) {
-      return '⚠ CNIC is required';
+    if (value == null || value.trim().isEmpty) {
+      return 'CNIC number is required';
     }
-    // Strict pattern: 5 digits - 7 digits - 1 digit
     final cnicRegex = RegExp(r'^\d{5}-\d{7}-\d{1}$');
-    if (!cnicRegex.hasMatch(value)) {
-      return '⚠ Enter a valid CNIC (XXXXX-XXXXXXX-X)';
+    if (!cnicRegex.hasMatch(value.trim())) {
+      return 'Format: XXXXX-XXXXXXX-X (e.g. 34601-1234567-1)';
     }
     return null;
   }

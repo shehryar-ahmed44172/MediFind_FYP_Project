@@ -79,56 +79,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     }
   }
 
-  // Shows a small dialog asking for the email to jump straight to OTP entry.
-  // Intended for responders who come back after admin approval.
-  void _showOtpEmailDialog(BuildContext context) {
-    final emailCtrl = TextEditingController(text: _emailController.text.trim());
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Enter Verification Code'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Enter the email address you registered with. We\'ll take you to the OTP entry screen.',
-              style: TextStyle(fontSize: 13, height: 1.5),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              autofocus: true,
-              decoration: const InputDecoration(
-                labelText: 'Registered Email',
-                prefixIcon: Icon(Icons.email_outlined),
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final email = emailCtrl.text.trim();
-              Navigator.pop(ctx);
-              if (email.isNotEmpty) {
-                context.push('/verify-email', extra: {'email': email});
-              }
-            },
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // nav by role
   void _navigateByRole(String? role) {
     switch (role?.toUpperCase()) {
@@ -276,19 +226,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ],
                 ),
 
-                // Responder OTP shortcut — for users whose admin approval email arrived
-                SizedBox(height: 1.hp),
-                TextButton.icon(
-                  onPressed: () => _showOtpEmailDialog(context),
-                  icon: const Icon(Icons.key_rounded, size: 16),
-                  label: Text(
-                    'Responder? Already received your OTP code →',
-                    style: TextStyle(fontSize: 1.4.hp),
-                  ),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.orange.shade700,
-                  ),
-                ),
               ],
             ),
           ),

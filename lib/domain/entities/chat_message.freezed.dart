@@ -309,7 +309,7 @@ ChatRoom _$ChatRoomFromJson(Map<String, dynamic> json) {
 mixin _$ChatRoom {
   String get id => throw _privateConstructorUsedError;
   String get patientId => throw _privateConstructorUsedError;
-  String get caregiverId => throw _privateConstructorUsedError;
+  String? get caregiverId => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
   Map<String, dynamic>? get patient => throw _privateConstructorUsedError;
@@ -330,7 +330,7 @@ abstract class $ChatRoomCopyWith<$Res> {
   $Res call(
       {String id,
       String patientId,
-      String caregiverId,
+      String? caregiverId,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
@@ -353,7 +353,7 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
   $Res call({
     Object? id = null,
     Object? patientId = null,
-    Object? caregiverId = null,
+    Object? caregiverId = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
@@ -369,10 +369,9 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
           ? _value.patientId
           : patientId // ignore: cast_nullable_to_non_nullable
               as String,
-      caregiverId: null == caregiverId
+      caregiverId: freezed == caregiverId
           ? _value.caregiverId
-          : caregiverId // ignore: cast_nullable_to_non_nullable
-              as String,
+          : caregiverId as String?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -408,7 +407,7 @@ abstract class _$$ChatRoomImplCopyWith<$Res>
   $Res call(
       {String id,
       String patientId,
-      String caregiverId,
+      String? caregiverId,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
@@ -429,7 +428,7 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
   $Res call({
     Object? id = null,
     Object? patientId = null,
-    Object? caregiverId = null,
+    Object? caregiverId = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
@@ -445,10 +444,9 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
           ? _value.patientId
           : patientId // ignore: cast_nullable_to_non_nullable
               as String,
-      caregiverId: null == caregiverId
+      caregiverId: freezed == caregiverId
           ? _value.caregiverId
-          : caregiverId // ignore: cast_nullable_to_non_nullable
-              as String,
+          : caregiverId as String?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -479,7 +477,7 @@ class _$ChatRoomImpl implements _ChatRoom {
   const _$ChatRoomImpl(
       {required this.id,
       required this.patientId,
-      required this.caregiverId,
+      this.caregiverId,
       required this.createdAt,
       required this.updatedAt,
       final Map<String, dynamic>? patient,
@@ -497,7 +495,7 @@ class _$ChatRoomImpl implements _ChatRoom {
   @override
   final String patientId;
   @override
-  final String caregiverId;
+  final String? caregiverId;
   @override
   final DateTime createdAt;
   @override
@@ -588,7 +586,7 @@ abstract class _ChatRoom implements ChatRoom {
   const factory _ChatRoom(
       {required final String id,
       required final String patientId,
-      required final String caregiverId,
+      final String? caregiverId,
       required final DateTime createdAt,
       required final DateTime updatedAt,
       final Map<String, dynamic>? patient,
@@ -603,7 +601,7 @@ abstract class _ChatRoom implements ChatRoom {
   @override
   String get patientId;
   @override
-  String get caregiverId;
+  String? get caregiverId;
   @override
   DateTime get createdAt;
   @override

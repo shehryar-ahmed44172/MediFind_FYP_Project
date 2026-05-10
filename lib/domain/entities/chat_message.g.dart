@@ -44,7 +44,7 @@ _$ChatRoomImpl _$$ChatRoomImplFromJson(Map<String, dynamic> json) =>
     _$ChatRoomImpl(
       id: json['id'] as String,
       patientId: json['patientId'] as String,
-      caregiverId: json['caregiverId'] as String,
+      caregiverId: json['caregiverId'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       patient: json['patient'] as Map<String, dynamic>?,

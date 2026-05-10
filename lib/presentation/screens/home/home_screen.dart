@@ -1,4 +1,3 @@
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -45,19 +44,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       backgroundColor: theme.scaffoldBackgroundColor,
       body: Stack(
         children: [
-          // Background ambient glow — adapts to theme
-          Positioned(
-            top: -100,
-            right: -100,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.primary.withOpacity(isDark ? 0.08 : 0.05),
-              ),
-            ),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -161,11 +147,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           data: (profile) {
             return GestureDetector(
               onTap: () => _showMedicalQRSheet(profile, theme, isDark),
-              child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: BackdropFilter(
-                filter: ui.ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
+              child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -217,8 +199,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ],
                   ),
                 ),
-              ),
-            ), // ClipRRect
             ); // GestureDetector
           },
           loading: () => const SizedBox(height: 100),
@@ -358,42 +338,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         GestureDetector(
           onTap: () => context.push('/home/emergency'),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Multiple Glow Layers
-              _buildSOSGlow(0, 180, Colors.redAccent.withOpacity(0.12)),
-              _buildSOSGlow(0.5, 220, Colors.redAccent.withOpacity(0.06)),
+          child: SizedBox(
+            width: 220,
+            height: 220,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Pulse glow layers — fixed container prevents layout shift
+                _buildSOSGlow(0, 180, Colors.redAccent.withOpacity(0.12)),
+                _buildSOSGlow(0.5, 220, Colors.redAccent.withOpacity(0.06)),
 
-              Container(
-                width: 160,
-                height: 160,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const RadialGradient(
-                    colors: [Color(0xFFFF5252), Color(0xFF991B1B)],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.red.withOpacity(0.45),
-                      blurRadius: 40,
-                      spreadRadius: 5,
+                Container(
+                  width: 160,
+                  height: 160,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const RadialGradient(
+                      colors: [Color(0xFFFF5252), Color(0xFF991B1B)],
                     ),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.red.withOpacity(0.45),
+                        blurRadius: 40,
+                        spreadRadius: 5,
+                      ),
+                    ],
+                  ),
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.emergency_rounded, size: 54, color: Colors.white),
+                      SizedBox(height: 4),
+                      Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 2)),
+                    ],
+                  ),
                 ),
-                child: const Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.emergency_rounded, size: 54, color: Colors.white),
-                    SizedBox(height: 4),
-                    Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 2)),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 24),
+        const SizedBox(height: 16),
         Text(
           isDeaf ? 'TAP TO TRIGGER EMERGENCY' : 'PRESS AND HOLD FOR HELP',
           style: TextStyle(
@@ -436,36 +420,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       itemBuilder: (context, index) {
         final service = services[index];
         final color = service['color'] as Color;
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(24),
-          child: BackdropFilter(
-            filter: ui.ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-            child: Container(
-              decoration: BoxDecoration(
-                color: tileBg,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: tileBorder),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    if (service['route'] != null) {
-                      context.go(service['route'] as String);
-                    }
-                  },
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(service['icon'] as IconData, color: color, size: 28),
-                      const SizedBox(height: 10),
-                      Text(
-                        service['title'] as String,
-                        style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
-                      ),
-                    ],
+        return Container(
+          decoration: BoxDecoration(
+            color: tileBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: tileBorder),
+          ),
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(24),
+              onTap: () {
+                if (service['route'] != null) {
+                  context.go(service['route'] as String);
+                }
+              },
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(service['icon'] as IconData, color: color, size: 28),
+                  const SizedBox(height: 10),
+                  Text(
+                    service['title'] as String,
+                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
                   ),
-                ),
+                ],
               ),
             ),
           ),

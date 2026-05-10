@@ -330,6 +330,17 @@ class MediFindApiClient {
     }
   }
 
+  Future<void> deleteAccount() async {
+    try {
+      final response = await _dio.delete('users/me');
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to delete account');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   Future<User> updateProfile(Map<String, dynamic> data) async {
     try {
       final response = await _dio.put(

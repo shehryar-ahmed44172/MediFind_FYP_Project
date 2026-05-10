@@ -187,4 +187,13 @@ class AuthRepositoryImpl implements AuthRepository {
     debugPrint('💰 [MockPayment] Processed $amount via $method successfully.');
     return true;
   }
+
+  @override
+  Future<void> deleteAccount() async {
+    await apiClient.deleteAccount();
+    // Clear all local session data after successful deletion
+    await localDataSource.clearAuthToken();
+    apiClient.clearAuthToken();
+    SocketService.instance.disconnect();
+  }
 }

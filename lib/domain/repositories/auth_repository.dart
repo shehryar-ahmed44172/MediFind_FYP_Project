@@ -23,4 +23,5 @@ abstract class AuthRepository {
   Future<String> uploadDocument(File file);
   Future<User> upgradeSubscription(String plan);
   Future<bool> processPayment(double amount, String method);
+  Future<void> deleteAccount();
 }

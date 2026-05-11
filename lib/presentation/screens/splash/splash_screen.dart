@@ -91,18 +91,26 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProvider
           }
           return;
         } else {
-          // If user is null but we were supposedly logged in, it's a stale session
+          // If user is null but authState is true, wipe the stale session directly.
+          // We call the repo rather than logoutProvider to avoid any provider caching
+          // or lifecycle issues that could silently skip the actual token clearing.
           debugPrint('⚠️ Splash: User profile is null but authState is true. Clearing stale session.');
-          await ref.read(logoutProvider.future).catchError((_) => null);
+          try {
+            final authRepo = await ref.read(authRepositoryProvider.future);
+            await authRepo.logout();
+          } catch (_) {}
         }
       }
-      
+
       // Default fallback to login
       if (mounted) context.go('/login');
     } catch (e) {
       debugPrint('⚠️ Splash: Initial profile fetch failed. Forcing logout to clear stale session.');
-      // Explicitly logout to clear Hive tokens and avoid infinite loop in router
-      await ref.read(logoutProvider.future).catchError((_) => null);
+      // Clear tokens directly via the repository to guarantee a clean state.
+      try {
+        final authRepo = await ref.read(authRepositoryProvider.future);
+        await authRepo.logout();
+      } catch (_) {}
       if (mounted) context.go('/login');
     }
   }

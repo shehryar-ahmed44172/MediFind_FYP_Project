@@ -7,6 +7,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/constants/app_constants.dart';
+import '../../../services/location/responder_location_tracker.dart';
+import '../../../config/router.dart';
 
 // ─── Role Theme ───────────────────────────────────────────────────────────────
 class _RoleTheme {
@@ -57,6 +59,7 @@ class UserProfileScreen extends ConsumerStatefulWidget {
 
 class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _isUploading = false;
+  bool _isDeleting = false;
 
   String _resolveImageUrl(String? path) {
     if (path == null || path.isEmpty) return '';
@@ -121,9 +124,44 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ],
       ),
     );
-    if (ok == true) {
-      await ref.read(logoutProvider.future);
-      if (mounted) context.go('/login');
+
+    if (ok != true || !mounted) return;
+
+    try {
+      // 1. Clear tokens from Hive + API client + socket.
+      final authRepo = await ref.read(authRepositoryProvider.future);
+      await authRepo.logout();
+
+      // 2. ── CRITICAL: set authState to data(false) SYNCHRONOUSLY ────────────
+      //    Riverpod's ref.invalidate() is deferred — the new notifier's async
+      //    _initializeAuth() may not complete before the router's redirect fires.
+      //    forceLoggedOut() sets the state immediately so that EVERY subsequent
+      //    redirect evaluation (including ones triggered by GoRouterRefreshStream)
+      //    sees data(false) and never sends the user back to /splash or /home.
+      ref.read(authStateProvider.notifier).forceLoggedOut();
+
+      // 3. Invalidate derived providers so they re-read from cleared storage.
+      ref.invalidate(currentUserIdProvider);
+      ref.invalidate(currentUserRoleProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(responderLocationTrackerProvider);
+
+      if (!mounted) return;
+
+      // 4. Belt-and-suspenders: skip one redirect evaluation in case the router
+      //    fires before the data(false) state propagates to its listener.
+      AppRouter.skipNextRedirect();
+      context.go('/login');
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sign out failed: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 
@@ -215,15 +253,44 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
+    setState(() => _isDeleting = true);
+
     try {
-      await ref.read(deleteAccountProvider.future);
-      if (mounted) context.go('/login');
+      // Get the repo directly — avoids FutureProvider mid-flight abandonment issues
+      final authRepo = await ref.read(authRepositoryProvider.future);
+
+      // Make the DELETE /api/users/me request and clear local session data
+      await authRepo.deleteAccount();
+
+      // Synchronously mark the session as ended — same reasoning as logout.
+      ref.read(authStateProvider.notifier).forceLoggedOut();
+
+      // Invalidate derived providers so they re-read from cleared storage.
+      ref.invalidate(currentUserIdProvider);
+      ref.invalidate(currentUserRoleProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(responderLocationTrackerProvider);
+
+      if (!mounted) return;
+
+      // ── Bypass GoRouter's redirect for this navigation ─────────────────
+      // Without this, the redirect reads authStateProvider which may still
+      // hold data(true) (stale) and intercepts context.go('/login') by
+      // returning '/splash', which causes the black-screen bug.
+      // skipNextRedirect() makes the next redirect evaluation return null
+      // unconditionally (one-shot flag, clears itself immediately).
+      AppRouter.skipNextRedirect();
+      context.go('/login');
     } catch (e) {
+      // Always reset the overlay, even if the widget is still mounted.
+      // Without this guard the dark overlay would stick forever.
       if (mounted) {
+        setState(() => _isDeleting = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete account: $e'),
             backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -238,7 +305,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final settings = ref.watch(accessibilityProvider);
     final isOwn = widget.userId == null;
 
-    return Scaffold(
+    return Stack(
+      children: [
+        Scaffold(
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -305,7 +374,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         _SignOutButton(onTap: _confirmLogout),
                         const SizedBox(height: 8),
                         _DeleteAccountButton(
-                            onTap: () => _confirmDeleteAccount(user)),
+                            onTap: _isDeleting ? null : () => _confirmDeleteAccount(user)),
                         const SizedBox(height: 8),
                       ],
                     ],
@@ -316,6 +385,30 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           );
         },
       ),
+    ),
+        // ── Full-screen deletion overlay ───────────────────────────────────
+        if (_isDeleting)
+          Container(
+            color: Colors.black.withOpacity(0.55),
+            child: const Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(color: Colors.white),
+                  SizedBox(height: 20),
+                  Text(
+                    'Deleting account…',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -956,7 +1049,7 @@ class _SignOutButton extends StatelessWidget {
 
 // ─── Delete Account Button ────────────────────────────────────────────────────
 class _DeleteAccountButton extends StatelessWidget {
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   const _DeleteAccountButton({required this.onTap});
 
   @override

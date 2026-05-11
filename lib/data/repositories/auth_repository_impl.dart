@@ -190,10 +190,18 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<void> deleteAccount() async {
+    // Make the backend call while the token is still live
     await apiClient.deleteAccount();
-    // Clear all local session data after successful deletion
+
+    // Wipe ALL local session data (clearAuthToken clears the entire authBox:
+    // access token, refresh token, userId, userRole)
     await localDataSource.clearAuthToken();
+
+    // Prevent the 401 interceptor from firing a session-expired callback
+    // by clearing the in-memory token AFTER the successful deletion
     apiClient.clearAuthToken();
+
+    // Tear down the socket connection
     SocketService.instance.disconnect();
   }
 }

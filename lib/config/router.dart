@@ -64,6 +64,14 @@ class AppRouter {
     _container = container;
   }
 
+  /// When set, the NEXT redirect evaluation returns null (no redirect) and
+  /// clears itself. Call this immediately before any programmatic navigation
+  /// that must bypass the auth redirect — e.g. after account deletion where
+  /// authStateProvider still holds stale data(true) and would otherwise
+  /// intercept context.go('/login') and send the user to /splash instead.
+  static bool _skipNextRedirect = false;
+  static void skipNextRedirect() => _skipNextRedirect = true;
+
   // Helper for modern transitions
   static Page<dynamic> _modernPageTransition({
     required LocalKey key,
@@ -94,6 +102,12 @@ class AppRouter {
         ? GoRouterRefreshStream(_container!.read(authStateProvider.notifier).stream)
         : null,
     redirect: (context, state) {
+      // One-shot bypass for programmatic navigations (e.g. account deletion)
+      if (_skipNextRedirect) {
+        _skipNextRedirect = false;
+        return null;
+      }
+
       if (_container == null) return null;
       
       final authState = _container!.read(authStateProvider);

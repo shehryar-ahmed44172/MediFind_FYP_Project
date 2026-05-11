@@ -42,14 +42,23 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
-  late AnimationController _radarController;
-  late Animation<double> _radarAnimation;
-  
+
+  // Three staggered radar ring controllers — InDrive style
+  late AnimationController _radar1Controller;
+  late AnimationController _radar2Controller;
+  late AnimationController _radar3Controller;
+
+  // "Responder Found" flash overlay
+  bool _responderFound = false;
+  late AnimationController _foundController;
+  late Animation<double> _foundOpacity;
+
   final Set<Marker> _markers = {};
   GoogleMapController? _mapController;
   BitmapDescriptor? _ambulanceIcon;
   BitmapDescriptor? _userIcon;
-  
+  BitmapDescriptor? _confirmedIcon;
+
   late AnimationController _bikeMovementController;
   final List<_SimulatedBike> _simulatedBikes = [];
   final math.Random _random = math.Random();
@@ -62,18 +71,40 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       vsync: this,
       duration: const Duration(seconds: 1),
     )..repeat(reverse: true);
-    
+
     _pulseAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    _radarController = AnimationController(
+    // Three radar rings — each delayed by 0.66s to stagger the expanding effect
+    _radar1Controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: const Duration(milliseconds: 2000),
     )..repeat();
-    
-    _radarAnimation = Tween<double>(begin: 0, end: 1.0).animate(
-      CurvedAnimation(parent: _radarController, curve: Curves.easeOut),
+
+    _radar2Controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    Future.delayed(const Duration(milliseconds: 666), () {
+      if (mounted) _radar2Controller.repeat();
+    });
+
+    _radar3Controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    Future.delayed(const Duration(milliseconds: 1333), () {
+      if (mounted) _radar3Controller.repeat();
+    });
+
+    // "Responder Found" flash
+    _foundController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    );
+    _foundOpacity = Tween<double>(begin: 0, end: 1).animate(
+      CurvedAnimation(parent: _foundController, curve: Curves.easeIn),
     );
 
     _bikeMovementController = AnimationController(
@@ -104,7 +135,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   }
 
   void _updateBikePositions() {
-    if (!mounted || _cancelled || _ambulanceIcon == null) return;
+    if (!mounted || _cancelled || _ambulanceIcon == null || _responderFound) return;
 
     setState(() {
       _markers.clear();
@@ -140,15 +171,40 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       final icons = await Future.wait([
         MapUtils.getAmbulanceMarker(),
         MapUtils.getPatientMarker(),
+        MapUtils.getConfirmedResponderMarker(),
       ]);
       if (mounted) {
         setState(() {
-          _ambulanceIcon = icons[0];
-          _userIcon = icons[1];
+          _ambulanceIcon  = icons[0];
+          _userIcon       = icons[1];
+          _confirmedIcon  = icons[2];
         });
       }
     } catch (e) {
       debugPrint('Error loading marker icons: $e');
+    }
+  }
+
+  /// Called by socket/polling when a real responder accepts.
+  /// Stops the simulation, shows the confirmation flash, then navigates.
+  void _onResponderAssigned() {
+    if (_responderFound) return; // guard against double-fire
+    setState(() => _responderFound = true);
+    _foundController.forward();
+    HapticFeedback.heavyImpact();
+
+    // Replace all simulated bikes with the confirmed marker at center
+    if (_confirmedIcon != null) {
+      setState(() {
+        _markers
+          ..removeWhere((m) => m.markerId.value.startsWith('sim_'))
+          ..add(Marker(
+            markerId: const MarkerId('confirmed_responder'),
+            position: LatLng(widget.latitude, widget.longitude),
+            icon: _confirmedIcon!,
+            anchor: const Offset(0.5, 0.5),
+          ));
+      });
     }
   }
 
@@ -187,7 +243,10 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   void dispose() {
     _timer.cancel();
     _pulseController.dispose();
-    _radarController.dispose();
+    _radar1Controller.dispose();
+    _radar2Controller.dispose();
+    _radar3Controller.dispose();
+    _foundController.dispose();
     _bikeMovementController.dispose();
     super.dispose();
   }
@@ -277,8 +336,12 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
             status == 'ACCEPTED' ||
             status == 'RESPONDER_ASSIGNED' ||
             status == 'EN_ROUTE') {
+          _onResponderAssigned();
           _timer.cancel();
-          if (mounted) context.go('/emergency/$_emergencyId/tracking');
+          // Brief delay so the "Responder Found" flash is visible before navigating
+          Future.delayed(const Duration(milliseconds: 1200), () {
+            if (mounted) context.go('/emergency/$_emergencyId/tracking');
+          });
         }
       }
     });
@@ -287,7 +350,6 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     ref.listen(socketStreamProvider, (previous, next) {
       if (next.hasValue && next.value!.event == SocketEvent.emergencyStatusChange) {
         final rawData = next.value!.data;
-        // Handle both flat and nested data structures from backend
         final data = (rawData is Map && rawData.containsKey('data')) ? rawData['data'] : rawData;
 
         if (data is Map) {
@@ -296,8 +358,11 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
               status == 'ACCEPTED' ||
               status == 'RESPONDER_ASSIGNED' ||
               status == 'EN_ROUTE') {
+            _onResponderAssigned();
             _timer.cancel();
-            if (mounted) context.go('/emergency/$_emergencyId/tracking');
+            Future.delayed(const Duration(milliseconds: 1200), () {
+              if (mounted) context.go('/emergency/$_emergencyId/tracking');
+            });
           }
         }
       }
@@ -328,25 +393,80 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   myLocationButtonEnabled: false,
                   onMapCreated: (controller) => _mapController = controller,
                 ),
-                // Radar Pulse Effect
-                Center(
-                  child: AnimatedBuilder(
-                    animation: _radarAnimation,
-                    builder: (context, child) {
-                      return Container(
-                        width: 200 * _radarAnimation.value,
-                        height: 200 * _radarAnimation.value,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.primary.withOpacity(1 - _radarAnimation.value),
-                            width: 2,
+                // ── Triple-ring InDrive-style radar ──────────────────────
+                ...[_radar1Controller, _radar2Controller, _radar3Controller]
+                    .map((ctrl) => Center(
+                          child: AnimatedBuilder(
+                            animation: ctrl,
+                            builder: (_, __) {
+                              final v = ctrl.value;
+                              return Container(
+                                width: 220 * v,
+                                height: 220 * v,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.primary
+                                      .withOpacity(0.10 * (1 - v)),
+                                  border: Border.all(
+                                    color: AppColors.primary
+                                        .withOpacity(0.70 * (1 - v)),
+                                    width: 1.5,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
+                        )),
+
+                // ── Responder Found flash overlay ────────────────────────
+                if (_responderFound)
+                  FadeTransition(
+                    opacity: _foundOpacity,
+                    child: Container(
+                      color: Colors.black54,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(18),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF22C55E),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(0xFF22C55E)
+                                        .withOpacity(0.45),
+                                    blurRadius: 24,
+                                    spreadRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(Icons.check_rounded,
+                                  color: Colors.white, size: 40),
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Responder Found!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'En route to your location',
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.80),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                      );
-                    },
+                      ),
+                    ),
                   ),
-                ),
               ],
             ),
           ),

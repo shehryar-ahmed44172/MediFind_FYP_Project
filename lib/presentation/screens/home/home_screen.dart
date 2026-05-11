@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
@@ -79,48 +80,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildProfessionalHeader(AsyncValue<dynamic> userAsync, ThemeData theme, bool isDark) {
     final textColor = isDark ? Colors.white : theme.colorScheme.onSurface;
     return userAsync.when(
-      data: (user) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      data: (user) => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('MediFind Hub',
-                style: TextStyle(
-                  color: AppColors.primaryLight.withOpacity(0.85),
-                  fontWeight: FontWeight.w900,
-                  fontSize: 12,
-                  letterSpacing: 2,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                user?.fullName.split(' ')[0] ?? 'User',
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 32,
-                  letterSpacing: -1,
-                ),
-              ),
-            ],
-          ),
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: AppColors.success.withOpacity(0.5),
-                width: 1.5,
-              ),
+          Text('MediFind Hub',
+            style: TextStyle(
+              color: AppColors.primaryLight.withOpacity(0.85),
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+              letterSpacing: 2,
             ),
-            child: CircleAvatar(
-              radius: 24,
-              backgroundColor: AppColors.primary.withOpacity(0.12),
-              child: Text(
-                user?.fullName.substring(0, 1) ?? 'U',
-                style: TextStyle(color: textColor, fontWeight: FontWeight.bold),
-              ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            user?.fullName.split(' ')[0] ?? 'User',
+            style: TextStyle(
+              color: textColor,
+              fontWeight: FontWeight.w900,
+              fontSize: 32,
+              letterSpacing: -1,
             ),
           ),
         ],
@@ -421,77 +399,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildAdvancedSOSCenter(ThemeData theme, bool isDeaf, bool isDark) {
-    final subtitleColor = isDark
-        ? Colors.white.withOpacity(0.4)
-        : theme.colorScheme.onSurface.withOpacity(0.5);
-
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: () => context.push('/home/emergency'),
-          child: SizedBox(
-            width: 220,
-            height: 220,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Pulse glow layers — fixed container prevents layout shift
-                _buildSOSGlow(0, 180, Colors.redAccent.withOpacity(0.12)),
-                _buildSOSGlow(0.5, 220, Colors.redAccent.withOpacity(0.06)),
-
-                Container(
-                  width: 160,
-                  height: 160,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: const RadialGradient(
-                      colors: [Color(0xFFFF5252), Color(0xFF991B1B)],
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.red.withOpacity(0.45),
-                        blurRadius: 40,
-                        spreadRadius: 5,
-                      ),
-                    ],
-                  ),
-                  child: const Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.emergency_rounded, size: 54, color: Colors.white),
-                      SizedBox(height: 4),
-                      Text('SOS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 28, letterSpacing: 2)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          isDeaf ? 'TAP TO TRIGGER EMERGENCY' : 'PRESS AND HOLD FOR HELP',
-          style: TextStyle(
-            color: subtitleColor,
-            fontSize: 10,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.5,
-          ),
-        ),
-      ],
+    return _SOSButton(
+      isDeaf: isDeaf,
+      onTap: () => context.push('/home/emergency'),
     );
-  }
-
-  Widget _buildSOSGlow(double delay, double size, Color color) {
-    return _PulseCircle(delay: delay, size: size, color: color);
   }
 
   Widget _buildGlassServiceGrid(ThemeData theme, bool isDark) {
     final services = [
-      {'title': 'Medical Records', 'icon': Icons.folder_copy_rounded, 'color': Colors.blueAccent,   'route': '/home/medical-reports'},
-      {'title': 'Caregivers',      'icon': Icons.people_alt_rounded,  'color': Colors.orangeAccent, 'route': '/home/caregivers'},
-      {'title': 'Messages',        'icon': Icons.chat_bubble_rounded,  'color': Colors.purpleAccent, 'route': '/chats'},
-      {'title': 'Responders',      'icon': Icons.security_rounded,     'color': Colors.greenAccent,  'route': null},
+      {'title': 'Medical Records', 'icon': Icons.folder_copy_rounded, 'color': AppColors.primaryLight,  'route': '/home/medical-reports'},
+      {'title': 'Caregivers',      'icon': Icons.people_alt_rounded,  'color': AppColors.warning,       'route': '/home/caregivers'},
+      {'title': 'Messages',        'icon': Icons.chat_bubble_rounded,  'color': AppColors.secondaryTeal, 'route': '/chats'},
+      {'title': 'Responders',      'icon': Icons.security_rounded,     'color': AppColors.success,       'route': null},
     ];
 
     final tileBg     = isDark ? Colors.white.withOpacity(0.05) : theme.colorScheme.surfaceContainer;
@@ -594,7 +513,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       SnackBar(
         content: Text('$feature feature coming soon!'),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.indigo.shade700,
+        backgroundColor: AppColors.primary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       ),
     );
@@ -662,31 +581,29 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
-class _PulseCircle extends StatefulWidget {
-  final double delay;
-  final double size;
-  final Color color;
+// ── Modern full-width SOS button with breathing glow animation ───────────────
+class _SOSButton extends StatefulWidget {
+  final bool isDeaf;
+  final VoidCallback onTap;
 
-  const _PulseCircle({required this.delay, required this.size, required this.color});
+  const _SOSButton({required this.isDeaf, required this.onTap});
 
   @override
-  State<_PulseCircle> createState() => _PulseCircleState();
+  State<_SOSButton> createState() => _SOSButtonState();
 }
 
-class _PulseCircleState extends State<_PulseCircle> with SingleTickerProviderStateMixin {
+class _SOSButtonState extends State<_SOSButton> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late Animation<double> _anim;
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-
-    Future.delayed(Duration(milliseconds: (widget.delay * 1000).toInt()), () {
-      if (mounted) _controller.repeat();
-    });
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
   }
 
   @override
@@ -698,252 +615,96 @@ class _PulseCircleState extends State<_PulseCircle> with SingleTickerProviderSta
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, child) {
+      animation: _anim,
+      builder: (context, _) {
         return Container(
-          width: widget.size * _controller.value,
-          height: widget.size * _controller.value,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: widget.color.withOpacity(widget.color.opacity * (1 - _controller.value)),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD32F2F).withOpacity(0.25 + _anim.value * 0.25),
+                blurRadius: 24 + _anim.value * 16,
+                spreadRadius: 2 + _anim.value * 4,
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(28),
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: widget.onTap,
+                splashColor: Colors.white.withOpacity(0.15),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 36),
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFD32F2F), Color(0xFF8B0000)],
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Glass-effect icon ring
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withOpacity(0.15),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.35),
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.emergency_rounded,
+                          color: Colors.white,
+                          size: 52,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'SOS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w900,
+                          fontSize: 44,
+                          letterSpacing: 10,
+                          height: 1,
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      // Pill badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.2),
+                          ),
+                        ),
+                        child: Text(
+                          widget.isDeaf ? 'TAP TO TRIGGER EMERGENCY' : 'EMERGENCY ALERT',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 11,
+                            letterSpacing: 2,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildAttachReportOption(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.go('/home/medical-reports'),
-          borderRadius: BorderRadius.circular(20),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primary.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(Icons.note_add_outlined, color: theme.colorScheme.primary),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Medical Records',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        'Attach or view your reports',
-                        style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildQuickServices(ThemeData theme, bool isDeaf) {
-    final services = [
-      {'title': 'My Medical Profile', 'icon': Icons.health_and_safety_outlined, 'color': AppColors.primary, 'route': '/home/medical-profile', 'push': true},
-      {'title': 'Medical Records', 'icon': Icons.assignment_outlined, 'color': AppColors.secondary, 'route': '/home/medical-reports', 'push': false},
-      {'title': 'Connect Caregivers', 'icon': Icons.people_outline_rounded, 'color': AppColors.accent, 'route': '/home/caregivers', 'push': false},
-      {'title': 'Hospitals Nearby', 'icon': Icons.local_hospital_outlined, 'color': Colors.red, 'route': null, 'push': false},
-      {'title': 'Emergency Responders', 'icon': Icons.security_outlined, 'color': Colors.indigo, 'route': null, 'push': false},
-      {'title': 'Emergency Contacts', 'icon': Icons.contact_phone_outlined, 'color': Colors.orange, 'route': '/home/emergency-contacts', 'push': true},
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Quick Services',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                HapticFeedbackService.light();
-              }, 
-              child: const Text('See All', style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 16,
-            mainAxisSpacing: 16,
-            childAspectRatio: isDeaf ? (SizeConfig.screenWidth > 600 ? 1.2 : 0.9) : (SizeConfig.screenWidth > 600 ? 1.4 : 1.1),
-          ),
-          itemCount: services.length,
-          itemBuilder: (context, index) {
-            final service = services[index];
-            final color = service['color'] as Color;
-            return InkWell(
-              onTap: () {
-                HapticFeedbackService.medium();
-                final route = service['route'] as String?;
-                if (route != null) {
-                  final shouldPush = service['push'] == true;
-                  if (shouldPush) {
-                    context.push(route);
-                  } else {
-                    context.go(route);
-                  }
-                } else {
-                  _showFeatureComingSoon(context, service['title'] as String);
-                }
-              },
-              borderRadius: BorderRadius.circular(24),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: AppShadows.neumorphicOut,
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: EdgeInsets.all(isDeaf ? 20 : 16),
-                      decoration: BoxDecoration(
-                        color: color.withOpacity(0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        service['icon'] as IconData, 
-                        color: color, 
-                        size: isDeaf ? 44 : 32,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Text(
-                        service['title'] as String,
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          fontSize: isDeaf ? 14 : 13,
-                          color: Colors.black87,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPremiumCard(ThemeData theme, dynamic user) {
-    // Only show for Free users
-    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
-
-    return Container(
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0C637E).withOpacity(0.2),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () => context.push('/subscription-plans'),
-          borderRadius: BorderRadius.circular(24),
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 28),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Unlock MediFind Premium',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Get live tracking & priority dispatch',
-                        style: TextStyle(
-                          color: Colors.white.withOpacity(0.8),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withOpacity(0.7), size: 14),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showFeatureComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature feature coming soon!'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: Colors.indigo.shade700,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
     );
   }
 }

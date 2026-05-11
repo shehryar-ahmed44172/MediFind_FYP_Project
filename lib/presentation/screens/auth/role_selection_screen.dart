@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
+import '../../theme/app_theme.dart';
 
 class RoleSelectionScreen extends StatefulWidget {
   const RoleSelectionScreen({super.key});
@@ -131,7 +132,7 @@ class _RoleSelectionScreenState extends State<RoleSelectionScreen> {
                           ),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 1.8.hp),
-                    backgroundColor: theme.colorScheme.primary,
+                    backgroundColor: AppColors.primaryLight,
                     disabledBackgroundColor: Colors.grey.shade200,
                     foregroundColor: Colors.white,
                     disabledForegroundColor: Colors.grey.shade400,

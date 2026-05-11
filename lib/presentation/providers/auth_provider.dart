@@ -102,29 +102,32 @@ class AuthStateNotifier extends StateNotifier<AsyncValue<bool>> {
   void _initializeAuth() async {
     state = const AsyncValue.loading();
     try {
-      // Use ref.watch or future to wait for the repository to be ready
       final repo = await _authRepository.when(
         data: (repo) async => repo,
-        loading: () async {
-          // If still loading, we should wait for the future
-          // But since we are already in an async method, we can just return and let the listener handle it?
-          // No, better to wait.
-          return null; 
-        },
+        loading: () async => null,
         error: (err, st) => throw err,
       );
-      
-      if (repo == null) {
-        // If we returned null because it's loading, we just exit.
-        // The provider will rebuild when the repository data is ready.
-        return;
-      }
+
+      if (repo == null) return;
 
       final isLoggedIn = await repo.isUserLoggedIn();
       state = AsyncValue.data(isLoggedIn);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
+  }
+
+  /// Immediately marks the session as logged out (synchronous).
+  ///
+  /// Call this right after clearing the token storage so that:
+  /// - The GoRouter redirect sees data(false) immediately — no waiting for
+  ///   the async Riverpod rebuild cycle.
+  /// - GoRouterRefreshStream fires notifyListeners() → GoRouter re-evaluates
+  ///   the redirect and returns null (not logged in, not going to login) or
+  ///   routes directly to /login.
+  /// - Any subsequent redirect evaluation cannot send the user back to /splash.
+  void forceLoggedOut() {
+    state = const AsyncValue.data(false);
   }
 }
 
@@ -144,16 +147,19 @@ final registerProvider =
   await authRepo.register(request);
 });
 
-final logoutProvider = FutureProvider<void>((ref) async {
-  final authRepo = await ref.watch(authRepositoryProvider.future);
+// autoDispose: CRITICAL — prevents Riverpod from caching the completed void result.
+// Without autoDispose, a second call to ref.read(logoutProvider.future) returns the
+// cached completed future immediately, silently skipping the actual logout logic.
+final logoutProvider = FutureProvider.autoDispose<void>((ref) async {
+  final authRepo = await ref.read(authRepositoryProvider.future);
   await authRepo.logout();
-  
-  // Invalidate Auth State
+
+  // Invalidate auth state so any listeners see "logged out" immediately.
   ref.invalidate(authStateProvider);
   ref.invalidate(currentUserIdProvider);
   ref.invalidate(currentUserRoleProvider);
   ref.invalidate(currentUserProvider);
-  
+
   // Stop background tracking for Responders
   ref.invalidate(responderLocationTrackerProvider);
 });

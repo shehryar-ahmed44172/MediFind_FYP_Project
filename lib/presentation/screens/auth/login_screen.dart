@@ -5,6 +5,7 @@ import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -171,11 +172,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 // login btn with neumorphic effect
                 Container(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primary,
+                    color: AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: theme.colorScheme.primary.withOpacity(0.4),
+                        color: AppColors.primaryLight.withOpacity(0.4),
                         blurRadius: 12,
                         offset: const Offset(4, 4),
                       ),

@@ -71,7 +71,9 @@ class WebSocketService {
   void _doConnect() {
     try {
       // Use wss if baseUrl is https, else ws
-      final wsUrl = AppConstants.baseUrl.replaceFirst('http', 'ws');
+      // Remove /api/ from baseUrl to get the host root, then construct ws path
+      final host = AppConstants.baseUrl.replaceAll('/api/', '');
+      final wsUrl = host.replaceFirst('http', 'ws');
       final uri = Uri.parse('$wsUrl/api/v1/ws/emergency/$_currentEmergencyId');
       
       // In a real app, pass auth token via headers or connect message

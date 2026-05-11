@@ -24,7 +24,48 @@ class MedicalProfileScreen extends ConsumerWidget {
 
   Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId, AccessibilitySettings settings, double m) {
     final profileAsync = ref.watch(getMedicalProfileProvider(userId));
+    final theme = Theme.of(context);
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: theme.colorScheme.onSurface),
+          onPressed: () => context.pop(),
+        ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Medical Profile',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+                color: theme.colorScheme.onSurface,
+              ),
+            ),
+            Text(
+              'Your health information',
+              style: TextStyle(
+                fontSize: 11,
+                color: theme.colorScheme.onSurface.withOpacity(0.45),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
+        titleSpacing: 0,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.edit_rounded,
+                color: theme.colorScheme.primary, size: 20),
+            tooltip: 'Edit Profile',
+            onPressed: () => context.push('/home/medical-profile/edit'),
+          ),
+          const SizedBox(width: 4),
+        ],
+      ),
       body: Column(
         children: [
           Expanded(
@@ -35,12 +76,15 @@ class MedicalProfileScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.medical_information_outlined,
-                      size: 72, color: Colors.grey),
+                  Icon(Icons.medical_information_outlined,
+                      size: 72, color: Colors.grey.shade300),
                   const SizedBox(height: 16),
-                  const Text('No medical profile found',
-                      style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  const SizedBox(height: 24),
+                  Text('No medical profile found',
+                      style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text('Tap the edit button above to create one',
+                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
+                  const SizedBox(height: 28),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add),
                     label: const Text('Create Medical Profile'),

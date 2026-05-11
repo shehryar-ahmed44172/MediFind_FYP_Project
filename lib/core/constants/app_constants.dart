@@ -14,7 +14,7 @@ class AppConstants {
   //   • Phone and PC must be on the SAME WiFi network
   //   • Backend must be running: `npm run dev` in medifind-backend
   //   • Windows Firewall must allow port 3000 (see README if blocked)
-  static const String _lanIp       = '192.168.100.86'; // ← your PC's IPv4
+  static const String _lanIp       = '192.168.100.5'; // ← your PC's IPv4
   static const int    _backendPort = 3000;
 
   static const String _devBaseUrl   = 'http://$_lanIp:$_backendPort/api/';

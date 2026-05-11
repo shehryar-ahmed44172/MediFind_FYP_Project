@@ -48,6 +48,7 @@ import '../presentation/screens/settings/checkout_screen.dart';
 import '../presentation/screens/settings/payment_success_screen.dart';
 import '../presentation/screens/patient/predefined_messages_screen.dart';
 import '../presentation/screens/auth/pending_approval_screen.dart';
+import '../presentation/screens/settings/accessibility_settings_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -353,6 +354,12 @@ class AppRouter {
         name: 'emergency-contacts',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const EmergencyContactsScreen(),
+      ),
+      GoRoute(
+        path: '/home/accessibility-settings',
+        name: 'accessibility-settings',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const AccessibilitySettingsScreen(),
       ),
 
       // -----------------------------------------------------------------------

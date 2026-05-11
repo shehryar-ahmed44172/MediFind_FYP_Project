@@ -44,7 +44,10 @@ class MediFindApiClient {
       },
     );
 
-    // Add interceptor for logging
+    // Add interceptor
+    if (kDebugMode) {
+      debugPrint('🚀 MediFind API Client initialized with Base URL: ${_dio.options.baseUrl}');
+    }
     _dio.interceptors.add(
       LogInterceptor(
         requestBody: true,

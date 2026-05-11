@@ -17,6 +17,7 @@ class Emergency with _$Emergency {
     DateTime? updatedAt,
     String? responderId,
     @Default(false) bool voiceAlertGenerated,
+    String? voiceSummary,
     String? additionalInfo,
     DateTime? completedAt,
     @Default('NORMAL') String priority,

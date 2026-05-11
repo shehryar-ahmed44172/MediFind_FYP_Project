@@ -8,7 +8,7 @@ import 'package:dio/dio.dart';
 
 class MedicalReportsUploadService {
   final Dio _dio;
-  static const String _baseUrl = '/medical-reports';
+  static const String _baseUrl = 'reports';
 
   MedicalReportsUploadService({Dio? dio}) : _dio = dio ?? Dio();
 

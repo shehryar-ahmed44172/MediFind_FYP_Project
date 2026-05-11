@@ -126,8 +126,38 @@ class _EmergencyRequestScreenState
   Widget _buildContent(BuildContext context, ThemeData theme, emergency_entity.Emergency? emergency) {
     if (emergency == null) return const Center(child: Text('Emergency not found'));
 
-    final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
+    // If the server pre-captured a voiceSummary at SOS time, use it as the
+    // primary source. This works even when the patient's phone is off.
+    final hasCapturedSummary = emergency.voiceSummary != null &&
+        emergency.voiceSummary!.trim().isNotEmpty;
 
+    if (hasCapturedSummary) {
+      // Fast path: show pre-captured snapshot immediately — no extra API call needed.
+      final patientAsync = ref.watch(userProfileProvider(emergency.userId));
+      final patientName = patientAsync.when(
+        data: (u) => u?.fullName ?? 'Patient',
+        loading: () => 'Loading...',
+        error: (_, __) => 'Patient',
+      );
+      return _buildRequestDetails(
+        context: context,
+        theme: theme,
+        emergencyType: emergency.emergencyType,
+        patientName: patientName,
+        distance: 'Calculating...',
+        bloodGroup: _extractFromSummary(emergency.voiceSummary!, 'Blood Type') ?? 'See summary below',
+        allergies: _extractFromSummary(emergency.voiceSummary!, 'Allergies') ?? 'See summary below',
+        conditions: _extractFromSummary(emergency.voiceSummary!, 'Conditions') ?? 'See summary below',
+        priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+        isDeaf: emergency.patientType.toUpperCase() == 'DEAF',
+        voiceSummary: emergency.voiceSummary,
+        dataSource: 'snapshot',
+      );
+    }
+
+    // Fallback: fetch live medical profile from server (requires active connection).
+    // Medical data is on the SERVER — this works regardless of patient's phone state.
+    final profileAsync = ref.watch(getMedicalProfileProvider(emergency.userId));
     return profileAsync.when(
       data: (profile) {
         final patientAsync = ref.watch(userProfileProvider(emergency.userId));
@@ -136,18 +166,18 @@ class _EmergencyRequestScreenState
           loading: () => '...',
           error: (_, __) => 'Patient',
         );
-        
         return _buildRequestDetails(
           context: context,
           theme: theme,
           emergencyType: emergency.emergencyType,
           patientName: patientName,
-          distance: 'Calculating...', 
-          bloodGroup: profile?.bloodType ?? 'Unknown',
+          distance: 'Calculating...',
+          bloodGroup: profile?.bloodType ?? 'Not recorded',
           allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
           conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
           priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
           isDeaf: (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF'),
+          dataSource: 'live',
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -157,11 +187,25 @@ class _EmergencyRequestScreenState
         emergencyType: emergency.emergencyType,
         patientName: 'Patient',
         distance: '...',
-        bloodGroup: 'Not provided',
-        allergies: 'No record share requested',
-        conditions: 'Medical profile not provided by patient',
+        bloodGroup: 'Unavailable',
+        allergies: 'Unavailable',
+        conditions: 'Unavailable',
+        dataSource: 'unavailable',
       ),
     );
+  }
+
+  /// Extracts a labelled value from the pre-captured voiceSummary text.
+  /// e.g. "Blood Type: O+" → "O+"
+  String? _extractFromSummary(String summary, String label) {
+    final lines = summary.split('\n');
+    for (final line in lines) {
+      if (line.toLowerCase().startsWith(label.toLowerCase())) {
+        final parts = line.split(':');
+        if (parts.length > 1) return parts.sublist(1).join(':').trim();
+      }
+    }
+    return null;
   }
 
   Widget _buildRequestDetails({
@@ -175,6 +219,8 @@ class _EmergencyRequestScreenState
     required String conditions,
     String priority = 'NORMAL',
     bool isDeaf = false,
+    String? voiceSummary,
+    String dataSource = 'live',
   }) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
@@ -277,7 +323,110 @@ class _EmergencyRequestScreenState
           ),
           const SizedBox(height: 16),
 
-          // Medical Profile Summary
+          // ── Privacy / audit notice ────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.amber.shade50,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.amber.shade300),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.lock_outline_rounded, size: 15, color: Colors.amber.shade800),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'HIPAA-Protected Medical Data',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.amber.shade900,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'This access is logged and limited to active emergency context only. '
+                        'Do not share or screenshot this information.',
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          color: Colors.amber.shade800,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // ── Data source badge ─────────────────────────────────────────
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: dataSource == 'snapshot'
+                      ? Colors.blue.shade50
+                      : dataSource == 'live'
+                          ? Colors.green.shade50
+                          : Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: dataSource == 'snapshot'
+                        ? Colors.blue.shade200
+                        : dataSource == 'live'
+                            ? Colors.green.shade200
+                            : Colors.grey.shade300,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      dataSource == 'snapshot'
+                          ? Icons.save_outlined
+                          : dataSource == 'live'
+                              ? Icons.cloud_done_outlined
+                              : Icons.cloud_off_outlined,
+                      size: 12,
+                      color: dataSource == 'snapshot'
+                          ? Colors.blue.shade700
+                          : dataSource == 'live'
+                              ? Colors.green.shade700
+                              : Colors.grey.shade600,
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      dataSource == 'snapshot'
+                          ? 'Pre-captured at SOS time — valid even if patient phone is off'
+                          : dataSource == 'live'
+                              ? 'Live from server'
+                              : 'Data unavailable',
+                      style: TextStyle(
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        color: dataSource == 'snapshot'
+                            ? Colors.blue.shade700
+                            : dataSource == 'live'
+                                ? Colors.green.shade700
+                                : Colors.grey.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Medical Profile Summary ───────────────────────────────────
           Container(
             decoration: BoxDecoration(
               color: theme.scaffoldBackgroundColor,
@@ -304,6 +453,37 @@ class _EmergencyRequestScreenState
                   _InfoRow(label: 'Blood Group', value: bloodGroup),
                   _InfoRow(label: 'Allergies', value: allergies),
                   _InfoRow(label: 'Conditions', value: conditions),
+                  // Full pre-captured summary when available
+                  if (voiceSummary != null && voiceSummary.trim().isNotEmpty) ...[
+                    const Divider(),
+                    const Text(
+                      'Full Captured Summary',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.grey,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: Colors.blue.shade100),
+                      ),
+                      child: Text(
+                        voiceSummary,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.6,
+                          color: Colors.blue.shade900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

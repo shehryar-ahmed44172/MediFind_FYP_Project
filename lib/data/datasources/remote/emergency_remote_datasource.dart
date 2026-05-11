@@ -8,7 +8,7 @@ import '../../../domain/entities/medical_profile.dart';
 
 class EmergencyRemoteDataSource {
   final Dio _dio;
-  static const String _baseUrl = '/api/emergencies';
+  static const String _baseUrl = 'emergencies';
 
   EmergencyRemoteDataSource({Dio? dio}) : _dio = dio ?? Dio();
 

@@ -128,7 +128,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 
   Future<void> _confirmDeleteAccount(dynamic user) async {
-    // Step 1: Warning dialog
     final proceed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -164,14 +163,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     if (proceed != true || !mounted) return;
 
-    // Step 2: Email confirmation
     final emailController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (ctx, setState) {
-          final matches =
-              emailController.text.trim() == (user.email ?? '');
+          final matches = emailController.text.trim() == (user.email ?? '');
           return AlertDialog(
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20)),
@@ -207,8 +204,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   foregroundColor:
                       matches ? Colors.red : Colors.red.withOpacity(0.4),
                 ),
-                onPressed:
-                    matches ? () => Navigator.pop(ctx, true) : null,
+                onPressed: matches ? () => Navigator.pop(ctx, true) : null,
                 child: const Text('Delete My Account'),
               ),
             ],
@@ -219,7 +215,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
     if (confirmed != true || !mounted) return;
 
-    // Step 3: Execute deletion
     try {
       await ref.read(deleteAccountProvider.future);
       if (mounted) context.go('/login');
@@ -259,27 +254,27 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           }
           final rt = _kRoleThemes[user.role] ?? _kRoleThemes['PATIENT']!;
 
-          return CustomScrollView(
+          return SingleChildScrollView(
             physics: const BouncingScrollPhysics(),
-            slivers: [
-              // ── Gradient header ──────────────────────────────────────────
-              _ProfileHeader(
-                user: user,
-                rt: rt,
-                isOwnProfile: isOwn,
-                isUploading: _isUploading,
-                resolveUrl: _resolveImageUrl,
-                onCameraTap: _pickAndUploadImage,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // ── Gradient identity card ──────────────────────────────
+                _ProfileCard(
+                  user: user,
+                  rt: rt,
+                  isOwnProfile: isOwn,
+                  isUploading: _isUploading,
+                  resolveUrl: _resolveImageUrl,
+                  onCameraTap: _pickAndUploadImage,
+                ),
 
-              // ── Body content ─────────────────────────────────────────────
-              SliverToBoxAdapter(
-                child: Padding(
+                // ── Body content ────────────────────────────────────────
+                Padding(
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Accessibility notice
                       if (settings.textOnlyMode) ...[
                         _AccessibilityBanner(),
                         const SizedBox(height: 16),
@@ -298,7 +293,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
                       const SizedBox(height: 20),
 
-                      // Account info — same for all roles
                       _AccountInfoCard(
                         user: user,
                         fontMultiplier: settings.fontSizeMultiplier,
@@ -310,14 +304,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         const SizedBox(height: 12),
                         _SignOutButton(onTap: _confirmLogout),
                         const SizedBox(height: 8),
-                        _DeleteAccountButton(onTap: () => _confirmDeleteAccount(user)),
+                        _DeleteAccountButton(
+                            onTap: () => _confirmDeleteAccount(user)),
                         const SizedBox(height: 8),
                       ],
                     ],
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           );
         },
       ),
@@ -325,8 +320,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 }
 
-// ─── Gradient Header ──────────────────────────────────────────────────────────
-class _ProfileHeader extends StatelessWidget {
+// ─── Profile Identity Card ────────────────────────────────────────────────────
+// A contained gradient card — no full-screen banner, no conflict with AppHeader.
+class _ProfileCard extends StatelessWidget {
   final dynamic user;
   final _RoleTheme rt;
   final bool isOwnProfile;
@@ -334,7 +330,7 @@ class _ProfileHeader extends StatelessWidget {
   final String Function(String?) resolveUrl;
   final VoidCallback onCameraTap;
 
-  const _ProfileHeader({
+  const _ProfileCard({
     required this.user,
     required this.rt,
     required this.isOwnProfile,
@@ -345,169 +341,140 @@ class _ProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SliverAppBar(
-      expandedHeight: 268,
-      pinned: true,
-      backgroundColor: rt.colorA,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.pin,
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Gradient bg
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [rt.colorA, rt.colorB],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [rt.colorA, rt.colorB],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: rt.colorA.withOpacity(0.35),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // ── Avatar ────────────────────────────────────────────────
+          Stack(
+            children: [
+              Container(
+                width: 84,
+                height: 84,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: Colors.white.withOpacity(0.85), width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.2),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipOval(
+                  child: isUploading
+                      ? Container(
+                          color: rt.colorA.withOpacity(0.5),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2.5,
+                            ),
+                          ),
+                        )
+                      : _Avatar(
+                          imageUrl: resolveUrl(user.profileImageUrl),
+                          name: user.fullName ?? '',
+                          rt: rt,
+                        ),
                 ),
               ),
-            ),
-            // Decorative circles
-            Positioned(
-              right: -50, top: -50,
-              child: _Circle(200, Colors.white.withOpacity(0.06)),
-            ),
-            Positioned(
-              left: -30, bottom: 10,
-              child: _Circle(130, Colors.white.withOpacity(0.05)),
-            ),
-            Positioned(
-              right: 40, bottom: -20,
-              child: _Circle(80, Colors.white.withOpacity(0.04)),
-            ),
-            // Centre content
-            SafeArea(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 16),
-                  // Avatar
-                  Stack(
+              if (isOwnProfile)
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: GestureDetector(
+                    onTap: onCameraTap,
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.15),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Icon(Icons.camera_alt_rounded,
+                          size: 13, color: rt.colorA),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(width: 16),
+
+          // ── Name + role ────────────────────────────────────────────
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  user.fullName ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.1,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 10),
+                // Role badge
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border:
+                        Border.all(color: Colors.white.withOpacity(0.35)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Container(
-                        width: 108,
-                        height: 108,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 3),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.28),
-                              blurRadius: 22,
-                              offset: const Offset(0, 8),
-                            ),
-                          ],
-                        ),
-                        child: ClipOval(
-                          child: isUploading
-                              ? Container(
-                                  color: rt.colorA.withOpacity(0.5),
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: Colors.white,
-                                      strokeWidth: 2.5,
-                                    ),
-                                  ),
-                                )
-                              : _Avatar(
-                                  imageUrl: resolveUrl(user.profileImageUrl),
-                                  name: user.fullName ?? '',
-                                  rt: rt,
-                                ),
+                      Icon(rt.icon, color: Colors.white, size: 12),
+                      const SizedBox(width: 5),
+                      Text(
+                        rt.label,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
                         ),
                       ),
-                      if (isOwnProfile)
-                        Positioned(
-                          bottom: 2,
-                          right: 2,
-                          child: GestureDetector(
-                            onTap: onCameraTap,
-                            child: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withOpacity(0.2),
-                                    blurRadius: 6,
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                Icons.camera_alt_rounded,
-                                size: 15,
-                                color: rt.colorA,
-                              ),
-                            ),
-                          ),
-                        ),
                     ],
                   ),
-                  const SizedBox(height: 14),
-                  // Name
-                  Text(
-                    user.fullName ?? '',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.2,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  // Role badge
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(
-                          color: Colors.white.withOpacity(0.4), width: 1),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(rt.icon, color: Colors.white, size: 14),
-                        const SizedBox(width: 7),
-                        Text(
-                          rt.label,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
-}
-
-class _Circle extends StatelessWidget {
-  final double size;
-  final Color color;
-  const _Circle(this.size, this.color);
-  @override
-  Widget build(BuildContext context) => Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-      );
 }
 
 class _Avatar extends StatelessWidget {
@@ -516,26 +483,27 @@ class _Avatar extends StatelessWidget {
   final _RoleTheme rt;
   const _Avatar(
       {required this.imageUrl, required this.name, required this.rt});
+
   @override
   Widget build(BuildContext context) {
     if (imageUrl.isNotEmpty) {
       return Image.network(
         imageUrl,
         fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _initials(name, rt),
+        errorBuilder: (_, __, ___) => _initials(),
       );
     }
-    return _initials(name, rt);
+    return _initials();
   }
 
-  Widget _initials(String n, _RoleTheme rt) => Container(
+  Widget _initials() => Container(
         color: rt.colorA.withOpacity(0.35),
         child: Center(
           child: Text(
-            n.isNotEmpty ? n[0].toUpperCase() : '?',
+            name.isNotEmpty ? name[0].toUpperCase() : '?',
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 46,
+              fontSize: 38,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -589,6 +557,7 @@ class _PatientSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDeaf = user.patientType == 'DEAF';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -597,21 +566,19 @@ class _PatientSection extends StatelessWidget {
         Row(
           children: [
             Expanded(
-              child: _StatCard(
+              child: _StatusBadge(
                 icon: isDeaf
                     ? Icons.hearing_disabled_rounded
-                    : Icons.health_and_safety_rounded,
-                label: 'Patient Mode',
-                value: isDeaf ? 'Deaf & Mute' : 'Standard',
+                    : Icons.hearing_rounded,
+                label: isDeaf ? 'Deaf & Mute' : 'Standard Mode',
                 color: isDeaf ? Colors.teal : const Color(0xFF10B981),
               ),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 10),
             Expanded(
-              child: _StatCard(
+              child: _StatusBadge(
                 icon: Icons.sos_rounded,
-                label: 'SOS Status',
-                value: 'Ready',
+                label: 'SOS Ready',
                 color: const Color(0xFFEF4444),
               ),
             ),
@@ -631,12 +598,27 @@ class _PatientSection extends StatelessWidget {
         _SectionLabel('Quick Access'),
         const SizedBox(height: 10),
         _QuickAccessCard(links: [
-          _QLinkData(Icons.medical_information_rounded,
-              'Medical Profile', '/medical-profile', Colors.red.shade400),
-          _QLinkData(Icons.contacts_rounded, 'Emergency Contacts',
-              '/medical-profile', Colors.orange.shade700),
-          _QLinkData(Icons.settings_accessibility_rounded, 'Accessibility',
-              '/accessibility-settings', Colors.teal.shade600),
+          _QLinkData(
+            Icons.medical_information_rounded,
+            'Medical Profile',
+            'View your full health record',
+            '/home/medical-profile',
+            Colors.red.shade400,
+          ),
+          _QLinkData(
+            Icons.contacts_rounded,
+            'Emergency Contacts',
+            'Manage people to contact in emergencies',
+            '/home/emergency-contacts',
+            Colors.orange.shade700,
+          ),
+          _QLinkData(
+            Icons.settings_accessibility_rounded,
+            'Accessibility',
+            'Font size, contrast & interface mode',
+            '/home/accessibility-settings',
+            Colors.teal.shade600,
+          ),
         ]),
       ],
     );
@@ -651,38 +633,44 @@ class _ResponderStatsRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isVerified = user.verificationStatus == 'VERIFIED';
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _StatCard(
-            icon: Icons.star_rounded,
-            label: 'Rating',
-            value: '${(user.rating ?? 5.0).toStringAsFixed(1)}',
-            valueSuffix: ' ★',
-            color: const Color(0xFFF59E0B),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            icon: Icons.check_circle_rounded,
-            label: 'Completed',
-            value: '${user.totalResponsesHandled ?? 0}',
-            color: const Color(0xFF10B981),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: _StatCard(
-            icon: isVerified
-                ? Icons.verified_rounded
-                : Icons.pending_rounded,
-            label: 'Status',
-            value: isVerified ? 'Verified' : 'Pending',
-            color: isVerified
-                ? const Color(0xFF10B981)
-                : const Color(0xFFF59E0B),
-          ),
+        _SectionLabel('Performance'),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _MiniStatCard(
+                icon: Icons.star_rounded,
+                label: 'Rating',
+                value: (user.rating ?? 5.0).toStringAsFixed(1),
+                color: const Color(0xFFF59E0B),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MiniStatCard(
+                icon: Icons.check_circle_rounded,
+                label: 'Completed',
+                value: '${user.totalResponsesHandled ?? 0}',
+                color: const Color(0xFF10B981),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _MiniStatCard(
+                icon: isVerified
+                    ? Icons.verified_rounded
+                    : Icons.pending_rounded,
+                label: 'Status',
+                value: isVerified ? 'Verified' : 'Pending',
+                color: isVerified
+                    ? const Color(0xFF10B981)
+                    : const Color(0xFFF59E0B),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -706,6 +694,7 @@ class _ResponderCredentials extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 16),
         _SectionLabel('Professional Credentials'),
         const SizedBox(height: 10),
         Container(
@@ -763,9 +752,10 @@ class _ResponderCredentials extends StatelessWidget {
         const SizedBox(height: 10),
         _QuickAccessCard(links: [
           _QLinkData(Icons.history_rounded, 'Response History',
-              '/settings', rt.colorA),
+              'View past emergency responses', '/settings', rt.colorA),
           _QLinkData(Icons.tune_rounded, 'Responder Settings',
-              '/settings', Colors.grey.shade700),
+              'Availability and notifications', '/settings',
+              Colors.grey.shade700),
         ]),
       ],
     );
@@ -796,13 +786,16 @@ class _CaregiverSection extends StatelessWidget {
         _SectionLabel('Quick Access'),
         const SizedBox(height: 10),
         _QuickAccessCard(links: [
-          _QLinkData(Icons.people_rounded, 'My Patients', '/settings',
-              rt.colorA),
+          _QLinkData(Icons.people_rounded, 'My Patients',
+              'View all linked patients', '/settings', rt.colorA),
           _QLinkData(Icons.person_add_rounded, 'Link New Patient',
-              '/settings', const Color(0xFF10B981)),
+              'Connect to a new patient account', '/settings',
+              const Color(0xFF10B981)),
           _QLinkData(Icons.notifications_active_rounded, 'Alert Settings',
-              '/settings', Colors.orange.shade700),
-          _QLinkData(Icons.tune_rounded, 'Preferences', '/settings',
+              'Configure SOS notifications', '/settings',
+              Colors.orange.shade700),
+          _QLinkData(Icons.tune_rounded, 'Preferences',
+              'Interface and monitoring settings', '/settings',
               Colors.grey.shade700),
         ]),
       ],
@@ -860,7 +853,7 @@ class _AccountInfoCard extends StatelessWidget {
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(row.icon,
-                              color: Colors.grey.shade600,
+                              color: Colors.grey.shade500,
                               size: 18 * m),
                         ),
                         const SizedBox(width: 14),
@@ -874,7 +867,7 @@ class _AccountInfoCard extends StatelessWidget {
                                   fontSize: 11 * m,
                                   color: Colors.grey.shade500,
                                   fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.4,
+                                  letterSpacing: 0.3,
                                 ),
                               ),
                               const SizedBox(height: 3),
@@ -910,6 +903,7 @@ class _AccountInfoCard extends StatelessWidget {
 class _EditProfileButton extends StatelessWidget {
   final _RoleTheme rt;
   const _EditProfileButton({required this.rt});
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -919,8 +913,7 @@ class _EditProfileButton extends StatelessWidget {
         onPressed: () => context.push('/edit-profile'),
         icon: const Icon(Icons.edit_rounded, size: 19),
         label: const Text('Edit Profile',
-            style:
-                TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         style: ElevatedButton.styleFrom(
           backgroundColor: rt.colorA,
           foregroundColor: Colors.white,
@@ -937,6 +930,7 @@ class _EditProfileButton extends StatelessWidget {
 class _SignOutButton extends StatelessWidget {
   final VoidCallback onTap;
   const _SignOutButton({required this.onTap});
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -944,11 +938,10 @@ class _SignOutButton extends StatelessWidget {
       height: 54,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: const Icon(Icons.logout_rounded,
-            size: 19, color: Colors.red),
+        icon: const Icon(Icons.logout_rounded, size: 19, color: Colors.red),
         label: const Text('Sign Out',
             style: TextStyle(
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.bold,
                 color: Colors.red)),
         style: OutlinedButton.styleFrom(
@@ -961,81 +954,168 @@ class _SignOutButton extends StatelessWidget {
   }
 }
 
-// ─── Shared widgets ───────────────────────────────────────────────────────────
+// ─── Delete Account Button ────────────────────────────────────────────────────
+class _DeleteAccountButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _DeleteAccountButton({required this.onTap});
 
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.delete_forever_rounded,
+            color: Colors.red, size: 18),
+        label: const Text(
+          'Delete My Account',
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.w600,
+            fontSize: 14,
+          ),
+        ),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.red.withOpacity(0.3), width: 1),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Shared Widgets ───────────────────────────────────────────────────────────
+
+/// Section label with a coloured left accent bar.
 class _SectionLabel extends StatelessWidget {
   final String text;
   const _SectionLabel(this.text);
+
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(left: 4),
-        child: Text(
-          text.toUpperCase(),
-          style: TextStyle(
-            fontSize: 11.5,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.9,
-            color: Colors.grey.shade500,
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 3,
+          height: 16,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            borderRadius: BorderRadius.circular(2),
           ),
         ),
-      );
+        const SizedBox(width: 8),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.3,
+            color: Theme.of(context).colorScheme.onSurface,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
-class _StatCard extends StatelessWidget {
+/// Compact horizontal status badge used for patient health status.
+class _StatusBadge extends StatelessWidget {
   final IconData icon;
   final String label;
-  final String value;
-  final String? valueSuffix;
   final Color color;
-  const _StatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.valueSuffix,
-    required this.color,
-  });
+  const _StatusBadge(
+      {required this.icon, required this.label, required this.color});
+
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withOpacity(0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: color, size: 16),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Mini stat card for responders.
+class _MiniStatCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  const _MiniStatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(16),
         boxShadow: AppShadows.neumorphicOut,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(9),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(11),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: color, size: 20),
+            child: Icon(icon, color: color, size: 18),
           ),
-          const SizedBox(height: 12),
-          RichText(
-            text: TextSpan(
-              style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: color,
-                  fontSize: 20),
-              children: [
-                TextSpan(text: value),
-                if (valueSuffix != null)
-                  TextSpan(
-                      text: valueSuffix,
-                      style: const TextStyle(fontSize: 15)),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: color,
             ),
           ),
-          const SizedBox(height: 3),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey,
-                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10.5,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ],
       ),
     );
@@ -1052,6 +1132,7 @@ class _InfoBanner extends StatelessWidget {
       required this.title,
       required this.subtitle,
       required this.color});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1059,7 +1140,7 @@ class _InfoBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withOpacity(0.22)),
       ),
       child: Row(
         children: [
@@ -1097,14 +1178,17 @@ class _InfoBanner extends StatelessWidget {
 class _QLinkData {
   final IconData icon;
   final String label;
+  final String subtitle;
   final String route;
   final Color color;
-  const _QLinkData(this.icon, this.label, this.route, this.color);
+  const _QLinkData(
+      this.icon, this.label, this.subtitle, this.route, this.color);
 }
 
 class _QuickAccessCard extends StatelessWidget {
   final List<_QLinkData> links;
   const _QuickAccessCard({required this.links});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1113,59 +1197,71 @@ class _QuickAccessCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: AppShadows.neumorphicOut,
       ),
-      child: Column(
-        children: links.asMap().entries.map((e) {
-          final i = e.key;
-          final link = e.value;
-          return Column(
-            children: [
-              InkWell(
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(i == 0 ? 20 : 0),
-                  topRight: Radius.circular(i == 0 ? 20 : 0),
-                  bottomLeft:
-                      Radius.circular(i == links.length - 1 ? 20 : 0),
-                  bottomRight:
-                      Radius.circular(i == links.length - 1 ? 20 : 0),
-                ),
-                onTap: () => context.push(link.route),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 18, vertical: 15),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(9),
-                        decoration: BoxDecoration(
-                          color: link.color.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child:
-                            Icon(link.icon, color: link.color, size: 20),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: links.asMap().entries.map((e) {
+              final i = e.key;
+              final link = e.value;
+              return Column(
+                children: [
+                  InkWell(
+                    onTap: () => context.push(link.route),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 13),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(9),
+                            decoration: BoxDecoration(
+                              color: link.color.withOpacity(0.10),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(link.icon,
+                                color: link.color, size: 20),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  link.label,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  link.subtitle,
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(Icons.chevron_right_rounded,
+                              color: Colors.grey.shade400, size: 22),
+                        ],
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          link.label,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600,
-                              fontSize: 15),
-                        ),
-                      ),
-                      Icon(Icons.chevron_right_rounded,
-                          color: Colors.grey.shade400, size: 22),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              if (i < links.length - 1)
-                Divider(
-                    height: 0,
-                    indent: 56,
-                    color: Colors.grey.shade100),
-            ],
-          );
-        }).toList(),
+                  if (i < links.length - 1)
+                    Divider(
+                        height: 0,
+                        indent: 56,
+                        color: Colors.grey.shade100),
+                ],
+              );
+            }).toList(),
+          ),
+        ),
       ),
     );
   }
@@ -1188,13 +1284,13 @@ class _CredRow extends StatelessWidget {
     this.isFirst = false,
     this.isLast = false,
   });
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
         Padding(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Row(
             children: [
               Container(
@@ -1216,7 +1312,7 @@ class _CredRow extends StatelessWidget {
                         fontSize: 11,
                         color: Colors.grey.shade500,
                         fontWeight: FontWeight.w600,
-                        letterSpacing: 0.4,
+                        letterSpacing: 0.3,
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -1224,7 +1320,7 @@ class _CredRow extends StatelessWidget {
                       value,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15,
+                        fontSize: 14.5,
                         color: valueColor,
                       ),
                     ),
@@ -1251,13 +1347,14 @@ class _InfoRowData {
 // ─── Image Source Bottom Sheet ────────────────────────────────────────────────
 class _ImagePickerSheet extends StatelessWidget {
   const _ImagePickerSheet();
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -1271,20 +1368,15 @@ class _ImagePickerSheet extends StatelessWidget {
           ),
           const SizedBox(height: 20),
           const Text('Update Profile Picture',
-              style:
-                  TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 28),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _PickerOption(
-                  Icons.photo_library_outlined,
-                  'Gallery',
-                  ImageSource.gallery),
+                  Icons.photo_library_outlined, 'Gallery', ImageSource.gallery),
               _PickerOption(
-                  Icons.camera_alt_outlined,
-                  'Camera',
-                  ImageSource.camera),
+                  Icons.camera_alt_outlined, 'Camera', ImageSource.camera),
             ],
           ),
         ],
@@ -1298,6 +1390,7 @@ class _PickerOption extends StatelessWidget {
   final String label;
   final ImageSource source;
   const _PickerOption(this.icon, this.label, this.source);
+
   @override
   Widget build(BuildContext context) {
     return InkWell(
@@ -1316,42 +1409,8 @@ class _PickerOption extends StatelessWidget {
               child: Icon(icon, color: AppColors.primary, size: 30),
             ),
             const SizedBox(height: 10),
-            Text(label,
-                style: const TextStyle(fontWeight: FontWeight.bold)),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Delete Account Button ────────────────────────────────────────────────────
-class _DeleteAccountButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _DeleteAccountButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.delete_forever_rounded,
-            color: Colors.red, size: 18),
-        label: const Text(
-          'Delete My Account',
-          style: TextStyle(
-            color: Colors.red,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.red.withOpacity(0.35), width: 1),
-          ),
         ),
       ),
     );

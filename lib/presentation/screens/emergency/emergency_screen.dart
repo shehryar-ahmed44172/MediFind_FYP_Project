@@ -339,34 +339,62 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                       const SizedBox(height: 12),
 
                       // Notes field
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: _selectedEmergencyType == 'OTHER'
-                                ? const Color(0xFFD32F2F)
-                                : theme.colorScheme.outline.withOpacity(0.2),
-                            width: _selectedEmergencyType == 'OTHER' ? 2 : 1,
-                          ),
+                      TextFormField(
+                        controller: _additionalInfoController,
+                        focusNode: _otherFocusNode,
+                        maxLines: _selectedEmergencyType == 'OTHER' ? 4 : 3,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: theme.colorScheme.onSurface,
                         ),
-                        child: TextField(
-                          controller: _additionalInfoController,
-                          focusNode: _otherFocusNode,
-                          maxLines: _selectedEmergencyType == 'OTHER' ? 4 : 3,
-                          decoration: InputDecoration(
-                            labelText: _selectedEmergencyType == 'OTHER'
-                                ? 'Describe your emergency (required)'
-                                : 'Any additional details (optional)',
-                            hintText: _selectedEmergencyType == 'OTHER'
-                                ? 'e.g. unconscious, bleeding...'
-                                : 'e.g. exact location, symptoms...',
-                            prefixIcon: Icon(
-                              Icons.edit_note_rounded,
+                        decoration: InputDecoration(
+                          labelText: _selectedEmergencyType == 'OTHER'
+                              ? 'Describe your emergency *'
+                              : 'Additional details (optional)',
+                          hintText: _selectedEmergencyType == 'OTHER'
+                              ? 'e.g. unconscious, severe bleeding...'
+                              : 'e.g. exact floor, symptoms, landmarks...',
+                          alignLabelWithHint: true,
+                          filled: true,
+                          fillColor: _selectedEmergencyType == 'OTHER'
+                              ? const Color(0xFFD32F2F).withOpacity(0.04)
+                              : theme.colorScheme.surfaceContainer,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
+                              color: theme.colorScheme.outline.withOpacity(0.2),
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: BorderSide(
                               color: _selectedEmergencyType == 'OTHER'
                                   ? const Color(0xFFD32F2F)
-                                  : theme.colorScheme.onSurface.withOpacity(0.4),
+                                  : theme.colorScheme.outline.withOpacity(0.2),
+                              width: _selectedEmergencyType == 'OTHER' ? 2 : 1,
                             ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                              color: Color(0xFFD32F2F),
+                              width: 2,
+                            ),
+                          ),
+                          labelStyle: TextStyle(
+                            color: _selectedEmergencyType == 'OTHER'
+                                ? const Color(0xFFD32F2F)
+                                : theme.colorScheme.onSurface.withOpacity(0.55),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          hintStyle: TextStyle(
+                            color: theme.colorScheme.onSurface.withOpacity(0.35),
+                            fontSize: 13,
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
                           ),
                         ),
                       ),

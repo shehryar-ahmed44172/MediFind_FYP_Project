@@ -275,7 +275,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                   style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                const Text('• Ensure you are on the same Wi-Fi as the server (192.168.100.86).\n• Toggle "Online" status twice to force-sync location.\n• Check server logs for [Geospatial Search] entries.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                const Text('• Ensure you are on the same Wi-Fi as the server (192.168.100.5).\n• Toggle "Online" status twice to force-sync location.\n• Check server logs for [Geospatial Search] entries.', style: TextStyle(fontSize: 13, color: Colors.grey)),
               ],
             ),
           ),

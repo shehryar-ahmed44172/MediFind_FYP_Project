@@ -33,6 +33,7 @@ mixin _$Emergency {
   DateTime? get updatedAt => throw _privateConstructorUsedError;
   String? get responderId => throw _privateConstructorUsedError;
   bool get voiceAlertGenerated => throw _privateConstructorUsedError;
+  String? get voiceSummary => throw _privateConstructorUsedError;
   String? get additionalInfo => throw _privateConstructorUsedError;
   DateTime? get completedAt => throw _privateConstructorUsedError;
   String get priority => throw _privateConstructorUsedError;
@@ -61,6 +62,7 @@ abstract class $EmergencyCopyWith<$Res> {
       DateTime? updatedAt,
       String? responderId,
       bool voiceAlertGenerated,
+      String? voiceSummary,
       String? additionalInfo,
       DateTime? completedAt,
       String priority,
@@ -91,6 +93,7 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
     Object? updatedAt = freezed,
     Object? responderId = freezed,
     Object? voiceAlertGenerated = null,
+    Object? voiceSummary = freezed,
     Object? additionalInfo = freezed,
     Object? completedAt = freezed,
     Object? priority = null,
@@ -138,6 +141,9 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
           ? _value.voiceAlertGenerated
           : voiceAlertGenerated // ignore: cast_nullable_to_non_nullable
               as bool,
+      voiceSummary: freezed == voiceSummary
+          ? _value.voiceSummary
+          : voiceSummary as String?,
       additionalInfo: freezed == additionalInfo
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
@@ -181,6 +187,7 @@ abstract class _$$EmergencyImplCopyWith<$Res>
       DateTime? updatedAt,
       String? responderId,
       bool voiceAlertGenerated,
+      String? voiceSummary,
       String? additionalInfo,
       DateTime? completedAt,
       String priority,
@@ -209,6 +216,7 @@ class __$$EmergencyImplCopyWithImpl<$Res>
     Object? updatedAt = freezed,
     Object? responderId = freezed,
     Object? voiceAlertGenerated = null,
+    Object? voiceSummary = freezed,
     Object? additionalInfo = freezed,
     Object? completedAt = freezed,
     Object? priority = null,
@@ -256,6 +264,9 @@ class __$$EmergencyImplCopyWithImpl<$Res>
           ? _value.voiceAlertGenerated
           : voiceAlertGenerated // ignore: cast_nullable_to_non_nullable
               as bool,
+      voiceSummary: freezed == voiceSummary
+          ? _value.voiceSummary
+          : voiceSummary as String?,
       additionalInfo: freezed == additionalInfo
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
@@ -294,6 +305,7 @@ class _$EmergencyImpl implements _Emergency {
       this.updatedAt,
       this.responderId,
       this.voiceAlertGenerated = false,
+      this.voiceSummary,
       this.additionalInfo,
       this.completedAt,
       this.priority = 'NORMAL',
@@ -330,6 +342,8 @@ class _$EmergencyImpl implements _Emergency {
   @override
   @JsonKey()
   final bool voiceAlertGenerated;
+  @override
+  final String? voiceSummary;
   @override
   final String? additionalInfo;
   @override
@@ -428,6 +442,7 @@ abstract class _Emergency implements Emergency {
       final DateTime? updatedAt,
       final String? responderId,
       final bool voiceAlertGenerated,
+      final String? voiceSummary,
       final String? additionalInfo,
       final DateTime? completedAt,
       final String priority,
@@ -460,6 +475,8 @@ abstract class _Emergency implements Emergency {
   String? get responderId;
   @override
   bool get voiceAlertGenerated;
+  @override
+  String? get voiceSummary;
   @override
   String? get additionalInfo;
   @override

@@ -146,7 +146,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         return profileAsync.when(
           data: (profile) {
             return GestureDetector(
-              onTap: () => _showMedicalQRSheet(profile, theme, isDark),
+              onTap: () => _showMedicalIDOptions(profile, theme, isDark),
               child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
@@ -207,6 +207,97 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+
+  /// Shows an action sheet letting the patient choose between editing their
+  /// medical profile or displaying the emergency QR code.
+  void _showMedicalIDOptions(dynamic profile, ThemeData theme, bool isDark) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // drag handle
+            Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: 20),
+              decoration: BoxDecoration(
+                color: isDark ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Text(
+              'Medical ID',
+              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'What would you like to do?',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.5),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Edit Medical Profile
+            _OptionTile(
+              icon: Icons.edit_note_rounded,
+              color: AppColors.primary,
+              title: 'Edit Medical Profile',
+              subtitle: 'Update blood type, allergies, conditions and more',
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/home/medical-profile');
+              },
+            ),
+            const SizedBox(height: 12),
+            // Show Emergency QR
+            _OptionTile(
+              icon: Icons.qr_code_2_rounded,
+              color: Colors.deepPurple,
+              title: 'Show Emergency QR',
+              subtitle: 'Display your medical ID for first responders to scan',
+              onTap: () {
+                Navigator.pop(context);
+                _showMedicalQRSheet(profile, theme, isDark);
+              },
+            ),
+            const SizedBox(height: 16),
+            // Privacy note
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.07),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Your QR is private. Only you can generate it. '
+                      'Responders access your data only during an active emergency — all accesses are logged.',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.primary.withOpacity(0.75),
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -434,6 +525,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onTap: () {
                 if (service['route'] != null) {
                   context.go(service['route'] as String);
+                } else {
+                  _showFeatureComingSoon(context, service['title'] as String);
                 }
               },
               child: Column(
@@ -456,32 +549,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildPremiumUpgradeCard(ThemeData theme, dynamic user) {
     if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(24),
+      child: InkWell(
         borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          colors: AppColors.medifindGradient,
-        ),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.circular(23),
-        ),
-        child: Row(
-          children: [
-            Icon(Icons.auto_awesome_rounded, color: theme.colorScheme.primary),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                'Upgrade to Premium',
-                style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-              ),
+        onTap: () => context.push('/subscription-plans'),
+        child: Container(
+          padding: const EdgeInsets.all(2),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            gradient: LinearGradient(
+              colors: AppColors.medifindGradient,
             ),
-            Icon(Icons.arrow_forward_ios_rounded, color: theme.colorScheme.onSurface.withOpacity(0.3), size: 14),
-          ],
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(23),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, color: theme.colorScheme.primary),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Text(
+                    'Upgrade to Premium',
+                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                Icon(Icons.arrow_forward_ios_rounded, color: theme.colorScheme.onSurface.withOpacity(0.3), size: 14),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -495,6 +596,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         behavior: SnackBarBehavior.floating,
         backgroundColor: Colors.indigo.shade700,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      ),
+    );
+  }
+}
+
+// ── Option tile used inside the Medical ID action sheet ──────────────────────
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: color.withOpacity(0.07),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(icon, color: color, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800, color: color)),
+                    const SizedBox(height: 2),
+                    Text(subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurface.withOpacity(0.55))),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios_rounded, size: 13, color: color.withOpacity(0.6)),
+            ],
+          ),
+        ),
       ),
     );
   }

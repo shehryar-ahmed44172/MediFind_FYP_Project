@@ -24,6 +24,7 @@ _$EmergencyImpl _$$EmergencyImplFromJson(Map<String, dynamic> json) =>
           : DateTime.parse(json['updatedAt'] as String),
       responderId: json['responderId'] as String?,
       voiceAlertGenerated: json['voiceAlertGenerated'] as bool? ?? false,
+      voiceSummary: json['voiceSummary'] as String?,
       additionalInfo: json['additionalInfo'] as String?,
       completedAt: json['completedAt'] == null
           ? null
@@ -47,6 +48,7 @@ Map<String, dynamic> _$$EmergencyImplToJson(_$EmergencyImpl instance) =>
       'updatedAt': instance.updatedAt?.toIso8601String(),
       'responderId': instance.responderId,
       'voiceAlertGenerated': instance.voiceAlertGenerated,
+      'voiceSummary': instance.voiceSummary,
       'additionalInfo': instance.additionalInfo,
       'completedAt': instance.completedAt?.toIso8601String(),
       'priority': instance.priority,

@@ -308,6 +308,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return Stack(
       children: [
         Scaffold(
+      appBar: !isOwn
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: () => context.pop(),
+              ),
+            )
+          : null,
       body: userAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -357,7 +367,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       ] else if (user.role == 'CAREGIVER') ...[
                         _CaregiverSection(user: user, rt: rt),
                       ] else ...[
-                        _PatientSection(user: user, rt: rt),
+                        _PatientSection(user: user, rt: rt, isOwnProfile: isOwn),
                       ],
 
                       const SizedBox(height: 20),
@@ -645,7 +655,8 @@ class _AccessibilityBanner extends StatelessWidget {
 class _PatientSection extends StatelessWidget {
   final dynamic user;
   final _RoleTheme rt;
-  const _PatientSection({required this.user, required this.rt});
+  final bool isOwnProfile;
+  const _PatientSection({required this.user, required this.rt, this.isOwnProfile = true});
 
   @override
   Widget build(BuildContext context) {
@@ -669,11 +680,17 @@ class _PatientSection extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: _StatusBadge(
-                icon: Icons.sos_rounded,
-                label: 'SOS Ready',
-                color: const Color(0xFFEF4444),
-              ),
+              child: isOwnProfile
+                  ? _StatusBadge(
+                      icon: Icons.sos_rounded,
+                      label: 'SOS Ready',
+                      color: const Color(0xFFEF4444),
+                    )
+                  : _StatusBadge(
+                      icon: Icons.shield_rounded,
+                      label: 'Monitored',
+                      color: AppColors.primary,
+                    ),
             ),
           ],
         ),
@@ -682,37 +699,172 @@ class _PatientSection extends StatelessWidget {
           _InfoBanner(
             icon: Icons.sign_language_rounded,
             title: 'Deaf & Mute Mode Active',
-            subtitle:
-                'Silent SOS  •  Icon-only UI  •  Haptic + Flash alerts',
+            subtitle: 'Silent SOS  •  Icon-only UI  •  Haptic + Flash alerts',
             color: Colors.teal,
           ),
         ],
         const SizedBox(height: 20),
-        _SectionLabel('Quick Access'),
-        const SizedBox(height: 10),
-        _QuickAccessCard(links: [
-          _QLinkData(
-            Icons.medical_information_rounded,
-            'Medical Profile',
-            'View your full health record',
-            '/home/medical-profile',
-            Colors.red.shade400,
+
+        // ── Own profile: patient self-management links ──────────────────────
+        if (isOwnProfile) ...[
+          _SectionLabel('Quick Access'),
+          const SizedBox(height: 10),
+          _QuickAccessCard(links: [
+            _QLinkData(
+              Icons.medical_information_rounded,
+              'Medical Profile',
+              'View your full health record',
+              '/home/medical-profile',
+              Colors.red.shade400,
+            ),
+            _QLinkData(
+              Icons.contacts_rounded,
+              'Emergency Contacts',
+              'Manage people to contact in emergencies',
+              '/home/emergency-contacts',
+              Colors.orange.shade700,
+            ),
+            _QLinkData(
+              Icons.settings_accessibility_rounded,
+              'Accessibility',
+              'Font size, contrast & interface mode',
+              '/home/accessibility-settings',
+              Colors.teal.shade600,
+            ),
+          ]),
+        ]
+
+        // ── Caregiver viewing a patient: relevant caregiver actions ─────────
+        else ...[
+          _SectionLabel('Caregiver Actions'),
+          const SizedBox(height: 10),
+          _CaregiverActionsCard(user: user),
+        ],
+      ],
+    );
+  }
+}
+
+// ─── Caregiver Actions Card (shown when a caregiver views a patient) ──────────
+class _CaregiverActionsCard extends StatelessWidget {
+  final dynamic user;
+  const _CaregiverActionsCard({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.cardColor,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppShadows.neumorphicOut,
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Material(
+          color: Colors.transparent,
+          child: Column(
+            children: [
+              _CaregiverActionTile(
+                icon: Icons.chat_bubble_rounded,
+                color: AppColors.warning,
+                label: 'Message Patient',
+                subtitle: 'Open conversation in Messages',
+                onTap: () => context.go('/caregiver/chats'),
+                isLast: false,
+              ),
+              _CaregiverActionTile(
+                icon: Icons.people_rounded,
+                color: AppColors.primary,
+                label: 'View in My Patients',
+                subtitle: 'See full monitoring dashboard',
+                onTap: () => context.go('/caregiver/my-patients'),
+                isLast: false,
+              ),
+              _CaregiverActionTile(
+                icon: Icons.map_rounded,
+                color: AppColors.primaryLight,
+                label: 'Live Location Map',
+                subtitle: 'View patient on the map',
+                onTap: () => context.go('/caregiver/maps'),
+                isLast: true,
+              ),
+            ],
           ),
-          _QLinkData(
-            Icons.contacts_rounded,
-            'Emergency Contacts',
-            'Manage people to contact in emergencies',
-            '/home/emergency-contacts',
-            Colors.orange.shade700,
+        ),
+      ),
+    );
+  }
+}
+
+class _CaregiverActionTile extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool isLast;
+
+  const _CaregiverActionTile({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+    required this.isLast,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(9),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: color, size: 20),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: Colors.grey.shade500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded,
+                    color: Colors.grey.shade400, size: 22),
+              ],
+            ),
           ),
-          _QLinkData(
-            Icons.settings_accessibility_rounded,
-            'Accessibility',
-            'Font size, contrast & interface mode',
-            '/home/accessibility-settings',
-            Colors.teal.shade600,
-          ),
-        ]),
+        ),
+        if (!isLast)
+          Divider(height: 1, indent: 16, endIndent: 16,
+              color: Colors.grey.withOpacity(0.12)),
       ],
     );
   }
@@ -880,16 +1032,20 @@ class _CaregiverSection extends StatelessWidget {
         const SizedBox(height: 10),
         _QuickAccessCard(links: [
           _QLinkData(Icons.people_rounded, 'My Patients',
-              'View all linked patients', '/settings', rt.colorA),
+              'View and manage all linked patients', '/caregiver/my-patients', rt.colorA,
+              usePush: false),
           _QLinkData(Icons.person_add_rounded, 'Link New Patient',
-              'Connect to a new patient account', '/settings',
-              const Color(0xFF10B981)),
-          _QLinkData(Icons.notifications_active_rounded, 'Alert Settings',
-              'Configure SOS notifications', '/settings',
-              Colors.orange.shade700),
-          _QLinkData(Icons.tune_rounded, 'Preferences',
-              'Interface and monitoring settings', '/settings',
-              Colors.grey.shade700),
+              'Connect to a new patient account', '/caregiver/my-patients/link-patient',
+              const Color(0xFF10B981),
+              usePush: true),
+          _QLinkData(Icons.map_rounded, 'Live Map',
+              'See patients on the live location map', '/caregiver/maps',
+              Colors.orange.shade700,
+              usePush: false),
+          _QLinkData(Icons.history_rounded, 'Activity History',
+              'View past emergencies and reports', '/caregiver/history',
+              Colors.grey.shade700,
+              usePush: true),
         ]),
       ],
     );
@@ -1274,8 +1430,10 @@ class _QLinkData {
   final String subtitle;
   final String route;
   final Color color;
+  final bool usePush;
   const _QLinkData(
-      this.icon, this.label, this.subtitle, this.route, this.color);
+      this.icon, this.label, this.subtitle, this.route, this.color,
+      {this.usePush = true});
 }
 
 class _QuickAccessCard extends StatelessWidget {
@@ -1301,7 +1459,7 @@ class _QuickAccessCard extends StatelessWidget {
               return Column(
                 children: [
                   InkWell(
-                    onTap: () => context.push(link.route),
+                    onTap: () => link.usePush ? context.push(link.route) : context.go(link.route),
                     child: Padding(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 13),

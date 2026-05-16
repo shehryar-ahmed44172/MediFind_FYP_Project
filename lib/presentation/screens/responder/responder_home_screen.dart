@@ -74,9 +74,25 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
-                  Text(user?.fullName.split(' ')[0] ?? 'Responder',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+                  Text(
+                    'RESPONDER DASHBOARD',
+                    style: TextStyle(
+                      color: AppColors.primaryLight.withOpacity(0.85),
+                      fontWeight: FontWeight.w900,
+                      fontSize: 11,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    user?.fullName.split(' ')[0] ?? 'Responder',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 32,
+                      letterSpacing: -1,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -127,10 +143,10 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
   Widget _buildQuickActionGrid(ThemeData theme) {
     final actions = [
-      {'title': 'Emergencies', 'icon': Icons.emergency_rounded, 'color': Colors.red, 'route': '/responder'},
-      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/responder/history'},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/responder/chats'},
-      {'title': 'Diagnostics', 'icon': Icons.analytics_rounded, 'color': Colors.blue, 'route': '/diagnostics'},
+      {'title': 'My Profile',  'icon': Icons.person_rounded,       'color': AppColors.primary,       'route': '/responder/profile'},
+      {'title': 'History',     'icon': Icons.history_rounded,       'color': AppColors.secondaryTeal, 'route': '/responder/history'},
+      {'title': 'Messages',    'icon': Icons.chat_bubble_rounded,   'color': AppColors.warning,       'route': '/responder/chats'},
+      {'title': 'Diagnostics', 'icon': Icons.analytics_rounded,     'color': AppColors.primaryLight,  'route': '/diagnostics'},
     ];
 
     return GridView.builder(
@@ -227,13 +243,35 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
   Widget _buildEmptyEmergenciesState() {
     return Center(
-      child: Column(
-        children: [
-          const SizedBox(height: 32),
-          Icon(Icons.check_circle_outline_rounded, size: 72, color: Colors.grey.shade300),
-          const SizedBox(height: 16),
-          const Text('No active emergency requests', style: TextStyle(color: Colors.grey)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 32),
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.verified_user_rounded, size: 52, color: AppColors.primary.withOpacity(0.5)),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'All Clear',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.primary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'No active emergency requests at this time.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            ),
+          ],
+        ),
       ),
     );
   }

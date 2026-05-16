@@ -108,14 +108,38 @@ class MedicalProfileRepositoryImpl implements MedicalProfileRepository {
 
   @override
   Future<void> addEmergencyContact(String userId, EmergencyContact contact) async {
-    // Current implementation doesn't support structured emergency contacts update
-    // This will be implemented when backend supports it
-    throw UnimplementedError('addEmergencyContact not yet implemented');
+    final profile = await getMedicalProfile(userId);
+    if (profile == null) return;
+    final updatedContacts = [...profile.emergencyContacts, contact];
+    final updated = await remoteDataSource.updateMedicalProfile(
+      bloodType: profile.bloodType,
+      disabilityType: profile.disabilityType,
+      allergies: profile.allergies,
+      chronicDiseases: profile.chronicDiseases,
+      medications: profile.medications.map((m) => m.toJson()).toList(),
+      emergencyContacts: updatedContacts.map((c) => c.toJson()).toList(),
+      additionalNotes: profile.additionalNotes,
+    );
+    await localDataSource.saveMedicalProfile(updated.toJson());
   }
 
   @override
   Future<void> removeEmergencyContact(String userId, String contactName) async {
-    throw UnimplementedError('removeEmergencyContact not yet implemented');
+    final profile = await getMedicalProfile(userId);
+    if (profile == null) return;
+    final updatedContacts = profile.emergencyContacts
+        .where((c) => c.name != contactName)
+        .toList();
+    final updated = await remoteDataSource.updateMedicalProfile(
+      bloodType: profile.bloodType,
+      disabilityType: profile.disabilityType,
+      allergies: profile.allergies,
+      chronicDiseases: profile.chronicDiseases,
+      medications: profile.medications.map((m) => m.toJson()).toList(),
+      emergencyContacts: updatedContacts.map((c) => c.toJson()).toList(),
+      additionalNotes: profile.additionalNotes,
+    );
+    await localDataSource.saveMedicalProfile(updated.toJson());
   }
 
   @override

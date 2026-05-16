@@ -538,7 +538,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                       'Emergency SOS',
                       style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: theme.colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 8),

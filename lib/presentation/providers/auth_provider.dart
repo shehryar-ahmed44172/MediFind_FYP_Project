@@ -204,10 +204,33 @@ class LoginParams {
   LoginParams({required this.email, required this.password});
 }
 
-final forgotPasswordProvider = FutureProvider.family<void, String>((ref, email) async {
-  final authRepo = await ref.watch(authRepositoryProvider.future);
+// autoDispose: CRITICAL — prevents caching. Without it, calling the provider
+// a second time with the same email returns the old cached result and skips the API call.
+final forgotPasswordProvider =
+    FutureProvider.autoDispose.family<void, String>((ref, email) async {
+  final authRepo = await ref.read(authRepositoryProvider.future);
   await authRepo.forgotPassword(email);
 });
+
+/// Completes the forgot-password flow: verifies the OTP and sets the new password in one request.
+// autoDispose: same reason — each submit must hit the API fresh.
+final resetPasswordProvider =
+    FutureProvider.autoDispose.family<void, ResetPasswordParams>((ref, params) async {
+  final authRepo = await ref.read(authRepositoryProvider.future);
+  await authRepo.resetPassword(params.email, params.otp, params.newPassword);
+});
+
+class ResetPasswordParams {
+  final String email;
+  final String otp;
+  final String newPassword;
+
+  const ResetPasswordParams({
+    required this.email,
+    required this.otp,
+    required this.newPassword,
+  });
+}
 
 final updateProfileProvider = FutureProvider.family<User, Map<String, dynamic>>((ref, data) async {
   final authRepo = await ref.watch(authRepositoryProvider.future);

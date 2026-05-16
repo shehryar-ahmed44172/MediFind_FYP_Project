@@ -35,9 +35,24 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Hello,', style: TextStyle(color: Colors.grey, fontSize: 1.8.hp)),
-                      Text(user?.fullName.split(' ')[0] ?? 'Caregiver',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 3.2.hp)),
+                      Text(
+                        'CAREGIVER DASHBOARD',
+                        style: TextStyle(
+                          color: AppColors.primaryLight.withOpacity(0.85),
+                          fontWeight: FontWeight.w900,
+                          fontSize: 11,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        user?.fullName.split(' ')[0] ?? 'Caregiver',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 32,
+                          letterSpacing: -1,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -51,18 +66,27 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
               child: _buildQuickActionGrid(theme),
             ),
 
-            // 3. Monitored Patients Title
+            // 3. Stats Row + Section Title
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: asyncPatients.when(
+                data: (patients) => Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Live Monitoring', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                    if (asyncPatients.hasValue && asyncPatients.value!.isNotEmpty)
-                      Text('Recent Updates', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                    if (patients.isNotEmpty) _buildStatsRow(context, patients, theme),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text('Live Monitoring', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('${patients.length} Linked', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
               ),
             ),
 
@@ -104,10 +128,10 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     // 'push': true  → opens as a full-screen overlay above the shell (context.push)
     // 'push': false → switches tab via shell (context.go)
     final actions = [
-      {'title': 'My Patients', 'icon': Icons.people_rounded, 'color': AppColors.primary, 'route': '/caregiver/my-patients', 'push': false},
-      {'title': 'Live Map', 'icon': Icons.map_rounded, 'color': Colors.blue, 'route': '/caregiver/maps', 'push': false},
-      {'title': 'Messages', 'icon': Icons.chat_bubble_rounded, 'color': Colors.orange, 'route': '/caregiver/chats', 'push': false},
-      {'title': 'History', 'icon': Icons.history_rounded, 'color': Colors.indigo, 'route': '/caregiver/history', 'push': true},
+      {'title': 'My Patients', 'icon': Icons.people_rounded,     'color': AppColors.primary,       'route': '/caregiver/my-patients', 'push': false},
+      {'title': 'Live Map',    'icon': Icons.map_rounded,         'color': AppColors.primaryLight,  'route': '/caregiver/maps',        'push': false},
+      {'title': 'Messages',   'icon': Icons.chat_bubble_rounded, 'color': AppColors.warning,       'route': '/caregiver/chats',       'push': false},
+      {'title': 'History',    'icon': Icons.history_rounded,     'color': AppColors.secondaryTeal, 'route': '/caregiver/history',     'push': true},
     ];
 
     return GridView.builder(
@@ -232,6 +256,8 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
             onTap: () {
               if (isActive && patient.activeEmergencyId != null) {
                 context.push('/caregiver/tracking/${patient.activeEmergencyId}');
+              } else {
+                context.go('/caregiver/my-patients');
               }
             },
             child: Padding(

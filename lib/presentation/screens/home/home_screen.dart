@@ -123,6 +123,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         return profileAsync.when(
           data: (profile) {
+            final currentUser = ref.read(currentUserProvider).valueOrNull;
+            final isVerified = currentUser?.isEmailVerified == true;
             return GestureDetector(
               onTap: () => _showMedicalIDOptions(profile, theme, isDark),
               child: Container(
@@ -171,7 +173,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         children: [
                           _buildIDStat('BLOOD', profile?.bloodType ?? '--', Colors.redAccent, labelColor),
                           _buildIDStat('ALLERGIES', (profile?.allergies.isNotEmpty == true) ? 'ACTIVE' : 'NONE', Colors.orangeAccent, labelColor),
-                          _buildIDStat('STATUS', 'VERIFIED', Colors.greenAccent, labelColor),
+                          _buildIDStat('STATUS', isVerified ? 'VERIFIED' : 'PENDING', isVerified ? Colors.greenAccent : Colors.orangeAccent, labelColor),
                         ],
                       ),
                     ],
@@ -407,10 +409,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildGlassServiceGrid(ThemeData theme, bool isDark) {
     final services = [
-      {'title': 'Medical Records', 'icon': Icons.folder_copy_rounded, 'color': AppColors.primaryLight,  'route': '/home/medical-reports'},
-      {'title': 'Caregivers',      'icon': Icons.people_alt_rounded,  'color': AppColors.warning,       'route': '/home/caregivers'},
-      {'title': 'Messages',        'icon': Icons.chat_bubble_rounded,  'color': AppColors.secondaryTeal, 'route': '/chats'},
-      {'title': 'Responders',      'icon': Icons.security_rounded,     'color': AppColors.success,       'route': null},
+      {'title': 'Medical Records',  'icon': Icons.folder_copy_rounded,      'color': AppColors.primaryLight,  'route': '/home/medical-reports'},
+      {'title': 'Caregivers',       'icon': Icons.people_alt_rounded,       'color': AppColors.warning,       'route': '/home/caregivers'},
+      {'title': 'Messages',         'icon': Icons.chat_bubble_rounded,      'color': AppColors.secondaryTeal, 'route': '/chats'},
+      {'title': 'SOS Contacts',     'icon': Icons.contact_emergency_rounded, 'color': AppColors.success,       'route': '/home/emergency-contacts'},
     ];
 
     final tileBg     = isDark ? Colors.white.withOpacity(0.05) : theme.colorScheme.surfaceContainer;
@@ -442,11 +444,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             child: InkWell(
               borderRadius: BorderRadius.circular(24),
               onTap: () {
-                if (service['route'] != null) {
-                  context.go(service['route'] as String);
-                } else {
-                  _showFeatureComingSoon(context, service['title'] as String);
-                }
+                final route = service['route'] as String?;
+                if (route != null) context.go(route);
               },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -508,16 +507,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
 
-  void _showFeatureComingSoon(BuildContext context, String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature feature coming soon!'),
-        behavior: SnackBarBehavior.floating,
-        backgroundColor: AppColors.primary,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      ),
-    );
-  }
 }
 
 // ── Option tile used inside the Medical ID action sheet ──────────────────────

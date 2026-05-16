@@ -48,6 +48,8 @@ import '../presentation/screens/settings/checkout_screen.dart';
 import '../presentation/screens/settings/payment_success_screen.dart';
 import '../presentation/screens/patient/predefined_messages_screen.dart';
 import '../presentation/screens/auth/pending_approval_screen.dart';
+import '../presentation/screens/auth/reset_password_otp_screen.dart';
+import '../presentation/screens/auth/reset_new_password_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
 
 // AppRouter class manages all the navigation paths within the app
@@ -120,6 +122,8 @@ class AppRouter {
                              state.uri.path == '/register' ||
                              state.uri.path == '/select-role' ||
                              state.uri.path == '/forgot-password' ||
+                             state.uri.path == '/reset-password-otp' ||
+                             state.uri.path == '/reset-new-password' ||
                              state.uri.path == '/verify-email' ||
                              state.uri.path == '/pending-approval';
       final isGoingToSplash = state.uri.path == '/splash';
@@ -156,6 +160,25 @@ class AppRouter {
         path: '/forgot-password',
         name: 'forgot-password',
         builder: (context, state) => const ForgotPasswordScreen(),
+      ),
+      GoRoute(
+        path: '/reset-password-otp',
+        name: 'reset-password-otp',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return ResetPasswordOtpScreen(email: extra['email'] ?? '');
+        },
+      ),
+      GoRoute(
+        path: '/reset-new-password',
+        name: 'reset-new-password',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return ResetNewPasswordScreen(
+            email: extra['email'] ?? '',
+            otp: extra['otp'] ?? '',
+          );
+        },
       ),
       GoRoute(
         path: '/register',

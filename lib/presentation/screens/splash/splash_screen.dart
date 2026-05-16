@@ -161,8 +161,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProvider
               },
               child: Image.asset(
                 'assets/logos/Medifind_New_Logo-removebg-preview.png',
-                width: 81.wp, 
-                fit: BoxFit.fitWidth,
+                width: 85.wp, 
+                fit: BoxFit.contain,
               ),
             ),
             

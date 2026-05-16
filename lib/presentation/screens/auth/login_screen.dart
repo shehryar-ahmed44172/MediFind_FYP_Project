@@ -30,54 +30,279 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _login() async {
+    FocusScope.of(context).unfocus();
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      debugPrint('🔑 [Login] Attempting login for: ${_emailController.text.trim()}');
       final params = LoginParams(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
-
-      // attempt login
-      debugPrint('📡 [Login] Sending request to backend...');
       await ref.read(loginProvider(params).future);
-      debugPrint('✅ [Login] Login successful!');
 
-      if (mounted) {
-        final role = await ref.read(currentUserRoleProvider.future);
-        if (mounted) {
-          _navigateByRole(role);
-        }
-      }
+      if (!mounted) return;
+      final role = await ref.read(currentUserRoleProvider.future);
+      if (mounted) _navigateByRole(role);
+
     } catch (e) {
-      debugPrint('❌ [Login] Login failed: $e');
-      if (mounted) {
-        final errorStr = e.toString();
-        if (errorStr.contains('verify your email')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please verify your email before logging in.'),
-              backgroundColor: Colors.orange,
-              behavior: SnackBarBehavior.floating,
+      if (!mounted) return;
+      final raw = e.toString().replaceAll('Exception:', '').trim();
+
+      // ── Account locked ───────────────────────────────────────────────────
+      if (raw.toLowerCase().contains('locked') ||
+          raw.toLowerCase().contains('temporarily locked')) {
+        _showLockedModal(raw);
+
+      // ── Email not verified ───────────────────────────────────────────────
+      } else if (raw.toLowerCase().contains('verify your email') ||
+                 raw.toLowerCase().contains('email') && raw.toLowerCase().contains('verif')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please verify your email before logging in.'),
+            backgroundColor: Colors.orange,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        context.go('/verify-email',
+            extra: {'email': _emailController.text.trim()});
+
+      // ── Warning: 1–2 attempts remaining ─────────────────────────────────
+      } else if (raw.toLowerCase().contains('warning') &&
+                 raw.toLowerCase().contains('attempt')) {
+        _showAttemptsWarningBar(raw);
+
+      // ── Generic invalid credentials ──────────────────────────────────────
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    raw.contains('credentials')
+                        ? 'Incorrect email or password. Please try again.'
+                        : raw,
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ),
-          );
-          context.go('/verify-email', extra: {'email': _emailController.text.trim()});
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Login failed: ${errorStr.replaceAll('Exception:', '').trim()}'),
-              backgroundColor: Colors.red.shade700,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // ── Lockout modal ──────────────────────────────────────────────────────────
+  void _showLockedModal(String errorMessage) {
+    // Extract "X minutes" from the backend message
+    final minuteMatch =
+        RegExp(r'(\d+)\s*minute').firstMatch(errorMessage);
+    final minutesRemaining =
+        minuteMatch != null ? int.tryParse(minuteMatch.group(1) ?? '') : null;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding: EdgeInsets.zero,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Red header band ────────────────────────────────────────
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFFEBEB),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade100,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.lock_person_rounded,
+                      size: 48,
+                      color: Colors.red.shade700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Account Temporarily Locked',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.red.shade800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Body ──────────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+              child: Column(
+                children: [
+                  Text(
+                    'Your account has been locked due to 5 consecutive failed login attempts.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (minutesRemaining != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border:
+                            Border.all(color: Colors.orange.shade200),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.timer_outlined,
+                              color: Colors.orange.shade700, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Try again in $minutesRemaining minute${minutesRemaining == 1 ? '' : 's'}',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange.shade800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'If you forgot your password, you can reset it now without waiting.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey.shade500,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // ── Actions ───────────────────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.go('/forgot-password');
+                      },
+                      icon: const Icon(Icons.lock_reset_rounded),
+                      label: const Text('Reset My Password'),
+                      style: OutlinedButton.styleFrom(
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.shade600,
+                        foregroundColor: Colors.white,
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'I Understand',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Attempts-remaining warning ─────────────────────────────────────────────
+  void _showAttemptsWarningBar(String message) {
+    // Extract number from "X attempts remaining"
+    final match = RegExp(r'(\d+)\s*attempt').firstMatch(message);
+    final remaining = match != null ? int.tryParse(match.group(1) ?? '') : null;
+
+    final isLastAttempt = remaining == 1;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 5),
+        backgroundColor:
+            isLastAttempt ? Colors.red.shade800 : Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        shape:
+            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        content: Row(
+          children: [
+            Icon(
+              isLastAttempt
+                  ? Icons.warning_rounded
+                  : Icons.info_outline_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isLastAttempt
+                    ? '⚠️ Last attempt! Your account will be locked for 30 minutes if you fail again.'
+                    : 'Incorrect password. $remaining attempts remaining before lockout.',
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w500),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   // nav by role

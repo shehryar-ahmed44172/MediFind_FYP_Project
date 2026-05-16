@@ -83,8 +83,22 @@ class UserRepositoryImpl implements UserRepository {
       }
     } catch (_) {}
 
-    // Fallback or API logic
-    throw UnimplementedError('getUser API logic not implemented');
+    final profile = await apiClient.getUserProfile(userId);
+    if (profile == null) {
+      throw NetworkException(message: 'User not found');
+    }
+    final user = User(
+      id: profile.userId,
+      fullName: profile.fullName,
+      email: profile.email,
+      phoneNumber: profile.phoneNumber,
+      role: profile.role,
+      profileImageUrl: profile.profileImageUrl,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+    );
+    await localDataSource.saveUser(_userToMap(user));
+    return user;
   }
 
   @override

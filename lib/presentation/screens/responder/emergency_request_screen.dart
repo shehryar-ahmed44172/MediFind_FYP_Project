@@ -6,6 +6,7 @@ import '../../theme/app_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
+import '../../../services/location/location_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/accessibility_provider.dart';
@@ -133,6 +134,23 @@ class _EmergencyRequestScreenState
   Widget _buildContent(BuildContext context, ThemeData theme, emergency_entity.Emergency? emergency) {
     if (emergency == null) return const Center(child: Text('Emergency not found'));
 
+    // Calculate distance from responder's current location to emergency location
+    Future<String> _calculateDistance() async {
+      try {
+        final position = await LocationService().getCurrentLocation();
+        final distanceInMeters = LocationService().calculateDistance(
+          position.latitude,
+          position.longitude,
+          emergency.latitude,
+          emergency.longitude,
+        );
+        final distanceInKm = distanceInMeters / 1000;
+        return '${distanceInKm.toStringAsFixed(1)} km';
+      } catch (e) {
+        return 'Unable to calculate';
+      }
+    }
+
     // If the server pre-captured a voiceSummary at SOS time, use it as the
     // primary source. This works even when the patient's phone is off.
     final hasCapturedSummary = emergency.voiceSummary != null &&
@@ -146,19 +164,24 @@ class _EmergencyRequestScreenState
         loading: () => 'Loading...',
         error: (_, __) => 'Patient',
       );
-      return _buildRequestDetails(
-        context: context,
-        theme: theme,
-        emergencyType: emergency.emergencyType,
-        patientName: patientName,
-        distance: 'Calculating...',
-        bloodGroup: _extractFromSummary(emergency.voiceSummary!, 'Blood Type') ?? 'See summary below',
-        allergies: _extractFromSummary(emergency.voiceSummary!, 'Allergies') ?? 'See summary below',
-        conditions: _extractFromSummary(emergency.voiceSummary!, 'Conditions') ?? 'See summary below',
-        priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
-        isDeaf: emergency.patientType.toUpperCase() == 'DEAF',
-        voiceSummary: emergency.voiceSummary,
-        dataSource: 'snapshot',
+      return FutureBuilder<String>(
+        future: _calculateDistance(),
+        builder: (context, distanceSnapshot) {
+          return _buildRequestDetails(
+            context: context,
+            theme: theme,
+            emergencyType: emergency.emergencyType,
+            patientName: patientName,
+            distance: distanceSnapshot.data ?? 'Calculating...',
+            bloodGroup: _extractFromSummary(emergency.voiceSummary!, 'Blood Type') ?? 'See summary below',
+            allergies: _extractFromSummary(emergency.voiceSummary!, 'Allergies') ?? 'See summary below',
+            conditions: _extractFromSummary(emergency.voiceSummary!, 'Conditions') ?? 'See summary below',
+            priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+            isDeaf: emergency.patientType.toUpperCase() == 'DEAF',
+            voiceSummary: emergency.voiceSummary,
+            dataSource: 'snapshot',
+          );
+        },
       );
     }
 
@@ -173,18 +196,23 @@ class _EmergencyRequestScreenState
           loading: () => '...',
           error: (_, __) => 'Patient',
         );
-        return _buildRequestDetails(
-          context: context,
-          theme: theme,
-          emergencyType: emergency.emergencyType,
-          patientName: patientName,
-          distance: 'Calculating...',
-          bloodGroup: profile?.bloodType ?? 'Not recorded',
-          allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
-          conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
-          priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
-          isDeaf: (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF'),
-          dataSource: 'live',
+        return FutureBuilder<String>(
+          future: _calculateDistance(),
+          builder: (context, distanceSnapshot) {
+            return _buildRequestDetails(
+              context: context,
+              theme: theme,
+              emergencyType: emergency.emergencyType,
+              patientName: patientName,
+              distance: distanceSnapshot.data ?? 'Calculating...',
+              bloodGroup: profile?.bloodType ?? 'Not recorded',
+              allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
+              conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
+              priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+              isDeaf: (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF'),
+              dataSource: 'live',
+            );
+          },
         );
       },
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -193,7 +221,7 @@ class _EmergencyRequestScreenState
         theme: theme,
         emergencyType: emergency.emergencyType,
         patientName: 'Patient',
-        distance: '...',
+        distance: 'Unable to calculate',
         bloodGroup: 'Unavailable',
         allergies: 'Unavailable',
         conditions: 'Unavailable',

@@ -4,12 +4,14 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../providers/medical_profile_provider.dart';
 import '../../../domain/entities/emergency.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../widgets/common/emergency_timer.dart';
 
 import '../home/widgets/connectivity_banner.dart';
 import '../../theme/app_theme.dart';
+import 'dart:async';
 import '../../../services/location/responder_location_tracker.dart';
 
 
@@ -22,6 +24,7 @@ class ResponderHomeScreen extends ConsumerStatefulWidget {
 
 class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   bool _isUpdatingStatus = false;
+  Timer? _pollTimer;
 
   @override
   void initState() {
@@ -30,15 +33,25 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
       ref.read(getActiveEmergenciesProvider);
       final user = ref.read(currentUserProvider).valueOrNull;
       if (user?.isActive == true) {
-        // Sync availability
         ref.read(setResponderAvailabilityProvider(true));
-        
-        // Start background location tracking for visibility
         ref.read(responderLocationTrackerProvider).start();
-        
         debugPrint('📍 Responder initialized and tracking started');
       }
     });
+
+    // Fallback polling every 10 seconds to catch missed socket cancellation events
+    _pollTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        ref.invalidate(watchActiveEmergenciesProvider);
+        debugPrint('🔄 Polling: refreshed active emergencies list');
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -445,7 +458,7 @@ class _EmergencyRequestCard extends ConsumerWidget {
       case 'CARDIAC':
         return Icons.favorite_rounded;
       case 'RESPIRATORY':
-        return Icons.lungs_rounded;
+        return Icons.air_rounded; // Respiratory - air/breathing
       case 'FALL':
         return Icons.trending_down_rounded;
       case 'TRAUMA':
@@ -663,7 +676,7 @@ class _EmergencyRequestCard extends ConsumerWidget {
                       },
                       loading: () => const SizedBox(
                         height: 20,
-                        child: LinearProgressIndicator(minVerticalPadding: 0),
+                        child: LinearProgressIndicator(),
                       ),
                       error: (_, __) => Text(
                         patientAsync.valueOrNull?.fullName ?? 'Patient',
@@ -672,7 +685,7 @@ class _EmergencyRequestCard extends ConsumerWidget {
                     ),
                     loading: () => const SizedBox(
                       height: 20,
-                      child: LinearProgressIndicator(minVerticalPadding: 0),
+                      child: LinearProgressIndicator(),
                     ),
                     error: (_, __) => const Text(
                       'Patient',

@@ -289,9 +289,29 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
         // --- RESPONDER LOGIC: Emergency Cancelled/Resolved by others ---
         else if ((type == 'EMERGENCY_RESOLVED' || type == 'EMERGENCY_CANCELLED' || type == 'EMERGENCY_ACCEPTED_BY_OTHER') && user.role == 'RESPONDER') {
           debugPrint('🧹 SOS Request no longer active: $type');
-          // This will dismiss the dialog if it's currently showing
+
+          // Update local cache status so stream filters it out immediately
+          final emergencyId = data['emergencyId'] ?? data['id'];
+          if (emergencyId != null) {
+            try {
+              final localDs = await ref.read(localDataSourceProvider.future);
+              final cached = await localDs.getEmergency(emergencyId.toString());
+              if (cached != null) {
+                cached['status'] = type == 'EMERGENCY_CANCELLED' ? 'CANCELLED' : 'RESOLVED';
+                await localDs.saveEmergency(cached);
+                debugPrint('📦 Local cache updated: $emergencyId → ${cached['status']}');
+              }
+            } catch (e) {
+              debugPrint('⚠️ Could not update local cache for cancelled emergency: $e');
+            }
+          }
+
+          // Dismiss any active alert modal
           PushNotificationService.dismissCurrentEmergencyModal();
+
+          // Invalidate BOTH providers so responder home screen refreshes immediately
           ref.invalidate(getActiveEmergenciesProvider);
+          ref.invalidate(watchActiveEmergenciesProvider);
         }
 
         // --- CAREGIVER LOGIC: Patient SOS ---
@@ -318,12 +338,21 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 
         if (emergencyId != null) {
           final repo = await ref.read(emergencyRepositoryProvider.future);
-          
+
           // Force refresh the emergency in cache
           try {
             await repo.getEmergency(emergencyId);
             ref.invalidate(getEmergencyProvider(emergencyId));
             ref.invalidate(getActiveEmergenciesProvider);
+
+            // If status is terminal (cancelled/resolved), also invalidate stream
+            // so responder home screen removes it immediately
+            if (newStatus == 'CANCELLED' || newStatus == 'RESOLVED' ||
+                newStatus == 'COMPLETED' || newStatus == 'ASSIGNED' ||
+                newStatus == 'RESPONDER_ASSIGNED') {
+              ref.invalidate(watchActiveEmergenciesProvider);
+              debugPrint('🔄 watchActiveEmergencies invalidated for status: $newStatus');
+            }
             
             // --- ACCESSIBILITY LOGIC: DEAF Patient Feedback ---
             if (user.role == 'PATIENT' && user.patientType == 'DEAF') {

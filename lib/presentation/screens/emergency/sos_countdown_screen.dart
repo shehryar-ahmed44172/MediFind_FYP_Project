@@ -210,24 +210,25 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
   void _initializeSearch() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_secondsLeft <= 1) {
-        timer.cancel();
-        _autoCancel();
-      } else {
-        if (mounted) {
-          setState(() => _secondsLeft--);
-          
-          final user = ref.read(currentUserProvider).valueOrNull;
-          if (user?.patientType == 'DEAF') {
-            HapticFeedback.heavyImpact(); // Stronger feedback for Deaf patients
-          } else {
-            HapticFeedback.lightImpact();
-          }
-          
-          // HEARTBEAT POLLING: Every 5 seconds, manually refresh status as a fallback
-          if (_secondsLeft % 5 == 0 && _emergencyId != null) {
-            ref.invalidate(getEmergencyProvider(_emergencyId!));
-          }
+      if (mounted) {
+        setState(() => _secondsLeft--);
+
+        final user = ref.read(currentUserProvider).valueOrNull;
+        if (user?.patientType == 'DEAF') {
+          HapticFeedback.heavyImpact(); // Stronger feedback for Deaf patients
+        } else {
+          HapticFeedback.lightImpact();
+        }
+
+        // HEARTBEAT POLLING: Every 5 seconds, manually refresh status as a fallback
+        if (_secondsLeft % 5 == 0 && _emergencyId != null) {
+          ref.invalidate(getEmergencyProvider(_emergencyId!));
+        }
+
+        // Auto-cancel when countdown reaches 0
+        if (_secondsLeft <= 0) {
+          timer.cancel();
+          _autoCancel();
         }
       }
     });
@@ -275,7 +276,12 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
           if (mounted) SocketService.instance.joinEmergencyRoom(emergency.id);
         });
         
-        VoiceAlertService().speakMessage("Emergency request sent. Searching for nearby responders.");
+        final _user = ref.read(currentUserProvider).valueOrNull;
+        final _isDeaf = (_user?.patientType?.toUpperCase() == 'DEAF') ||
+            ref.read(accessibilityProvider).textOnlyMode;
+        if (!_isDeaf) {
+          VoiceAlertService().speakMessage("Emergency request sent. Searching for nearby responders.");
+        }
       }
       
     } catch (e) {

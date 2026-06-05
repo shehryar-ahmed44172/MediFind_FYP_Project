@@ -85,19 +85,19 @@ class _HistoryItemCard extends StatelessWidget {
     switch (status) {
       case 'ACCEPTED':
       case 'RESPONDER_ASSIGNED':
-        statusColor = Colors.green;
+        statusColor = AppColors.primaryBlue; // Logo-matched success
         statusIcon = Icons.check_circle_outline;
         break;
       case 'REJECTED':
-        statusColor = Colors.red;
+        statusColor = AppColors.error; // Error color
         statusIcon = Icons.cancel_outlined;
         break;
       case 'COMPLETED':
-        statusColor = Colors.blue;
+        statusColor = AppColors.primaryBlue; // Logo-matched completion
         statusIcon = Icons.task_alt;
         break;
       default:
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning; // Warning for pending
         statusIcon = Icons.hourglass_empty;
     }
 

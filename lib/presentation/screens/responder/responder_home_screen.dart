@@ -205,8 +205,8 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
           ),
           child: Row(
             children: [
-              Icon(Icons.power_settings_new_rounded, 
-                   color: (user?.isActive ?? false) ? Colors.green : Colors.grey, 
+              Icon(Icons.power_settings_new_rounded,
+                   color: (user?.isActive ?? false) ? AppColors.primaryBlue : Colors.grey, // Logo-matched active indicator
                    size: 3.hp),
               SizedBox(width: 4.wp),
               Expanded(
@@ -296,19 +296,19 @@ class _HistoryItemCard extends StatelessWidget {
     switch (status) {
       case 'ACCEPTED':
       case 'RESPONDER_ASSIGNED':
-        statusColor = Colors.green;
+        statusColor = AppColors.primaryBlue; // Logo-matched success
         statusIcon = Icons.check_circle_outline;
         break;
       case 'REJECTED':
-        statusColor = Colors.red;
+        statusColor = AppColors.error; // Error color for rejection
         statusIcon = Icons.cancel_outlined;
         break;
       case 'COMPLETED':
-        statusColor = Colors.blue;
+        statusColor = AppColors.primaryBlue; // Logo-matched completion
         statusIcon = Icons.task_alt;
         break;
       default:
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning; // Warning for pending
         statusIcon = Icons.hourglass_empty;
     }
 
@@ -419,10 +419,54 @@ class _EmergencyRequestCard extends ConsumerWidget {
   final Emergency request;
   const _EmergencyRequestCard({required this.request});
 
+  /// Get color based on emergency type (Phase 1: Color-coding)
+  Color _getEmergencyColor(String emergencyType) {
+    // ── Colors matched to MediFind logo palette ──────────────────────────
+    // Primary: #0C637E (Navy-Teal) | Secondary: #2496A7 (Teal) | Accent: #2891C2 (Sky Blue)
+    switch (emergencyType.toUpperCase()) {
+      case 'CARDIAC':
+        return AppColors.primaryNavy; // #0C637E - Most urgent, darkest
+      case 'RESPIRATORY':
+        return AppColors.primaryTeal; // #2496A7 - Urgent, medium
+      case 'STROKE':
+        return AppColors.primaryBlue; // #2891C2 - Urgent, lighter blue
+      case 'TRAUMA':
+        return const Color(0xFF0A5B76); // Darker navy-teal shade - Very urgent
+      case 'FALL':
+        return const Color(0xFF17A2B8); // Lighter cyan teal - Less urgent
+      default:
+        return AppColors.primaryNavy; // Fallback to primary
+    }
+  }
+
+  /// Get emergency icon based on type
+  IconData _getEmergencyIcon(String emergencyType) {
+    switch (emergencyType.toUpperCase()) {
+      case 'CARDIAC':
+        return Icons.favorite_rounded;
+      case 'RESPIRATORY':
+        return Icons.lungs_rounded;
+      case 'FALL':
+        return Icons.trending_down_rounded;
+      case 'TRAUMA':
+        return Icons.local_hospital_rounded;
+      case 'STROKE':
+        return Icons.psychology_rounded;
+      default:
+        return Icons.emergency_rounded;
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    
+    final emergencyColor = _getEmergencyColor(request.emergencyType);
+    final emergencyIcon = _getEmergencyIcon(request.emergencyType);
+
+    // Fetch patient info (Phase 1: Patient name display)
+    final patientAsync = ref.watch(userProfileProvider(request.userId));
+    final profileAsync = ref.watch(getMedicalProfileProvider(request.userId));
+
     return Dismissible(
       key: Key(request.id),
       direction: DismissDirection.endToStart,
@@ -430,17 +474,15 @@ class _EmergencyRequestCard extends ConsumerWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: Colors.red.shade100,
+          color: AppColors.error.withOpacity(0.1),
           borderRadius: BorderRadius.circular(24),
         ),
-        child: const Icon(Icons.delete_outline_rounded, color: Colors.red),
+        child: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
       ),
       onDismissed: (_) async {
-        // First delete locally to remove from UI instantly
         final localDs = await ref.read(localDataSourceProvider.future);
         await localDs.deleteEmergency(request.id);
-        
-        // Notify backend that responder rejected the request
+
         final user = ref.read(currentUserProvider).valueOrNull;
         if (user != null) {
           try {
@@ -459,113 +501,224 @@ class _EmergencyRequestCard extends ConsumerWidget {
           color: theme.cardColor,
           borderRadius: BorderRadius.circular(24),
           boxShadow: AppShadows.cardShadow,
+          // Phase 1: Color-coded left border
+          border: Border(
+            left: BorderSide(color: emergencyColor, width: 6),
+          ),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
             onTap: () => context.go('/responder/request/${request.id}'),
             child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.red.shade400, Colors.red.shade700],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                  // Header row with icon and type
+                  Row(
+                    children: [
+                      // Colored icon (Phase 1)
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: emergencyColor.withOpacity(0.15),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          emergencyIcon,
+                          color: emergencyColor,
+                          size: 26,
+                        ),
                       ),
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.red.withOpacity(0.3),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: const Icon(Icons.emergency_rounded, color: Colors.white, size: 28),
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          request.emergencyType.replaceAll('_', ' '),
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold, 
-                            fontSize: 17,
-                            letterSpacing: 0.5,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Row(
+                      const SizedBox(width: 14),
+
+                      // Type and distance
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.location_on_outlined, size: 14, color: Colors.grey.shade600),
-                            const SizedBox(width: 4),
                             Text(
-                              'Incoming Request',
-                              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                            ),
-                            if (request.patientType.toUpperCase() == 'DEAF') ...[
-                              const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.shade100,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  'DEAF',
-                                  style: TextStyle(
-                                    color: Colors.blue.shade900,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                              request.emergencyType.replaceAll('_', ' '),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: emergencyColor,
+                                letterSpacing: 0.5,
                               ),
-                            ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '2.3 km • ${request.expiresAt != null ? "45 sec remaining" : "Incoming"}',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
-                        if (request.expiresAt != null) ...[
-                          const SizedBox(height: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              borderRadius: BorderRadius.circular(8),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Patient info row (Phase 1: Patient name + medical flags)
+                  patientAsync.when(
+                    data: (patient) => profileAsync.when(
+                      data: (profile) {
+                        final patientName = patient?.fullName ?? 'Patient';
+                        final bloodType = profile?.bloodType ?? 'Unknown';
+                        final hasAllergies = profile?.allergies.isNotEmpty ?? false;
+                        final allergyDisplay = hasAllergies
+                            ? profile!.allergies.first.substring(0, 3)
+                            : 'None';
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Patient name
+                            Text(
+                              patientName,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
+                            const SizedBox(height: 6),
+
+                            // Medical flags row (Phase 1)
+                            Row(
                               children: [
-                                Icon(Icons.timer_outlined, size: 12, color: Colors.red.shade700),
-                                const SizedBox(width: 4),
-                                EmergencyTimer(
-                                  expiresAt: request.expiresAt!.toIso8601String(),
-                                  // We don't have serverTime here easily from the list, 
-                                  // but local time is usually fine for a 60s countdown.
-                                  style: TextStyle(
-                                    color: Colors.red.shade700,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                                // Blood type badge
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.error.withOpacity(0.1), // Critical medical info
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    '🔴 $bloodType',
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.error,
+                                    ),
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+
+                                // Allergy badge (Phase 1)
+                                if (hasAllergies)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.warning.withOpacity(0.1), // Warning for allergies
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      '⚠️ $allergyDisplay',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.warning,
+                                      ),
+                                    ),
+                                  ),
+
+                                const Spacer(),
+
+                                // DEAF badge (Phase 1: Enhanced)
+                                if (request.patientType.toUpperCase() == 'DEAF')
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 7,
+                                      vertical: 3,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryBlue.withOpacity(0.1), // Logo-matched accessibility
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text(
+                                      '👁️ DEAF',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primaryBlue,
+                                      ),
+                                    ),
+                                  ),
                               ],
                             ),
-                          ),
-                        ],
-                      ],
+                          ],
+                        );
+                      },
+                      loading: () => const SizedBox(
+                        height: 20,
+                        child: LinearProgressIndicator(minVerticalPadding: 0),
+                      ),
+                      error: (_, __) => Text(
+                        patientAsync.valueOrNull?.fullName ?? 'Patient',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    loading: () => const SizedBox(
+                      height: 20,
+                      child: LinearProgressIndicator(minVerticalPadding: 0),
+                    ),
+                    error: (_, __) => const Text(
+                      'Patient',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.05),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                  const SizedBox(height: 10),
+
+                  // Action buttons row (Phase 1: Quick accept button)
+                  Row(
+                    children: [
+                      // View Details button
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => context.go('/responder/request/${request.id}'),
+                          icon: const Icon(Icons.info_outline_rounded, size: 16),
+                          label: const Text('Details'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            side: BorderSide(color: emergencyColor),
+                            foregroundColor: emergencyColor,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+
+                      // Quick Accept button (Phase 1)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => context.go('/responder/request/${request.id}'),
+                          icon: const Icon(Icons.check_rounded, size: 18),
+                          label: const Text('Accept'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: emergencyColor,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

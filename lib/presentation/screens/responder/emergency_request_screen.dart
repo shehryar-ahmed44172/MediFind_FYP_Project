@@ -8,6 +8,7 @@ import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
@@ -58,13 +59,19 @@ class _EmergencyRequestScreenState
         responderId: responderId,
       )).future);
       
-      VoiceAlertService().speakMessage("Emergency accepted. Preparing automated analysis.");
+      final voiceEnabled = ref.read(accessibilityProvider).voiceGuidanceEnabled;
+
+      if (voiceEnabled) {
+        VoiceAlertService().speakMessage("Emergency accepted. Preparing automated analysis.");
+      }
 
       // Check if patient is deaf and play situational report
       final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-      
-      if (profile != null && (profile.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF')) {
-        // Play the detailed medical report for the responder
+
+      if (voiceEnabled &&
+          profile != null &&
+          (profile.patientType.toUpperCase() == 'DEAF' ||
+              emergency.patientType.toUpperCase() == 'DEAF')) {
         await VoiceAlertService().speakAutomatedEmergencyReport(
           emergency: emergency,
           medical: profile,
@@ -73,7 +80,7 @@ class _EmergencyRequestScreenState
         } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: AppColors.error),
         );
         setState(() => _isAccepting = false);
       }
@@ -249,7 +256,7 @@ class _EmergencyRequestScreenState
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Text('HIGH PRIORITY ESCALATION',
-                        style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
                   ),
                 const Icon(Icons.emergency_rounded,
                     color: Colors.white, size: 48),
@@ -273,7 +280,7 @@ class _EmergencyRequestScreenState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade900,
+                color: AppColors.primaryNavy, // Logo-matched accessibility alert
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Row(
@@ -373,16 +380,16 @@ class _EmergencyRequestScreenState
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: dataSource == 'snapshot'
-                      ? Colors.blue.shade50
+                      ? AppColors.primaryBlue.withOpacity(0.1) // Logo-matched light blue
                       : dataSource == 'live'
-                          ? Colors.green.shade50
+                          ? AppColors.primaryTeal.withOpacity(0.1) // Logo-matched light teal
                           : Colors.grey.shade100,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: dataSource == 'snapshot'
-                        ? Colors.blue.shade200
+                        ? AppColors.primaryBlue.withOpacity(0.4)
                         : dataSource == 'live'
-                            ? Colors.green.shade200
+                            ? AppColors.primaryTeal.withOpacity(0.4)
                             : Colors.grey.shade300,
                   ),
                 ),
@@ -397,9 +404,9 @@ class _EmergencyRequestScreenState
                               : Icons.cloud_off_outlined,
                       size: 12,
                       color: dataSource == 'snapshot'
-                          ? Colors.blue.shade700
+                          ? AppColors.primaryBlue // Logo-matched
                           : dataSource == 'live'
-                              ? Colors.green.shade700
+                              ? AppColors.primaryTeal // Logo-matched
                               : Colors.grey.shade600,
                     ),
                     const SizedBox(width: 5),
@@ -413,9 +420,9 @@ class _EmergencyRequestScreenState
                         fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         color: dataSource == 'snapshot'
-                            ? Colors.blue.shade700
+                            ? AppColors.primaryBlue // Logo-matched
                             : dataSource == 'live'
-                                ? Colors.green.shade700
+                                ? AppColors.primaryTeal // Logo-matched
                                 : Colors.grey.shade600,
                       ),
                     ),
@@ -470,16 +477,16 @@ class _EmergencyRequestScreenState
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: AppColors.primaryBlue.withOpacity(0.1), // Logo-matched light blue
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: Colors.blue.shade100),
+                        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
                       ),
                       child: Text(
                         voiceSummary,
                         style: TextStyle(
                           fontSize: 12,
                           height: 1.6,
-                          color: Colors.blue.shade900,
+                          color: AppColors.primaryBlue.withOpacity(0.9),
                         ),
                       ),
                     ),
@@ -498,8 +505,8 @@ class _EmergencyRequestScreenState
                   onPressed: (_isAccepting || _isRejecting) ? null : _reject,
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: Colors.red),
-                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: AppColors.error),
+                    foregroundColor: AppColors.error,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),
                   ),
@@ -508,7 +515,7 @@ class _EmergencyRequestScreenState
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.red),
+                              strokeWidth: 2, color: AppColors.error),
                         )
                       : const Text('Reject', style: TextStyle(fontSize: 16)),
                 ),
@@ -519,7 +526,7 @@ class _EmergencyRequestScreenState
                 child: ElevatedButton(
                   onPressed: (_isAccepting || _isRejecting) ? null : _accept,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
+                    backgroundColor: AppColors.primaryBlue, // Logo-matched primary action
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12)),

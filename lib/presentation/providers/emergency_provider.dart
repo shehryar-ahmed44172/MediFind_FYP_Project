@@ -260,7 +260,22 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
       else if (message.event == SocketEvent.notification) {
         final type = data['type'];
         debugPrint('🔔 Notification Type: $type for Role: ${user.role}');
-        
+
+        // PRIVACY FIX: SYSTEM_ALERT from admin — only show to the intended recipient.
+        // The backend emits to notifications:{userId} room, but if the recipientId
+        // field is present, double-check it matches the current user.
+        if (type == 'SYSTEM_ALERT') {
+          final recipientId = data['recipientId']?.toString();
+          if (recipientId != null && recipientId.isNotEmpty && recipientId != user.id) {
+            debugPrint('🛡️ [Privacy] SYSTEM_ALERT for $recipientId blocked — current user is ${user.id}');
+            return;
+          }
+          // Show as an in-app snackbar/banner for the correct user
+          debugPrint('📣 [Admin] SYSTEM_ALERT received for current user: ${data['title']}');
+          // Notification is handled by FCM/push layer; nothing else to do here.
+          return;
+        }
+
         // PRIVACY FIX: Responders should NEVER receive chat notifications
         if (type == 'CHAT_MESSAGE' && user.role == 'RESPONDER') {
           debugPrint('🛡️ [Privacy] Blocked chat notification for Responder');

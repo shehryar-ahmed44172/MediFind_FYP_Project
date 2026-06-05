@@ -65,7 +65,7 @@ class AppConstants {
   static const String emergencyTypeShortnessOfBreath = 'SHORTNESS_OF_BREATH';
   static const String emergencyTypeChestPain = 'CHEST_PAIN';
   static const String emergencyTypeOther = 'OTHER';
-  
+
   // Emergency Status
   static const String statusInitiated = 'INITIATED';
   static const String statusInProgress = 'IN_PROGRESS';

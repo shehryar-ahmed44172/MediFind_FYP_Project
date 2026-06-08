@@ -9,6 +9,7 @@ import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
 import '../../../services/location/location_service.dart';
+import '../../../services/notification/push_notification_service.dart';
 import '../../../core/utils/exceptions.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
@@ -83,8 +84,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   // ── Responder Selections ───────────────────────────────────────────────
   String _selectedResponderType   = 'RESCUE_OFFICER'; // mutable, user-selectable
-  String _selectedVehicleType     = 'AMBULANCE';
+  // Vehicle is fixed — all responders use Motorbike Ambulance
+  final String _selectedVehicleType = 'MOTORBIKE_AMBULANCE';
   final List<String> _selectedSpecializations = [];
+
+  // ── Motorbike-specific fields ──────────────────────────────────────────
+  final _motorbikeNumberController = TextEditingController();
+  XFile? _drivingLicense;
+  XFile? _motorbikeDoc;
 
   // ── Document Uploads ───────────────────────────────────────────────────
   XFile? _cnicFront;
@@ -121,6 +128,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _confirmPasswordController.dispose();
     _organizationController.dispose();
     _licenseController.dispose();
+    _motorbikeNumberController.dispose();
     _cityController.dispose();
     _houseNoController.dispose();
     _addressController.dispose();
@@ -131,11 +139,21 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   // ── Date Picker ────────────────────────────────────────────────────────
   Future<void> _selectDate() async {
+    final bool isResponder = widget.role == 'RESPONDER';
+    // Responders must be 18+: latest allowed date is today minus 18 years
+    final DateTime maxDate = isResponder
+        ? DateTime(DateTime.now().year - 18, DateTime.now().month, DateTime.now().day)
+        : DateTime.now();
+    final DateTime initialDate = isResponder
+        ? maxDate
+        : DateTime.now().subtract(const Duration(days: 365 * 18));
+
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
+      initialDate: initialDate,
       firstDate: DateTime(1900),
-      lastDate: DateTime.now(),
+      lastDate: maxDate,
+      helpText: isResponder ? 'Responders must be 18 or older' : 'Select Date of Birth',
       builder: (context, child) => Theme(
         data: Theme.of(context).copyWith(
           colorScheme: ColorScheme.light(primary: _roleTheme['color'] as Color),
@@ -160,10 +178,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     if (picked != null) {
       setState(() {
         switch (docType) {
-          case 'CNIC_FRONT': _cnicFront = picked;          break;
-          case 'CNIC_BACK':  _cnicBack  = picked;          break;
-          case 'EMP_FRONT':  _employeeCardFront = picked;  break;
-          case 'EMP_BACK':   _employeeCardBack  = picked;  break;
+          case 'CNIC_FRONT':     _cnicFront         = picked; break;
+          case 'CNIC_BACK':      _cnicBack          = picked; break;
+          case 'EMP_FRONT':      _employeeCardFront = picked; break;
+          case 'EMP_BACK':       _employeeCardBack  = picked; break;
+          case 'DRIVING_LICENSE':_drivingLicense    = picked; break;
+          case 'BIKE_DOC':       _motorbikeDoc      = picked; break;
         }
       });
     }
@@ -348,6 +368,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         ));
         return;
       }
+      if (_drivingLicense == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('⚠ Please upload your Driving License before submitting.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
+      if (_motorbikeDoc == null) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('⚠ Please upload your Motorbike Documents before submitting.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ));
+        return;
+      }
     }
 
     setState(() => _isLoading = true);
@@ -359,6 +395,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       String? cnicBackUrl;
       String? empFrontUrl;
       String? empBackUrl;
+      String? drivingLicenseUrl;
+      String? motorbikeDocUrl;
 
       if (widget.role == 'RESPONDER') {
         final authRepo = await ref.read(authRepositoryProvider.future);
@@ -378,6 +416,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           debugPrint('   Uploading Employee Card Back...');
           empBackUrl = await authRepo.uploadDocument(File(_employeeCardBack!.path));
         }
+        if (_drivingLicense != null) {
+          debugPrint('   Uploading Driving License...');
+          drivingLicenseUrl = await authRepo.uploadDocument(File(_drivingLicense!.path));
+        }
+        if (_motorbikeDoc != null) {
+          debugPrint('   Uploading Motorbike Documents...');
+          motorbikeDocUrl = await authRepo.uploadDocument(File(_motorbikeDoc!.path));
+        }
       }
 
       // ── Compose Address ────────────────────────────────────────────────
@@ -386,6 +432,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         _addressController.text.trim(),
         _additionalAddressController.text.trim(),
       ].where((s) => s.isNotEmpty).join(', ');
+
+      // ── Get FCM token so push notifications work before first login ────
+      // Responders stay on the pending screen until approved — they can't
+      // log in, so the normal post-login token sync never fires. Sending
+      // the token at registration time ensures approval/rejection push
+      // notifications reach the device even when the app is in background.
+      final String? fcmToken = await PushNotificationService.getToken();
+      debugPrint('📲 [Register] FCM Token: ${fcmToken != null ? 'obtained' : 'unavailable'}');
 
       // ── Build Request ──────────────────────────────────────────────────
       final Map<String, dynamic> request = {
@@ -406,7 +460,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         'organization':   widget.role == 'RESPONDER' ? _organizationController.text.trim() : null,
         'licenseNumber':  widget.role == 'RESPONDER' ? _licenseController.text.trim() : null,
         'responderType':  widget.role == 'RESPONDER' ? _selectedResponderType : null,
-        'vehicleType':    widget.role == 'RESPONDER' ? _selectedVehicleType : null,
+        'vehicleType':       widget.role == 'RESPONDER' ? _selectedVehicleType : null,
+        'motorbikeNumber':   widget.role == 'RESPONDER' ? _motorbikeNumberController.text.trim() : null,
         'specialization': widget.role == 'RESPONDER' ? _selectedSpecializations : null,
 
         // Document URLs
@@ -414,6 +469,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         'cnicBackImageUrl':         cnicBackUrl,
         'employeeCardImageUrl':     empFrontUrl,
         'employeeCardBackImageUrl': empBackUrl,
+        'drivingLicenseUrl':        drivingLicenseUrl,
+        'motorbikeDocUrl':          motorbikeDocUrl,
+
+        // FCM token — stored immediately so push notifications work
+        // before the responder logs in for the first time
+        'fcmToken': fcmToken,
       };
 
       await ref.read(registerProvider(request).future);
@@ -666,7 +727,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                     hintText: 'Select your birth date',
                     prefixIcon: Icon(Icons.calendar_today_rounded),
                   ),
-                  validator: (v) => v.isNullOrEmpty ? 'Please select your date of birth' : null,
+                  validator: (v) {
+                    if (v.isNullOrEmpty) return 'Please select your date of birth';
+                    if (isResponder && _selectedDob != null) {
+                      final age = DateTime.now().difference(_selectedDob!).inDays / 365.25;
+                      if (age < 18) return 'Responders must be at least 18 years old';
+                    }
+                    return null;
+                  },
                 ),
                 SizedBox(height: 3.hp),
 
@@ -692,70 +760,76 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 ),
                 SizedBox(height: 2.hp),
 
-                Row(children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _cityController,
-                      textCapitalization: TextCapitalization.words,
-                      maxLength: 50,
-                      decoration: const InputDecoration(
-                        labelText: 'City',
-                        prefixIcon: Icon(Icons.location_city_rounded),
-                        counterText: '',
-                        errorMaxLines: 2,
-                      ),
-                      textInputAction: TextInputAction.next,
-                      validator: (v) {
-                        if (v.isNullOrEmpty) return 'City is required';
-                        if (v!.trim().length < 2) return 'Minimum 2 characters required';
-                        return null;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _houseNoController,
-                      maxLength: 20,
-                      decoration: const InputDecoration(
-                        labelText: 'House / Flat',
-                        prefixIcon: Icon(Icons.home_outlined),
-                        counterText: '',
-                        errorMaxLines: 2,
-                      ),
-                      textInputAction: TextInputAction.next,
-                      validator: (v) => v.isNullOrEmpty ? 'House or flat number is required' : null,
-                    ),
-                  ),
-                ]),
-                SizedBox(height: 1.6.hp),
-
+                // City — required for everyone
                 TextFormField(
-                  controller: _addressController,
-                  maxLength: 100,
-                  decoration: const InputDecoration(
-                    labelText: 'Street / Area',
-                    prefixIcon: Icon(Icons.map_rounded),
+                  controller: _cityController,
+                  textCapitalization: TextCapitalization.words,
+                  maxLength: 50,
+                  decoration: InputDecoration(
+                    labelText: 'City',
+                    prefixIcon: const Icon(Icons.location_city_rounded),
+                    helperText: isResponder ? 'The city you operate in' : null,
                     counterText: '',
+                    errorMaxLines: 2,
                   ),
+                  textInputAction: TextInputAction.next,
                   validator: (v) {
-                    if (v.isNullOrEmpty) return 'Street or area is required';
-                    if (v!.trim().length < 3) return 'Minimum 3 characters required';
+                    if (v.isNullOrEmpty) return 'City is required';
+                    if (v!.trim().length < 2) return 'Minimum 2 characters required';
                     return null;
                   },
                 ),
                 SizedBox(height: 1.6.hp),
 
-                TextFormField(
-                  controller: _additionalAddressController,
-                  maxLength: 100,
-                  decoration: const InputDecoration(
-                    labelText: 'Additional Address (Optional)',
-                    prefixIcon: Icon(Icons.add_location_alt_outlined),
-                    counterText: '',
+                // House / Flat + Street + Additional Address — Patients & Caregivers only
+                // Responders operate via GPS, not a home address
+                if (!isResponder) ...[
+                  Row(children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _houseNoController,
+                        maxLength: 20,
+                        decoration: const InputDecoration(
+                          labelText: 'House / Flat',
+                          prefixIcon: Icon(Icons.home_outlined),
+                          counterText: '',
+                          errorMaxLines: 2,
+                        ),
+                        textInputAction: TextInputAction.next,
+                        validator: (v) => v.isNullOrEmpty ? 'House or flat number is required' : null,
+                      ),
+                    ),
+                  ]),
+                  SizedBox(height: 1.6.hp),
+
+                  TextFormField(
+                    controller: _addressController,
+                    maxLength: 100,
+                    decoration: const InputDecoration(
+                      labelText: 'Street / Area',
+                      prefixIcon: Icon(Icons.map_rounded),
+                      counterText: '',
+                    ),
+                    validator: (v) {
+                      if (v.isNullOrEmpty) return 'Street or area is required';
+                      if (v!.trim().length < 3) return 'Minimum 3 characters required';
+                      return null;
+                    },
                   ),
-                ),
-                SizedBox(height: 3.hp),
+                  SizedBox(height: 1.6.hp),
+
+                  TextFormField(
+                    controller: _additionalAddressController,
+                    maxLength: 100,
+                    decoration: const InputDecoration(
+                      labelText: 'Additional Address (Optional)',
+                      prefixIcon: Icon(Icons.add_location_alt_outlined),
+                      counterText: '',
+                    ),
+                  ),
+                  SizedBox(height: 3.hp),
+                ] else
+                  SizedBox(height: 3.hp),
 
                 // ─── Accessibility Mode (Patient only, if not pre-selected) ──
                 if (isPatient && widget.patientType == null) ...[
@@ -827,26 +901,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   SizedBox(height: 1.6.hp),
 
-                  // Responder Type — dropdown with description subtitle
+                  // Responder Type — single-line items to avoid overflow
                   DropdownButtonFormField<String>(
-                    initialValue: _selectedResponderType,
+                    value: _selectedResponderType,
                     isExpanded: true,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Responder Type',
-                      prefixIcon: Icon(Icons.medical_services_rounded),
-                      helperText: 'Select the role that best matches your training',
+                      prefixIcon: const Icon(Icons.medical_services_rounded),
+                      // Show the subtitle of the selected type as helper text
+                      helperText: _responderTypeOptions
+                          .firstWhere((o) => o['value'] == _selectedResponderType,
+                              orElse: () => {'sub': 'Select the role that best matches your training'})['sub'],
+                      helperMaxLines: 2,
                     ),
                     items: _responderTypeOptions.map((opt) => DropdownMenuItem<String>(
                       value: opt['value'],
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(opt['label']!,
-                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                          Text(opt['sub']!,
-                            style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-                        ],
+                      child: Text(
+                        opt['label']!,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     )).toList(),
                     onChanged: (v) { if (v != null) setState(() => _selectedResponderType = v); },
@@ -854,21 +927,49 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   ),
                   SizedBox(height: 1.6.hp),
 
-                  // Vehicle Type
-                  DropdownButtonFormField<String>(
-                    value: _selectedVehicleType,
-                    isExpanded: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Vehicle Type',
-                      prefixIcon: Icon(Icons.directions_car_rounded),
+                  // Vehicle Type — fixed as Motorbike Ambulance
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: roleColor.withOpacity(0.4), width: 1.5),
+                      borderRadius: BorderRadius.circular(12),
+                      color: roleColor.withOpacity(0.05),
                     ),
-                    items: const [
-                      DropdownMenuItem(value: 'AMBULANCE', child: Text('Ambulance')),
-                      DropdownMenuItem(value: 'MOTORBIKE', child: Text('Motorbike')),
-                      DropdownMenuItem(value: 'CAR',       child: Text('Car')),
-                      DropdownMenuItem(value: 'ON_FOOT',   child: Text('On Foot / No Vehicle')),
-                    ],
-                    onChanged: (v) { if (v != null) setState(() => _selectedVehicleType = v); },
+                    child: Row(
+                      children: [
+                        Icon(Icons.two_wheeler_rounded, color: roleColor, size: 22),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Vehicle Type',
+                                style: TextStyle(fontSize: 11, color: roleColor, fontWeight: FontWeight.w600)),
+                              const SizedBox(height: 2),
+                              const Text('Motorbike Ambulance',
+                                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                        Icon(Icons.lock_outline_rounded, color: roleColor.withOpacity(0.5), size: 16),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 1.6.hp),
+
+                  // Motorbike Registration Number
+                  TextFormField(
+                    controller: _motorbikeNumberController,
+                    textCapitalization: TextCapitalization.characters,
+                    decoration: InputDecoration(
+                      labelText: 'Motorbike Registration Number',
+                      hintText: 'e.g. LHR-1234',
+                      prefixIcon: Icon(Icons.pin_rounded, color: roleColor),
+                    ),
+                    validator: (v) {
+                      if (v == null || v.trim().isEmpty) return 'Motorbike number is required';
+                      return null;
+                    },
                   ),
                   SizedBox(height: 3.hp),
 
@@ -953,7 +1054,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'CNIC (both sides) and Employee Card (front) are required. '
+                            'CNIC (both sides), Employee Card (front), Driving License and Motorbike Documents are required. '
                             'Employee Card back side is optional.',
                             style: TextStyle(color: roleColor, fontSize: 1.2.hp),
                           ),
@@ -1011,6 +1112,41 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       onTap: () => _pickImage('EMP_BACK'),
                     )),
                   ]),
+                  SizedBox(height: 2.hp),
+
+                  // Driving License
+                  Text('Driving License',
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 1.hp),
+                  _DocumentUploadCard(
+                    label: 'Driving License',
+                    icon: Icons.drive_eta_rounded,
+                    color: roleColor,
+                    file: _drivingLicense,
+                    isRequired: true,
+                    onTap: () => _pickImage('DRIVING_LICENSE'),
+                  ),
+                  SizedBox(height: 2.hp),
+
+                  // Motorbike Documents
+                  Text('Motorbike Documents',
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 1.hp),
+                  Text(
+                    'Upload your motorbike registration certificate (RC book).',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade600, fontSize: 1.2.hp,
+                    ),
+                  ),
+                  SizedBox(height: 1.hp),
+                  _DocumentUploadCard(
+                    label: 'Motorbike Registration / RC Book',
+                    icon: Icons.two_wheeler_rounded,
+                    color: roleColor,
+                    file: _motorbikeDoc,
+                    isRequired: true,
+                    onTap: () => _pickImage('BIKE_DOC'),
+                  ),
                   SizedBox(height: 3.hp),
                 ],
 

@@ -842,6 +842,17 @@ function Overview() {
   const [analytics,         setAnalytics]         = useState(null);
   const [lastUpdated,       setLastUpdated]       = useState(null);
   const [refreshing,        setRefreshing]        = useState(false);
+  const [statsDelta,        setStatsDelta]        = useState(null);
+  const prevStatsRef = useRef(null);
+
+  /* Helper: turn a numeric delta into a badge label */
+  const deltaLabel = (d) => {
+    if (d == null) return 'Live';
+    if (d > 0) return `+${d}`;
+    if (d < 0) return `${d}`;
+    return 'Live';
+  };
+  const deltaUp = (d) => d == null || d >= 0;
 
   const loadData = () => {
     setLoading(true);
@@ -853,7 +864,12 @@ function Overview() {
       api.get('/api/admin/analytics/emergencies?days=14'),
     ])
       .then(([statsRes, pendRes, healthRes, logsRes, analyticsRes]) => {
-        if (statsRes.data.success)     setStats(statsRes.data.data);
+        if (statsRes.data.success) {
+          const s = statsRes.data.data;
+          prevStatsRef.current = s;   // baseline for delta tracking
+          setStats(s);
+          setStatsDelta(null);        // reset deltas on full reload
+        }
         if (pendRes.data.success) {
           const arr = pendRes.data.data || [];
           setPendingCount(arr.length);
@@ -876,7 +892,20 @@ function Overview() {
       api.get('/api/admin/responders/pending'),
     ])
       .then(([statsRes, pendRes]) => {
-        if (statsRes.data.success) setStats(statsRes.data.data);
+        if (statsRes.data.success) {
+          const newS = statsRes.data.data;
+          const prev = prevStatsRef.current;
+          if (prev) {
+            setStatsDelta({
+              totalUsers:        newS.totalUsers        - prev.totalUsers,
+              activeEmergencies: newS.activeEmergencies - prev.activeEmergencies,
+              totalEmergencies:  newS.totalEmergencies  - prev.totalEmergencies,
+              onlineResponders:  newS.onlineResponders  - prev.onlineResponders,
+            });
+          }
+          prevStatsRef.current = newS;
+          setStats(newS);
+        }
         if (pendRes.data.success) {
           const arr = pendRes.data.data || [];
           setPendingCount(arr.length);
@@ -895,11 +924,13 @@ function Overview() {
     return () => clearInterval(interval);
   }, []);
 
-  /* Stat card definitions */
+  /* Stat card definitions — trends derived from real delta vs previous poll */
+  const d = statsDelta;
   const cards = stats ? [
     {
       label: 'Total Users', value: stats.totalUsers,
-      trend: '+12%', up: true,
+      trend: deltaLabel(d?.totalUsers),
+      up: deltaUp(d?.totalUsers),
       Icon: Users, accent: '#0C637E', pale: '#E2F0F3',
       sub: 'Registered accounts',
       to: '/admin/users?role=ALL',
@@ -913,14 +944,16 @@ function Overview() {
     },
     {
       label: 'Total Emergencies', value: stats.totalEmergencies,
-      trend: '+5%', up: true,
+      trend: deltaLabel(d?.totalEmergencies),
+      up: deltaUp(d?.totalEmergencies),
       Icon: AlertTriangle, accent: '#F59E0B', pale: '#FFFBEB',
       sub: 'All-time SOS events',
       to: '/admin/sos?filter=ALL',
     },
     {
       label: 'Verified Responders', value: stats.onlineResponders,
-      trend: '+3', up: true,
+      trend: deltaLabel(d?.onlineResponders),
+      up: deltaUp(d?.onlineResponders),
       Icon: Zap, accent: '#10B981', pale: '#ECFDF5',
       sub: 'Ready to respond',
       to: '/admin/users?role=RESPONDER',

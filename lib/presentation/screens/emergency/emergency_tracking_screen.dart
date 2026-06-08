@@ -33,6 +33,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   double? _responderLong;
   String? _responderName;
   String? _responderPhone;
+  String? _responderProfileImage;
+  double?  _responderRating;
+  String? _responderType;
+  String? _motorbikeNumber;
+  String? _vehicleType;
+  String? _organization;
   String _currentStatus = 'PENDING';
   String _eta = 'Calculating...';
   
@@ -115,18 +121,26 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           final newStatus = data['status']?.toString() ?? data['newStatus']?.toString() ?? _currentStatus;
           
           if (newStatus != _currentStatus) {
-            // Voice Alerts for progress
-            if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
-              VoiceAlertService().speakMessage("A responder has been assigned and is on the way.");
-            } else if (newStatus == 'ARRIVED') {
-              VoiceAlertService().speakMessage("The responder has arrived at your location.");
+            // Voice Alerts for progress — skip for deaf patients who rely on visual/haptic cues
+            if (!isDeafPatient) {
+              if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
+                VoiceAlertService().speakMessage("A responder has been assigned and is on the way.");
+              } else if (newStatus == 'ARRIVED') {
+                VoiceAlertService().speakMessage("The responder has arrived at your location.");
+              }
             }
           }
 
           setState(() {
             _currentStatus = newStatus;
-            if (data['responderName'] != null) _responderName = data['responderName'];
-            if (data['responderPhone'] != null) _responderPhone = data['responderPhone'];
+            if (data['responderName']         != null) _responderName         = data['responderName'];
+            if (data['responderPhone']        != null) _responderPhone        = data['responderPhone'];
+            if (data['responderProfileImage'] != null) _responderProfileImage = data['responderProfileImage'];
+            if (data['responderRating']       != null) _responderRating       = double.tryParse(data['responderRating'].toString());
+            if (data['responderType']         != null) _responderType         = data['responderType'];
+            if (data['motorbikeNumber']       != null) _motorbikeNumber       = data['motorbikeNumber'];
+            if (data['vehicleType']           != null) _vehicleType           = data['vehicleType'];
+            if (data['organization']          != null) _organization          = data['organization'];
           });
           
           if (newStatus == 'ARRIVED' && isDeafPatient) {
@@ -183,8 +197,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           _responderLat = (_responderLat ?? emergency.latitude + 0.01) - 0.0005;
           _responderLong = (_responderLong ?? emergency.longitude + 0.01) - 0.0005;
           _eta = "4 min";
-          _responderName = "Simulated Responder";
-          _currentStatus = 'EN_ROUTE';
+          _responderName        = "Ali Hassan";
+          _responderRating      = 4.8;
+          _responderType        = 'PARAMEDIC';
+          _vehicleType          = 'MOTORBIKE_AMBULANCE';
+          _motorbikeNumber      = 'LHR-2847';
+          _organization         = 'Rescue 1122';
+          _currentStatus        = 'EN_ROUTE';
         });
       }
     });
@@ -614,79 +633,233 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                 controller: scrollController,
                 padding: const EdgeInsets.all(24),
                 children: [
+                  // ── drag handle ──
                   Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey.withOpacity(0.3), borderRadius: BorderRadius.circular(2)))),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
+
+                  // ── "Responder On The Way" label ──
                   Row(
                     children: [
                       Container(
-                        width: 64,
-                        height: 64,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [AppColors.primary.withOpacity(0.2), AppColors.primary.withOpacity(0.05)],
-                          ),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+                          color: AppColors.primary.withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                         ),
-                        child: const Icon(Icons.person_pin_rounded, color: Colors.white, size: 32),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
+                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
+                            const SizedBox(width: 6),
                             Text(
-                              _responderName ?? 'Assigning...',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w900,
-                                fontSize: 22,
-                                color: Colors.white,
-                                letterSpacing: -0.5,
+                              _responderName != null ? 'RESPONDER ASSIGNED' : 'FINDING RESPONDER...',
+                              style: TextStyle(
+                                color: AppColors.primaryLight,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blueAccent.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    _currentStatus.replaceAll('_', ' '),
-                                    style: const TextStyle(
-                                      color: Colors.blueAccent,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Verified Responder',
-                                  style: TextStyle(color: Colors.white38, fontSize: 11, fontWeight: FontWeight.w500),
-                                ),
-                              ],
                             ),
                           ],
                         ),
                       ),
-                      if (!isDeafPatient) ...[
-                        _buildPremiumAction(Icons.phone_rounded, Colors.greenAccent, () {
-                          if (_responderPhone != null) _makePhoneCall(_responderPhone!);
-                        }),
-                        const SizedBox(width: 12),
-                      ],
-                      _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, () {
-                        _openChat();
-                      }),
                     ],
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
+
+                  // ── InDrive-style responder card ──
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                    ),
+                    child: Column(
+                      children: [
+                        // Row 1: avatar + name/rating + action buttons
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            // Profile photo / initials avatar
+                            Container(
+                              width: 68,
+                              height: 68,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(color: AppColors.primary.withOpacity(0.4), width: 2),
+                                gradient: LinearGradient(
+                                  colors: [AppColors.primary.withOpacity(0.25), AppColors.primary.withOpacity(0.07)],
+                                ),
+                              ),
+                              clipBehavior: Clip.hardEdge,
+                              child: _responderProfileImage != null
+                                  ? Image.network(
+                                      _responderProfileImage!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) => _buildInitialsAvatar(),
+                                    )
+                                  : _buildInitialsAvatar(),
+                            ),
+                            const SizedBox(width: 14),
+
+                            // Name, type badge, stars
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    _responderName ?? 'Assigning...',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 18,
+                                      color: Colors.white,
+                                      letterSpacing: -0.3,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      // Responder type badge
+                                      if (_responderType != null) ...[
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blueAccent.withOpacity(0.15),
+                                            borderRadius: BorderRadius.circular(4),
+                                            border: Border.all(color: Colors.blueAccent.withOpacity(0.3)),
+                                          ),
+                                          child: Text(
+                                            _responderType!.replaceAll('_', ' '),
+                                            style: const TextStyle(color: Colors.blueAccent, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.4),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                      ],
+                                      // Star rating
+                                      if (_responderRating != null) ...[
+                                        const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
+                                        const SizedBox(width: 3),
+                                        Text(
+                                          _responderRating!.toStringAsFixed(1),
+                                          style: const TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.w800),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  if (_organization != null)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 3),
+                                      child: Text(
+                                        _organization!,
+                                        style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+
+                            // Action buttons: call + chat
+                            Column(
+                              children: [
+                                if (!isDeafPatient)
+                                  _buildPremiumAction(Icons.phone_rounded, Colors.greenAccent, () {
+                                    if (_responderPhone != null) _makePhoneCall(_responderPhone!);
+                                  }),
+                                if (!isDeafPatient) const SizedBox(height: 10),
+                                _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, _openChat),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 14),
+                        Divider(color: Colors.white.withOpacity(0.08)),
+                        const SizedBox(height: 12),
+
+                        // Row 2: Vehicle info card (InDrive-style)
+                        Row(
+                          children: [
+                            // Motorbike icon
+                            Container(
+                              width: 42,
+                              height: 42,
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.12),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: Colors.orange.withOpacity(0.25)),
+                              ),
+                              child: const Icon(Icons.two_wheeler_rounded, color: Colors.orange, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    (_vehicleType == 'MOTORBIKE_AMBULANCE' || _vehicleType == null)
+                                        ? 'Motorbike Ambulance'
+                                        : _vehicleType!.replaceAll('_', ' '),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Emergency Response Vehicle',
+                                    style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Number plate badge (InDrive-style)
+                            if (_motorbikeNumber != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFF0F172A),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+                                ),
+                                child: Text(
+                                  _motorbikeNumber!.toUpperCase(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 13,
+                                    letterSpacing: 1.5,
+                                    fontFamily: 'monospace',
+                                  ),
+                                ),
+                              )
+                            else
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.05),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                                ),
+                                child: Text(
+                                  'PLATE N/A',
+                                  style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11, fontWeight: FontWeight.w700, letterSpacing: 1),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                   const Divider(color: Colors.white10),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 16),
                   const Text('Live Status Update', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
                   const SizedBox(height: 20),
                   _buildModernStatusTimeline(theme, settings),
@@ -712,6 +885,22 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           ),
         );
       },
+    );
+  }
+
+  Widget _buildInitialsAvatar() {
+    final initials = (_responderName?.isNotEmpty == true)
+        ? _responderName!.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
+        : '?';
+    return Center(
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: AppColors.primaryLight,
+          fontWeight: FontWeight.w900,
+          fontSize: initials.length == 1 ? 28 : 22,
+        ),
+      ),
     );
   }
 

@@ -91,7 +91,7 @@ function Sidebar({ open, onToggle, onLogout }) {
     >
       {/* ── Logo + toggle row ── */}
       <div style={{
-        height: '108px',
+        height: '130px',
         display: 'flex', alignItems: 'center',
         justifyContent: open ? 'space-between' : 'center',
         padding: open ? '0 14px 0 16px' : '0',
@@ -103,9 +103,9 @@ function Sidebar({ open, onToggle, onLogout }) {
               <img
                 src={logo} alt="MediFind"
                 style={{
-                  height: '72px', objectFit: 'contain', display: 'block',
-                  maxWidth: '210px',
-                  filter: 'brightness(1.2) drop-shadow(0 1px 6px rgba(0,0,0,0.35))',
+                  height: '100px', objectFit: 'contain', display: 'block',
+                  maxWidth: '220px',
+                  filter: 'brightness(1.25) drop-shadow(0 2px 10px rgba(0,0,0,0.4))',
                   cursor: 'pointer',
                 }}
               />
@@ -840,6 +840,8 @@ function Overview() {
   const [error,             setError]             = useState('');
   const [recentActivity,    setRecentActivity]    = useState([]);
   const [analytics,         setAnalytics]         = useState(null);
+  const [lastUpdated,       setLastUpdated]       = useState(null);
+  const [refreshing,        setRefreshing]        = useState(false);
 
   const loadData = () => {
     setLoading(true);
@@ -860,12 +862,38 @@ function Overview() {
         if (healthRes.data.success)    setHealth(healthRes.data.data);
         if (logsRes.data.success)      setRecentActivity(logsRes.data.data || []);
         if (analyticsRes.data.success) setAnalytics(analyticsRes.data.data);
+        setLastUpdated(new Date());
       })
       .catch(() => setError('Unable to reach backend — check your server is running.'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadData(); }, []);
+  /* Silent background refresh — updates stats without showing skeleton */
+  const silentRefresh = () => {
+    setRefreshing(true);
+    Promise.all([
+      api.get('/api/admin/stats'),
+      api.get('/api/admin/responders/pending'),
+    ])
+      .then(([statsRes, pendRes]) => {
+        if (statsRes.data.success) setStats(statsRes.data.data);
+        if (pendRes.data.success) {
+          const arr = pendRes.data.data || [];
+          setPendingCount(arr.length);
+          setPendingResponders(arr);
+        }
+        setLastUpdated(new Date());
+      })
+      .catch(() => {}) // fail silently — don't override the error banner
+      .finally(() => setRefreshing(false));
+  };
+
+  useEffect(() => {
+    loadData();
+    /* Poll key stats every 15 seconds */
+    const interval = setInterval(silentRefresh, 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* Stat card definitions */
   const cards = stats ? [
@@ -974,6 +1002,12 @@ function Overview() {
           </p>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Last-updated timestamp */}
+          {lastUpdated && (
+            <span style={{ fontSize: '0.74rem', color: C.textMuted, fontWeight: 600 }}>
+              Updated {lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </span>
+          )}
           <motion.button
             whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
             onClick={loadData}
@@ -985,7 +1019,14 @@ function Overview() {
               fontSize: '0.82rem', fontFamily: 'inherit',
             }}
           >
-            <RefreshCw size={14} /> Refresh
+            <motion.span
+              animate={refreshing ? { rotate: 360 } : { rotate: 0 }}
+              transition={refreshing ? { repeat: Infinity, duration: 1, ease: 'linear' } : {}}
+              style={{ display: 'flex' }}
+            >
+              <RefreshCw size={14} />
+            </motion.span>
+            Refresh
           </motion.button>
           <div style={{
             display: 'flex', alignItems: 'center', gap: '8px',
@@ -997,7 +1038,7 @@ function Overview() {
               transition={{ repeat: Infinity, duration: 2 }}
               style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }}
             />
-            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#059669' }}>All Systems Operational</span>
+            <span style={{ fontSize: '0.78rem', fontWeight: 700, color: '#059669' }}>Live · Auto-refresh</span>
           </div>
         </div>
       </div>

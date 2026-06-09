@@ -23,8 +23,12 @@ class ResponderHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
+  /// null  → use server value (no pending change)
+  /// true/false → optimistic value while the API call is in-flight
+  bool? _optimisticAvailability;
   bool _isUpdatingStatus = false;
   Timer? _pollTimer;
+  bool _wasConnected = true; // tracks previous connectivity state for resync
 
   @override
   void initState() {
@@ -54,12 +58,52 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
     super.dispose();
   }
 
+  Future<void> _setAvailability(bool value) async {
+    if (_isUpdatingStatus) return;
+    setState(() {
+      _optimisticAvailability = value;
+      _isUpdatingStatus = true;
+    });
+    try {
+      await ref.read(setResponderAvailabilityProvider(value).future);
+      if (value) {
+        ref.read(responderLocationTrackerProvider).start();
+      } else {
+        ref.read(responderLocationTrackerProvider).stop();
+      }
+      // Clear optimistic state — server value is now up-to-date
+      if (mounted) setState(() { _optimisticAvailability = null; _isUpdatingStatus = false; });
+    } catch (e) {
+      debugPrint('❌ Failed to update availability: $e');
+      // Revert: clear optimistic override so UI snaps back to server state
+      if (mounted) {
+        setState(() { _optimisticAvailability = null; _isUpdatingStatus = false; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not update status — check your connection and try again.'),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
     final userAsync = ref.watch(currentUserProvider);
     final emergenciesAsync = ref.watch(watchActiveEmergenciesProvider);
+
+    // When connectivity is restored, sync availability state from server
+    // so a stale cached value never leaves the toggle stuck.
+    ref.listen<bool>(isConnectedProvider, (prev, next) {
+      if (prev == false && next == true) {
+        debugPrint('🔄 Connectivity restored — resyncing availability state');
+        ref.invalidate(currentUserProvider);
+      }
+    });
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -206,50 +250,92 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   }
 
   Widget _buildStatusToggle(ThemeData theme, AsyncValue userAsync) {
+    final isConnected = ref.watch(isConnectedProvider);
+
     return Padding(
       padding: EdgeInsets.all(2.hp),
       child: userAsync.when(
-        data: (user) => Container(
-          padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.5.hp),
-          decoration: BoxDecoration(
-            color: theme.cardColor,
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: AppShadows.cardShadow,
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.power_settings_new_rounded,
-                   color: (user?.isActive ?? false) ? AppColors.primaryBlue : Colors.grey, // Logo-matched active indicator
-                   size: 3.hp),
-              SizedBox(width: 4.wp),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text((user?.isActive ?? false) ? 'Ready to Respond' : 'Offline',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 2.2.hp)),
-                    const Text('Switch on to receive alerts', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ),
-              ),
-              Switch.adaptive(
-                value: user?.isActive ?? false,
-                onChanged: (value) async {
-                  setState(() => _isUpdatingStatus = true);
-                  await ref.read(setResponderAvailabilityProvider(value).future);
-                  if (value) {
-                    ref.read(responderLocationTrackerProvider).start();
-                  } else {
-                    ref.read(responderLocationTrackerProvider).stop();
-                  }
-                  setState(() => _isUpdatingStatus = false);
-                },
-              ),
-            ],
-          ),
-        ),
         loading: () => const LinearProgressIndicator(),
         error: (_, __) => const SizedBox.shrink(),
+        data: (user) {
+          // The displayed value: optimistic override (while API in-flight)
+          // or the server's confirmed value.
+          final serverActive = user?.isActive ?? false;
+          final displayActive = _optimisticAvailability ?? serverActive;
+
+          Color iconColor;
+          String statusLabel;
+          String subLabel;
+          if (!isConnected) {
+            iconColor  = Colors.orange;
+            statusLabel = 'No Internet Connection';
+            subLabel   = 'Toggle unavailable while offline';
+          } else if (_isUpdatingStatus) {
+            iconColor  = displayActive ? AppColors.primaryBlue : Colors.grey;
+            statusLabel = displayActive ? 'Going Online…' : 'Going Offline…';
+            subLabel   = 'Updating your status…';
+          } else {
+            iconColor  = displayActive ? AppColors.primaryBlue : Colors.grey;
+            statusLabel = displayActive ? 'Ready to Respond' : 'Offline';
+            subLabel   = 'Switch on to receive alerts';
+          }
+
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 250),
+            padding: EdgeInsets.symmetric(horizontal: 5.wp, vertical: 2.5.hp),
+            decoration: BoxDecoration(
+              color: theme.cardColor,
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: AppShadows.cardShadow,
+              border: Border.all(
+                color: !isConnected
+                    ? Colors.orange.withOpacity(0.45)
+                    : Colors.transparent,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.power_settings_new_rounded,
+                  color: iconColor,
+                  size: 3.hp,
+                ),
+                SizedBox(width: 4.wp),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(statusLabel,
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 2.2.hp)),
+                      Text(subLabel,
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
+                  ),
+                ),
+                // While updating → show a small spinner so the toggle
+                // isn't frozen/confusing; once done → restore the switch.
+                if (_isUpdatingStatus)
+                  SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor: AlwaysStoppedAnimation(iconColor),
+                    ),
+                  )
+                else
+                  Switch.adaptive(
+                    value: displayActive,
+                    // Disable entirely when offline so the user gets
+                    // an amber border + sub-label instead of a stuck toggle.
+                    onChanged: isConnected ? (value) => _setAvailability(value) : null,
+                    activeColor: AppColors.primaryBlue,
+                  ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }

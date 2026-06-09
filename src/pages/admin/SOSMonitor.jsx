@@ -663,11 +663,6 @@ const SOSMonitor = () => {
                             📞 {r.user.phoneNumber}
                           </p>
                         )}
-                        {r.motorbikeNumber && (
-                          <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
-                            🏍️ {r.motorbikeNumber}
-                          </p>
-                        )}
                         <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
                           {r.currentLatitude?.toFixed(5)}, {r.currentLongitude?.toFixed(5)}
                         </p>

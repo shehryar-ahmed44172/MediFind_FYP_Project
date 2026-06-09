@@ -19,8 +19,20 @@ const ProtectedRoute = ({ children }) => {
 
 const SessionTimeoutHandler = ({ children }) => {
   const { isAuthenticated, logout } = useAuth();
-  const timeoutRef = React.useRef(null);
-  const TIMEOUT_DURATION = 30 * 60 * 1000; // 30 minutes
+  const timeoutRef   = React.useRef(null);
+  const [timeoutMs, setTimeoutMs] = React.useState(30 * 60 * 1000); // default 30 min
+
+  // Fetch the admin-configured session timeout once on mount
+  useEffect(() => {
+    fetch('/api/admin/client-settings')
+      .then(r => r.json())
+      .then(d => {
+        if (d?.data?.sessionTimeoutMinutes) {
+          setTimeoutMs(Math.max(5, Math.min(120, Number(d.data.sessionTimeoutMinutes))) * 60 * 1000);
+        }
+      })
+      .catch(() => {}); // silently use default
+  }, []);
 
   const resetTimer = React.useCallback(() => {
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
@@ -28,9 +40,9 @@ const SessionTimeoutHandler = ({ children }) => {
       timeoutRef.current = setTimeout(() => {
         console.log('HIPAA: Session timed out due to inactivity');
         logout();
-      }, TIMEOUT_DURATION);
+      }, timeoutMs);
     }
-  }, [isAuthenticated, logout]);
+  }, [isAuthenticated, logout, timeoutMs]);
 
   useEffect(() => {
     if (isAuthenticated) {

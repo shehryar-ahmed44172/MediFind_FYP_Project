@@ -4,6 +4,7 @@ import {
   Save, RefreshCw, ChevronRight, AlertCircle,
   CheckCircle, Eye, EyeOff, Server, Lock,
   Zap, Wifi, WifiOff, FlaskConical,
+  Plus, Trash2, Globe, ShieldCheck, ShieldOff,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
@@ -109,6 +110,9 @@ const PlatformSettings = () => {
   const [testingSmtp,  setTestingSmtp]    = useState(false);
   const [smtpStatus,   setSmtpStatus]     = useState(null); // null | 'ok' | 'fail'
   const [showEmailPass, setShowEmailPass] = useState(false);
+  const [myIp,         setMyIp]           = useState('');
+  const [newIp,        setNewIp]          = useState('');
+  const [ipError,      setIpError]        = useState('');
 
   // ── Settings state ───────────────────────────────────────────────────────────
   const [settings, setSettings] = useState({
@@ -121,6 +125,7 @@ const PlatformSettings = () => {
     twoFactorRequired:    false,
     sessionTimeoutMinutes: 30,
     ipWhitelisting:       false,
+    allowedIps:           [],
     // Email gateway
     emailGateway:   'env',
     smtpHost:       '',
@@ -188,18 +193,23 @@ const PlatformSettings = () => {
 
   const set = (key) => (val) => setSettings(s => ({ ...s, [key]: val }));
 
-  // ── Load settings on mount ───────────────────────────────────────────────────
+  // ── Load settings + admin IP on mount ───────────────────────────────────────
   useEffect(() => {
     api.get('/api/admin/platform-settings')
       .then(res => {
         if (res.data.success) {
-          const { envInfo: ei, ...rest } = res.data.data;
-          setSettings(s => ({ ...s, ...rest }));
+          const { envInfo: ei, smtpPass: _masked, ...rest } = res.data.data;
+          setSettings(s => ({ ...s, ...rest, smtpPass: '' })); // never pre-fill password
           if (ei) setEnvInfo(ei);
         }
       })
-      .catch(() => {}) // silently use defaults
+      .catch(() => {})
       .finally(() => setLoading(false));
+
+    // Fetch admin's current IP for easy whitelisting
+    api.get('/api/admin/my-ip')
+      .then(res => { if (res.data?.data?.ip) setMyIp(res.data.data.ip); })
+      .catch(() => {});
   }, []);
 
   // ── Save ─────────────────────────────────────────────────────────────────────
@@ -266,6 +276,20 @@ const PlatformSettings = () => {
       setSettings(s => ({ ...s, emailGateway: gw.id }));
     }
   };
+
+  // ── IP whitelist helpers ──────────────────────────────────────────────────────
+  const isValidIp = (ip) => /^(\d{1,3}\.){3}\d{1,3}$/.test(ip) && ip.split('.').every(n => Number(n) <= 255);
+
+  const addIp = (ip) => {
+    const trimmed = ip.trim();
+    if (!isValidIp(trimmed)) { setIpError('Enter a valid IPv4 address (e.g. 192.168.1.1)'); return; }
+    if (settings.allowedIps.includes(trimmed)) { setIpError('This IP is already in the list'); return; }
+    setIpError('');
+    setSettings(s => ({ ...s, allowedIps: [...s.allowedIps, trimmed] }));
+    setNewIp('');
+  };
+
+  const removeIp = (ip) => setSettings(s => ({ ...s, allowedIps: s.allowedIps.filter(i => i !== ip) }));
 
   const TABS = [
     { id: 'GENERAL',  label: 'General',       icon: Settings  },
@@ -623,45 +647,144 @@ const PlatformSettings = () => {
 
               {/* ── SECURITY ──────────────────────────────────────────────── */}
               {activeTab === 'SECURITY' && (
-                <div style={{ maxWidth: '600px' }}>
-                  <SectionTitle title="Security & Access Control" sub="These settings take effect immediately after saving" />
+                <div style={{ maxWidth: '620px' }}>
+                  <SectionTitle title="Security & Access Control" sub="Changes take effect immediately after saving" />
 
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+                  {/* ── 2FA ── */}
+                  <div style={{ marginBottom: '1rem' }}>
                     <ToggleRow
                       label="Require 2FA for Admin Accounts"
-                      desc="All administrators must verify via a second factor on each login."
+                      desc="Admins must enter an email OTP after password login. Takes effect on next login."
                       value={settings.twoFactorRequired}
                       onChange={set('twoFactorRequired')}
                     />
+                    {settings.twoFactorRequired && (
+                      <div style={{ marginTop: '8px', padding: '10px 14px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', fontSize: '0.78rem', color: '#1D4ED8', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                        <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
+                        <span><strong>Email OTP enabled.</strong> After entering the correct password, a 6-digit one-time code will be sent to the admin's registered email address. The session only starts after the code is verified.</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ── Session Timeout ── */}
+                  <div style={{ marginBottom: '1rem' }}>
                     <ToggleRow
                       label="Session Auto-Timeout"
-                      desc={`Auto-logout after ${settings.sessionTimeoutMinutes} minutes of inactivity (HIPAA requirement).`}
+                      desc={`Auto-logout after ${settings.sessionTimeoutMinutes} min of inactivity (HIPAA). Always on.`}
                       value={true}
                       onChange={() => {}}
                       disabled
                     />
+                    <div style={{ marginTop: '10px', display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '4px' }}>
+                      <Label text="Timeout (minutes)" sub="5 – 120" />
+                      <input
+                        type="number" min={5} max={120}
+                        value={settings.sessionTimeoutMinutes}
+                        onChange={e => set('sessionTimeoutMinutes')(Math.max(5, Math.min(120, Number(e.target.value))))}
+                        style={{ width: '90px', padding: '0.6rem 0.875rem', borderRadius: '9px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.9rem', outline: 'none', textAlign: 'center', fontWeight: 700 }}
+                      />
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Applied to all active sessions after save</span>
+                    </div>
+                  </div>
+
+                  {/* ── IP Whitelisting ── */}
+                  <div style={{ marginBottom: '1.5rem' }}>
                     <ToggleRow
                       label="IP Whitelisting"
-                      desc="Restrict admin console access to specific office IP addresses."
+                      desc="Block admin console access from any IP not in the list below. Enforced server-side."
                       value={settings.ipWhitelisting}
-                      onChange={set('ipWhitelisting')}
+                      onChange={val => {
+                        set('ipWhitelisting')(val);
+                        if (val && settings.allowedIps.length === 0 && myIp) {
+                          // Auto-add their current IP so they don't lock themselves out
+                          setSettings(s => ({ ...s, ipWhitelisting: val, allowedIps: [myIp] }));
+                        }
+                      }}
                     />
+
+                    {settings.ipWhitelisting && (
+                      <div style={{ marginTop: '12px', padding: '1.25rem', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '14px' }}>
+
+                        {/* Current IP helper */}
+                        {myIp && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '8px 12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px' }}>
+                            <Globe size={14} color="#2563EB" />
+                            <span style={{ fontSize: '0.78rem', color: '#1D4ED8', flex: 1 }}>
+                              Your current IP: <strong style={{ fontFamily: 'monospace' }}>{myIp}</strong>
+                            </span>
+                            {!settings.allowedIps.includes(myIp) && (
+                              <button
+                                onClick={() => addIp(myIp)}
+                                style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', background: '#2563EB', color: 'white', border: 'none', cursor: 'pointer' }}
+                              >
+                                + Add My IP
+                              </button>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Allowed IPs list */}
+                        {settings.allowedIps.length === 0 ? (
+                          <div style={{ padding: '12px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem', border: '1px dashed var(--border)', borderRadius: '8px', marginBottom: '12px' }}>
+                            No IPs added — add at least one or whitelisting will block everyone including you
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                            {settings.allowedIps.map(ip => (
+                              <div key={ip} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                                <ShieldCheck size={14} color="var(--primary)" />
+                                <code style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-sub)' }}>{ip}</code>
+                                {ip === myIp && <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', background: 'var(--primary-pale)', color: 'var(--primary)', borderRadius: '4px' }}>YOU</span>}
+                                <button onClick={() => removeIp(ip)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', padding: '2px' }}>
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Add new IP */}
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <input
+                            value={newIp}
+                            onChange={e => { setNewIp(e.target.value); setIpError(''); }}
+                            onKeyDown={e => e.key === 'Enter' && addIp(newIp)}
+                            placeholder="192.168.1.100"
+                            style={{ flex: 1, padding: '0.65rem 0.875rem', borderRadius: '9px', border: `1px solid ${ipError ? '#EF4444' : 'var(--border)'}`, background: 'var(--surface)', fontSize: '0.875rem', fontFamily: 'monospace', outline: 'none' }}
+                          />
+                          <button
+                            onClick={() => addIp(newIp)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '0.65rem 1rem', borderRadius: '9px', background: 'var(--primary)', color: 'white', border: 'none', fontWeight: 700, fontSize: '0.82rem', cursor: 'pointer' }}
+                          >
+                            <Plus size={14} /> Add
+                          </button>
+                        </div>
+                        {ipError && <p style={{ fontSize: '0.75rem', color: '#EF4444', marginTop: '5px' }}>{ipError}</p>}
+
+                        <div style={{ marginTop: '10px', padding: '8px 12px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', fontSize: '0.74rem', color: '#92400E', display: 'flex', gap: '6px' }}>
+                          <AlertCircle size={13} style={{ flexShrink: 0, marginTop: '1px' }} />
+                          <span>If you remove your own IP and save, you will be locked out of the admin panel immediately. Always keep your IP in the list.</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div style={{ marginBottom: '1.5rem' }}>
-                    <Label text="Session Timeout (minutes)" sub="minimum 5, maximum 120" />
-                    <input
-                      type="number" min={5} max={120}
-                      value={settings.sessionTimeoutMinutes}
-                      onChange={e => set('sessionTimeoutMinutes')(Number(e.target.value))}
-                      style={{ width: '160px', padding: '0.825rem 1.1rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--surface)', fontSize: '0.9rem', outline: 'none' }}
-                    />
-                  </div>
-
-                  <div style={{ padding: '1rem 1.25rem', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', borderRadius: '10px', display: 'flex', gap: '10px', fontSize: '0.8rem', color: 'var(--warning-fg)' }}>
-                    <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '1px' }} />
-                    <span>Session timeout is enforced client-side in the portal. For server-side JWT expiry, update <code style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: '4px' }}>JWT_EXPIRES_IN</code> in the server .env.</span>
-                  </div>
+                  {/* ── Save button ── */}
+                  <motion.button
+                    whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+                    onClick={handleSave} disabled={saving}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '7px',
+                      padding: '0.8rem 1.6rem', borderRadius: '12px',
+                      background: 'var(--primary)', color: 'white',
+                      fontWeight: 700, fontSize: '0.875rem',
+                      border: 'none', cursor: saving ? 'wait' : 'pointer',
+                      opacity: saving ? 0.7 : 1,
+                      boxShadow: '0 4px 12px rgba(12,99,126,0.2)',
+                    }}
+                  >
+                    {saving ? <><RefreshCw size={15} style={{ animation: 'spin 1s linear infinite' }} /> Saving…</> : <><Save size={15} /> Save Security Settings</>}
+                  </motion.button>
                 </div>
               )}
 

@@ -8,6 +8,7 @@ import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import LegalPage from './pages/LegalPage';
 import NotFound from './pages/NotFound';
+import NavigationLoader from './components/NavigationLoader';
 import './App.css';
 import './index.css';
 
@@ -49,23 +50,26 @@ const SessionTimeoutHandler = ({ children }) => {
 
 function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/terms" element={<LegalPage type="terms" />} />
-      <Route path="/privacy" element={<LegalPage type="privacy" />} />
-      <Route
-        path="/admin/*"
-        element={
-          <ProtectedRoute>
-            <SessionTimeoutHandler>
-              <Dashboard />
-            </SessionTimeoutHandler>
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <NavigationLoader />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/terms" element={<LegalPage type="terms" />} />
+        <Route path="/privacy" element={<LegalPage type="privacy" />} />
+        <Route
+          path="/admin/*"
+          element={
+            <ProtectedRoute>
+              <SessionTimeoutHandler>
+                <Dashboard />
+              </SessionTimeoutHandler>
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }
 

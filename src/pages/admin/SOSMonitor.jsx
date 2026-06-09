@@ -44,6 +44,118 @@ const orangeIcon = new L.Icon({
   iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
 });
 
+// ── Compass bearing (0-360°) from point A to point B ───────────────────────
+const calcBearing = (lat1, lon1, lat2, lon2) => {
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+};
+
+// ── Ambulance motorbike SVG DivIcon — rotates to face direction of travel ───
+// The SVG is drawn facing east (right). We subtract 90° so bearing=0 (north)
+// makes the icon point up, bearing=90 makes it point right, etc.
+const makeAmbulanceIcon = (bearing = 0) => L.divIcon({
+  className: '',
+  html: `
+    <div style="
+      width:52px;height:32px;
+      transform:rotate(${bearing - 90}deg);
+      transform-origin:center center;
+      transition:transform 0.55s ease;
+      filter:drop-shadow(0 3px 10px rgba(5,150,105,0.72));
+    ">
+      <svg xmlns="http://www.w3.org/2000/svg" width="52" height="32" viewBox="0 0 52 32">
+        <style>@keyframes siren{0%,49%{opacity:1}50%,100%{opacity:0.18}}</style>
+        <!-- Main body -->
+        <rect x="10" y="10" width="30" height="11" rx="4" fill="#059669"/>
+        <!-- Siren bar (animated red) -->
+        <rect x="17" y="4" width="15" height="7" rx="3" fill="#EF4444" style="animation:siren 0.75s ease infinite"/>
+        <!-- Siren lights -->
+        <circle cx="20" cy="7.5" r="1.5" fill="white" style="animation:siren 0.75s 0.375s ease infinite"/>
+        <circle cx="29" cy="7.5" r="1.5" fill="white"/>
+        <!-- White cross horizontal -->
+        <rect x="18" y="13" width="14" height="3" rx="0.5" fill="white"/>
+        <!-- White cross vertical -->
+        <rect x="23.5" y="10" width="3" height="9" rx="0.5" fill="white"/>
+        <!-- Front fork / handlebar -->
+        <rect x="40" y="12" width="7" height="3" rx="1.5" fill="#047857"/>
+        <!-- Rear exhaust -->
+        <rect x="4" y="14.5" width="6" height="2" rx="1" fill="#047857" opacity="0.8"/>
+        <!-- Back wheel -->
+        <circle cx="14" cy="25" r="6" fill="#111827" stroke="#10B981" stroke-width="2"/>
+        <circle cx="14" cy="25" r="2" fill="#10B981"/>
+        <!-- Front wheel -->
+        <circle cx="38" cy="25" r="6" fill="#111827" stroke="#10B981" stroke-width="2"/>
+        <circle cx="38" cy="25" r="2" fill="#10B981"/>
+      </svg>
+    </div>
+  `,
+  iconSize:    [52, 32],
+  iconAnchor:  [26, 30],
+  popupAnchor: [0, -32],
+});
+
+// ── MovingVehicleMarker ─────────────────────────────────────────────────────
+// Renders an ambulance motorbike that moves & rotates smoothly.
+// Uses imperative Leaflet API (L.marker + setLatLng) so the DOM element
+// persists between React renders — no flickering, true smooth movement.
+function MovingVehicleMarker({ vehicle }) {
+  const map = useMap();
+  const markerRef = useRef(null);
+
+  // Create marker once on mount; remove on unmount
+  useEffect(() => {
+    const marker = L.marker([vehicle.lat, vehicle.lon], {
+      icon: makeAmbulanceIcon(vehicle.bearing || 0),
+      zIndexOffset: 2000,
+    }).addTo(map);
+    marker.bindPopup(`
+      <div style="min-width:170px">
+        <strong style="color:#059669;font-size:13px;display:block;margin-bottom:5px">🚑 En Route</strong>
+        <b style="font-size:12px">${vehicle.name}</b>
+      </div>
+    `);
+    markerRef.current = marker;
+    return () => { marker.remove(); markerRef.current = null; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Update position + icon rotation on each GPS update — this is what makes it "move"
+  useEffect(() => {
+    if (!markerRef.current) return;
+    markerRef.current.setLatLng([vehicle.lat, vehicle.lon]);
+    markerRef.current.setIcon(makeAmbulanceIcon(vehicle.bearing || 0));
+    markerRef.current.setPopupContent(`
+      <div style="min-width:175px">
+        <strong style="color:#059669;font-size:13px;display:block;margin-bottom:5px">🚑 En Route</strong>
+        <b style="font-size:12px">${vehicle.name}</b><br/>
+        <span style="font-size:11px;color:#64748B">${(vehicle.responderType || 'Responder').replace(/_/g, ' ')}</span><br/>
+        ${vehicle.eta != null
+          ? `<span style="font-size:12px;font-weight:700;color:#D97706">ETA ≈ ${vehicle.eta} min</span><br/>`
+          : ''}
+        <span style="font-size:10px;color:#94A3B8;font-family:monospace">
+          ${vehicle.lat.toFixed(5)}, ${vehicle.lon.toFixed(5)}
+        </span>
+      </div>
+    `);
+  }, [vehicle.lat, vehicle.lon, vehicle.bearing, vehicle.eta, vehicle.name]);
+
+  return null;
+}
+
+// ── Lahore demo simulation route (Liberty Market → Model Town, ~2.5 km) ────
+// Used by the "Simulate Route" button so the defence demo shows a live-moving
+// ambulance without needing a physical responder to be moving.
+const SIM_ROUTE = [
+  [31.5166, 74.3477], [31.5148, 74.3455], [31.5130, 74.3430],
+  [31.5110, 74.3405], [31.5088, 74.3380], [31.5065, 74.3355],
+  [31.5042, 74.3330], [31.5018, 74.3305], [31.4995, 74.3280],
+  [31.4972, 74.3255], [31.4950, 74.3230], [31.4928, 74.3205],
+  [31.4907, 74.3180], [31.4886, 74.3155], [31.4866, 74.3132],
+];
+
 // ── FitBoundsToResponders: zooms/pans the Leaflet map to fit all responder pins ──
 function FitBoundsToResponders({ responders }) {
   const map = useMap();
@@ -186,6 +298,11 @@ const SOSMonitor = () => {
   const intervalRef    = useRef(null);
   const respIntervalRef = useRef(null);
   const socketRef      = useRef(null);
+  // Moving ambulance markers (live GPS + simulation)
+  const [movingVehicles, setMovingVehicles] = useState({}); // { responderId: { lat, lon, bearing, emergencyId, name, responderType, eta, status } }
+  const [simRunning,     setSimRunning]     = useState(false);
+  const simIntervalRef = useRef(null);
+  const simIndexRef    = useRef(0);
 
   const fetchEmergencies = async () => {
     try {
@@ -257,9 +374,35 @@ const SOSMonitor = () => {
       }
     });
 
-    // Responder moved during an active emergency — refresh the online responders list
-    // so the green pin on the admin map stays up to date without waiting for the 10s poll
-    socket.on('LOCATION_UPDATE', () => { fetchOnlineResponders(); });
+    // Responder moved during an active emergency — update the moving ambulance marker
+    // and refresh the idle-responder green pins in the background.
+    // Backend now also emits LOCATION_UPDATE to admin_notifications (added in trackingService.ts).
+    socket.on('LOCATION_UPDATE', (payload) => {
+      const d = payload?.data || payload;
+      if (d?.responderId && d?.latitude != null && d?.longitude != null) {
+        setMovingVehicles(prev => {
+          const existing = prev[d.responderId];
+          // Calculate bearing from previous position → new position
+          const bearing = existing
+            ? calcBearing(existing.lat, existing.lon, d.latitude, d.longitude)
+            : (existing?.bearing ?? 0);
+          return {
+            ...prev,
+            [d.responderId]: {
+              lat: d.latitude,
+              lon: d.longitude,
+              bearing,
+              emergencyId: d.emergencyId,
+              eta:         d.estimatedArrivalMinutes,
+              status:      d.status,
+              name:        existing?.name         || 'Responder',
+              responderType: existing?.responderType || '',
+            },
+          };
+        });
+      }
+      fetchOnlineResponders();
+    });
     socket.on('RESPONDER_LOCATION_UPDATE', () => { fetchOnlineResponders(); });
 
     return () => {
@@ -267,6 +410,51 @@ const SOSMonitor = () => {
       socketRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Enrich movingVehicles with responder name/type once onlineResponders loads ──
+  useEffect(() => {
+    if (Object.keys(movingVehicles).length === 0 || onlineResponders.length === 0) return;
+    setMovingVehicles(prev => {
+      let changed = false;
+      const next = { ...prev };
+      for (const [rid, v] of Object.entries(next)) {
+        if (v.name === 'Responder') {
+          const r = onlineResponders.find(r => r.userId === rid);
+          if (r) {
+            next[rid] = { ...v, name: r.user?.fullName || 'Responder', responderType: r.responderType || '' };
+            changed = true;
+          }
+        }
+      }
+      return changed ? next : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onlineResponders]);
+
+  // ── Remove moving vehicles whose emergencies are resolved/cancelled ────────
+  useEffect(() => {
+    if (Object.keys(movingVehicles).length === 0) return;
+    const activeIds = new Set(
+      emergencies.filter(e => ['ACTIVE', 'ASSIGNED'].includes(e.status)).map(e => e.id)
+    );
+    setMovingVehicles(prev => {
+      const next = {};
+      let removed = false;
+      for (const [rid, v] of Object.entries(prev)) {
+        // Keep demo vehicles and vehicles whose emergency is still active
+        if (!v.emergencyId || v.emergencyId === 'DEMO' || activeIds.has(v.emergencyId)) {
+          next[rid] = v;
+        } else {
+          removed = true;
+        }
+      }
+      return removed ? next : prev;
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [emergencies]);
+
+  // ── Clean up simulation interval if the component unmounts ────────────────
+  useEffect(() => () => clearInterval(simIntervalRef.current), []);
 
   // Update filter when URL param changes (e.g. user clicks a stat card again)
   useEffect(() => { setActiveFilter(initialFilter); }, [initialFilter]);
@@ -308,8 +496,53 @@ const SOSMonitor = () => {
       ]
     : [30.3753, 69.3451]; // Pakistan center
 
-  /* ── Show map whenever there's something to display ── */
-  const shouldShowMap = !loading && (activeEmergencies.length > 0 || onlineResponders.length > 0);
+  /* ── Show map whenever there's something to display (or a simulation is running) ── */
+  const shouldShowMap = !loading && (
+    activeEmergencies.length > 0 ||
+    onlineResponders.length > 0 ||
+    Object.keys(movingVehicles).length > 0
+  );
+
+  /* ── Defence demo: simulate an ambulance moving along SIM_ROUTE ── */
+  const startSimulation = () => {
+    simIndexRef.current = 0;
+    setSimRunning(true);
+    simIntervalRef.current = setInterval(() => {
+      const idx = simIndexRef.current;
+      if (idx >= SIM_ROUTE.length) {
+        clearInterval(simIntervalRef.current);
+        setSimRunning(false);
+        return;
+      }
+      const [lat, lon] = SIM_ROUTE[idx];
+      const prevPt = idx > 0 ? SIM_ROUTE[idx - 1] : null;
+      const bearing = prevPt ? calcBearing(prevPt[0], prevPt[1], lat, lon) : 225; // initial = SW
+      const eta = Math.max(0, SIM_ROUTE.length - idx - 1);
+      setMovingVehicles(prev => ({
+        ...prev,
+        DEMO_AMBULANCE: {
+          lat, lon, bearing,
+          emergencyId:  'DEMO',
+          eta,
+          status:       idx === SIM_ROUTE.length - 1 ? 'ARRIVED' : 'EN_ROUTE',
+          name:         'Paramedic Demo Unit',
+          responderType:'PARAMEDIC',
+        },
+      }));
+      simIndexRef.current += 1;
+    }, 1400); // step every 1.4 s — smooth but not frantic
+  };
+
+  const stopSimulation = () => {
+    clearInterval(simIntervalRef.current);
+    setSimRunning(false);
+    simIndexRef.current = 0;
+    setMovingVehicles(prev => {
+      const next = { ...prev };
+      delete next.DEMO_AMBULANCE;
+      return next;
+    });
+  };
 
   /* ── Per-emergency nearby responder count (client-side Haversine) ── */
   const nearbyCount = (emergency) => {
@@ -611,12 +844,32 @@ const SOSMonitor = () => {
                 <div style={{ width: responderFocused ? '12px' : '10px', height: responderFocused ? '12px' : '10px', borderRadius: '50%', background: '#10B981', transition: 'all 0.2s', boxShadow: responderFocused ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none' }} />
                 Responder ({onlineResponders.length})
               </div>
+              {/* Ambulance legend — only when at least one vehicle is moving */}
+              {Object.keys(movingVehicles).length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
+                  🚑 En Route ({Object.keys(movingVehicles).length})
+                </div>
+              )}
               {selectedEmergency && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#3B82F6' }}>
                   <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3B82F620', border: '1.5px solid #3B82F6' }} />
                   {NEARBY_RADIUS_KM} km radius
                 </div>
               )}
+              {/* Simulate Route button — for defence demo */}
+              <button
+                onClick={simRunning ? stopSimulation : startSimulation}
+                style={{
+                  fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer',
+                  padding: '4px 11px', borderRadius: '7px',
+                  background: simRunning ? 'rgba(239,68,68,0.1)' : 'rgba(5,150,105,0.1)',
+                  color: simRunning ? '#DC2626' : '#059669',
+                  border: `1px solid ${simRunning ? '#FCA5A5' : '#6EE7B7'}`,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {simRunning ? '🛑 Stop Simulation' : '🚑 Simulate Route'}
+              </button>
               {/* Clear buttons */}
               {responderFocused && (
                 <button
@@ -759,6 +1012,17 @@ const SOSMonitor = () => {
                     </Marker>
                   </React.Fragment>
                 ) : null
+              ))}
+
+              {/* ── Ambulance motorbike markers (live GPS + simulation) ─────────────
+                   Each MovingVehicleMarker uses imperative Leaflet API internally
+                   so it glides smoothly between GPS updates (no React flicker).
+                   Bearing is recalculated from consecutive positions so the icon
+                   rotates to face the actual direction of travel, exactly like
+                   how Uber / Careem / InDrive show moving vehicles.
+              ──────────────────────────────────────────────────────────────────── */}
+              {Object.entries(movingVehicles).map(([rid, v]) => (
+                <MovingVehicleMarker key={rid} vehicle={{ ...v, responderId: rid }} />
               ))}
             </MapContainer>
           </div>

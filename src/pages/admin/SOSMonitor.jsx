@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, MapPin, Clock, Phone, AlertTriangle, ShieldCheck, RefreshCw, User, Filter, Wifi, WifiOff } from 'lucide-react';
+import { Activity, MapPin, Clock, Phone, AlertTriangle, ShieldCheck, RefreshCw, User, Filter, Wifi, WifiOff, Users, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
@@ -16,12 +16,40 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom red icon for active emergencies
+// Custom red icon for active emergencies (patient SOS)
 const redIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
 });
+
+// Green icon for available online responders
+const greenIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
+});
+
+// Orange icon for assigned/en-route responders
+const orangeIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
+});
+
+// Client-side Haversine: returns distance in km between two GPS points
+const haversineKm = (lat1, lon1, lat2, lon2) => {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const NEARBY_RADIUS_KM = 5; // radius used for "nearby" badge on cards
 
 // ─── Ctrl+Scroll overlay: shows hint when user scrolls without Ctrl ──────────
 function CtrlScrollHint() {
@@ -120,15 +148,18 @@ const SOSMonitor = () => {
   // Historical data (Cancelled, Resolved) is accessible via the All filter or stat cards.
   const initialFilter = validFilters.includes(urlFilter) ? urlFilter : 'ACTIVE';
 
-  const [emergencies,   setEmergencies]   = useState([]);
-  const [loading,       setLoading]       = useState(true);
-  const [error,         setError]         = useState('');
-  const [lastUpdated,   setLastUpdated]   = useState(null);
-  const [activeFilter,  setActiveFilter]  = useState(initialFilter);
-  const [socketOnline,  setSocketOnline]  = useState(false);
-  const [timeRange,     setTimeRange]     = useState('today'); // 'today' | 'week' | 'all'
-  const intervalRef = useRef(null);
-  const socketRef   = useRef(null);
+  const [emergencies,        setEmergencies]        = useState([]);
+  const [loading,            setLoading]            = useState(true);
+  const [error,              setError]              = useState('');
+  const [lastUpdated,        setLastUpdated]        = useState(null);
+  const [activeFilter,       setActiveFilter]       = useState(initialFilter);
+  const [socketOnline,       setSocketOnline]       = useState(false);
+  const [timeRange,          setTimeRange]          = useState('today'); // 'today' | 'week' | 'all'
+  const [onlineResponders,   setOnlineResponders]   = useState([]); // live GPS-located available responders
+  const [selectedEmergency,  setSelectedEmergency]  = useState(null); // clicked emergency for map focus
+  const intervalRef    = useRef(null);
+  const respIntervalRef = useRef(null);
+  const socketRef      = useRef(null);
 
   const fetchEmergencies = async () => {
     try {
@@ -149,6 +180,20 @@ const SOSMonitor = () => {
     fetchEmergencies();
     intervalRef.current = setInterval(fetchEmergencies, 4000); // 4s — fast enough to catch status changes without socket
     return () => clearInterval(intervalRef.current);
+  }, []);
+
+  // ── Online responders: fetch on mount then every 10 s ──────────────────────
+  const fetchOnlineResponders = async () => {
+    try {
+      const res = await api.get('/api/admin/responders/online');
+      if (res.data.success) setOnlineResponders(res.data.data || []);
+    } catch { /* silent — map still shows without responder pins */ }
+  };
+
+  useEffect(() => {
+    fetchOnlineResponders();
+    respIntervalRef.current = setInterval(fetchOnlineResponders, 10000);
+    return () => clearInterval(respIntervalRef.current);
   }, []);
 
   // ── Real-time Socket.io connection ──────────────────────────────────────
@@ -185,6 +230,11 @@ const SOSMonitor = () => {
         fetchEmergencies();
       }
     });
+
+    // Responder moved during an active emergency — refresh the online responders list
+    // so the green pin on the admin map stays up to date without waiting for the 10s poll
+    socket.on('LOCATION_UPDATE', () => { fetchOnlineResponders(); });
+    socket.on('RESPONDER_LOCATION_UPDATE', () => { fetchOnlineResponders(); });
 
     return () => {
       socket.disconnect();
@@ -232,6 +282,18 @@ const SOSMonitor = () => {
       ]
     : [30.3753, 69.3451]; // Pakistan center
 
+  /* ── Show map whenever there's something to display ── */
+  const shouldShowMap = !loading && (activeEmergencies.length > 0 || onlineResponders.length > 0);
+
+  /* ── Per-emergency nearby responder count (client-side Haversine) ── */
+  const nearbyCount = (emergency) => {
+    if (!emergency?.latitude || !emergency?.longitude) return 0;
+    return onlineResponders.filter(r =>
+      r.currentLatitude && r.currentLongitude &&
+      haversineKm(emergency.latitude, emergency.longitude, r.currentLatitude, r.currentLongitude) <= NEARBY_RADIUS_KM
+    ).length;
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -275,7 +337,7 @@ const SOSMonitor = () => {
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             {activeFilter === 'ACTIVE'
-              ? 'Live view of active emergencies with real-time GPS map.'
+              ? `Live view of active emergencies. ${onlineResponders.length} responder${onlineResponders.length !== 1 ? 's' : ''} online on map.`
               : activeFilter === 'ALL'
               ? 'All emergency requests with full status breakdown.'
               : `Filtered view — ${filterOpt?.label} emergencies.`}
@@ -332,12 +394,12 @@ const SOSMonitor = () => {
 
       {/* ── Stats Breakdown Cards ── */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: '12px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '12px', marginBottom: '1.25rem' }}>
           {[
-            { key: 'ACTIVE',    label: 'Active',    count: breakdown.ACTIVE,    color: 'var(--s-active)',    bg: 'var(--s-active-bg)'    },
-            { key: 'ASSIGNED',  label: 'Assigned',  count: breakdown.ASSIGNED,  color: 'var(--s-assigned)',  bg: 'var(--s-assigned-bg)'  },
-            { key: 'RESOLVED',  label: 'Resolved',  count: breakdown.RESOLVED,  color: 'var(--s-resolved)',  bg: 'var(--s-resolved-bg)'  },
-            { key: 'CANCELLED', label: 'Cancelled', count: breakdown.CANCELLED, color: 'var(--s-cancelled)', bg: 'var(--s-cancelled-bg)' },
+            { key: 'ACTIVE',    label: 'Active SOS', count: breakdown.ACTIVE,    color: 'var(--s-active)',    bg: 'var(--s-active-bg)'    },
+            { key: 'ASSIGNED',  label: 'Assigned',   count: breakdown.ASSIGNED,  color: 'var(--s-assigned)',  bg: 'var(--s-assigned-bg)'  },
+            { key: 'RESOLVED',  label: 'Resolved',   count: breakdown.RESOLVED,  color: 'var(--s-resolved)',  bg: 'var(--s-resolved-bg)'  },
+            { key: 'CANCELLED', label: 'Cancelled',  count: breakdown.CANCELLED, color: 'var(--s-cancelled)', bg: 'var(--s-cancelled-bg)' },
           ].map(stat => (
             <motion.div
               key={stat.key}
@@ -356,6 +418,33 @@ const SOSMonitor = () => {
               <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{stat.label}</p>
             </motion.div>
           ))}
+          {/* Online Responders — not a filter, just a live counter */}
+          <motion.div
+            whileHover={{ y: -2 }}
+            style={{
+              background: 'var(--surface)',
+              border: '1.5px solid #10B981',
+              borderRadius: '14px', padding: '14px 18px',
+              position: 'relative', overflow: 'hidden',
+            }}
+          >
+            <motion.div
+              animate={{ opacity: [0.15, 0.35, 0.15] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#10B98112,transparent)', pointerEvents: 'none' }}
+            />
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10B981', lineHeight: 1 }}>
+                {onlineResponders.length}
+              </p>
+              <motion.div
+                animate={{ scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
+                transition={{ repeat: Infinity, duration: 1.6 }}
+                style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }}
+              />
+            </div>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Online Responders</p>
+          </motion.div>
         </div>
       )}
 
@@ -410,41 +499,82 @@ const SOSMonitor = () => {
         </motion.div>
       )}
 
-      {/* ── Live Map: only shown when there are active emergencies to plot.
-           Cancelled / Resolved emergencies never appear on the map.
-           isolation:isolate traps Leaflet's z-indexes (800+) inside the box
-           so they cannot bleed over the fixed sidebar or top bar.          ── */}
-      {!loading && activeEmergencies.length > 0 && (
+      {/* ── Live Map ─────────────────────────────────────────────────────────────
+           Shows two layers simultaneously:
+             🔴  Patient SOS pins  (red) — ACTIVE emergencies only
+             🟢  Responder pins    (green) — all available + GPS-located responders
+           Click any SOS pin / card to draw a 5 km radius and highlight nearby
+           responders. isolation:isolate traps Leaflet z-indexes inside the box.
+      ─────────────────────────────────────────────────────────────────────────── */}
+      {shouldShowMap && (
         <motion.div
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           style={{
             marginBottom: '1.5rem', borderRadius: '16px',
-            border: '1.5px solid var(--s-active)',
-            overflow: 'hidden', boxShadow: '0 4px 24px rgba(239,68,68,0.12)',
-            position: 'relative',   /* establish stacking context */
-            isolation: 'isolate',   /* trap Leaflet z-indexes inside */
-            zIndex: 0,              /* don't float above fixed UI chrome */
+            border: activeEmergencies.length > 0 ? '1.5px solid var(--s-active)' : '1.5px solid #10B981',
+            overflow: 'hidden',
+            boxShadow: activeEmergencies.length > 0 ? '0 4px 24px rgba(239,68,68,0.12)' : '0 4px 24px rgba(16,185,129,0.12)',
+            position: 'relative', isolation: 'isolate', zIndex: 0,
           }}
         >
+          {/* Map header bar */}
           <div style={{
-            padding: '12px 18px', background: 'var(--error-bg)',
-            borderBottom: '1px solid var(--s-active)',
-            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '10px 18px',
+            background: activeEmergencies.length > 0 ? 'var(--error-bg)' : 'rgba(16,185,129,0.06)',
+            borderBottom: `1px solid ${activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981'}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px',
           }}>
-            <motion.div
-              animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.2 }}
-              style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--s-active)', flexShrink: 0 }}
-            />
-            <span style={{ fontWeight: 800, color: 'var(--s-active)', fontSize: '0.85rem' }}>
-              LIVE MAP — {activeEmergencies.length} Active SOS Signal{activeEmergencies.length !== 1 ? 's' : ''}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              {activeEmergencies.length > 0 && (
+                <motion.div
+                  animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.2 }}
+                  style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--s-active)', flexShrink: 0 }}
+                />
+              )}
+              <span style={{ fontWeight: 800, color: activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981', fontSize: '0.85rem' }}>
+                LIVE MAP
+                {activeEmergencies.length > 0 && ` — ${activeEmergencies.length} Active SOS Signal${activeEmergencies.length !== 1 ? 's' : ''}`}
+              </span>
+              {selectedEmergency && (
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                  · Showing {NEARBY_RADIUS_KM} km radius for selected SOS
+                </span>
+              )}
+            </div>
+            {/* Legend */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#EF4444' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+                Patient SOS
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#10B981' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }} />
+                Available Responder ({onlineResponders.length})
+              </div>
+              {selectedEmergency && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#3B82F6' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3B82F640', border: '1.5px solid #3B82F6' }} />
+                  {NEARBY_RADIUS_KM} km radius
+                </div>
+              )}
+              {selectedEmergency && (
+                <button
+                  onClick={() => setSelectedEmergency(null)}
+                  style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
+                >
+                  ✕ Clear
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Map itself */}
           <div style={{ position: 'relative' }}>
             <MapContainer
               center={mapCenter}
               zoom={activeEmergencies.length > 0 ? 12 : 6}
-              style={{ height: '360px', width: '100%' }}
-              key={activeFilter}
+              style={{ height: '420px', width: '100%' }}
+              key={`${activeFilter}-${onlineResponders.length}`}
               scrollWheelZoom={false}
             >
               <TileLayer
@@ -452,33 +582,101 @@ const SOSMonitor = () => {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               <CtrlScrollHint />
+
+              {/* ── Patient SOS markers (red) ── */}
               {activeEmergencies.map((e) => (
                 e.latitude && e.longitude ? (
                   <React.Fragment key={e.id}>
                     <Circle
                       center={[e.latitude, e.longitude]}
-                      radius={300}
-                      color="#EF4444" fillColor="#EF4444" fillOpacity={0.15}
+                      radius={250}
+                      color="#EF4444" fillColor="#EF4444" fillOpacity={0.12}
                     />
-                    <Marker position={[e.latitude, e.longitude]} icon={redIcon}>
+                    <Marker
+                      position={[e.latitude, e.longitude]}
+                      icon={redIcon}
+                      eventHandlers={{ click: () => setSelectedEmergency(e) }}
+                    >
                       <Popup>
-                        <div style={{ minWidth: '180px' }}>
-                          <strong style={{ color: '#EF4444', fontSize: '13px' }}>
+                        <div style={{ minWidth: '200px' }}>
+                          <strong style={{ color: '#EF4444', fontSize: '13px', display: 'block', marginBottom: '6px' }}>
                             🆘 {e.emergencyType || 'Medical'} Emergency
                           </strong>
-                          <p style={{ margin: '6px 0 2px', fontSize: '13px', fontWeight: 600 }}>
+                          <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600 }}>
                             {e.patient?.fullName || 'Unknown Patient'}
                           </p>
                           <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
                             📞 {e.patient?.phoneNumber || 'No phone'}
                           </p>
-                          <p style={{ margin: 0, fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                          <p style={{ margin: '0 0 6px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
                             {e.latitude?.toFixed(5)}, {e.longitude?.toFixed(5)}
                           </p>
+                          <div style={{ background: nearbyCount(e) > 0 ? '#ECFDF5' : '#FEF2F2', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', fontWeight: 700, color: nearbyCount(e) > 0 ? '#059669' : '#DC2626' }}>
+                            {nearbyCount(e) > 0
+                              ? `✅ ${nearbyCount(e)} responder${nearbyCount(e) !== 1 ? 's' : ''} within ${NEARBY_RADIUS_KM} km`
+                              : `⚠️ No responders within ${NEARBY_RADIUS_KM} km`}
+                          </div>
+                          <button
+                            onClick={() => setSelectedEmergency(e)}
+                            style={{ marginTop: '8px', width: '100%', padding: '5px', borderRadius: '6px', background: '#3B82F6', color: 'white', border: 'none', fontWeight: 700, fontSize: '11px', cursor: 'pointer' }}
+                          >
+                            Show {NEARBY_RADIUS_KM} km radius
+                          </button>
                         </div>
                       </Popup>
                     </Marker>
                   </React.Fragment>
+                ) : null
+              ))}
+
+              {/* ── 5 km radius circle for selected emergency ── */}
+              {selectedEmergency?.latitude && selectedEmergency?.longitude && (
+                <Circle
+                  center={[selectedEmergency.latitude, selectedEmergency.longitude]}
+                  radius={NEARBY_RADIUS_KM * 1000}
+                  color="#3B82F6" fillColor="#3B82F6" fillOpacity={0.06}
+                  weight={2} dashArray="6 4"
+                />
+              )}
+
+              {/* ── Online responder markers (green) ── */}
+              {onlineResponders.map((r) => (
+                r.currentLatitude && r.currentLongitude ? (
+                  <Marker
+                    key={r.userId}
+                    position={[r.currentLatitude, r.currentLongitude]}
+                    icon={greenIcon}
+                  >
+                    <Popup>
+                      <div style={{ minWidth: '180px' }}>
+                        <strong style={{ color: '#059669', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
+                          🟢 Available Responder
+                        </strong>
+                        <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600 }}>
+                          {r.user?.fullName || 'Responder'}
+                        </p>
+                        <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#64748B' }}>
+                          {r.responderType?.replace('_', ' ') || 'Responder'} {r.organization ? `· ${r.organization}` : ''}
+                        </p>
+                        {r.user?.phoneNumber && (
+                          <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
+                            📞 {r.user.phoneNumber}
+                          </p>
+                        )}
+                        {r.motorbikeNumber && (
+                          <p style={{ margin: '0 0 2px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                            🏍️ {r.motorbikeNumber}
+                          </p>
+                        )}
+                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                          {r.currentLatitude?.toFixed(5)}, {r.currentLongitude?.toFixed(5)}
+                        </p>
+                        <div style={{ marginTop: '6px', background: '#ECFDF5', borderRadius: '5px', padding: '3px 7px', fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-block' }}>
+                          ⭐ {Number(r.rating || 5).toFixed(1)}
+                        </div>
+                      </div>
+                    </Popup>
+                  </Marker>
                 ) : null
               ))}
             </MapContainer>
@@ -544,12 +742,14 @@ const SOSMonitor = () => {
                   className="card"
                   style={{
                     padding: '1.625rem',
-                    border: '1px solid var(--border)',
-                    borderLeft: `4px solid ${s.color}`,
+                    border: selectedEmergency?.id === e.id ? '1.5px solid #3B82F6' : '1px solid var(--border)',
+                    borderLeft: `4px solid ${selectedEmergency?.id === e.id ? '#3B82F6' : s.color}`,
                     borderRadius: 'var(--radius-md)',
-                    background: 'var(--surface)',
-                    transition: 'box-shadow 0.2s ease',
+                    background: selectedEmergency?.id === e.id ? 'rgba(59,130,246,0.04)' : 'var(--surface)',
+                    transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
+                    cursor: e.latitude && e.longitude ? 'pointer' : 'default',
                   }}
+                  onClick={() => e.latitude && e.longitude && setSelectedEmergency(selectedEmergency?.id === e.id ? null : e)}
                 >
                   {/* Card header */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
@@ -612,6 +812,26 @@ const SOSMonitor = () => {
                       </a>
                     )}
                   </div>
+
+                  {/* Nearby Responders Badge — only for ACTIVE/ASSIGNED emergencies with GPS */}
+                  {(e.status === 'ACTIVE' || e.status === 'ASSIGNED') && e.latitude && e.longitude && (
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: '0.5rem',
+                      padding: '0.55rem 0.875rem', borderRadius: '10px', marginBottom: '0.875rem',
+                      background: nearbyCount(e) > 0 ? '#ECFDF5' : '#FEF9EC',
+                      border: `1px solid ${nearbyCount(e) > 0 ? '#A7F3D0' : '#FDE68A'}`,
+                    }}>
+                      <Navigation size={13} color={nearbyCount(e) > 0 ? '#059669' : '#D97706'} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: nearbyCount(e) > 0 ? '#059669' : '#D97706' }}>
+                        {nearbyCount(e) > 0
+                          ? `${nearbyCount(e)} responder${nearbyCount(e) !== 1 ? 's' : ''} within ${NEARBY_RADIUS_KM} km`
+                          : `No responders within ${NEARBY_RADIUS_KM} km`}
+                      </span>
+                      <span style={{ marginLeft: 'auto', fontSize: '0.68rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                        {selectedEmergency?.id === e.id ? 'Shown on map ↑' : 'Click card to focus map'}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Status row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border)', paddingTop: '1rem' }}>

@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
 
 class EmailVerificationScreen extends ConsumerStatefulWidget {
   final String email;
@@ -160,12 +159,25 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: const AppHeader(
-        greetingOverride: 'Verify Email',
-        canPop: true,
-        backPathOverride: '/login',
-        showLogout: false,
-        showProfile: false,
+      appBar: AppBar(
+        title: const Text(
+          'Verify Email',
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+        centerTitle: true,
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            } else {
+              context.go('/login');
+            }
+          },
+        ),
       ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(3.hp),

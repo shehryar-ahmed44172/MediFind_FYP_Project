@@ -200,10 +200,10 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
   Widget _buildQuickActionGrid(ThemeData theme) {
     final actions = [
-      {'title': 'My Profile',  'icon': Icons.person_rounded,       'color': AppColors.primary,       'route': '/responder/profile'},
-      {'title': 'History',     'icon': Icons.history_rounded,       'color': AppColors.secondaryTeal, 'route': '/responder/history'},
-      {'title': 'Messages',    'icon': Icons.chat_bubble_rounded,   'color': AppColors.warning,       'route': '/responder/chats'},
-      {'title': 'Diagnostics', 'icon': Icons.analytics_rounded,     'color': AppColors.primaryLight,  'route': '/diagnostics'},
+      {'title': 'My Profile', 'icon': Icons.person_rounded,     'color': AppColors.primary,       'route': '/responder/profile'},
+      {'title': 'History',    'icon': Icons.history_rounded,     'color': AppColors.secondaryTeal, 'route': '/responder/history'},
+      {'title': 'Messages',   'icon': Icons.chat_bubble_rounded, 'color': AppColors.warning,       'route': '/responder/chats'},
+      {'title': 'My Rating',  'icon': Icons.star_rounded,        'color': const Color(0xFFF59E0B), 'route': null}, // null = inline bottom sheet
     ];
 
     return GridView.builder(
@@ -225,6 +225,9 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
             final route = action['route'] as String?;
             if (route != null) {
               context.go(route);
+            } else {
+              // "My Rating" — show performance sheet inline
+              _showPerformanceSheet(context);
             }
           },
           borderRadius: BorderRadius.circular(24),
@@ -240,12 +243,161 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                 Icon(action['icon'] as IconData, color: color, size: 28),
                 const SizedBox(height: 8),
                 Text(action['title'] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  void _showPerformanceSheet(BuildContext context) {
+    final user = ref.read(currentUserProvider).valueOrNull;
+    final rating  = user?.rating ?? 5.0;
+    final total   = user?.totalResponsesHandled ?? 0;
+    final type    = user?.responderType ?? 'Responder';
+    final org     = user?.organization;
+
+    // Build star row: filled stars up to rating, empty after
+    final fullStars  = rating.floor();
+    final halfStar   = (rating - fullStars) >= 0.5;
+
+    String performanceLabel;
+    Color  performanceColor;
+    if (rating >= 4.5) {
+      performanceLabel = 'Excellent';
+      performanceColor = const Color(0xFF059669);
+    } else if (rating >= 4.0) {
+      performanceLabel = 'Good';
+      performanceColor = const Color(0xFF0C637E);
+    } else if (rating >= 3.5) {
+      performanceLabel = 'Average';
+      performanceColor = const Color(0xFFF59E0B);
+    } else {
+      performanceLabel = 'Needs Improvement';
+      performanceColor = const Color(0xFFDC2626);
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Avatar + name
+            CircleAvatar(
+              radius: 34,
+              backgroundColor: AppColors.primary.withOpacity(0.12),
+              child: Text(
+                user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'R',
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              user?.fullName ?? 'Responder',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            ),
+            Text(
+              org != null ? '$type · $org' : type,
+              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 24),
+
+            // Rating display
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ...List.generate(5, (i) {
+                  if (i < fullStars) {
+                    return const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 32);
+                  } else if (i == fullStars && halfStar) {
+                    return const Icon(Icons.star_half_rounded, color: Color(0xFFF59E0B), size: 32);
+                  } else {
+                    return Icon(Icons.star_outline_rounded, color: Colors.grey.shade300, size: 32);
+                  }
+                }),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(
+                  rating.toStringAsFixed(1),
+                  style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1),
+                ),
+                const Text(' / 5.0', style: TextStyle(fontSize: 16, color: Colors.grey)),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              decoration: BoxDecoration(
+                color: performanceColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(color: performanceColor.withOpacity(0.3)),
+              ),
+              child: Text(
+                performanceLabel,
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: performanceColor),
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Stats row
+            Row(
+              children: [
+                _StatTile(
+                  icon: Icons.local_hospital_rounded,
+                  iconColor: AppColors.primary,
+                  label: 'Responses',
+                  value: '$total',
+                ),
+                const SizedBox(width: 12),
+                _StatTile(
+                  icon: Icons.shield_rounded,
+                  iconColor: const Color(0xFF059669),
+                  label: 'Status',
+                  value: user?.isActive == true ? 'Active' : 'Offline',
+                  valueColor: user?.isActive == true ? const Color(0xFF059669) : Colors.grey,
+                ),
+                const SizedBox(width: 12),
+                _StatTile(
+                  icon: Icons.verified_rounded,
+                  iconColor: const Color(0xFF0C637E),
+                  label: 'Verified',
+                  value: user?.verificationStatus == 'VERIFIED' ? 'Yes' : 'Pending',
+                  valueColor: user?.verificationStatus == 'VERIFIED'
+                      ? const Color(0xFF0C637E)
+                      : const Color(0xFFF59E0B),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
     );
   }
 
@@ -368,6 +520,56 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
               'No active emergency requests at this time.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.grey.shade500, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Compact stat tile used in the performance bottom sheet ───────────────────
+class _StatTile extends StatelessWidget {
+  final IconData icon;
+  final Color    iconColor;
+  final String   label;
+  final String   value;
+  final Color?   valueColor;
+
+  const _StatTile({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 10),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.grey.shade200),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: iconColor, size: 22),
+            const SizedBox(height: 6),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: valueColor ?? Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(fontSize: 11, color: Colors.grey.shade500, fontWeight: FontWeight.w500),
             ),
           ],
         ),

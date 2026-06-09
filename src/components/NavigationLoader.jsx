@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 
-const SHOW_MS  = 700;  // how long the loader stays fully visible
+const SHOW_MS  = 5000; // how long the loader stays fully visible
 const FADE_MS  = 320;  // fade-out duration
 
 /* ─── keyframe CSS injected once ─────────────────────────────────────────── */

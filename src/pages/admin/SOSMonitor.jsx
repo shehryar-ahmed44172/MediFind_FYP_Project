@@ -23,11 +23,18 @@ const redIcon = new L.Icon({
   iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
 });
 
-// Green icon for available online responders
+// Green icon for available online responders (normal view)
 const greenIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
+});
+
+// Large green icon for responder-focus mode — stands out clearly on the map
+const greenIconLarge = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [32, 52], iconAnchor: [16, 52], popupAnchor: [1, -46], shadowSize: [52, 52],
 });
 
 // Orange icon for assigned/en-route responders
@@ -36,6 +43,23 @@ const orangeIcon = new L.Icon({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
   iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
 });
+
+// ── FitBoundsToResponders: zooms/pans the Leaflet map to fit all responder pins ──
+function FitBoundsToResponders({ responders }) {
+  const map = useMap();
+  useEffect(() => {
+    const valid = responders.filter(r => r.currentLatitude && r.currentLongitude);
+    if (valid.length === 0) return;
+    if (valid.length === 1) {
+      map.setView([valid[0].currentLatitude, valid[0].currentLongitude], 14, { animate: true });
+      return;
+    }
+    const bounds = L.latLngBounds(valid.map(r => [r.currentLatitude, r.currentLongitude]));
+    map.fitBounds(bounds.pad(0.25), { animate: true, maxZoom: 14 });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [responders.length]);
+  return null;
+}
 
 // Client-side Haversine: returns distance in km between two GPS points
 const haversineKm = (lat1, lon1, lat2, lon2) => {
@@ -157,6 +181,8 @@ const SOSMonitor = () => {
   const [timeRange,          setTimeRange]          = useState('today'); // 'today' | 'week' | 'all'
   const [onlineResponders,   setOnlineResponders]   = useState([]); // live GPS-located available responders
   const [selectedEmergency,  setSelectedEmergency]  = useState(null); // clicked emergency for map focus
+  const [responderFocused,   setResponderFocused]   = useState(false); // Online Responders card clicked — focus map on responders
+  const mapRef = useRef(null); // scroll-to-map anchor
   const intervalRef    = useRef(null);
   const respIntervalRef = useRef(null);
   const socketRef      = useRef(null);
@@ -418,32 +444,54 @@ const SOSMonitor = () => {
               <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>{stat.label}</p>
             </motion.div>
           ))}
-          {/* Online Responders — not a filter, just a live counter */}
+          {/* Online Responders — clickable: focuses map on all responder pins */}
           <motion.div
-            whileHover={{ y: -2 }}
+            whileHover={{ y: -2, boxShadow: '0 6px 24px rgba(16,185,129,0.25)' }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              setResponderFocused(f => !f);
+              setSelectedEmergency(null); // clear any SOS focus
+              // Scroll map into view
+              setTimeout(() => mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
+            }}
             style={{
-              background: 'var(--surface)',
-              border: '1.5px solid #10B981',
+              background: responderFocused ? '#ECFDF5' : 'var(--surface)',
+              border: `1.5px solid ${responderFocused ? '#059669' : '#10B981'}`,
               borderRadius: '14px', padding: '14px 18px',
               position: 'relative', overflow: 'hidden',
+              cursor: 'pointer', transition: 'all 0.18s ease',
+              boxShadow: responderFocused ? '0 0 0 3px rgba(16,185,129,0.18)' : 'none',
             }}
           >
+            {/* Ambient shimmer */}
             <motion.div
-              animate={{ opacity: [0.15, 0.35, 0.15] }}
+              animate={{ opacity: [0.12, 0.28, 0.12] }}
               transition={{ repeat: Infinity, duration: 2 }}
-              style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#10B98112,transparent)', pointerEvents: 'none' }}
+              style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#10B98114,transparent)', pointerEvents: 'none' }}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: '#10B981', lineHeight: 1 }}>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>
                 {onlineResponders.length}
               </p>
               <motion.div
-                animate={{ scale: [1, 1.4, 1], opacity: [0.6, 1, 0.6] }}
+                animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ repeat: Infinity, duration: 1.6 }}
                 style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }}
               />
             </div>
-            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>Online Responders</p>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: responderFocused ? '#059669' : 'var(--text-muted)', position: 'relative' }}>
+              Online Responders
+            </p>
+            {responderFocused && (
+              <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#059669', marginTop: '3px', position: 'relative', letterSpacing: '0.04em' }}>
+                📍 Pinned on map ↓
+              </p>
+            )}
+            {!responderFocused && (
+              <p style={{ fontSize: '0.65rem', color: 'var(--text-muted)', marginTop: '3px', position: 'relative' }}>
+                Click to view on map
+              </p>
+            )}
           </motion.div>
         </div>
       )}
@@ -508,56 +556,77 @@ const SOSMonitor = () => {
       ─────────────────────────────────────────────────────────────────────────── */}
       {shouldShowMap && (
         <motion.div
+          ref={mapRef}
           initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
           style={{
             marginBottom: '1.5rem', borderRadius: '16px',
-            border: activeEmergencies.length > 0 ? '1.5px solid var(--s-active)' : '1.5px solid #10B981',
+            border: responderFocused
+              ? '2px solid #059669'
+              : activeEmergencies.length > 0 ? '1.5px solid var(--s-active)' : '1.5px solid #10B981',
             overflow: 'hidden',
-            boxShadow: activeEmergencies.length > 0 ? '0 4px 24px rgba(239,68,68,0.12)' : '0 4px 24px rgba(16,185,129,0.12)',
+            boxShadow: responderFocused
+              ? '0 0 0 4px rgba(16,185,129,0.15), 0 8px 32px rgba(16,185,129,0.2)'
+              : activeEmergencies.length > 0 ? '0 4px 24px rgba(239,68,68,0.12)' : '0 4px 24px rgba(16,185,129,0.12)',
             position: 'relative', isolation: 'isolate', zIndex: 0,
+            transition: 'border-color 0.3s ease, box-shadow 0.3s ease',
           }}
         >
           {/* Map header bar */}
           <div style={{
             padding: '10px 18px',
-            background: activeEmergencies.length > 0 ? 'var(--error-bg)' : 'rgba(16,185,129,0.06)',
-            borderBottom: `1px solid ${activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981'}`,
+            background: responderFocused
+              ? 'rgba(16,185,129,0.08)'
+              : activeEmergencies.length > 0 ? 'var(--error-bg)' : 'rgba(16,185,129,0.06)',
+            borderBottom: `1px solid ${responderFocused ? '#059669' : activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981'}`,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {activeEmergencies.length > 0 && (
-                <motion.div
-                  animate={{ opacity: [1, 0.3, 1] }} transition={{ repeat: Infinity, duration: 1.2 }}
-                  style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--s-active)', flexShrink: 0 }}
-                />
-              )}
-              <span style={{ fontWeight: 800, color: activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981', fontSize: '0.85rem' }}>
-                LIVE MAP
-                {activeEmergencies.length > 0 && ` — ${activeEmergencies.length} Active SOS Signal${activeEmergencies.length !== 1 ? 's' : ''}`}
+              {/* Blinking dot */}
+              <motion.div
+                animate={{ opacity: [1, 0.25, 1] }}
+                transition={{ repeat: Infinity, duration: responderFocused ? 1.8 : 1.2 }}
+                style={{ width: '8px', height: '8px', borderRadius: '50%', background: responderFocused ? '#10B981' : 'var(--s-active)', flexShrink: 0 }}
+              />
+              <span style={{ fontWeight: 800, color: responderFocused ? '#059669' : activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981', fontSize: '0.85rem' }}>
+                {responderFocused
+                  ? `RESPONDER VIEW — ${onlineResponders.length} Online Responder${onlineResponders.length !== 1 ? 's' : ''}`
+                  : `LIVE MAP${activeEmergencies.length > 0 ? ` — ${activeEmergencies.length} Active SOS Signal${activeEmergencies.length !== 1 ? 's' : ''}` : ''}`}
               </span>
-              {selectedEmergency && (
+              {selectedEmergency && !responderFocused && (
                 <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                  · Showing {NEARBY_RADIUS_KM} km radius for selected SOS
+                  · Showing {NEARBY_RADIUS_KM} km radius
                 </span>
               )}
             </div>
-            {/* Legend */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#EF4444' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
-                Patient SOS
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#10B981' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }} />
-                Available Responder ({onlineResponders.length})
+
+            {/* Legend + controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+              {activeEmergencies.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#EF4444' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+                  Patient SOS
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
+                <div style={{ width: responderFocused ? '12px' : '10px', height: responderFocused ? '12px' : '10px', borderRadius: '50%', background: '#10B981', transition: 'all 0.2s', boxShadow: responderFocused ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none' }} />
+                Responder ({onlineResponders.length})
               </div>
               {selectedEmergency && (
                 <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#3B82F6' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3B82F640', border: '1.5px solid #3B82F6' }} />
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3B82F620', border: '1.5px solid #3B82F6' }} />
                   {NEARBY_RADIUS_KM} km radius
                 </div>
               )}
-              {selectedEmergency && (
+              {/* Clear buttons */}
+              {responderFocused && (
+                <button
+                  onClick={() => setResponderFocused(false)}
+                  style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', background: 'rgba(16,185,129,0.12)', border: '1px solid #10B981', cursor: 'pointer', padding: '3px 10px', borderRadius: '6px' }}
+                >
+                  ✕ Exit Responder View
+                </button>
+              )}
+              {selectedEmergency && !responderFocused && (
                 <button
                   onClick={() => setSelectedEmergency(null)}
                   style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '2px 6px', borderRadius: '4px' }}
@@ -573,7 +642,7 @@ const SOSMonitor = () => {
             <MapContainer
               center={mapCenter}
               zoom={activeEmergencies.length > 0 ? 12 : 6}
-              style={{ height: '420px', width: '100%' }}
+              style={{ height: responderFocused ? '500px' : '420px', width: '100%', transition: 'height 0.35s ease' }}
               key={`${activeFilter}-${onlineResponders.length}`}
               scrollWheelZoom={false}
             >
@@ -583,19 +652,25 @@ const SOSMonitor = () => {
               />
               <CtrlScrollHint />
 
-              {/* ── Patient SOS markers (red) ── */}
+              {/* Auto-fit to all responders when Responder View is active */}
+              {responderFocused && <FitBoundsToResponders responders={onlineResponders} />}
+
+              {/* ── Patient SOS markers (red) — dimmed in responder-focus mode ── */}
               {activeEmergencies.map((e) => (
                 e.latitude && e.longitude ? (
                   <React.Fragment key={e.id}>
                     <Circle
                       center={[e.latitude, e.longitude]}
                       radius={250}
-                      color="#EF4444" fillColor="#EF4444" fillOpacity={0.12}
+                      color="#EF4444" fillColor="#EF4444"
+                      fillOpacity={responderFocused ? 0.04 : 0.12}
+                      opacity={responderFocused ? 0.3 : 1}
                     />
                     <Marker
                       position={[e.latitude, e.longitude]}
                       icon={redIcon}
-                      eventHandlers={{ click: () => setSelectedEmergency(e) }}
+                      opacity={responderFocused ? 0.35 : 1}
+                      eventHandlers={{ click: () => { if (!responderFocused) setSelectedEmergency(e); } }}
                     >
                       <Popup>
                         <div style={{ minWidth: '200px' }}>
@@ -617,7 +692,7 @@ const SOSMonitor = () => {
                               : `⚠️ No responders within ${NEARBY_RADIUS_KM} km`}
                           </div>
                           <button
-                            onClick={() => setSelectedEmergency(e)}
+                            onClick={() => { setSelectedEmergency(e); setResponderFocused(false); }}
                             style={{ marginTop: '8px', width: '100%', padding: '5px', borderRadius: '6px', background: '#3B82F6', color: 'white', border: 'none', fontWeight: 700, fontSize: '11px', cursor: 'pointer' }}
                           >
                             Show {NEARBY_RADIUS_KM} km radius
@@ -630,7 +705,7 @@ const SOSMonitor = () => {
               ))}
 
               {/* ── 5 km radius circle for selected emergency ── */}
-              {selectedEmergency?.latitude && selectedEmergency?.longitude && (
+              {selectedEmergency?.latitude && selectedEmergency?.longitude && !responderFocused && (
                 <Circle
                   center={[selectedEmergency.latitude, selectedEmergency.longitude]}
                   radius={NEARBY_RADIUS_KM * 1000}
@@ -639,39 +714,50 @@ const SOSMonitor = () => {
                 />
               )}
 
-              {/* ── Online responder markers (green) ── */}
+              {/* ── Online responder markers ── */}
+              {/* In focus mode: large icon + green pulse halo. Normal: small icon. */}
               {onlineResponders.map((r) => (
                 r.currentLatitude && r.currentLongitude ? (
-                  <Marker
-                    key={r.userId}
-                    position={[r.currentLatitude, r.currentLongitude]}
-                    icon={greenIcon}
-                  >
-                    <Popup>
-                      <div style={{ minWidth: '180px' }}>
-                        <strong style={{ color: '#059669', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
-                          🟢 Available Responder
-                        </strong>
-                        <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600 }}>
-                          {r.user?.fullName || 'Responder'}
-                        </p>
-                        <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#64748B' }}>
-                          {r.responderType?.replace('_', ' ') || 'Responder'} {r.organization ? `· ${r.organization}` : ''}
-                        </p>
-                        {r.user?.phoneNumber && (
-                          <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
-                            📞 {r.user.phoneNumber}
+                  <React.Fragment key={r.userId}>
+                    {/* Pulse halo (only in responder-focus mode) */}
+                    {responderFocused && (
+                      <Circle
+                        center={[r.currentLatitude, r.currentLongitude]}
+                        radius={180}
+                        color="#10B981" fillColor="#10B981" fillOpacity={0.18}
+                        weight={2}
+                      />
+                    )}
+                    <Marker
+                      position={[r.currentLatitude, r.currentLongitude]}
+                      icon={responderFocused ? greenIconLarge : greenIcon}
+                    >
+                      <Popup>
+                        <div style={{ minWidth: '200px' }}>
+                          <strong style={{ color: '#059669', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
+                            🟢 Available Responder
+                          </strong>
+                          <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 700 }}>
+                            {r.user?.fullName || 'Responder'}
                           </p>
-                        )}
-                        <p style={{ margin: '4px 0 0', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
-                          {r.currentLatitude?.toFixed(5)}, {r.currentLongitude?.toFixed(5)}
-                        </p>
-                        <div style={{ marginTop: '6px', background: '#ECFDF5', borderRadius: '5px', padding: '3px 7px', fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-block' }}>
-                          ⭐ {Number(r.rating || 5).toFixed(1)}
+                          <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#64748B' }}>
+                            {r.responderType?.replace(/_/g, ' ') || 'Responder'}{r.organization ? ` · ${r.organization}` : ''}
+                          </p>
+                          {r.user?.phoneNumber && (
+                            <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
+                              📞 {r.user.phoneNumber}
+                            </p>
+                          )}
+                          <p style={{ margin: '4px 0 4px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                            {r.currentLatitude?.toFixed(5)}, {r.currentLongitude?.toFixed(5)}
+                          </p>
+                          <div style={{ background: '#ECFDF5', borderRadius: '5px', padding: '3px 7px', fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-block' }}>
+                            ⭐ {Number(r.rating || 5).toFixed(1)}
+                          </div>
                         </div>
-                      </div>
-                    </Popup>
-                  </Marker>
+                      </Popup>
+                    </Marker>
+                  </React.Fragment>
                 ) : null
               ))}
             </MapContainer>

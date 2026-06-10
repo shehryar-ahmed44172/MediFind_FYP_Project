@@ -296,11 +296,24 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
   void _autoCancel() async {
     if (_emergencyId != null) {
-      await ref.read(cancelEmergencyProvider(_emergencyId!).future);
+      try {
+        await ref.read(cancelEmergencyProvider(_emergencyId!).future);
+      } catch (e) {
+        // The backend's 60-second cancellation window expires at roughly the
+        // same time as the mobile countdown — the API will reject with
+        // "Cancellation window has expired". That's expected; the backend
+        // escalation service will clean up the DB record on its next pass.
+        // We must still navigate the patient away from this screen.
+        debugPrint('[SOS] Auto-cancel API call failed (window likely expired): $e');
+      }
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No responders available. Emergency cancelled automatically.')),
+        const SnackBar(
+          content: Text('No responders available. Emergency cancelled automatically.'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
       );
       context.go('/home');
     }

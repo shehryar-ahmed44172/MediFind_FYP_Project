@@ -409,10 +409,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildGlassServiceGrid(ThemeData theme, bool isDark) {
     final services = [
-      {'title': 'Medical Records',  'icon': Icons.folder_copy_rounded,      'color': AppColors.primaryLight,  'route': '/home/medical-reports'},
-      {'title': 'Caregivers',       'icon': Icons.people_alt_rounded,       'color': AppColors.warning,       'route': '/home/caregivers'},
-      {'title': 'Messages',         'icon': Icons.chat_bubble_rounded,      'color': AppColors.secondaryTeal, 'route': '/chats'},
-      {'title': 'SOS Contacts',     'icon': Icons.contact_emergency_rounded, 'color': AppColors.success,       'route': '/home/emergency-contacts'},
+      {'title': 'Medical Records',  'icon': Icons.folder_copy_rounded,       'color': AppColors.primaryLight,  'route': '/home/medical-reports',    'push': true},
+      {'title': 'Caregivers',       'icon': Icons.people_alt_rounded,        'color': AppColors.warning,       'route': '/home/caregivers',          'push': true},
+      {'title': 'Messages',         'icon': Icons.chat_bubble_rounded,       'color': AppColors.secondaryTeal, 'route': '/chats',                    'push': false},
+      {'title': 'SOS Contacts',     'icon': Icons.contact_emergency_rounded, 'color': AppColors.success,       'route': '/home/emergency-contacts',  'push': true},
     ];
 
     final tileBg     = isDark ? Colors.white.withOpacity(0.05) : theme.colorScheme.surfaceContainer;
@@ -445,7 +445,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               borderRadius: BorderRadius.circular(24),
               onTap: () {
                 final route = service['route'] as String?;
-                if (route != null) context.go(route);
+                final usePush = service['push'] as bool? ?? false;
+                if (route != null) {
+                  usePush ? context.push(route) : context.go(route);
+                }
               },
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,

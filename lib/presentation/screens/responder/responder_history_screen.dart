@@ -80,29 +80,42 @@ class _HistoryItemCard extends StatelessWidget {
     final type = (emergency['emergencyType'] as String? ?? 'Medical').toUpperCase();
     final date = DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now();
 
+    // Derive the display status: prefer the EmergencyRequest status, but if it
+    // is still PENDING and the parent emergency was cancelled, show CANCELLED.
+    final emergencyStatus =
+        (item['emergency'] as Map<String, dynamic>?)?['status'] as String? ?? '';
+    final displayStatus = (status == 'PENDING' &&
+            (emergencyStatus == 'CANCELLED' || emergencyStatus == 'RESOLVED'))
+        ? emergencyStatus
+        : status;
+
     Color statusColor;
     IconData statusIcon;
-    switch (status) {
+    switch (displayStatus) {
       case 'ACCEPTED':
       case 'RESPONDER_ASSIGNED':
-        statusColor = AppColors.primaryBlue; // Logo-matched success
+        statusColor = AppColors.primaryBlue;
         statusIcon = Icons.check_circle_outline;
         break;
       case 'REJECTED':
-        statusColor = AppColors.error; // Error color
+        statusColor = AppColors.error;
         statusIcon = Icons.cancel_outlined;
         break;
       case 'COMPLETED':
-        statusColor = AppColors.primaryBlue; // Logo-matched completion
+        statusColor = AppColors.primaryBlue;
         statusIcon = Icons.task_alt;
         break;
+      case 'CANCELLED':
+        statusColor = Colors.orange;
+        statusIcon = Icons.event_busy_rounded;
+        break;
       default:
-        statusColor = AppColors.warning; // Warning for pending
+        statusColor = AppColors.warning; // true PENDING
         statusIcon = Icons.hourglass_empty;
     }
 
     return InkWell(
-      onTap: () => _showHistoryDetails(context),
+      onTap: () => _showHistoryDetails(context, displayStatus),
       borderRadius: BorderRadius.circular(24),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
@@ -146,7 +159,7 @@ class _HistoryItemCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  status,
+                  displayStatus,
                   style: TextStyle(
                       color: statusColor,
                       fontSize: 11,
@@ -160,7 +173,7 @@ class _HistoryItemCard extends StatelessWidget {
     );
   }
 
-  void _showHistoryDetails(BuildContext context) {
+  void _showHistoryDetails(BuildContext context, String displayStatus) {
     final emergency = item['emergency'] as Map<String, dynamic>? ?? {};
     final patient = emergency['patient'] as Map<String, dynamic>? ?? {};
     final date = DateTime.tryParse(item['createdAt']?.toString() ?? '') ?? DateTime.now();
@@ -177,7 +190,7 @@ class _HistoryItemCard extends StatelessWidget {
             _buildDetailRow(Icons.person_rounded, 'Patient', patient['fullName'] ?? 'Unknown'),
             _buildDetailRow(Icons.emergency_rounded, 'Type', emergency['emergencyType'] ?? 'Medical'),
             _buildDetailRow(Icons.calendar_today_rounded, 'Date', '${date.day}/${date.month}/${date.year}'),
-            _buildDetailRow(Icons.info_outline_rounded, 'Status', item['status'] ?? 'N/A'),
+            _buildDetailRow(Icons.info_outline_rounded, 'Status', displayStatus),
             if (item['rejectionReason'] != null)
               _buildDetailRow(Icons.warning_amber_rounded, 'Reason', item['rejectionReason']),
           ],

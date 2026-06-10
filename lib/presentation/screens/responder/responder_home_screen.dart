@@ -65,6 +65,11 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
       _isUpdatingStatus = true;
     });
     try {
+      // FutureProvider.family caches by argument, so the second call with the
+      // same value (e.g. true → false → true) would return the cached resolved
+      // Future without hitting the API again. Invalidate first to force a fresh
+      // execution every time the user taps the toggle.
+      ref.invalidate(setResponderAvailabilityProvider(value));
       await ref.read(setResponderAvailabilityProvider(value).future);
       if (value) {
         ref.read(responderLocationTrackerProvider).start();

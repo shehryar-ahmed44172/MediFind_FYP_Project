@@ -258,150 +258,169 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
   }
 
   void _showPerformanceSheet(BuildContext context) {
-    final user = ref.read(currentUserProvider).valueOrNull;
-    final rating  = user?.rating ?? 5.0;
-    final total   = user?.totalResponsesHandled ?? 0;
-    final type    = user?.responderType ?? 'Responder';
-    final org     = user?.organization;
-
-    // Build star row: filled stars up to rating, empty after
-    final fullStars  = rating.floor();
-    final halfStar   = (rating - fullStars) >= 0.5;
-
-    String performanceLabel;
-    Color  performanceColor;
-    if (rating >= 4.5) {
-      performanceLabel = 'Excellent';
-      performanceColor = const Color(0xFF059669);
-    } else if (rating >= 4.0) {
-      performanceLabel = 'Good';
-      performanceColor = const Color(0xFF0C637E);
-    } else if (rating >= 3.5) {
-      performanceLabel = 'Average';
-      performanceColor = const Color(0xFFF59E0B);
-    } else {
-      performanceLabel = 'Needs Improvement';
-      performanceColor = const Color(0xFFDC2626);
-    }
+    // Force a fresh fetch from the backend so rating is always up-to-date
+    ref.invalidate(currentUserProvider);
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Drag handle
-            Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 24),
+      builder: (_) => Consumer(
+        builder: (ctx, ref, __) {
+          final userAsync = ref.watch(currentUserProvider);
 
-            // Avatar + name
-            CircleAvatar(
-              radius: 34,
-              backgroundColor: AppColors.primary.withOpacity(0.12),
-              child: Text(
-                user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'R',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary),
-              ),
+          // Drag handle is always visible while loading or loaded
+          final handle = Container(
+            width: 40, height: 4,
+            margin: const EdgeInsets.only(bottom: 24),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(2),
             ),
-            const SizedBox(height: 12),
-            Text(
-              user?.fullName ?? 'Responder',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
-            ),
-            Text(
-              org != null ? '$type · $org' : type,
-              style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 24),
+          );
 
-            // Rating display
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          Widget body;
+          if (userAsync.isLoading) {
+            body = const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          } else {
+            final user   = userAsync.valueOrNull;
+            final rating = user?.rating ?? 5.0;
+            final total  = user?.totalResponsesHandled ?? 0;
+            final type   = user?.responderType ?? 'Responder';
+            final org    = user?.organization;
+
+            final fullStars = rating.floor();
+            final halfStar  = (rating - fullStars) >= 0.5;
+
+            String performanceLabel;
+            Color  performanceColor;
+            if (rating >= 4.5) {
+              performanceLabel = 'Excellent';
+              performanceColor = const Color(0xFF059669);
+            } else if (rating >= 4.0) {
+              performanceLabel = 'Good';
+              performanceColor = const Color(0xFF0C637E);
+            } else if (rating >= 3.5) {
+              performanceLabel = 'Average';
+              performanceColor = const Color(0xFFF59E0B);
+            } else {
+              performanceLabel = 'Needs Improvement';
+              performanceColor = const Color(0xFFDC2626);
+            }
+
+            body = Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ...List.generate(5, (i) {
-                  if (i < fullStars) {
-                    return const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 32);
-                  } else if (i == fullStars && halfStar) {
-                    return const Icon(Icons.star_half_rounded, color: Color(0xFFF59E0B), size: 32);
-                  } else {
-                    return Icon(Icons.star_outline_rounded, color: Colors.grey.shade300, size: 32);
-                  }
-                }),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
+                // Avatar + name
+                CircleAvatar(
+                  radius: 34,
+                  backgroundColor: AppColors.primary.withOpacity(0.12),
+                  child: Text(
+                    user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : 'R',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 Text(
-                  rating.toStringAsFixed(1),
-                  style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1),
+                  user?.fullName ?? 'Responder',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                 ),
-                const Text(' / 5.0', style: TextStyle(fontSize: 16, color: Colors.grey)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-              decoration: BoxDecoration(
-                color: performanceColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: performanceColor.withOpacity(0.3)),
-              ),
-              child: Text(
-                performanceLabel,
-                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: performanceColor),
-              ),
-            ),
-            const SizedBox(height: 24),
+                Text(
+                  org != null ? '$type · $org' : type,
+                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                ),
+                const SizedBox(height: 24),
 
-            // Stats row
-            Row(
-              children: [
-                _StatTile(
-                  icon: Icons.local_hospital_rounded,
-                  iconColor: AppColors.primary,
-                  label: 'Responses',
-                  value: '$total',
+                // Star row
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (i) {
+                    if (i < fullStars) {
+                      return const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 32);
+                    } else if (i == fullStars && halfStar) {
+                      return const Icon(Icons.star_half_rounded, color: Color(0xFFF59E0B), size: 32);
+                    } else {
+                      return Icon(Icons.star_outline_rounded, color: Colors.grey.shade300, size: 32);
+                    }
+                  }),
                 ),
-                const SizedBox(width: 12),
-                _StatTile(
-                  icon: Icons.shield_rounded,
-                  iconColor: const Color(0xFF059669),
-                  label: 'Status',
-                  value: user?.isActive == true ? 'Active' : 'Offline',
-                  valueColor: user?.isActive == true ? const Color(0xFF059669) : Colors.grey,
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      rating.toStringAsFixed(1),
+                      style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1),
+                    ),
+                    const Text(' / 5.0', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                _StatTile(
-                  icon: Icons.verified_rounded,
-                  iconColor: const Color(0xFF0C637E),
-                  label: 'Verified',
-                  value: user?.verificationStatus == 'VERIFIED' ? 'Yes' : 'Pending',
-                  valueColor: user?.verificationStatus == 'VERIFIED'
-                      ? const Color(0xFF0C637E)
-                      : const Color(0xFFF59E0B),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: performanceColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: performanceColor.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    performanceLabel,
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13, color: performanceColor),
+                  ),
                 ),
+                const SizedBox(height: 24),
+
+                // Stats row
+                Row(
+                  children: [
+                    _StatTile(
+                      icon: Icons.local_hospital_rounded,
+                      iconColor: AppColors.primary,
+                      label: 'Responses',
+                      value: '$total',
+                    ),
+                    const SizedBox(width: 12),
+                    _StatTile(
+                      icon: Icons.shield_rounded,
+                      iconColor: const Color(0xFF059669),
+                      label: 'Status',
+                      value: user?.isActive == true ? 'Active' : 'Offline',
+                      valueColor: user?.isActive == true ? const Color(0xFF059669) : Colors.grey,
+                    ),
+                    const SizedBox(width: 12),
+                    _StatTile(
+                      icon: Icons.verified_rounded,
+                      iconColor: const Color(0xFF0C637E),
+                      label: 'Verified',
+                      value: user?.verificationStatus == 'VERIFIED' ? 'Yes' : 'Pending',
+                      valueColor: user?.verificationStatus == 'VERIFIED'
+                          ? const Color(0xFF0C637E)
+                          : const Color(0xFFF59E0B),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
               ],
+            );
+          }
+
+          return Container(
+            decoration: BoxDecoration(
+              color: Theme.of(ctx).cardColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             ),
-            const SizedBox(height: 8),
-          ],
-        ),
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [handle, body],
+            ),
+          );
+        },
       ),
     );
   }

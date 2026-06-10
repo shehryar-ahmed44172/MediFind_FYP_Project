@@ -122,6 +122,16 @@ class _EmergencyRequestScreenState
       appBar: AppBar(
         title: const Text('Emergency Request'),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/responder');
+            }
+          },
+        ),
       ),
       body: emergencyAsync.when(
         data: (emergency) => _buildContent(context, theme, emergency as emergency_entity.Emergency?),

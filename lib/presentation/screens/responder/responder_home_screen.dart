@@ -815,7 +815,7 @@ class _EmergencyRequestCard extends ConsumerWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: InkWell(
-            onTap: () => context.go('/responder/request/${request.id}'),
+            onTap: () => context.push('/responder/request/${request.id}'),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(

@@ -30,3 +30,4 @@ Add active emergency tracking screen
 Initialize MediFind Flutter application
 Add patient medical profile screen
 Add caregiver registration and authentication
+Add unit tests for application services

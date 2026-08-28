@@ -27,3 +27,4 @@ Add patient medical profile screen
 Add GPS location capture for SOS requests
 Update emergency request UI
 Add active emergency tracking screen
+Initialize MediFind Flutter application

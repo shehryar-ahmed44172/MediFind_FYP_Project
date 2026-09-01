@@ -1,2 +1,3 @@
 Fix navigation issues in authentication flow
 Add emergency SOS trigger functionality
+Implement password reset functionality

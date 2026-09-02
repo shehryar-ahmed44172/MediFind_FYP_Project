@@ -5,3 +5,4 @@ Set up Clean Architecture folder structure
 Implement ETA calculation for responders
 Add emergency request history
 Improve error handling in API requests
+Update emergency request UI

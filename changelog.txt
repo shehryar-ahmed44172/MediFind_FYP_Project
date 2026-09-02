@@ -8,3 +8,4 @@ Improve error handling in API requests
 Update emergency request UI
 Integrate file picker for medical reports
 Improve loading and error states
+Implement medical profile editing

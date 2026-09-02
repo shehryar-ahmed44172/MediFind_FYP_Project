@@ -3,3 +3,4 @@ Add emergency SOS trigger functionality
 Implement password reset functionality
 Set up Clean Architecture folder structure
 Implement ETA calculation for responders
+Add emergency request history

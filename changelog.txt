@@ -2,3 +2,4 @@ Fix navigation issues in authentication flow
 Add emergency SOS trigger functionality
 Implement password reset functionality
 Set up Clean Architecture folder structure
+Implement ETA calculation for responders

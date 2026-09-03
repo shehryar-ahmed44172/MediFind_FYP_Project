@@ -10,3 +10,4 @@ Integrate file picker for medical reports
 Improve loading and error states
 Implement medical profile editing
 Add caregiver registration and authentication
+Integrate file picker for medical reports

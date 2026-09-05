@@ -13,3 +13,4 @@ Add caregiver registration and authentication
 Integrate file picker for medical reports
 Create responder dashboard screen
 Add Dio HTTP client configuration
+Implement allergy information management

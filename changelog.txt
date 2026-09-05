@@ -14,3 +14,4 @@ Integrate file picker for medical reports
 Create responder dashboard screen
 Add Dio HTTP client configuration
 Implement allergy information management
+Add input validation to registration forms

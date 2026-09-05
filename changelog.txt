@@ -16,3 +16,4 @@ Add Dio HTTP client configuration
 Implement allergy information management
 Add input validation to registration forms
 Add Freezed models for medical profiles
+Add active emergency tracking screen

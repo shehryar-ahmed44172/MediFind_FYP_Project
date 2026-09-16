@@ -1,15 +1,17 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Bell, CheckCheck, AlertTriangle, UserCheck, Info, Clock,
-  ExternalLink, ChevronRight, MailOpen, EyeOff, Search, ArrowLeft,
+  Bell, CheckCheck, AlertTriangle, UserCheck, Info,
+  ExternalLink, ChevronRight, MailOpen, EyeOff, ArrowLeft,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAlert } from '../../context/hooks';
 import api from '../../services/api';
 import { errorMessage } from '../../services/adminApi';
 import { acquireSocket, releaseSocket } from '../../services/socket';
-import { PageHeader, RefreshButton, Button, EmptyState, ErrorBanner, FilterPill, Skeleton } from '../../components/ui';
+import {
+  PageHeader, RefreshButton, Button, EmptyState, ErrorBanner, Skeleton, Card, SearchInput,
+  SegmentedControl, StatusBadge, DetailItem,
+} from '../../components/ui';
 
 /*
  * Admin Inbox — the signed-in admin's notification history
@@ -40,12 +42,23 @@ const displayValue = (val) => {
   return String(val);
 };
 
-const TypeIcon = ({ n, size = 18 }) => {
-  if (isSos(n)) return <AlertTriangle size={size} color="var(--sos)" />;
-  if (isRegistration(n)) return <UserCheck size={size} color="var(--primary-light)" />;
-  if (typeOf(n).includes('SYSTEM')) return <CheckCheck size={size} color="var(--success)" />;
-  return <Info size={size} color="var(--text-muted)" />;
+// Small neutral type glyph; red is kept for SOS / emergencies only
+const TypeIcon = ({ n, size = 15 }) => {
+  if (isSos(n)) return <AlertTriangle size={size} aria-hidden="true" style={{ color: 'var(--error-fg)' }} />;
+  if (isRegistration(n)) return <UserCheck size={size} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />;
+  if (typeOf(n).includes('SYSTEM')) return <CheckCheck size={size} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />;
+  return <Info size={size} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />;
 };
+
+// Page-scoped layout: list (fixed) + reading pane; stacks below 1024px
+const INBOX_CSS = `
+.mf-inbox-grid { display: grid; grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); gap: 16px; min-height: 0; }
+.mf-inbox-list-btn { display: block; width: 100%; text-align: left; font-family: inherit; padding: 10px 16px 10px 26px;
+  border: none; border-bottom: 1px solid var(--border); background: transparent; cursor: pointer; position: relative; }
+.mf-inbox-list-btn[aria-current="true"] { background: var(--ui-accent-tint); }
+.mf-inbox-list-btn[aria-current="true"]:hover { background: var(--ui-accent-tint-strong); }
+@media (max-width: 1023px) { .mf-inbox-grid { grid-template-columns: minmax(0, 1fr); } }
+`;
 
 const AdminInbox = () => {
   const navigate = useNavigate();
@@ -167,98 +180,85 @@ const AdminInbox = () => {
   const unreadCount = visible.filter(n => !n.isRead).length;
   const selectedNotif = visible.find(n => n.id === selectedId) || null;
   const hasAction = selectedNotif && (isSos(selectedNotif) || isRegistration(selectedNotif));
+  const hasFilters = !!q || filter !== 'ALL';
+
+  const paneHeight = 'calc(100vh - 220px)';
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.3 }}
-      style={{ display: 'flex', flexDirection: 'column', minHeight: 'calc(100vh - 140px)' }}
-    >
+    <div className="mf-stack">
+      <style>{INBOX_CSS}</style>
       <PageHeader
         title="Admin Inbox"
-        subtitle="Alerts and notifications sent to your admin account. New alerts appear here live."
-        badge={unreadCount > 0 && (
-          <span style={{ fontSize: '0.72rem', fontWeight: 800, padding: '3px 9px', borderRadius: '999px', background: 'var(--tint-teal)', color: 'var(--admin-accent)' }}>
-            {unreadCount} unread
-          </span>
-        )}
+        description="Alerts and notifications sent to your admin account. New alerts appear here live."
+        badge={unreadCount > 0 && <StatusBadge tone="info"><span className="mf-num">{unreadCount}</span> unread</StatusBadge>}
         actions={(
           <>
             <RefreshButton onClick={refresh} loading={loading} />
-            <Button onClick={markAllRead} disabled={unreadCount === 0}>
-              <CheckCheck size={16} /> Mark all read
-            </Button>
+            <Button icon={CheckCheck} onClick={markAllRead} disabled={unreadCount === 0}>Mark all read</Button>
           </>
         )}
       />
 
-      <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
+      {error && <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>}
 
-      <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.25rem', minHeight: 0 }}>
-
+      <div className="mf-inbox-grid">
         {/* List */}
-        <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--admin-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', maxHeight: 'calc(100vh - 220px)', minHeight: '420px' }}>
-          <div style={{ padding: '14px', borderBottom: '1px solid var(--admin-border)', background: 'var(--table-head-bg)' }}>
-            <div style={{ position: 'relative', marginBottom: '10px' }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--admin-text-muted)', pointerEvents: 'none' }} />
-              <input
-                type="search"
-                placeholder="Search alerts…"
-                aria-label="Search alerts"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{ width: '100%', height: '38px', padding: '0 12px 0 34px', fontSize: '0.875rem', borderRadius: '10px', border: '1.5px solid var(--admin-border)', background: 'var(--input-bg)', color: 'var(--text-main)', outline: 'none' }}
-              />
-            </div>
-            <div role="group" aria-label="Filter alerts" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {FILTERS.map(f => (
-                <FilterPill key={f.key} active={filter === f.key} onClick={() => setFilter(f.key)}>{f.label}</FilterPill>
-              ))}
-            </div>
+        <Card style={{ display: 'flex', flexDirection: 'column', height: paneHeight, minHeight: '420px' }}>
+          <div style={{ padding: '12px', borderBottom: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <SearchInput width="100%" value={search} onChange={setSearch} placeholder="Search alerts…" />
+            <SegmentedControl
+              ariaLabel="Filter alerts"
+              value={filter}
+              onChange={setFilter}
+              options={FILTERS.map(f => ({ value: f.key, label: f.label, count: f.key === 'UNREAD' && unreadCount > 0 ? unreadCount : undefined }))}
+            />
           </div>
 
           <div style={{ flex: 1, overflowY: 'auto' }}>
             {loading ? (
-              Array.from({ length: 5 }, (_, i) => (
-                <div key={i} style={{ padding: '16px', borderBottom: '1px solid var(--admin-border)' }}>
-                  <Skeleton h={13} w="60%" mb={8} />
-                  <Skeleton h={11} w="85%" />
+              Array.from({ length: 6 }, (_, i) => (
+                <div key={i} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+                  <Skeleton h={12} w="60%" mb={8} />
+                  <Skeleton h={10} w="85%" />
                 </div>
               ))
             ) : filteredNotifs.length === 0 ? (
-              <EmptyState compact icon={MailOpen} title="No notifications" message={q || filter !== 'ALL' ? 'Nothing matches the current filter.' : 'You are all caught up.'} />
+              <EmptyState
+                compact
+                icon={MailOpen}
+                title="No notifications"
+                message={hasFilters ? 'Nothing matches the current filter.' : 'You are all caught up.'}
+                action={hasFilters && <Button size="sm" onClick={() => { setSearch(''); setFilter('ALL'); }}>Clear filters</Button>}
+              />
             ) : (
-              <ul style={{ listStyle: 'none' }}>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {filteredNotifs.map(n => {
                   const selected = selectedId === n.id;
                   return (
                     <li key={n.id}>
                       <button
                         type="button"
+                        className="mf-inbox-list-btn mf-row-hover"
                         onClick={() => { setSelectedId(n.id); markRead(n); }}
                         aria-current={selected ? 'true' : undefined}
-                        style={{
-                          display: 'block', width: '100%', textAlign: 'left', fontFamily: 'inherit',
-                          padding: '14px 16px', border: 'none', borderBottom: '1px solid var(--admin-border)',
-                          cursor: 'pointer', position: 'relative',
-                          background: selected ? 'var(--row-hover-bg)' : 'transparent',
-                        }}
                       >
                         {!n.isRead && (
-                          <span aria-label="Unread" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: '4px', background: 'var(--admin-accent)' }} />
+                          <span aria-label="Unread" style={{ position: 'absolute', left: '11px', top: '17px', width: '7px', height: '7px', borderRadius: '50%', background: 'var(--ui-accent)' }} />
                         )}
-                        <div style={{ display: 'flex', gap: '12px' }}>
-                          <div style={{ flexShrink: 0, marginTop: '2px' }}><TypeIcon n={n} /></div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px', marginBottom: '2px' }}>
-                              <span style={{ fontSize: '0.86rem', fontWeight: n.isRead ? 600 : 800, color: 'var(--admin-text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{n.title || 'Notification'}</span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--admin-text-muted)', flexShrink: 0 }}>{fmtTime(dateOf(n), { hour: '2-digit', minute: '2-digit' })}</span>
-                            </div>
-                            <p style={{ fontSize: '0.8rem', color: 'var(--admin-text-muted)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bodyOf(n) || '—'}</p>
-                          </div>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
+                          <span style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
+                            {isSos(n) && <TypeIcon n={n} size={13} />}
+                            <span style={{ fontSize: '13px', fontWeight: n.isRead ? 500 : 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {n.title || 'Notification'}
+                            </span>
+                          </span>
+                          <span className="mf-num" style={{ fontSize: '12px', color: 'var(--text-muted)', flexShrink: 0 }}>
+                            {fmtTime(dateOf(n), { hour: '2-digit', minute: '2-digit' })}
+                          </span>
                         </div>
+                        <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {bodyOf(n) || '—'}
+                        </p>
                       </button>
                     </li>
                   );
@@ -266,91 +266,76 @@ const AdminInbox = () => {
               </ul>
             )}
           </div>
-        </div>
+        </Card>
 
-        {/* Detail */}
-        <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--admin-border)', display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: '420px' }}>
-          <AnimatePresence mode="wait">
-            {selectedNotif ? (
-              <motion.div
-                key={selectedNotif.id}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 10 }}
-                style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
-              >
-                <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <Button variant="ghost" onClick={() => setSelectedId(null)} aria-label="Close notification">
-                    <ArrowLeft size={15} /> Back
+        {/* Reading pane */}
+        <Card style={{ display: 'flex', flexDirection: 'column', height: paneHeight, minHeight: '420px' }}>
+          {selectedNotif ? (
+            <div key={selectedNotif.id} className="mf-fade" style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+              <div style={{ padding: '8px 12px', minHeight: '52px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => setSelectedId(null)} aria-label="Close notification">
+                  Back
+                </Button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  {hasAction && (
+                    <Button size="sm" icon={ExternalLink} onClick={() => openRelated(selectedNotif)}>Open in portal</Button>
+                  )}
+                  <Button variant="ghost" size="sm" icon={EyeOff} onClick={() => hideNotif(selectedNotif.id)} title="Hide from this list for the current session" aria-label="Hide notification">
+                    Hide
                   </Button>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {hasAction && (
-                      <Button onClick={() => openRelated(selectedNotif)}>
-                        <ExternalLink size={14} /> Open in portal
-                      </Button>
-                    )}
-                    <Button variant="ghost" onClick={() => hideNotif(selectedNotif.id)} title="Hide from this list for the current session" aria-label="Hide notification">
-                      <EyeOff size={15} /> Hide
+                </div>
+              </div>
+
+              <div style={{ flex: 1, padding: '20px 24px', overflowY: 'auto' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '4px' }}>
+                  <TypeIcon n={selectedNotif} size={16} />
+                  <h2 style={{ fontSize: '16px', lineHeight: '24px', fontWeight: 600, color: 'var(--text-main)', margin: 0 }}>
+                    {selectedNotif.title || 'Notification'}
+                  </h2>
+                  <StatusBadge tone={isSos(selectedNotif) ? 'danger' : 'neutral'}>
+                    {typeOf(selectedNotif).replace(/_/g, ' ') || 'NOTIFICATION'}
+                  </StatusBadge>
+                </div>
+                <p className="mf-num" style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '0 0 16px' }}>
+                  {fmtTime(dateOf(selectedNotif)) || 'Unknown time'}
+                </p>
+
+                <p style={{ fontSize: '14px', color: 'var(--admin-text-sub)', lineHeight: 1.65, whiteSpace: 'pre-wrap', margin: '0 0 16px', maxWidth: '72ch' }}>
+                  {bodyOf(selectedNotif) || 'No message body.'}
+                </p>
+
+                {hasAction && (
+                  <div style={{ marginBottom: '20px' }}>
+                    <Button variant="primary" onClick={() => openRelated(selectedNotif)}>
+                      {isSos(selectedNotif) ? 'Open SOS monitor' : 'Open verification queue'} <ChevronRight size={15} aria-hidden="true" />
                     </Button>
                   </div>
-                </div>
+                )}
 
-                <div style={{ flex: 1, padding: '24px 28px', overflowY: 'auto' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '14px', marginBottom: '20px' }}>
-                    <div style={{ width: '46px', height: '46px', borderRadius: '14px', background: 'var(--table-head-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                      <TypeIcon n={selectedNotif} size={20} />
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '2px' }}>
-                        <h2 style={{ fontSize: '1.15rem', fontWeight: 800, color: 'var(--admin-text-main)', margin: 0 }}>{selectedNotif.title || 'Notification'}</h2>
-                        <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '4px', background: isSos(selectedNotif) ? 'var(--tint-red)' : 'var(--tint-teal)', color: isSos(selectedNotif) ? 'var(--error-fg)' : 'var(--admin-accent)' }}>
-                          {typeOf(selectedNotif).replace(/_/g, ' ') || 'NOTIFICATION'}
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '0.82rem', color: 'var(--admin-text-muted)', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Clock size={13} /> {fmtTime(dateOf(selectedNotif)) || 'Unknown time'}
-                      </p>
-                    </div>
+                {selectedNotif.data && typeof selectedNotif.data === 'object' && Object.keys(selectedNotif.data).length > 0 && (
+                  <div style={{ borderTop: '1px solid var(--border)', paddingTop: '16px' }}>
+                    <h3 style={{ fontSize: '11.5px', fontWeight: 500, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: '0 0 12px' }}>
+                      Attached data
+                    </h3>
+                    <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px 16px', margin: 0 }}>
+                      {Object.entries(selectedNotif.data).map(([key, val]) => (
+                        <DetailItem key={key} label={key}>
+                          <span className="mf-num" style={{ wordBreak: 'break-all' }}>{displayValue(val)}</span>
+                        </DetailItem>
+                      ))}
+                    </dl>
                   </div>
-
-                  <div style={{ background: 'var(--table-head-bg)', padding: '18px 20px', borderRadius: '14px', border: '1px solid var(--admin-border)', marginBottom: '18px' }}>
-                    <p style={{ fontSize: '0.98rem', color: 'var(--admin-text-sub)', lineHeight: 1.65, whiteSpace: 'pre-wrap', margin: 0 }}>
-                      {bodyOf(selectedNotif) || 'No message body.'}
-                    </p>
-                  </div>
-
-                  {hasAction && (
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '18px' }}>
-                      <Button variant="primary" onClick={() => openRelated(selectedNotif)}>
-                        {isSos(selectedNotif) ? 'Open SOS monitor' : 'Open verification queue'} <ChevronRight size={16} />
-                      </Button>
-                    </div>
-                  )}
-
-                  {selectedNotif.data && typeof selectedNotif.data === 'object' && Object.keys(selectedNotif.data).length > 0 && (
-                    <div style={{ borderTop: '1px solid var(--admin-border)', paddingTop: '18px' }}>
-                      <h3 style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '10px', letterSpacing: '0.06em' }}>Attached data</h3>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px' }}>
-                        {Object.entries(selectedNotif.data).map(([key, val]) => (
-                          <div key={key} style={{ padding: '10px 12px', borderRadius: '10px', border: '1px solid var(--admin-border)' }}>
-                            <p style={{ fontSize: '0.66rem', fontWeight: 800, color: 'var(--admin-text-muted)', textTransform: 'uppercase', marginBottom: '3px' }}>{key}</p>
-                            <p style={{ fontSize: '0.86rem', fontWeight: 700, color: 'var(--admin-text-main)', margin: 0, wordBreak: 'break-all' }}>{displayValue(val)}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </motion.div>
-            ) : (
-              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <EmptyState icon={Bell} title="Select a notification" message="Choose an alert from the list to see its details." />
+                )}
               </div>
-            )}
-          </AnimatePresence>
-        </div>
+            </div>
+          ) : (
+            <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <EmptyState icon={Bell} title="Select a notification" message="Choose an alert from the list to see its details." />
+            </div>
+          )}
+        </Card>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

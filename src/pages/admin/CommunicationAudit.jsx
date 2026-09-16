@@ -1,25 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Mail, MessageSquare, Bell, Search, CheckCircle, Clock, XCircle, Smartphone, Inbox } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Mail, MessageSquare, Bell, Smartphone, Inbox } from 'lucide-react';
 import api from '../../services/api';
 import { errorMessage } from '../../services/adminApi';
-import { PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, FilterPill, SearchInput, ErrorBanner } from '../../components/ui';
-import { thStyle, paginate } from '../../components/uiStyles';
+import {
+  PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, SearchInput, ErrorBanner,
+  Panel, Toolbar, SegmentedControl, DataTable, StatusBadge, StatCard, Button,
+} from '../../components/ui';
+import { paginate, toneFor } from '../../components/uiStyles';
 
-const STATUS_CONFIG = {
-  DELIVERED: { color: 'var(--success-fg)', pill: 'var(--success-fg)', icon: CheckCircle, label: 'Delivered' },
-  PENDING:   { color: 'var(--warning-fg)', pill: 'var(--warning-fg)', icon: Clock,       label: 'Pending' },
-  FAILED:    { color: 'var(--error-fg)', pill: 'var(--error-fg)', icon: XCircle,     label: 'Failed' },
-};
+const STATUS_LABEL = { DELIVERED: 'Delivered', PENDING: 'Pending', FAILED: 'Failed' };
 
 const TYPE_CONFIG = {
-  EMAIL:  { color: 'var(--admin-accent)', icon: Mail,          label: 'Email' },
-  PUSH:   { color: 'var(--primary)',             icon: Bell,          label: 'Push' },
-  IN_APP: { color: 'var(--success-fg)',             icon: Smartphone,    label: 'In-app' },
-  SMS:    { color: 'var(--warning-fg)',             icon: MessageSquare, label: 'SMS' },
+  EMAIL:  { icon: Mail,          label: 'Email' },
+  PUSH:   { icon: Bell,          label: 'Push' },
+  IN_APP: { icon: Smartphone,    label: 'In-app' },
+  SMS:    { icon: MessageSquare, label: 'SMS' },
 };
 
 const PAGE_SIZE = 15;
+const COLS = 6;
 
 const formatTime = (iso) => {
   const d = new Date(iso);
@@ -27,6 +26,8 @@ const formatTime = (iso) => {
     ? '—'
     : d.toLocaleString('en-PK', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: true });
 };
+
+const truncate = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
 const CommunicationAudit = () => {
   const [search, setSearch] = useState('');
@@ -82,129 +83,112 @@ const CommunicationAudit = () => {
     return matchType && matchStatus && matchSearch;
   });
   const { page: currentPage, rows } = paginate(filtered, page, PAGE_SIZE);
+  const hasFilters = !!q || typeFilter !== 'ALL' || statusFilter !== 'ALL';
+  const clearFilters = () => { setSearch(''); setTypeFilter('ALL'); setStatusFilter('ALL'); setPage(1); };
 
   const cards = [
-    { label: 'Total Sent', value: summary.total,     color: 'var(--admin-accent)' },
-    { label: 'Delivered',  value: summary.delivered, color: 'var(--success-fg)' },
-    { label: 'Pending',    value: summary.pending,   color: 'var(--warning-fg)' },
-    { label: 'Failed',     value: summary.failed,    color: 'var(--error-fg)' },
+    { label: 'Total sent', value: summary.total },
+    { label: 'Delivered',  value: summary.delivered },
+    { label: 'Pending',    value: summary.pending },
+    { label: 'Failed',     value: summary.failed },
   ];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.3 }}
-    >
+    <div className="mf-stack">
       <PageHeader
         title="Communication Audit"
-        subtitle="Every email, push and in-app notification the system has sent (latest 500)."
+        description="Every email, push and in-app notification the system has sent (latest 500)."
         actions={<RefreshButton onClick={refresh} loading={loading} />}
       />
 
-      <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
+      {error && <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>}
 
-      {/* Summary Cards */}
-      <div className="mf-grid-stats" style={{ marginBottom: '20px' }}>
+      <div className="mf-grid-stats">
         {cards.map((card) => (
-          <div key={card.label} style={{ background: 'var(--surface)', borderRadius: '14px', border: '1px solid var(--admin-border)', padding: '16px 20px' }}>
-            <p style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '6px' }}>{card.label}</p>
-            <p style={{ fontSize: '1.75rem', fontWeight: 800, color: card.color, lineHeight: 1.1 }}>
-              {loading ? '—' : Number(card.value).toLocaleString()}
-            </p>
-          </div>
+          <StatCard key={card.label} label={card.label} value={Number(card.value)} loading={loading} />
         ))}
       </div>
 
-      <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
-        {/* Filters */}
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--admin-border)', display: 'flex', gap: '12px 20px', alignItems: 'center', flexWrap: 'wrap' }}>
-          <div role="group" aria-label="Filter by channel" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {['ALL', 'EMAIL', 'PUSH', 'IN_APP'].map((t) => (
-              <FilterPill key={t} active={typeFilter === t} onClick={() => { setTypeFilter(t); setPage(1); }}>
-                {t === 'ALL' ? 'All channels' : TYPE_CONFIG[t].label}
-              </FilterPill>
-            ))}
-          </div>
-          <div role="group" aria-label="Filter by status" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-            {['ALL', 'DELIVERED', 'PENDING', 'FAILED'].map((s) => (
-              <FilterPill key={s} active={statusFilter === s} color={STATUS_CONFIG[s]?.pill} onClick={() => { setStatusFilter(s); setPage(1); }}>
-                {s === 'ALL' ? 'All statuses' : STATUS_CONFIG[s].label}
-              </FilterPill>
-            ))}
-          </div>
-          <div style={{ marginLeft: 'auto' }}>
-            <SearchInput icon={Search} width={260} value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search recipient or subject…" />
-          </div>
-        </div>
+      <Panel>
+        <Toolbar right={<SearchInput width={260} value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search recipient or subject…" />}>
+          <SegmentedControl
+            ariaLabel="Filter by channel"
+            value={typeFilter}
+            onChange={(v) => { setTypeFilter(v); setPage(1); }}
+            options={['ALL', 'EMAIL', 'PUSH', 'IN_APP'].map(t => ({ value: t, label: t === 'ALL' ? 'All channels' : TYPE_CONFIG[t].label }))}
+          />
+          <SegmentedControl
+            ariaLabel="Filter by status"
+            value={statusFilter}
+            onChange={(v) => { setStatusFilter(v); setPage(1); }}
+            options={['ALL', 'DELIVERED', 'PENDING', 'FAILED'].map(s => ({ value: s, label: s === 'ALL' ? 'All statuses' : STATUS_LABEL[s] }))}
+          />
+        </Toolbar>
 
-        {/* Table */}
-        <div className="mf-table-scroll">
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '860px' }}>
-            <thead>
+        <DataTable minWidth={900} maxHeight="calc(100vh - 380px)">
+          <thead>
+            <tr>
+              {['Category', 'Channel', 'Recipient', 'Subject', 'Status', 'Sent at'].map((h) => (
+                <th key={h} scope="col">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <TableSkeletonRows rows={8} cols={COLS} />
+            ) : filtered.length === 0 ? (
               <tr>
-                {['Category', 'Channel', 'Recipient', 'Subject', 'Status', 'Sent At'].map((h) => (
-                  <th key={h} scope="col" style={thStyle}>{h}</th>
-                ))}
+                <td colSpan={COLS}>
+                  <EmptyState
+                    icon={Inbox}
+                    title={comms.length === 0 ? 'No communications sent yet' : 'No communications match your filters'}
+                    message={comms.length === 0 ? undefined : 'Try another channel, status or search term.'}
+                    action={comms.length > 0 && hasFilters && <Button size="sm" onClick={clearFilters}>Clear filters</Button>}
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <TableSkeletonRows rows={6} cols={6} />
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={6}>
-                    <EmptyState
-                      icon={Inbox}
-                      title={comms.length === 0 ? 'No communications sent yet' : 'No communications match your filters'}
-                      message={comms.length === 0 ? undefined : 'Try another channel, status or search term.'}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                rows.map((comm) => {
-                  const typeCfg = TYPE_CONFIG[comm.type] || TYPE_CONFIG.IN_APP;
-                  const statusCfg = STATUS_CONFIG[comm.status] || { color: 'var(--admin-text-muted)', icon: Clock, label: comm.status || 'Unknown' };
-                  const TypeIcon = typeCfg.icon;
-                  const StatusIcon = statusCfg.icon;
-                  return (
-                    <tr key={comm.id} className="mf-table-row" style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                      <td style={{ padding: '12px 20px' }}>
-                        <span style={{ fontSize: '0.74rem', fontWeight: 700, background: 'var(--tint-teal)', color: 'var(--admin-accent)', padding: '3px 8px', borderRadius: '6px', whiteSpace: 'nowrap' }}>{comm.category || '—'}</span>
-                      </td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: typeCfg.color }}>
-                          <TypeIcon size={15} />
-                          <span style={{ fontSize: '0.84rem', fontWeight: 700 }}>{typeCfg.label}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 20px', fontSize: '0.86rem', color: 'var(--admin-text-main)', fontWeight: 600 }}>
-                        {comm.recipientName && comm.recipientName !== comm.recipient && (
-                          <div>{comm.recipientName}</div>
-                        )}
-                        <div style={{ fontSize: comm.recipientName && comm.recipientName !== comm.recipient ? '0.76rem' : undefined, color: comm.recipientName && comm.recipientName !== comm.recipient ? 'var(--admin-text-muted)' : undefined, fontWeight: comm.recipientName && comm.recipientName !== comm.recipient ? 500 : undefined }}>{comm.recipient}</div>
-                      </td>
-                      <td style={{ padding: '12px 20px', fontSize: '0.86rem', color: 'var(--admin-text-sub)', maxWidth: '280px' }}>
-                        <div title={comm.subject} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{comm.subject}</div>
-                      </td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <div title={comm.failureReason || undefined} style={{ display: 'flex', alignItems: 'center', gap: '6px', color: statusCfg.color }}>
-                          <StatusIcon size={15} />
-                          <span style={{ fontSize: '0.8rem', fontWeight: 700 }}>{statusCfg.label}</span>
-                        </div>
-                      </td>
-                      <td style={{ padding: '12px 20px', fontSize: '0.8rem', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>{formatTime(comm.sentAt)}</td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+            ) : (
+              rows.map((comm) => {
+                const typeCfg = TYPE_CONFIG[comm.type] || TYPE_CONFIG.IN_APP;
+                const TypeIcon = typeCfg.icon;
+                const hasName = comm.recipientName && comm.recipientName !== comm.recipient;
+                return (
+                  <tr key={comm.id} className="mf-table-row">
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      {comm.category
+                        ? <StatusBadge tone="neutral" dot={false}>{comm.category.charAt(0) + comm.category.slice(1).toLowerCase()}</StatusBadge>
+                        : '—'}
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', color: 'var(--admin-text-sub)' }}>
+                        <TypeIcon size={14} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />
+                        {typeCfg.label}
+                      </span>
+                    </td>
+                    <td style={{ maxWidth: '240px' }}>
+                      {hasName && <div style={{ ...truncate, color: 'var(--text-main)', fontWeight: 500 }}>{comm.recipientName}</div>}
+                      <div style={{ ...truncate, ...(hasName ? { fontSize: '12.5px', color: 'var(--text-muted)' } : { color: 'var(--text-main)' }) }} title={comm.recipient}>
+                        {comm.recipient}
+                      </div>
+                    </td>
+                    <td style={{ maxWidth: '300px' }}>
+                      <div title={comm.subject} style={truncate}>{comm.subject}</div>
+                    </td>
+                    <td style={{ whiteSpace: 'nowrap' }}>
+                      <StatusBadge tone={toneFor(comm.status)} title={comm.failureReason || undefined}>
+                        {STATUS_LABEL[comm.status] || comm.status || 'Unknown'}
+                      </StatusBadge>
+                    </td>
+                    <td className="mf-num" style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatTime(comm.sentAt)}</td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </DataTable>
         <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} loading={loading} />
-      </div>
-    </motion.div>
+      </Panel>
+    </div>
   );
 };
 

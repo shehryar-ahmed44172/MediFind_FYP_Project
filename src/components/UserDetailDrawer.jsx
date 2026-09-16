@@ -1,14 +1,11 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { motion } from 'framer-motion';
-import {
-  X, Mail, Phone, MapPin, Calendar, Clock, Shield, Activity, Star,
-  CheckCircle, XCircle, AlertTriangle, CreditCard, FileText, User,
-} from 'lucide-react';
+import { Star } from 'lucide-react';
 import api from '../services/api';
 import { updateSubscriptionPlan, PLAN_OPTIONS, errorMessage } from '../services/adminApi';
 import { resolveFileUrl } from '../utils/resolveFileUrl';
 import { useAlert } from '../context/hooks';
-import { Skeleton } from './ui';
+import { Avatar, Button, DetailItem, Drawer, Notice, Select, Skeleton, StatusBadge } from './ui';
+import { humanize, toneFor } from './uiStyles';
 
 const fmtDate = (iso, withTime = false) => {
   if (!iso) return '—';
@@ -21,43 +18,16 @@ const fmtDate = (iso, withTime = false) => {
 
 const asList = (v) => (Array.isArray(v) ? v.filter(Boolean).map(x => (typeof x === 'object' ? (x.name || x.label || JSON.stringify(x)) : String(x))) : []);
 
-const STATUS_COLORS = {
-  ACTIVE: 'var(--sos)', ASSIGNED: 'var(--primary-light)', ARRIVED: 'var(--primary-light)', RESOLVED: 'var(--success)', COMPLETED: 'var(--success)',
-  CANCELLED: 'var(--text-muted)', PENDING: 'var(--warning)', ACCEPTED: 'var(--success)', REJECTED: 'var(--sos)', EXPIRED: 'var(--text-muted)',
-};
-
-function Section({ title, icon, children, right }) {
-  const Glyph = icon;
+function Section({ title, children }) {
   return (
-    <section style={{ padding: '18px 22px', borderBottom: '1px solid var(--admin-border)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
-        <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.78rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--admin-text-muted)' }}>
-          {Glyph && <Glyph size={14} />} {title}
-        </h3>
-        {right}
-      </div>
+    <section style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+      <h3 style={{ fontSize: '13.5px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 12px' }}>{title}</h3>
       {children}
     </section>
   );
 }
 
-function Field({ label, value }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--admin-text-muted)', marginBottom: '2px' }}>{label}</p>
-      <p style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--admin-text-main)', wordBreak: 'break-word' }}>{value ?? '—'}</p>
-    </div>
-  );
-}
-
-function StatusChip({ status }) {
-  const color = STATUS_COLORS[status] || 'var(--text-muted)';
-  return (
-    <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', color, background: `color-mix(in srgb, ${color} 12%, transparent)`, whiteSpace: 'nowrap' }}>
-      {status || '—'}
-    </span>
-  );
-}
+const DETAIL_GRID = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px 20px', margin: 0 };
 
 /**
  * Slide-over panel with a user's full profile.
@@ -69,7 +39,7 @@ export default function UserDetailDrawer({ userId, onClose, onUserUpdated }) {
   const [state, setState] = useState({ loading: true, error: '', user: null });
   const [plan, setPlan] = useState('');
   const [savingPlan, setSavingPlan] = useState(false);
-  const closeRef = useRef(null);
+  const bodyRef = useRef(null);
 
   useEffect(() => {
     let alive = true;
@@ -87,12 +57,8 @@ export default function UserDetailDrawer({ userId, onClose, onUserUpdated }) {
     return () => { alive = false; };
   }, [userId]);
 
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  // Move focus into the drawer when it opens (Escape is handled by Drawer)
+  useEffect(() => { bodyRef.current?.focus(); }, []);
 
   const { loading, error, user } = state;
   const currentPlan = user?.subscriptionPlan || 'FREE';
@@ -123,227 +89,185 @@ export default function UserDetailDrawer({ userId, onClose, onUserUpdated }) {
 
   const mp = user?.medicalProfile;
   const rp = user?.responder;
+  const verification = rp ? (rp.verificationStatus || (rp.isVerified ? 'VERIFIED' : 'PENDING')) : null;
+
+  const headerBadges = loading ? (
+    <div style={{ marginTop: '8px', width: '200px' }}><Skeleton h={10} w="70%" /></div>
+  ) : user ? (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+      <StatusBadge dot={false}>{humanize(user.role)}</StatusBadge>
+      <StatusBadge tone={user.isActive ? 'success' : 'neutral'}>{user.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+      {user.isEmailVerified === false && <StatusBadge tone="warning">Email unverified</StatusBadge>}
+    </div>
+  ) : null;
 
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
-        style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 900 }}
-      />
-      <motion.aside
-        role="dialog"
-        aria-modal="true"
-        aria-label="User details"
-        initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
-        style={{
-          position: 'fixed', top: 0, right: 0, bottom: 0, width: 'min(520px, 100vw)', zIndex: 901,
-          background: 'var(--surface)', borderLeft: '1px solid var(--admin-border)', boxShadow: 'var(--shadow-lg)',
-          display: 'flex', flexDirection: 'column',
-        }}
-      >
-        {/* Header */}
-        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--admin-border)', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          {loading ? (
-            <div style={{ flex: 1 }}><Skeleton h={18} w="50%" mb={8} /><Skeleton h={12} w="70%" /></div>
-          ) : user ? (
-            <>
-              <div style={{ width: '52px', height: '52px', borderRadius: '14px', overflow: 'hidden', flexShrink: 0, background: 'linear-gradient(135deg,var(--primary),var(--primary-mid))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.2rem' }}>
-                {user.profileImageUrl
-                  ? <img src={resolveFileUrl(user.profileImageUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  : (user.fullName?.[0] || '?').toUpperCase()}
+    <Drawer
+      onClose={onClose}
+      width={540}
+      title={user ? (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', maxWidth: '100%' }}>
+          <Avatar name={user.fullName} src={user.profileImageUrl ? resolveFileUrl(user.profileImageUrl) : undefined} size={32} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.fullName}</span>
+        </span>
+      ) : 'User details'}
+      headerExtra={headerBadges}
+    >
+      <div ref={bodyRef} tabIndex={-1} aria-label="User details" style={{ outline: 'none' }}>
+        {loading ? (
+          <div style={{ padding: '20px' }}>
+            {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} h={12} w={`${90 - i * 8}%`} mb={14} />)}
+          </div>
+        ) : error ? (
+          <div style={{ padding: '20px' }}><Notice tone="danger">{error}</Notice></div>
+        ) : user && (
+          <>
+            {user.role === 'RESPONDER' && rp?.verificationStatus === 'PENDING' && (
+              <div style={{ padding: '16px 20px 0' }}>
+                <Notice tone="warning">Credentials are awaiting review in the Verification Queue.</Notice>
               </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <h2 style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--admin-text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.fullName}</h2>
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
-                  <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: 'var(--tint-teal)', color: 'var(--admin-accent)' }}>{user.role}</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: user.isActive ? 'var(--tint-green)' : 'var(--tint-red)', color: user.isActive ? 'var(--success-fg)' : 'var(--error-fg)' }}>
-                    {user.isActive ? <CheckCircle size={10} /> : <XCircle size={10} />} {user.isActive ? 'Active' : 'Inactive'}
-                  </span>
-                  {user.isEmailVerified === false && (
-                    <span style={{ fontSize: '0.68rem', fontWeight: 800, padding: '2px 8px', borderRadius: '6px', background: 'var(--tint-amber)', color: 'var(--warning-fg)' }}>Email unverified</span>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : <div style={{ flex: 1, fontWeight: 700, color: 'var(--admin-text-main)' }}>User details</div>}
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Close user details"
-            style={{ width: '36px', height: '36px', borderRadius: '10px', border: '1px solid var(--admin-border)', background: 'var(--surface)', color: 'var(--admin-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
-          >
-            <X size={18} />
-          </button>
-        </div>
+            )}
 
-        {/* Body */}
-        <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading ? (
-            <div style={{ padding: '22px' }}>
-              {Array.from({ length: 6 }, (_, i) => <Skeleton key={i} h={14} w={`${90 - i * 8}%`} mb={14} />)}
-            </div>
-          ) : error ? (
-            <div role="alert" style={{ margin: '22px', padding: '14px 16px', borderRadius: '12px', background: 'var(--error-bg)', border: '1px solid var(--error-border)', color: 'var(--error-fg)', fontWeight: 600, fontSize: '0.88rem' }}>
-              {error}
-            </div>
-          ) : user && (
-            <>
-              <Section title="Contact & Account" icon={User}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px 18px' }}>
-                  <Field label="Email" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Mail size={12} /> {user.email}</span>} />
-                  <Field label="Phone" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Phone size={12} /> {user.phoneNumber || '—'}</span>} />
-                  <Field label="City" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><MapPin size={12} /> {user.city || '—'}</span>} />
-                  <Field label="Date of birth" value={fmtDate(user.dateOfBirth)} />
-                  <Field label="Joined" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Calendar size={12} /> {fmtDate(user.createdAt)}</span>} />
-                  <Field label="Last login" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><Clock size={12} /> {fmtDate(user.lastLoginAt || user.lastLogin, true)}</span>} />
-                  {user.address && <Field label="Address" value={user.address} />}
-                  <Field label="Audit log entries" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}><FileText size={12} /> {user.auditCount ?? 0}</span>} />
+            <Section title="Contact & account">
+              <dl style={DETAIL_GRID}>
+                <DetailItem label="Email">{user.email}</DetailItem>
+                <DetailItem label="Phone"><span className="mf-num">{user.phoneNumber || '—'}</span></DetailItem>
+                <DetailItem label="City">{user.city || '—'}</DetailItem>
+                <DetailItem label="Date of birth"><span className="mf-num">{fmtDate(user.dateOfBirth)}</span></DetailItem>
+                <DetailItem label="Joined"><span className="mf-num">{fmtDate(user.createdAt)}</span></DetailItem>
+                <DetailItem label="Last login"><span className="mf-num">{fmtDate(user.lastLoginAt || user.lastLogin, true)}</span></DetailItem>
+                {user.address && <DetailItem label="Address">{user.address}</DetailItem>}
+                <DetailItem label="Audit log entries"><span className="mf-num">{user.auditCount ?? 0}</span></DetailItem>
+              </dl>
+            </Section>
+
+            {user.role !== 'ADMIN' && (
+              <Section title="Subscription">
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <label htmlFor="mf-plan-select" className="sr-only">Plan</label>
+                  <Select
+                    id="mf-plan-select"
+                    value={plan}
+                    disabled={savingPlan}
+                    onChange={e => setPlan(e.target.value)}
+                    style={{ width: 'auto', minWidth: '220px' }}
+                  >
+                    {PLAN_OPTIONS.map(p => (
+                      <option key={p.value} value={p.value}>{p.label}{p.price ? ` — PKR ${p.price.toLocaleString()}/mo` : ''}</option>
+                    ))}
+                  </Select>
+                  <Button variant="primary" onClick={applyPlan} disabled={savingPlan || plan === currentPlan}>
+                    {savingPlan ? 'Saving…' : 'Apply'}
+                  </Button>
                 </div>
+                <p style={{ fontSize: '12.5px', color: 'var(--text-muted)', margin: '8px 0 0' }}>
+                  Prices are fixed server-side. Changing the plan here does not charge or refund the user.
+                </p>
               </Section>
+            )}
 
-              {user.role !== 'ADMIN' && (
-                <Section title="Subscription" icon={CreditCard}>
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <label htmlFor="mf-plan-select" style={{ fontSize: '0.82rem', color: 'var(--admin-text-sub)', fontWeight: 600 }}>Plan</label>
-                    <select
-                      id="mf-plan-select"
-                      value={plan}
-                      disabled={savingPlan}
-                      onChange={e => setPlan(e.target.value)}
-                      style={{ height: '38px', padding: '0 12px', borderRadius: '10px', border: '1.5px solid var(--admin-border)', background: 'var(--input-bg)', color: 'var(--text-main)', fontWeight: 600, fontFamily: 'inherit', minWidth: '200px' }}
-                    >
-                      {PLAN_OPTIONS.map(p => (
-                        <option key={p.value} value={p.value}>{p.label}{p.price ? ` — PKR ${p.price.toLocaleString()}/mo` : ''}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      onClick={applyPlan}
-                      disabled={savingPlan || plan === currentPlan}
-                      style={{
-                        height: '38px', padding: '0 16px', borderRadius: '10px', border: 'none', fontWeight: 700, fontFamily: 'inherit',
-                        background: plan === currentPlan ? 'var(--tint-slate)' : 'linear-gradient(135deg, var(--grad-start), var(--grad-end))',
-                        color: plan === currentPlan ? 'var(--admin-text-muted)' : 'white',
-                        cursor: savingPlan || plan === currentPlan ? 'not-allowed' : 'pointer',
-                      }}
-                    >
-                      {savingPlan ? 'Saving…' : 'Apply'}
-                    </button>
-                  </div>
-                  <p style={{ fontSize: '0.74rem', color: 'var(--admin-text-muted)', marginTop: '8px' }}>
-                    Prices are fixed server-side. Changing the plan here does not charge or refund the user.
-                  </p>
+            {user.role === 'PATIENT' && (
+              <>
+                <Section title="Medical profile">
+                  {mp ? (
+                    <dl style={DETAIL_GRID}>
+                      <DetailItem label="Patient type">{mp.patientType === 'DEAF' ? 'Deaf / mute' : (mp.patientType || '—')}</DetailItem>
+                      <DetailItem label="Blood type">{mp.bloodType || '—'}</DetailItem>
+                      <DetailItem label="Chronic diseases">{asList(mp.chronicDiseases).join(', ') || '—'}</DetailItem>
+                      <DetailItem label="Allergies">{asList(mp.allergies).join(', ') || '—'}</DetailItem>
+                      <DetailItem label="Medications">{asList(mp.medications).join(', ') || '—'}</DetailItem>
+                      <DetailItem label="Emergency contacts"><span className="mf-num">{asList(mp.emergencyContacts).length || '0'}</span></DetailItem>
+                    </dl>
+                  ) : <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>No medical profile on file.</p>}
                 </Section>
-              )}
 
-              {user.role === 'PATIENT' && (
-                <>
-                  <Section title="Medical profile" icon={Shield}>
-                    {mp ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px 18px' }}>
-                        <Field label="Patient type" value={mp.patientType === 'DEAF' ? 'Deaf / mute' : (mp.patientType || '—')} />
-                        <Field label="Blood type" value={mp.bloodType || '—'} />
-                        <Field label="Chronic diseases" value={asList(mp.chronicDiseases).join(', ') || '—'} />
-                        <Field label="Allergies" value={asList(mp.allergies).join(', ') || '—'} />
-                        <Field label="Medications" value={asList(mp.medications).join(', ') || '—'} />
-                        <Field label="Emergency contacts" value={asList(mp.emergencyContacts).length || '0'} />
-                      </div>
-                    ) : <p style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>No medical profile on file.</p>}
-                  </Section>
+                <Section title="Emergencies">
+                  {user.emergencyStats && (
+                    <dl style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', margin: '0 0 12px', border: '1px solid var(--border)', borderRadius: '8px' }}>
+                      {[
+                        ['Total', user.emergencyStats.total],
+                        ['Resolved', (user.emergencyStats.resolved || 0) + (user.emergencyStats.completed || 0)],
+                        ['Cancelled', user.emergencyStats.cancelled],
+                        ['Active', user.emergencyStats.active],
+                      ].map(([label, val], i) => (
+                        <div key={label} style={{ padding: '8px 12px', borderLeft: i > 0 ? '1px solid var(--border)' : 'none', minWidth: 0 }}>
+                          <dt style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{label}</dt>
+                          <dd className="mf-num" style={{ margin: 0, fontSize: '15px', fontWeight: 600, color: label === 'Active' && val > 0 ? 'var(--error-fg)' : 'var(--text-main)' }}>{val ?? 0}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
+                  <HistoryList
+                    empty="No emergencies recorded."
+                    items={(user.emergencyHistory || []).map(e => ({
+                      id: e.id,
+                      title: `${e.emergencyType || 'Medical'} emergency`,
+                      meta: e.emergencyRequests?.[0]?.responder?.user?.fullName
+                        ? `Responder: ${e.emergencyRequests[0].responder.user.fullName}`
+                        : 'No responder accepted',
+                      date: e.createdAt,
+                      status: e.status,
+                    }))}
+                  />
+                </Section>
+              </>
+            )}
 
-                  <Section title="Emergencies" icon={Activity}>
-                    {user.emergencyStats && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '8px', marginBottom: '14px' }}>
-                        {[
-                          ['Total', user.emergencyStats.total, 'var(--admin-accent)'],
-                          ['Resolved', (user.emergencyStats.resolved || 0) + (user.emergencyStats.completed || 0), 'var(--success)'],
-                          ['Cancelled', user.emergencyStats.cancelled, 'var(--text-muted)'],
-                          ['Active', user.emergencyStats.active, 'var(--sos)'],
-                        ].map(([label, val, color]) => (
-                          <div key={label} style={{ padding: '10px', borderRadius: '10px', background: 'var(--table-head-bg)', border: '1px solid var(--admin-border)', textAlign: 'center' }}>
-                            <p style={{ fontSize: '1.2rem', fontWeight: 800, color }}>{val ?? 0}</p>
-                            <p style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--admin-text-muted)' }}>{label}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <HistoryList
-                      empty="No emergencies recorded."
-                      items={(user.emergencyHistory || []).map(e => ({
-                        id: e.id,
-                        title: `${e.emergencyType || 'Medical'} emergency`,
-                        meta: e.emergencyRequests?.[0]?.responder?.user?.fullName
-                          ? `Responder: ${e.emergencyRequests[0].responder.user.fullName}`
-                          : 'No responder accepted',
-                        date: e.createdAt,
-                        status: e.status,
-                      }))}
-                    />
-                  </Section>
-                </>
-              )}
+            {user.role === 'RESPONDER' && (
+              <>
+                <Section title="Responder profile">
+                  {rp ? (
+                    <dl style={DETAIL_GRID}>
+                      <DetailItem label="Type">{(rp.responderType || '').replace(/_/g, ' ') || '—'}</DetailItem>
+                      <DetailItem label="Organization">{rp.organization || 'Independent'}</DetailItem>
+                      <DetailItem label="License #">{rp.licenseNumber || '—'}</DetailItem>
+                      <DetailItem label="Verification"><StatusBadge tone={toneFor(verification)}>{humanize(verification)}</StatusBadge></DetailItem>
+                      <DetailItem label="Rating">
+                        <span className="mf-num" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                          <Star size={12} aria-hidden="true" style={{ color: 'var(--text-muted)' }} /> {Number(rp.rating ?? 0).toFixed(1)} ({rp.totalRatings ?? 0})
+                        </span>
+                      </DetailItem>
+                      <DetailItem label="Responses handled"><span className="mf-num">{rp.totalResponsesHandled ?? 0}</span></DetailItem>
+                      <DetailItem label="Availability">{rp.isAvailable ? 'Available' : 'Unavailable'}</DetailItem>
+                      {rp.rejectionReason && <DetailItem label="Rejection reason">{rp.rejectionReason}</DetailItem>}
+                    </dl>
+                  ) : <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>No responder profile on file.</p>}
+                </Section>
 
-              {user.role === 'RESPONDER' && (
-                <>
-                  <Section title="Responder profile" icon={Shield}>
-                    {rp ? (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '12px 18px' }}>
-                        <Field label="Type" value={(rp.responderType || '').replace(/_/g, ' ') || '—'} />
-                        <Field label="Organization" value={rp.organization || 'Independent'} />
-                        <Field label="License #" value={rp.licenseNumber || '—'} />
-                        <Field label="Verification" value={rp.verificationStatus || (rp.isVerified ? 'VERIFIED' : 'PENDING')} />
-                        <Field label="Rating" value={<span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}><Star size={12} color="var(--warning)" /> {Number(rp.rating ?? 0).toFixed(1)} ({rp.totalRatings ?? 0})</span>} />
-                        <Field label="Responses handled" value={rp.totalResponsesHandled ?? 0} />
-                        <Field label="Availability" value={rp.isAvailable ? 'Available' : 'Unavailable'} />
-                        {rp.rejectionReason && <Field label="Rejection reason" value={rp.rejectionReason} />}
-                      </div>
-                    ) : <p style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>No responder profile on file.</p>}
-                  </Section>
-
-                  <Section title="Recent dispatch requests" icon={Activity}>
-                    <HistoryList
-                      empty="No dispatch requests yet."
-                      items={(user.responderHistory || []).map(r => ({
-                        id: r.id,
-                        title: `${r.emergency?.emergencyType || 'Medical'} — ${r.emergency?.patient?.fullName || 'Unknown patient'}`,
-                        meta: r.distanceKm != null ? `${Number(r.distanceKm).toFixed(1)} km away` : null,
-                        date: r.sentAt,
-                        status: r.status,
-                      }))}
-                    />
-                  </Section>
-                </>
-              )}
-
-              {user.role === 'RESPONDER' && rp?.verificationStatus === 'PENDING' && (
-                <div style={{ margin: '16px 22px', padding: '12px 14px', borderRadius: '12px', background: 'var(--warning-bg)', border: '1px solid var(--warning-border)', color: 'var(--warning-fg)', fontSize: '0.84rem', fontWeight: 600, display: 'flex', gap: '8px', alignItems: 'center' }}>
-                  <AlertTriangle size={15} /> Credentials are awaiting review in the Verification Queue.
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </motion.aside>
-    </>
+                <Section title="Recent dispatch requests">
+                  <HistoryList
+                    empty="No dispatch requests yet."
+                    items={(user.responderHistory || []).map(r => ({
+                      id: r.id,
+                      title: `${r.emergency?.emergencyType || 'Medical'} — ${r.emergency?.patient?.fullName || 'Unknown patient'}`,
+                      meta: r.distanceKm != null ? `${Number(r.distanceKm).toFixed(1)} km away` : null,
+                      date: r.sentAt,
+                      status: r.status,
+                    }))}
+                  />
+                </Section>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </Drawer>
   );
 }
 
 function HistoryList({ items, empty }) {
-  if (!items.length) return <p style={{ fontSize: '0.85rem', color: 'var(--admin-text-muted)' }}>{empty}</p>;
+  if (!items.length) return <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0 }}>{empty}</p>;
   return (
-    <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      {items.map(item => (
-        <li key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '9px 12px', borderRadius: '10px', border: '1px solid var(--admin-border)', background: 'var(--table-head-bg)' }}>
+    <ul style={{ listStyle: 'none', margin: 0, border: '1px solid var(--border)', borderRadius: '8px', overflow: 'hidden' }}>
+      {items.map((item, i) => (
+        <li key={item.id} style={{ display: 'flex', alignItems: 'center', gap: '10px', minHeight: '46px', padding: '6px 12px', borderTop: i > 0 ? '1px solid var(--border)' : 'none' }}>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: '0.84rem', fontWeight: 700, color: 'var(--admin-text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</p>
-            <p style={{ fontSize: '0.72rem', color: 'var(--admin-text-muted)' }}>
-              {fmtDate(item.date, true)}{item.meta ? ` · ${item.meta}` : ''}
+            <p style={{ margin: 0, fontSize: '13px', fontWeight: 500, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.title}</p>
+            <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-muted)' }}>
+              <span className="mf-num">{fmtDate(item.date, true)}</span>{item.meta ? ` · ${item.meta}` : ''}
             </p>
           </div>
-          <StatusChip status={item.status} />
+          <StatusBadge tone={toneFor(item.status)}>{humanize(item.status)}</StatusBadge>
         </li>
       ))}
     </ul>

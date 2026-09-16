@@ -1,36 +1,25 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { TrendingUp, CheckCircle, Search, Crown, Zap, Star, Users, Lock, CreditCard } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Check, Users, Lock, CreditCard } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../services/api';
 import { updateSubscriptionPlan, PLAN_OPTIONS, errorMessage } from '../../services/adminApi';
 import { useAlert } from '../../context/hooks';
-import { PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, FilterPill, SearchInput, ErrorBanner } from '../../components/ui';
-import { thStyle, paginate } from '../../components/uiStyles';
+import {
+  PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, SegmentedControl, SearchInput, ErrorBanner,
+  StatCard, Panel, Toolbar, DataTable, StatusBadge, Avatar, Button, Select,
+} from '../../components/ui';
+import { paginate } from '../../components/uiStyles';
 
 // Plan catalogue — prices are fixed server-side (PKR); this page shows them read-only
 const PLAN_META = [
-  {
-    id: 'FREE', name: 'Free', icon: Zap, price: 0, color: 'var(--text-muted)',
-    features: ['Standard SOS / dispatch / monitoring', 'Basic profile & credentials', 'Core platform access'],
-  },
-  {
-    id: 'PROFESSIONAL', name: 'Pro', icon: Star, price: 499, color: 'var(--primary-light)',
-    features: ['Priority SOS / dispatch / alerts', 'Extended history & case management', 'Enhanced profile visibility'],
-  },
-  {
-    id: 'EXECUTIVE', name: 'Executive', icon: Crown, price: 2499, color: 'var(--primary)', featured: true,
-    features: ['Elite priority access', 'Full analytics & unlimited history', 'VIP support & custom badge'],
-  },
+  { id: 'FREE', name: 'Free', price: 0, features: ['Standard SOS / dispatch / monitoring', 'Basic profile & credentials', 'Core platform access'] },
+  { id: 'PROFESSIONAL', name: 'Pro', price: 499, features: ['Priority SOS / dispatch / alerts', 'Extended history & case management', 'Enhanced profile visibility'] },
+  { id: 'EXECUTIVE', name: 'Executive', price: 2499, features: ['Elite priority access', 'Full analytics & unlimited history', 'VIP support & custom badge'] },
 ];
 
 const PLAN_LABEL = Object.fromEntries(PLAN_OPTIONS.map(p => [p.value, p.label]));
 const PLAN_PRICE = Object.fromEntries(PLAN_OPTIONS.map(p => [p.value, p.price]));
-const PLAN_BADGE = {
-  FREE:         { color: 'var(--text-muted)', bg: 'var(--tint-slate)' },
-  PROFESSIONAL: { color: 'var(--primary-light)', bg: 'var(--tint-teal)'  },
-  EXECUTIVE:    { color: 'var(--primary)', bg: 'var(--tint-blue)'  },
-};
+const PLAN_TONE = { FREE: 'neutral', PROFESSIONAL: 'info', EXECUTIVE: 'accent' };
 
 const PAGE_SIZE = 10;
 const fmtPKR = (n) => `PKR ${Number(n || 0).toLocaleString()}`;
@@ -111,200 +100,156 @@ const SubscriptionManagement = () => {
   const breakdown = apiStats?.planBreakdown ?? [];
   const planCount = (id) => breakdown.find(p => p.plan === id)?.count ?? breakdown.find(p => p.plan === id)?._count ?? 0;
   const totalMRR = apiStats?.mrr ?? subscribers.reduce((sum, s) => sum + s.amount, 0);
-
-  const kpis = [
-    { label: 'Monthly Revenue', value: fmtPKR(totalMRR), icon: TrendingUp, color: 'var(--primary)', bg: 'var(--tint-teal)', hint: 'Estimated from current plans' },
-    { label: 'Paid Subscribers', value: apiStats?.totalPaid ?? subscribers.length, icon: CheckCircle, color: 'var(--success-fg)', bg: 'var(--tint-green)', hint: `${subscribers.filter(s => !s.active).length} with deactivated accounts` },
-    { label: 'Pro Accounts', value: planCount('PROFESSIONAL'), icon: Star, color: 'var(--primary-light)', bg: 'var(--tint-teal)', hint: fmtPKR(499) + ' / month each' },
-    { label: 'Executive Accounts', value: planCount('EXECUTIVE'), icon: Crown, color: 'var(--primary)', bg: 'var(--tint-blue)', hint: fmtPKR(2499) + ' / month each' },
-  ];
+  const filtersActive = planFilter !== 'ALL' || accountFilter !== 'ALL' || !!q;
+  const clearFilters = () => { setPlanFilter('ALL'); setAccountFilter('ALL'); setSearch(''); setPage(1); };
 
   const COLS = 6;
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
-      <PageHeader
-        title="Subscription Management"
-        subtitle="Revenue, plan distribution and paid subscribers. Change or cancel a subscriber's plan from the table."
-        actions={(
-          <>
-            <Link to="/admin/subscriptions/all" style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '9px 16px', borderRadius: '10px', border: '1.5px solid var(--admin-border)', background: 'var(--surface)', color: 'var(--admin-text-sub)', fontWeight: 700, fontSize: '0.85rem' }}>
-              <Users size={15} /> All users &amp; plans
-            </Link>
-            <RefreshButton onClick={refresh} loading={loading} />
-          </>
-        )}
-      />
+    <div className="mf-stack">
+      <div>
+        <PageHeader
+          title="Subscription Management"
+          description="Revenue, plan distribution and paid subscribers. Change or cancel a subscriber's plan from the table."
+          actions={(
+            <>
+              <Link to="/admin/subscriptions/all" className="mf-btn mf-btn--secondary">
+                <Users size={15} aria-hidden="true" /> All users &amp; plans
+              </Link>
+              <RefreshButton onClick={refresh} loading={loading} />
+            </>
+          )}
+        />
+        <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
 
-      <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
-
-      {/* KPI Cards */}
-      <div className="mf-grid-stats" style={{ marginBottom: '20px' }}>
-        {kpis.map((card) => (
-          <div key={card.label} style={{ background: 'var(--surface)', borderRadius: '14px', border: '1px solid var(--admin-border)', padding: '16px 20px', display: 'flex', gap: '14px', alignItems: 'center' }}>
-            <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: card.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <card.icon size={20} color={card.color} />
-            </div>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--admin-text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{card.label}</p>
-              <p style={{ fontSize: '1.45rem', fontWeight: 800, color: card.color, lineHeight: 1.2 }}>{loading ? '—' : card.value}</p>
-              <p style={{ fontSize: '0.72rem', color: 'var(--admin-text-muted)' }}>{card.hint}</p>
-            </div>
-          </div>
-        ))}
+        <div className="mf-grid-stats">
+          <StatCard label="Monthly revenue" value={fmtPKR(totalMRR)} hint="Estimated from current plans" loading={loading} />
+          <StatCard label="Paid subscribers" value={apiStats?.totalPaid ?? subscribers.length} hint={`${subscribers.filter(s => !s.active).length} with deactivated accounts`} loading={loading} />
+          <StatCard label="Pro accounts" value={planCount('PROFESSIONAL')} hint={`${fmtPKR(499)} / month each`} loading={loading} />
+          <StatCard label="Executive accounts" value={planCount('EXECUTIVE')} hint={`${fmtPKR(2499)} / month each`} loading={loading} />
+        </div>
       </div>
 
       {/* Plan catalogue (read-only) */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '8px' }}>
-        {PLAN_META.map((plan) => {
-          const featured = plan.featured;
-          const fg = featured ? 'white' : plan.color;
-          return (
-            <div key={plan.id}
-              style={{
-                padding: '20px 22px', borderRadius: '16px', position: 'relative',
-                border: `1.5px solid ${featured ? 'transparent' : 'var(--admin-border)'}`,
-                background: featured ? 'linear-gradient(135deg,var(--primary),var(--primary-light))' : 'var(--surface)',
-              }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                    <plan.icon size={17} color={fg} />
-                    <span style={{ fontWeight: 800, fontSize: '0.98rem', color: fg }}>{plan.name}</span>
-                  </div>
-                  <div style={{ fontSize: '1.5rem', fontWeight: 900, color: featured ? 'white' : 'var(--admin-text-main)' }}>
-                    {plan.price === 0 ? 'Free' : fmtPKR(plan.price)}
-                    {plan.price > 0 && <span style={{ fontSize: '0.78rem', fontWeight: 600, opacity: 0.75 }}> /mo</span>}
-                  </div>
-                </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: '1.6rem', fontWeight: 900, color: fg, lineHeight: 1 }}>{loading ? '—' : planCount(plan.id).toLocaleString()}</div>
-                  <div style={{ fontSize: '0.72rem', color: featured ? 'rgba(255,255,255,0.8)' : 'var(--admin-text-muted)', fontWeight: 700 }}>users</div>
-                </div>
+      <Panel
+        title="Plan catalogue"
+        description="Plan prices and features are fixed server-side and cannot be edited from the portal."
+        actions={<Lock size={14} aria-hidden="true" style={{ color: 'var(--text-muted)' }} />}
+      >
+        <div className="mf-grid-3" style={{ gap: 0 }}>
+          {PLAN_META.map((plan) => (
+            <div key={plan.id} style={{ padding: '14px 16px', minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                <StatusBadge tone={PLAN_TONE[plan.id]}>{plan.name}</StatusBadge>
+                <span style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                  <span className="mf-num" style={{ color: 'var(--text-main)', fontWeight: 600 }}>{loading ? '—' : planCount(plan.id).toLocaleString()}</span> users
+                </span>
               </div>
-              <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <p className="mf-num" style={{ fontSize: '18px', lineHeight: '26px', fontWeight: 600, color: 'var(--text-main)', margin: '0 0 8px' }}>
+                {plan.price === 0 ? 'Free' : fmtPKR(plan.price)}
+                {plan.price > 0 && <span style={{ fontSize: '12.5px', fontWeight: 400, color: 'var(--text-muted)' }}> /mo</span>}
+              </p>
+              <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {plan.features.map(f => (
-                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82rem', color: featured ? 'rgba(255,255,255,0.9)' : 'var(--admin-text-sub)' }}>
-                    <CheckCircle size={13} color={featured ? 'rgba(255,255,255,0.75)' : plan.color} />
+                  <li key={f} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--admin-text-sub)' }}>
+                    <Check size={13} aria-hidden="true" style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
                     {f}
                   </li>
                 ))}
               </ul>
             </div>
-          );
-        })}
-      </div>
-      <p style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', color: 'var(--admin-text-muted)', marginBottom: '20px' }}>
-        <Lock size={12} /> Plan prices and features are fixed server-side and cannot be edited from the portal.
-      </p>
-
-      {/* Subscriber Table */}
-      <div style={{ background: 'var(--surface)', borderRadius: '16px', border: '1px solid var(--admin-border)', overflow: 'hidden' }}>
-        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--admin-border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', gap: '12px 18px', flexWrap: 'wrap' }}>
-            <div role="group" aria-label="Filter by plan" style={{ display: 'flex', gap: '6px' }}>
-              {['ALL', 'PROFESSIONAL', 'EXECUTIVE'].map(p => (
-                <FilterPill key={p} active={planFilter === p} onClick={() => { setPlanFilter(p); setPage(1); }}>
-                  {p === 'ALL' ? 'All plans' : PLAN_LABEL[p]}
-                </FilterPill>
-              ))}
-            </div>
-            <div role="group" aria-label="Filter by account status" style={{ display: 'flex', gap: '6px' }}>
-              {[['ALL', 'Any account'], ['ACTIVE', 'Active accounts'], ['INACTIVE', 'Deactivated']].map(([k, label]) => (
-                <FilterPill key={k} active={accountFilter === k} color={k === 'INACTIVE' ? 'var(--error-fg)' : k === 'ACTIVE' ? 'var(--success-fg)' : undefined} onClick={() => { setAccountFilter(k); setPage(1); }}>
-                  {label}
-                </FilterPill>
-              ))}
-            </div>
-          </div>
-          <SearchInput icon={Search} width={240} value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search subscribers…" />
+          ))}
         </div>
+      </Panel>
 
-        <div className="mf-table-scroll">
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '820px' }}>
-            <thead>
+      {/* Subscriber table */}
+      <Panel>
+        <Toolbar right={<SearchInput width={240} value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search subscribers…" />}>
+          <SegmentedControl
+            ariaLabel="Filter by plan"
+            value={planFilter}
+            onChange={(v) => { setPlanFilter(v); setPage(1); }}
+            options={['ALL', 'PROFESSIONAL', 'EXECUTIVE'].map(p => ({ value: p, label: p === 'ALL' ? 'All plans' : PLAN_LABEL[p] }))}
+          />
+          <SegmentedControl
+            ariaLabel="Filter by account status"
+            value={accountFilter}
+            onChange={(v) => { setAccountFilter(v); setPage(1); }}
+            options={[{ value: 'ALL', label: 'Any account' }, { value: 'ACTIVE', label: 'Active' }, { value: 'INACTIVE', label: 'Deactivated' }]}
+          />
+        </Toolbar>
+
+        <DataTable minWidth="820px">
+          <thead>
+            <tr>
+              <th scope="col">Subscriber</th>
+              <th scope="col">Plan</th>
+              <th scope="col">Account</th>
+              <th scope="col" className="num">Monthly</th>
+              <th scope="col">Member since</th>
+              <th scope="col" className="actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <TableSkeletonRows rows={5} cols={COLS} />
+            ) : filtered.length === 0 ? (
               <tr>
-                {['Subscriber', 'Plan', 'Account', 'Monthly', 'Member since', 'Actions'].map((h, i) => (
-                  <th key={h} scope="col" style={{ ...thStyle, textAlign: i === 5 ? 'right' : 'left' }}>{h}</th>
-                ))}
+                <td colSpan={COLS}>
+                  <EmptyState
+                    icon={CreditCard}
+                    title={subscribers.length === 0 ? 'No paid subscribers yet' : 'No subscribers match your filters'}
+                    message={subscribers.length === 0 ? 'Users on the Free plan are listed under All Subscriptions.' : undefined}
+                    action={subscribers.length > 0 && filtersActive ? <Button size="sm" onClick={clearFilters}>Clear filters</Button> : undefined}
+                  />
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <TableSkeletonRows rows={5} cols={COLS} />
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={COLS}>
-                    <EmptyState
-                      icon={CreditCard}
-                      title={subscribers.length === 0 ? 'No paid subscribers yet' : 'No subscribers match your filters'}
-                      message={subscribers.length === 0 ? 'Users on the Free plan are listed under All Subscriptions.' : undefined}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                rows.map((sub) => {
-                  const badge = PLAN_BADGE[sub.plan] || PLAN_BADGE.FREE;
-                  const busy = savingId === sub.id;
-                  return (
-                    <tr key={sub.id} className="mf-table-row" style={{ borderBottom: '1px solid var(--admin-border)' }}>
-                      <td style={{ padding: '12px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'linear-gradient(135deg,var(--primary),var(--primary-mid))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.9rem', flexShrink: 0 }}>
-                            {(sub.user?.[0] || '?').toUpperCase()}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontWeight: 700, color: 'var(--admin-text-main)', fontSize: '0.88rem' }}>{sub.user}</div>
-                            <div style={{ fontSize: '0.76rem', color: 'var(--admin-text-muted)' }}>{sub.email} · {sub.role}</div>
-                          </div>
+            ) : (
+              rows.map((sub) => {
+                const busy = savingId === sub.id;
+                return (
+                  <tr key={sub.id} className="mf-table-row">
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <Avatar name={sub.user} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 500, color: 'var(--text-main)' }}>{sub.user}</div>
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>{sub.email} · {sub.role}</div>
                         </div>
-                      </td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 800, padding: '3px 10px', borderRadius: '6px', background: badge.bg, color: badge.color }}>{PLAN_LABEL[sub.plan] || sub.plan}</span>
-                      </td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <span style={{ fontSize: '0.76rem', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', background: sub.active ? 'var(--tint-green)' : 'var(--tint-red)', color: sub.active ? 'var(--success-fg)' : 'var(--error-fg)' }}>
-                          {sub.active ? 'Active' : 'Deactivated'}
-                        </span>
-                      </td>
-                      <td style={{ padding: '12px 20px', fontWeight: 700, color: 'var(--admin-text-main)', fontSize: '0.88rem', whiteSpace: 'nowrap' }}>
-                        {sub.amount > 0 ? fmtPKR(sub.amount) : '—'}
-                      </td>
-                      <td style={{ padding: '12px 20px', fontSize: '0.82rem', color: 'var(--admin-text-muted)', whiteSpace: 'nowrap' }}>
-                        {formatDate(sub.joinedAt)}
-                      </td>
-                      <td style={{ padding: '12px 20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
-                          <label className="sr-only" htmlFor={`plan-${sub.id}`}>Change plan for {sub.user}</label>
-                          <select
-                            id={`plan-${sub.id}`}
-                            value={sub.plan}
-                            disabled={busy}
-                            onChange={(e) => { if (e.target.value !== sub.plan) changePlan(sub, e.target.value); }}
-                            style={{ height: '32px', padding: '0 8px', borderRadius: '8px', border: '1.5px solid var(--admin-border)', background: 'var(--input-bg)', color: 'var(--text-main)', fontSize: '0.78rem', fontWeight: 700, fontFamily: 'inherit' }}
-                          >
-                            {PLAN_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                          </select>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => changePlan(sub, 'FREE')}
-                            style={{ height: '32px', padding: '0 12px', fontSize: '0.76rem', fontWeight: 700, borderRadius: '8px', background: 'var(--tint-red)', color: 'var(--error-fg)', border: '1px solid var(--error-border)', fontFamily: 'inherit', opacity: busy ? 0.6 : 1 }}
-                          >
-                            {busy ? 'Saving…' : 'Cancel plan'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} loading={loading} />
-      </div>
-    </motion.div>
+                      </div>
+                    </td>
+                    <td><StatusBadge tone={PLAN_TONE[sub.plan] || 'neutral'}>{PLAN_LABEL[sub.plan] || sub.plan}</StatusBadge></td>
+                    <td><StatusBadge tone={sub.active ? 'success' : 'danger'}>{sub.active ? 'Active' : 'Deactivated'}</StatusBadge></td>
+                    <td className="num" style={{ color: 'var(--text-main)', whiteSpace: 'nowrap' }}>
+                      <span className="mf-num">{sub.amount > 0 ? fmtPKR(sub.amount) : '—'}</span>
+                    </td>
+                    <td className="mf-num" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDate(sub.joinedAt)}</td>
+                    <td className="actions">
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                        <label className="sr-only" htmlFor={`plan-${sub.id}`}>Change plan for {sub.user}</label>
+                        <Select
+                          id={`plan-${sub.id}`}
+                          value={sub.plan}
+                          disabled={busy}
+                          onChange={(e) => { if (e.target.value !== sub.plan) changePlan(sub, e.target.value); }}
+                          style={{ height: '30px', width: 'auto', fontSize: '12.5px' }}
+                        >
+                          {PLAN_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                        </Select>
+                        <Button size="sm" variant="danger-outline" disabled={busy} onClick={() => changePlan(sub, 'FREE')}>
+                          {busy ? 'Saving…' : 'Cancel plan'}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </DataTable>
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} loading={loading} noun="subscribers" />
+      </Panel>
+    </div>
   );
 };
 

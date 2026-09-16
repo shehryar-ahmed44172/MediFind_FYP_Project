@@ -1,58 +1,38 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  Search, Users, ShieldOff, ShieldCheck, Trash2,
-  User, AlertTriangle, CheckCircle,
-  XCircle, Clock, Crown, Zap, Star, EarOff,
-  Calendar, Filter, ExternalLink, AlertCircle, Eye,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { ShieldOff, ShieldCheck, Trash2, User, Eye, ArrowUpRight } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 import api from '../services/api';
 import { errorMessage } from '../services/adminApi';
 import { resolveFileUrl } from '../utils/resolveFileUrl';
 import { useAlert } from '../context/hooks';
-import { PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, FilterPill } from '../components/ui';
-import { thStyle, paginate } from '../components/uiStyles';
+import {
+  PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, StatCard, Panel, Toolbar,
+  SearchInput, SegmentedControl, Notice, DataTable, StatusBadge, Avatar, IconButton, Button, ErrorBanner,
+} from '../components/ui';
+import { paginate } from '../components/uiStyles';
 import UserDetailDrawer from '../components/UserDetailDrawer';
-
-/* ─── Theme (CSS tokens — adapt to light/dark automatically) ──────────────── */
-const C = {
-  accent:   'var(--admin-accent)',
-  border:   'var(--admin-border)',
-  bg:       'var(--admin-bg)',
-  white:    'var(--surface)',
-  textMain: 'var(--admin-text-main)',
-  textSub:  'var(--admin-text-sub)',
-  textMuted:'var(--admin-text-muted)',
-};
 
 /* ─── Tab config ─────────────────────────────────────────────────────────── */
 const TABS = [
-  { key: 'ALL',       label: 'All Users',  Icon: Users,       accent: 'var(--primary-light)', pale: 'var(--tint-teal)'  },
-  { key: 'PATIENT',   label: 'Patients',   Icon: User,        accent: 'var(--primary-light)', pale: 'var(--tint-teal)'  },
-  { key: 'RESPONDER', label: 'Responders', Icon: ShieldCheck, accent: 'var(--success)',       pale: 'var(--tint-green)' },
-  { key: 'CAREGIVER', label: 'Caregivers', Icon: Users,       accent: 'var(--primary-mid)',   pale: 'var(--tint-blue)'  },
+  { key: 'ALL',       label: 'All users'  },
+  { key: 'PATIENT',   label: 'Patients'   },
+  { key: 'RESPONDER', label: 'Responders' },
+  { key: 'CAREGIVER', label: 'Caregivers' },
 ];
 const VALID_TABS = TABS.map(t => t.key);
 
-/* ─── Role badge config (used in ALL tab) ────────────────────────────────── */
-const ROLE_BADGE = {
-  PATIENT:   { label: 'Patient',   color: 'var(--primary-light)', bg: 'var(--tint-teal)'  },
-  RESPONDER: { label: 'Responder', color: 'var(--success)',       bg: 'var(--tint-green)' },
-  CAREGIVER: { label: 'Caregiver', color: 'var(--primary-mid)',   bg: 'var(--tint-blue)'  },
-};
+const ROLE_LABEL = { PATIENT: 'Patient', RESPONDER: 'Responder', CAREGIVER: 'Caregiver' };
 
-/* ─── Status helpers ─────────────────────────────────────────────────────── */
 const PLAN_META = {
-  FREE:         { label: 'Free',      color: 'var(--text-muted)',    bg: 'var(--tint-slate)', Icon: Zap   },
-  PROFESSIONAL: { label: 'Pro',       color: 'var(--primary-light)', bg: 'var(--tint-teal)',  Icon: Star  },
-  EXECUTIVE:    { label: 'Executive', color: 'var(--primary)',       bg: 'var(--tint-blue)',  Icon: Crown },
+  FREE:         { label: 'Free',      tone: 'neutral' },
+  PROFESSIONAL: { label: 'Pro',       tone: 'info'    },
+  EXECUTIVE:    { label: 'Executive', tone: 'accent'  },
 };
 
 const VERIF_META = {
-  PENDING:  { label: 'Pending Review', color: 'var(--warning-fg)', bg: 'var(--tint-amber)', Icon: Clock       },
-  VERIFIED: { label: 'Verified',       color: 'var(--success-fg)', bg: 'var(--tint-green)', Icon: CheckCircle },
-  REJECTED: { label: 'Rejected',       color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
+  PENDING:  { label: 'Pending review', tone: 'warning' },
+  VERIFIED: { label: 'Verified',       tone: 'success' },
+  REJECTED: { label: 'Rejected',       tone: 'danger'  },
 };
 
 /**
@@ -70,14 +50,12 @@ function getEffectiveStatus(user, role) {
   return user.isActive !== false ? 'ACTIVE' : 'INACTIVE';
 }
 
-const EFF_STATUS_STYLE = {
-  ACTIVE:   { label: 'Active',         color: 'var(--success-fg)', bg: 'var(--tint-green)', Icon: CheckCircle },
-  INACTIVE: { label: 'Inactive',       color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
-  PENDING:  { label: 'Pending Review', color: 'var(--warning-fg)', bg: 'var(--tint-amber)', Icon: Clock       },
-  REJECTED: { label: 'Rejected',       color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
+const EFF_STATUS = {
+  ACTIVE:   { label: 'Active',         tone: 'success' },
+  INACTIVE: { label: 'Inactive',       tone: 'neutral' },
+  PENDING:  { label: 'Pending review', tone: 'warning' },
+  REJECTED: { label: 'Rejected',       tone: 'danger'  },
 };
-
-const FILTER_COLORS = { ACTIVE: 'var(--success-fg)', INACTIVE: 'var(--error-fg)', PENDING: 'var(--warning-fg)', REJECTED: 'var(--error-fg)' };
 
 const formatDate = (iso) =>
   iso ? new Date(iso).toLocaleDateString('en-PK', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -221,57 +199,40 @@ export default function UserManagement() {
   });
   const { page: currentPage, rows } = paginate(filtered, page, PAGE_SIZE);
 
-  const summaryChips = getSummaryChips(users, activeTab);
+  const summary = getSummary(users, activeTab);
   const tab = TABS.find(t => t.key === activeTab);
+  const showsResponders = activeTab === 'RESPONDER' || activeTab === 'ALL';
+  const filtersActive = !!search || statusFilter !== 'ALL';
 
-  const filterOptions =
-    activeTab === 'RESPONDER' || activeTab === 'ALL'
-      ? ['ALL', 'ACTIVE', 'INACTIVE', 'PENDING', 'REJECTED']
-      : ['ALL', 'ACTIVE', 'INACTIVE'];
+  const filterOptions = (showsResponders
+    ? ['ALL', 'ACTIVE', 'INACTIVE', 'PENDING', 'REJECTED']
+    : ['ALL', 'ACTIVE', 'INACTIVE']
+  ).map(f => ({ value: f, label: f === 'ALL' ? 'All' : EFF_STATUS[f].label }));
+
+  const clearFilters = () => { setSearch(''); setStatusFilter('ALL'); setPage(1); };
 
   const COLS = 6;
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -12 }}
-      transition={{ duration: 0.3 }}
-    >
+    <>
       <PageHeader
         title="User Management"
-        subtitle="Manage platform participants, account access and subscription plans. Click a user to see their full profile."
+        description="Manage platform accounts, login access and subscription plans. Select a user to open their profile."
         actions={<RefreshButton onClick={refresh} loading={loading} />}
       />
 
-      {/* Summary chips */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', marginBottom: '20px' }}>
-        {summaryChips.map((s) => (
-          <div key={s.label} style={{
-            background: C.white, borderRadius: '12px', border: `1px solid ${C.border}`,
-            padding: '14px 18px', display: 'flex', alignItems: 'center', gap: '12px',
-            boxShadow: '0 1px 3px rgba(12,99,126,0.04)',
-          }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: s.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <s.Icon size={18} color={s.color} />
-            </div>
-            <div>
-              <p style={{ fontSize: '1.4rem', fontWeight: 800, color: s.color, lineHeight: 1 }}>{loading ? '—' : s.value}</p>
-              <p style={{ fontSize: '0.78rem', fontWeight: 600, color: C.textMuted, marginTop: '3px' }}>{s.label}</p>
-            </div>
-          </div>
+      <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
+
+      {/* Summary */}
+      <div className="mf-grid-stats" style={{ marginBottom: '16px' }}>
+        {summary.map(s => (
+          <StatCard key={s.label} label={s.label} value={s.value} hint={s.hint} loading={loading} />
         ))}
       </div>
 
-      {/* Main card */}
-      <div style={{
-        background: C.white, borderRadius: '16px',
-        border: `1px solid ${C.border}`,
-        boxShadow: '0 1px 4px rgba(12,99,126,0.05)',
-        overflow: 'hidden',
-      }}>
-        {/* Tabs */}
-        <div role="tablist" aria-label="User roles" style={{ display: 'flex', borderBottom: `1px solid ${C.border}`, background: 'var(--table-head-bg)', padding: '0 20px', overflowX: 'auto' }}>
+      <Panel>
+        {/* Role tabs */}
+        <div className="mf-tabs" role="tablist" aria-label="User roles">
           {TABS.map(t => {
             const on = t.key === activeTab;
             return (
@@ -280,22 +241,12 @@ export default function UserManagement() {
                 type="button"
                 role="tab"
                 aria-selected={on}
+                className="mf-tab"
                 onClick={() => changeTab(t.key)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '7px',
-                  padding: '14px 4px', marginRight: '24px',
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', fontWeight: on ? 700 : 600,
-                  fontSize: '0.875rem', whiteSpace: 'nowrap',
-                  color: on ? t.accent : C.textMuted,
-                  borderBottom: on ? `2.5px solid ${t.accent}` : '2.5px solid transparent',
-                  transition: 'all 0.15s',
-                }}
               >
-                <t.Icon size={15} strokeWidth={on ? 2.5 : 2} />
                 {t.label}
                 {on && !loading && (
-                  <span style={{ fontSize: '0.7rem', fontWeight: 800, padding: '2px 7px', borderRadius: '20px', background: t.pale, color: t.accent }}>
+                  <span className="mf-num" style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: 400 }}>
                     {users.length}
                   </span>
                 )}
@@ -304,220 +255,159 @@ export default function UserManagement() {
           })}
         </div>
 
-        {/* Filter row */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', padding: '14px 20px', borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ position: 'relative', width: '300px', maxWidth: '100%' }}>
-            <Search style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: C.textMuted, pointerEvents: 'none' }} size={15} />
-            <input
-              type="search"
-              placeholder={`Search ${tab?.label.toLowerCase()} by name, email or phone…`}
-              aria-label="Search users"
-              value={search}
-              onChange={e => { setSearch(e.target.value); setPage(1); }}
-              style={{
-                width: '100%', height: '38px', paddingLeft: '36px', paddingRight: '12px',
-                border: `1.5px solid ${C.border}`, borderRadius: '10px',
-                background: 'var(--input-bg)', outline: 'none', fontSize: '0.875rem',
-                fontFamily: 'inherit', color: C.textMain, boxSizing: 'border-box',
-              }}
+        <Toolbar
+          right={
+            <SegmentedControl
+              ariaLabel="Filter by status"
+              options={filterOptions}
+              value={statusFilter}
+              onChange={(v) => { setStatusFilter(v); setPage(1); }}
             />
-          </div>
-          <div role="group" aria-label="Filter by status" style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <Filter size={14} color="var(--text-muted)" aria-hidden="true" />
-            {filterOptions.map(f => (
-              <FilterPill key={f} active={statusFilter === f} color={FILTER_COLORS[f]} onClick={() => { setStatusFilter(f); setPage(1); }}>
-                {f === 'ALL' ? 'All' : EFF_STATUS_STYLE[f].label}
-              </FilterPill>
-            ))}
-          </div>
-        </div>
-
-        {/* Error */}
-        {error && (
-          <div role="alert" style={{ padding: '12px 20px', background: 'var(--error-bg)', borderBottom: '1px solid var(--error-border)', color: 'var(--error-fg)', fontSize: '0.875rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <AlertTriangle size={16} /> {error}
-            <button type="button" onClick={refresh} style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--error-border)', color: 'inherit', borderRadius: '8px', padding: '3px 10px', fontWeight: 700, fontFamily: 'inherit' }}>Retry</button>
-          </div>
-        )}
-
-        {/* Responder notice banner */}
-        {(activeTab === 'RESPONDER' || activeTab === 'ALL') && !loading && (
-          <div style={{ padding: '10px 20px', background: 'var(--warning-bg)', borderBottom: '1px solid var(--warning-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.8rem', color: 'var(--warning-fg)', fontWeight: 600 }}>
-              <AlertCircle size={14} />
-              Credential status (Verified / Pending / Rejected) is separate from login access. Approve or reject credentials in the Verification Queue.
-            </div>
-            <Link to="/admin/verify" style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.78rem', fontWeight: 700, color: 'var(--warning-fg)', textDecoration: 'none', whiteSpace: 'nowrap' }}>
-              Verification Queue <ExternalLink size={12} />
-            </Link>
-          </div>
-        )}
-
-        {/* Table */}
-        <div className="mf-table-scroll">
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '860px' }}>
-            <thead>
-              <tr>
-                {['User', 'Phone', (activeTab === 'RESPONDER' || activeTab === 'ALL') ? 'Credentials / Plan' : 'Plan', 'Status', 'Joined', 'Actions'].map((h, i) => (
-                  <th key={h} scope="col" style={{ ...thStyle, textAlign: i === 5 ? 'right' : 'left' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <TableSkeletonRows rows={5} cols={COLS} />
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={COLS}>
-                    <EmptyState
-                      icon={User}
-                      title={`No ${tab?.label.toLowerCase()} found`}
-                      message={search || statusFilter !== 'ALL' ? 'Try a different search term or filter.' : 'No accounts in this category yet.'}
-                      action={(search || statusFilter !== 'ALL') && (
-                        <button type="button" onClick={() => { setSearch(''); setStatusFilter('ALL'); setPage(1); }}
-                          style={{ padding: '7px 14px', borderRadius: '8px', border: `1.5px solid ${C.border}`, background: C.white, color: C.textSub, fontWeight: 700, fontFamily: 'inherit' }}>
-                          Clear filters
-                        </button>
-                      )}
-                    />
-                  </td>
-                </tr>
-              ) : (
-                rows.map((user) => {
-                  const role = activeTab === 'ALL' ? user.role : activeTab;
-                  const effStatus = getEffectiveStatus(user, role);
-                  const statusStyle = EFF_STATUS_STYLE[effStatus];
-                  const isDeaf  = user.medicalProfile?.patientType === 'DEAF';
-                  const plan    = PLAN_META[user.subscriptionPlan] || PLAN_META.FREE;
-                  const verifSt = user.responder?.verificationStatus;
-                  const verifMeta = verifSt ? VERIF_META[verifSt] : null;
-                  return (
-                    <tr
-                      key={user.id}
-                      className="mf-table-row"
-                      onClick={() => setDetailUserId(user.id)}
-                      style={{ borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}
-                    >
-                      {/* User */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <div style={{
-                            width: '40px', height: '40px', borderRadius: '11px', flexShrink: 0,
-                            background: 'linear-gradient(135deg, var(--primary), var(--primary-mid))',
-                            color: 'white', display: 'flex', alignItems: 'center',
-                            justifyContent: 'center', fontWeight: 800, fontSize: '1rem',
-                            overflow: 'hidden',
-                          }}>
-                            {user.profileImageUrl
-                              ? <img src={resolveFileUrl(user.profileImageUrl)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              : (user.fullName?.[0] || '?').toUpperCase()
-                            }
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
-                              <span style={{ fontWeight: 700, fontSize: '0.88rem', color: C.textMain }}>
-                                {user.fullName || '—'}
-                              </span>
-                              {activeTab === 'ALL' && ROLE_BADGE[user.role] && (
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: ROLE_BADGE[user.role].bg, color: ROLE_BADGE[user.role].color }}>
-                                  {ROLE_BADGE[user.role].label}
-                                </span>
-                              )}
-                              {isDeaf && (
-                                <span style={{ fontSize: '0.66rem', fontWeight: 800, padding: '2px 6px', borderRadius: '4px', background: 'var(--tint-amber)', color: 'var(--warning-fg)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                  <EarOff size={9} /> DEAF
-                                </span>
-                              )}
-                            </div>
-                            <div style={{ fontSize: '0.78rem', color: C.textMuted, marginTop: '1px' }}>{user.email}</div>
-                          </div>
-                        </div>
-                      </td>
-
-                      {/* Phone */}
-                      <td style={{ padding: '13px 20px', fontSize: '0.85rem', color: C.textSub, whiteSpace: 'nowrap' }}>
-                        {user.phoneNumber || '—'}
-                      </td>
-
-                      {/* Credentials / Plan */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '6px', background: plan.bg, color: plan.color, fontSize: '0.74rem', fontWeight: 700, width: 'fit-content' }}>
-                            <plan.Icon size={11} /> {plan.label}
-                          </div>
-                          {verifMeta && (
-                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '3px 9px', borderRadius: '6px', background: verifMeta.bg, color: verifMeta.color, fontSize: '0.74rem', fontWeight: 700, width: 'fit-content' }}>
-                              <verifMeta.Icon size={11} /> {verifMeta.label}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-
-                      {/* Effective Status */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '5px',
-                          padding: '4px 10px', borderRadius: '6px', whiteSpace: 'nowrap',
-                          fontSize: '0.76rem', fontWeight: 700,
-                          background: statusStyle.bg, color: statusStyle.color,
-                        }}>
-                          <statusStyle.Icon size={11} /> {statusStyle.label}
-                        </span>
-                      </td>
-
-                      {/* Joined */}
-                      <td style={{ padding: '13px 20px', fontSize: '0.82rem', color: C.textMuted, whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                          <Calendar size={12} /> {formatDate(user.createdAt)}
-                        </div>
-                      </td>
-
-                      {/* Actions — context-aware */}
-                      <td style={{ padding: '13px 20px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '6px' }}>
-                          <ActionButtons
-                            user={user}
-                            role={role}
-                            effStatus={effStatus}
-                            onView={() => setDetailUserId(user.id)}
-                            onDeactivate={handleDeactivate}
-                            onReactivate={handleReactivate}
-                            onDelete={handleDelete}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} loading={loading} />
-      </div>
-
-      <AnimatePresence>
-        {detailUserId && (
-          <UserDetailDrawer
-            key={detailUserId}
-            userId={detailUserId}
-            onClose={() => setDetailUserId(null)}
-            onUserUpdated={(patch) => patchUser(patch.id, patch)}
+          }
+        >
+          <SearchInput
+            width={300}
+            value={search}
+            onChange={(v) => { setSearch(v); setPage(1); }}
+            placeholder={`Search ${tab?.label.toLowerCase()} by name, email or phone…`}
+            aria-label="Search users"
           />
+        </Toolbar>
+
+        {/* Responder credential notice */}
+        {showsResponders && !loading && (
+          <Notice
+            tone="info"
+            inline
+            style={{ padding: '8px 16px', borderBottom: '1px solid var(--border)', color: 'var(--admin-text-sub)', fontSize: '12.5px' }}
+            action={
+              <Link to="/admin/verify" className="mf-link" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12.5px', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                Verification Queue <ArrowUpRight size={13} aria-hidden="true" />
+              </Link>
+            }
+          >
+            Credential status (verified, pending, rejected) is separate from login access. Approve or reject credentials in the Verification Queue.
+          </Notice>
         )}
-      </AnimatePresence>
-    </motion.div>
+
+        <DataTable minWidth="900px">
+          <thead>
+            <tr>
+              <th scope="col">User</th>
+              <th scope="col">Phone</th>
+              <th scope="col">{showsResponders ? 'Plan / Credentials' : 'Plan'}</th>
+              <th scope="col">Status</th>
+              <th scope="col">Joined</th>
+              <th scope="col" className="actions"><span className="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <TableSkeletonRows rows={5} cols={COLS} />
+            ) : filtered.length === 0 ? (
+              <tr>
+                <td colSpan={COLS}>
+                  <EmptyState
+                    icon={User}
+                    title={`No ${tab?.label.toLowerCase()} found`}
+                    message={filtersActive ? 'Try a different search term or filter.' : 'No accounts in this category yet.'}
+                    action={filtersActive && <Button size="sm" onClick={clearFilters}>Clear filters</Button>}
+                  />
+                </td>
+              </tr>
+            ) : (
+              rows.map((user) => {
+                const role = activeTab === 'ALL' ? user.role : activeTab;
+                const effStatus = getEffectiveStatus(user, role);
+                const status = EFF_STATUS[effStatus];
+                const isDeaf = user.medicalProfile?.patientType === 'DEAF';
+                const plan = PLAN_META[user.subscriptionPlan] || PLAN_META.FREE;
+                const verifSt = user.responder?.verificationStatus;
+                const verifMeta = verifSt ? VERIF_META[verifSt] : null;
+                return (
+                  <tr
+                    key={user.id}
+                    className="mf-table-row"
+                    onClick={() => setDetailUserId(user.id)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {/* User */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+                        <Avatar name={user.fullName} src={user.profileImageUrl ? resolveFileUrl(user.profileImageUrl) : undefined} />
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 500, color: 'var(--text-main)' }}>{user.fullName || '—'}</span>
+                            {activeTab === 'ALL' && ROLE_LABEL[user.role] && (
+                              <StatusBadge tone="neutral" dot={false} style={{ height: '20px', fontSize: '11.5px', padding: '0 6px' }}>
+                                {ROLE_LABEL[user.role]}
+                              </StatusBadge>
+                            )}
+                            {isDeaf && (
+                              <StatusBadge tone="info" dot={false} title="Deaf / hard of hearing" style={{ height: '20px', fontSize: '11.5px', padding: '0 6px' }}>
+                                Deaf
+                              </StatusBadge>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>{user.email}</div>
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Phone */}
+                    <td className="mf-num" style={{ whiteSpace: 'nowrap' }}>{user.phoneNumber || '—'}</td>
+
+                    {/* Plan / Credentials */}
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <StatusBadge tone={plan.tone} dot={false}>{plan.label}</StatusBadge>
+                        {verifMeta && <StatusBadge tone={verifMeta.tone}>{verifMeta.label}</StatusBadge>}
+                      </div>
+                    </td>
+
+                    {/* Effective status */}
+                    <td><StatusBadge tone={status.tone}>{status.label}</StatusBadge></td>
+
+                    {/* Joined */}
+                    <td className="mf-num" style={{ whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{formatDate(user.createdAt)}</td>
+
+                    {/* Actions — context-aware */}
+                    <td className="actions">
+                      <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: '2px' }}>
+                        <ActionButtons
+                          user={user}
+                          role={role}
+                          effStatus={effStatus}
+                          onView={() => setDetailUserId(user.id)}
+                          onDeactivate={handleDeactivate}
+                          onReactivate={handleReactivate}
+                          onDelete={handleDelete}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </DataTable>
+
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filtered.length} onChange={setPage} loading={loading} noun="users" />
+      </Panel>
+
+      {detailUserId && (
+        <UserDetailDrawer
+          key={detailUserId}
+          userId={detailUserId}
+          onClose={() => setDetailUserId(null)}
+          onUserUpdated={(patch) => patchUser(patch.id, patch)}
+        />
+      )}
+    </>
   );
 }
 
-/* ─── Context-aware action buttons ──────────────────────────────────────── */
-const iconBtn = (bg, color) => ({
-  width: '32px', height: '32px', borderRadius: '8px', border: 'none',
-  background: bg, color, cursor: 'pointer',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-});
-
+/* ─── Context-aware row actions ─────────────────────────────────────────── */
 function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactivate, onDelete }) {
   const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
   const name = user.fullName || user.email;
@@ -525,9 +415,7 @@ function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactiva
 
   return (
     <>
-      <button type="button" onClick={stop(onView)} title="View profile" aria-label={`View profile of ${name}`} style={iconBtn('var(--tint-teal)', 'var(--primary-light)')}>
-        <Eye size={15} />
-      </button>
+      <IconButton icon={Eye} label="View profile" aria-label={`View profile of ${name}`} onClick={stop(onView)} />
 
       {role === 'RESPONDER' && (effStatus === 'PENDING' || effStatus === 'REJECTED') ? (
         // Credential flow lives in the Verification Queue, not here
@@ -535,61 +423,53 @@ function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactiva
           to="/admin/verify"
           onClick={e => e.stopPropagation()}
           title="Open Verification Queue"
-          style={{
-            height: '32px', padding: '0 11px', borderRadius: '8px', textDecoration: 'none',
-            display: 'flex', alignItems: 'center', gap: '5px',
-            background: effStatus === 'REJECTED' ? 'var(--tint-red)' : 'var(--tint-amber)',
-            color: effStatus === 'REJECTED' ? 'var(--error-fg)' : 'var(--warning-fg)',
-            fontSize: '0.76rem', fontWeight: 700,
-          }}
+          className="mf-btn mf-btn--secondary mf-btn--sm"
+          style={{ margin: '0 2px' }}
         >
-          <ExternalLink size={13} />
           {effStatus === 'REJECTED' ? 'Review' : 'Verify'}
         </Link>
       ) : isAdmin ? null : effStatus === 'ACTIVE' ? (
-        <button type="button" onClick={stop(() => onDeactivate(user.id, name))} title="Deactivate account" aria-label={`Deactivate ${name}`} style={iconBtn('var(--tint-amber)', 'var(--warning-fg)')}>
-          <ShieldOff size={15} />
-        </button>
+        <IconButton icon={ShieldOff} label="Deactivate account" aria-label={`Deactivate ${name}`} onClick={stop(() => onDeactivate(user.id, name))} />
       ) : (
-        <button type="button" onClick={stop(() => onReactivate(user.id, name))} title="Reactivate account" aria-label={`Reactivate ${name}`} style={iconBtn('var(--tint-green)', 'var(--success-fg)')}>
-          <ShieldCheck size={15} />
-        </button>
+        <IconButton icon={ShieldCheck} label="Reactivate account" aria-label={`Reactivate ${name}`} onClick={stop(() => onReactivate(user.id, name))} />
       )}
 
-      {!isAdmin && <button type="button" onClick={stop(() => onDelete(user.id, name))} title="Delete account" aria-label={`Delete ${name}`} style={iconBtn('var(--tint-red)', 'var(--error-fg)')}>
-        <Trash2 size={15} />
-      </button>}
+      {!isAdmin && (
+        <IconButton icon={Trash2} tone="danger" label="Delete account" aria-label={`Delete ${name}`} onClick={stop(() => onDelete(user.id, name))} />
+      )}
     </>
   );
 }
 
-/* ─── Summary chips — tab-aware ─────────────────────────────────────────── */
-function getSummaryChips(users, role) {
+/* ─── Summary stats — tab-aware ─────────────────────────────────────────── */
+function getSummary(users, role) {
+  const active = users.filter(u => u.isActive !== false).length;
+  const inactive = users.filter(u => u.isActive === false).length;
   if (role === 'ALL') {
     return [
-      { label: 'Total Users',    value: users.length,                                                            color: 'var(--primary-light)', bg: 'var(--tint-teal)',  Icon: Users       },
-      { label: 'Active',         value: users.filter(u => u.isActive !== false).length,                          color: 'var(--success-fg)',    bg: 'var(--tint-green)', Icon: CheckCircle },
-      { label: 'Responders',     value: users.filter(u => u.role === 'RESPONDER').length,                        color: 'var(--success)',       bg: 'var(--tint-green)', Icon: ShieldCheck },
-      { label: 'Pending Review', value: users.filter(u => u.responder?.verificationStatus === 'PENDING').length, color: 'var(--warning-fg)',    bg: 'var(--tint-amber)', Icon: Clock       },
+      { label: 'Total users',    value: users.length },
+      { label: 'Active',         value: active },
+      { label: 'Responders',     value: users.filter(u => u.role === 'RESPONDER').length },
+      { label: 'Pending review', value: users.filter(u => u.responder?.verificationStatus === 'PENDING').length, hint: 'Responder credentials' },
     ];
   }
   if (role === 'RESPONDER') {
     return [
-      { label: 'Verified Responders', value: users.filter(u => u.responder?.verificationStatus === 'VERIFIED').length, color: 'var(--success-fg)', bg: 'var(--tint-green)', Icon: CheckCircle },
-      { label: 'Pending Review',      value: users.filter(u => u.responder?.verificationStatus === 'PENDING').length,  color: 'var(--warning-fg)', bg: 'var(--tint-amber)', Icon: Clock       },
-      { label: 'Rejected',            value: users.filter(u => u.responder?.verificationStatus === 'REJECTED').length, color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
+      { label: 'Verified responders', value: users.filter(u => u.responder?.verificationStatus === 'VERIFIED').length },
+      { label: 'Pending review',      value: users.filter(u => u.responder?.verificationStatus === 'PENDING').length },
+      { label: 'Rejected',            value: users.filter(u => u.responder?.verificationStatus === 'REJECTED').length },
     ];
   }
   if (role === 'PATIENT') {
     return [
-      { label: 'Active Patients', value: users.filter(u => u.isActive !== false).length,                     color: 'var(--success-fg)', bg: 'var(--tint-green)', Icon: CheckCircle },
-      { label: 'Inactive',        value: users.filter(u => u.isActive === false).length,                     color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
-      { label: 'Deaf / Mute',     value: users.filter(u => u.medicalProfile?.patientType === 'DEAF').length, color: 'var(--warning-fg)', bg: 'var(--tint-amber)', Icon: EarOff      },
+      { label: 'Active patients', value: active },
+      { label: 'Inactive',        value: inactive },
+      { label: 'Deaf / mute',     value: users.filter(u => u.medicalProfile?.patientType === 'DEAF').length },
     ];
   }
   // Caregivers
   return [
-    { label: 'Active Caregivers', value: users.filter(u => u.isActive !== false).length, color: 'var(--success-fg)', bg: 'var(--tint-green)', Icon: CheckCircle },
-    { label: 'Inactive',          value: users.filter(u => u.isActive === false).length, color: 'var(--error-fg)',   bg: 'var(--tint-red)',   Icon: XCircle     },
+    { label: 'Active caregivers', value: active },
+    { label: 'Inactive',          value: inactive },
   ];
 }

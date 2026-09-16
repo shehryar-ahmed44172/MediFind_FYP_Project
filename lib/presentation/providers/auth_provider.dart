@@ -8,6 +8,9 @@ import '../../domain/entities/user.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../../services/location/responder_location_tracker.dart';
+import '../../services/socket/socket_service.dart';
+import '../../core/utils/app_messenger.dart';
+import '../../core/utils/exceptions.dart';
 
 // API Client Provider
 final dioProvider = Provider<Dio>((ref) {
@@ -31,35 +34,44 @@ final Provider<MediFindApiClient> apiClientProvider = Provider<MediFindApiClient
         return null;
       }
       
-      // Call the refresh endpoint
+      // Call the refresh endpoint (uses a separate, interceptor-free Dio)
       final response = await client.refreshToken(refreshToken);
-      
-      // Save the new tokens
+
+      // Save the new tokens (refresh token may be rotated by the server)
       await localDataSource.saveAuthToken(response.accessToken);
-      if (response.refreshToken.isNotEmpty) {
-        await localDataSource.saveRefreshToken(response.refreshToken);
+      if (response.refreshToken != null) {
+        await localDataSource.saveRefreshToken(response.refreshToken!);
       }
-      
+
+      // Reconnect the socket with the fresh JWT so personal rooms keep working
+      SocketService.instance.updateAuthToken(response.accessToken);
+
       debugPrint('✅ [AuthService] Token refreshed and saved successfully');
       return response.accessToken;
     } catch (e) {
-      debugPrint('❌ [AuthService] Token refresh failed: $e');
+      debugPrint('[AuthService] Token refresh failed: $e');
+      // Let the client show the server's reason (e.g. account deactivated).
+      if (e is AppException && e.message.toLowerCase().contains('deactivated')) rethrow;
       return null;
     }
   };
 
   // Set up session expiration callback
-  client.onSessionExpired = () {
-    debugPrint('🚪 [AuthService] Session expired. Forcing logout...');
+  client.onSessionExpired = (String? reason) {
+    debugPrint('[AuthService] Session expired. Forcing logout...');
     // To break circularity, we don't reference logoutProvider directly.
-    // Instead, we clear the token and invalidate the auth state.
-    // We use Future.delayed to ensure invalidation happens outside the current build/init cycle
-    Future.delayed(Duration.zero, () {
-      ref.read(localDataSourceProvider.future).then((ds) {
-        ds.clearAuthToken();
-        ref.read(apiClientProvider).clearAuthToken();
-        ref.invalidate(authStateProvider);
-      });
+    // Instead, we clear the token and invalidate the auth state outside the
+    // current build/init cycle.
+    Future.delayed(Duration.zero, () async {
+      final ds = await ref.read(localDataSourceProvider.future);
+      await ds.clearAuthToken();
+      ref.read(apiClientProvider).clearAuthToken();
+      SocketService.instance.disconnect();
+      ref.read(authStateProvider.notifier).forceLoggedOut();
+      ref.invalidate(currentUserIdProvider);
+      ref.invalidate(currentUserRoleProvider);
+      ref.invalidate(currentUserProvider);
+      AppMessenger.showError(reason ?? 'Your session has expired. Please log in again.');
     });
   };
 
@@ -266,17 +278,33 @@ class VerifyEmailParams {
   VerifyEmailParams({required this.email, required this.otp});
 }
 
-final upgradeSubscriptionProvider = FutureProvider.family<User, String>((ref, plan) async {
-  final authRepo = await ref.watch(authRepositoryProvider.future);
-  final updatedUser = await authRepo.upgradeSubscription(plan);
+/// Upgrades the plan after a successful Stripe payment. autoDispose so every
+/// attempt hits the API (the server verifies the PaymentIntent).
+final upgradeSubscriptionProvider =
+    FutureProvider.autoDispose.family<User, UpgradeSubscriptionParams>((ref, params) async {
+  final authRepo = await ref.read(authRepositoryProvider.future);
+  final updatedUser = await authRepo.upgradeSubscription(
+    params.plan,
+    paymentIntentId: params.paymentIntentId,
+  );
   ref.invalidate(currentUserProvider);
   return updatedUser;
 });
 
-final processPaymentProvider = FutureProvider.family<bool, PaymentParams>((ref, params) async {
-  final authRepo = await ref.watch(authRepositoryProvider.future);
-  return await authRepo.processPayment(params.amount, params.method);
-});
+class UpgradeSubscriptionParams {
+  final String plan;
+  final String paymentIntentId;
+  const UpgradeSubscriptionParams({required this.plan, required this.paymentIntentId});
+
+  @override
+  bool operator ==(Object other) =>
+      other is UpgradeSubscriptionParams &&
+      other.plan == plan &&
+      other.paymentIntentId == paymentIntentId;
+
+  @override
+  int get hashCode => Object.hash(plan, paymentIntentId);
+}
 
 final deleteAccountProvider = FutureProvider<void>((ref) async {
   final authRepo = await ref.watch(authRepositoryProvider.future);
@@ -288,10 +316,3 @@ final deleteAccountProvider = FutureProvider<void>((ref) async {
   ref.invalidate(currentUserProvider);
   ref.invalidate(responderLocationTrackerProvider);
 });
-
-class PaymentParams {
-  final double amount;
-  final String method;
-  PaymentParams({required this.amount, required this.method});
-}
-

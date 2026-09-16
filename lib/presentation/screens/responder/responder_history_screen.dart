@@ -85,7 +85,9 @@ class _HistoryItemCard extends StatelessWidget {
     final emergencyStatus =
         (item['emergency'] as Map<String, dynamic>?)?['status'] as String? ?? '';
     final displayStatus = (status == 'PENDING' &&
-            (emergencyStatus == 'CANCELLED' || emergencyStatus == 'RESOLVED'))
+            (emergencyStatus == 'CANCELLED' ||
+                emergencyStatus == 'RESOLVED' ||
+                emergencyStatus == 'COMPLETED'))
         ? emergencyStatus
         : status;
 

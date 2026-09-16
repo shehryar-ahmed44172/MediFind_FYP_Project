@@ -22,6 +22,8 @@ import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
 import 'core/utils/responsive.dart';
 import 'presentation/widgets/connectivity_overlay.dart';
+import 'presentation/widgets/emergency/deaf_visual_alert_layer.dart';
+import 'core/utils/app_messenger.dart';
 // Added for AppRouter.navigatorKey
 
 
@@ -122,13 +124,16 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
         
         if (user != null && jwtToken != null) {
           final socketService = SocketService.instance;
-          socketService.setAuthToken(jwtToken);
+          // updateAuthToken reconnects an existing socket if the token changed
+          // (e.g. a new login), so the server always sees the current JWT.
+          socketService.updateAuthToken(jwtToken);
           socketService.connect(user.id);
-          debugPrint('🔌 Global Socket.io connection initiated for ${user.fullName}');
+          ref.read(accessibilityProvider.notifier).loadForUser(user.id, user.patientType);
         }
       } else {
         // Disconnect if logged out
         SocketService.instance.disconnect();
+        ref.read(accessibilityProvider.notifier).loadForUser(null, null);
       }
     }, fireImmediately: true);
   }
@@ -148,8 +153,22 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
       darkTheme: AppTheme.buildDarkTheme(accessibilitySettings),
       themeMode: accessibilitySettings.themeMode,
       routerConfig: AppRouter.router,
-      // Wrap every screen with the global connectivity overlay
-      builder: (context, child) => ConnectivityOverlay(child: child ?? const SizedBox.shrink()),
+      scaffoldMessengerKey: AppMessenger.key,
+      builder: (context, child) {
+        // App-wide font scaling from Accessibility settings (100–150%),
+        // applied on top of the OS text scale.
+        final mediaQuery = MediaQuery.of(context);
+        final systemScale = mediaQuery.textScaler.scale(1.0);
+        final scale = (systemScale * accessibilitySettings.fontSizeMultiplier).clamp(1.0, 2.0);
+        return MediaQuery(
+          data: mediaQuery.copyWith(textScaler: TextScaler.linear(scale)),
+          // Non-blocking offline banner + global deaf visual alerts (rendered
+          // above the navigator so they show on full-screen emergency routes).
+          child: ConnectivityOverlay(
+            child: DeafVisualAlertLayer(child: child ?? const SizedBox.shrink()),
+          ),
+        );
+      },
     );
   }
 }

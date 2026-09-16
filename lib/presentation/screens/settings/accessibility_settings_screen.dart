@@ -143,7 +143,7 @@ class _AccessibilitySettingsScreenState
             ),
             child: OutlinedButton.icon(
               onPressed: () {
-                notifier.initializeFromUser(user?.patientType);
+                notifier.resetToProfileDefaults(user?.patientType);
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Settings reset to profile defaults'),

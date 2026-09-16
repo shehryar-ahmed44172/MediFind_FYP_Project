@@ -2,7 +2,8 @@ import 'dart:io';
 import '../entities/medical_report.dart';
 
 abstract class MedicalReportRepository {
-  Future<List<MedicalReport>> getMedicalReports(String userId);
+  /// Reports of the authenticated user (backend resolves the user from the token).
+  Future<List<MedicalReport>> getMedicalReports();
   
   Future<MedicalReport> uploadMedicalReport({
     required File file,

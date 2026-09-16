@@ -18,12 +18,17 @@ final medicalReportRepositoryProvider = Provider<MedicalReportRepository>((ref) 
   return MedicalReportRepositoryImpl(apiClient: apiClient);
 });
 
+/// Reports of the currently authenticated patient.
+///
+/// The backend (`GET /api/reports/profile`) always returns the reports of the
+/// token's user, so [userId] is only used as the cache key (so switching
+/// accounts never shows another user's cached list).
 final medicalReportsProvider = FutureProvider.family<List<MedicalReport>, String>((ref, userId) async {
   // Ensure auth is initialized
   await ref.watch(authRepositoryProvider.future);
-  
+
   final repo = ref.watch(medicalReportRepositoryProvider);
-  return await repo.getMedicalReports(userId);
+  return await repo.getMedicalReports();
 });
 
 final medicalReportsNotifierProvider = StateNotifierProvider<MedicalReportsNotifier, AsyncValue<void>>((ref) {
@@ -58,6 +63,7 @@ class MedicalReportsNotifier extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
@@ -71,6 +77,7 @@ class MedicalReportsNotifier extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 
@@ -85,6 +92,7 @@ class MedicalReportsNotifier extends StateNotifier<AsyncValue<void>> {
       state = const AsyncValue.data(null);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
+      rethrow;
     }
   }
 }

@@ -1,9 +1,11 @@
 import '../entities/emergency.dart';
 import '../entities/user.dart';
+import '../entities/responder_alert.dart';
+import '../../data/datasources/remote/medifind_api_client.dart' show CreateEmergencyResult;
 
 /// Abstract repository for emergency operations
 abstract class EmergencyRepository {
-  Future<Emergency> createEmergency(
+  Future<CreateEmergencyResult> createEmergency(
     String emergencyType,
     double latitude,
     double longitude,
@@ -14,7 +16,7 @@ abstract class EmergencyRepository {
   
   Future<List<Emergency>> getUserEmergencies(String userId);
   
-  Future<void> updateEmergencyStatus(String emergencyId, String status);
+  Future<void> updateEmergencyStatus(String emergencyId, String status, {double? latitude, double? longitude});
   
   Future<void> assignResponder(String emergencyId, String responderId);
 
@@ -25,6 +27,10 @@ abstract class EmergencyRepository {
   Future<List<Emergency>> getActiveEmergencies();
   
   Future<List<Emergency>> getResponderActiveRequests();
+
+  /// Fetches this responder's live requests from the server and syncs the
+  /// local cache (stale/cancelled entries removed). Falls back to cache offline.
+  Future<List<ResponderAlert>> syncResponderAlerts(String? responderId);
   
   Future<void> updateEmergencyLocation(
     String emergencyId,

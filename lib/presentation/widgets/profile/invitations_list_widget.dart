@@ -6,6 +6,30 @@ import '../../theme/app_theme.dart';
 class InvitationsListWidget extends ConsumerWidget {
   const InvitationsListWidget({super.key});
 
+  Future<void> _respond(
+      BuildContext context, WidgetRef ref, String invitationId, bool accept) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(respondToInvitationProvider({
+        'invitationId': invitationId,
+        'accept': accept,
+      }).future);
+      ref.invalidate(allCaregiverLinksProvider);
+      ref.invalidate(caregiverLinksProvider);
+      messenger.showSnackBar(SnackBar(
+        content: Text(accept ? 'Invitation accepted' : 'Invitation declined'),
+        backgroundColor: accept ? AppColors.success : null,
+        behavior: SnackBarBehavior.floating,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Could not respond to invitation: $e'),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final invitationsAsync = ref.watch(pendingInvitationsProvider);
@@ -50,22 +74,12 @@ class InvitationsListWidget extends ConsumerWidget {
                         IconButton(
                           icon: const Icon(Icons.check_circle, color: Colors.green, size: 30),
                           tooltip: 'Accept',
-                          onPressed: () {
-                            ref.read(respondToInvitationProvider({
-                              'invitationId': inv.id,
-                              'accept': true,
-                            }));
-                          },
+                          onPressed: () => _respond(context, ref, inv.id, true),
                         ),
                         IconButton(
                           icon: const Icon(Icons.cancel, color: Colors.red, size: 30),
                           tooltip: 'Decline',
-                          onPressed: () {
-                             ref.read(respondToInvitationProvider({
-                              'invitationId': inv.id,
-                              'accept': false,
-                            }));
-                          },
+                          onPressed: () => _respond(context, ref, inv.id, false),
                         ),
                       ],
                     ),

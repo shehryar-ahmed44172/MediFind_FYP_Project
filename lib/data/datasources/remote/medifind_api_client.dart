@@ -9,17 +9,59 @@ import '../../../domain/entities/medical_profile.dart';
 import '../../../domain/entities/user.dart';
 
 typedef TokenRefreshCallback = Future<String?> Function();
-typedef LogoutCallback = void Function();
+/// [reason] is a user-facing message (e.g. account deactivated), or null.
+typedef LogoutCallback = void Function(String? reason);
+
+/// Result of `POST auth/refresh-token`.
+class TokenRefreshResult {
+  final String accessToken;
+  final String? refreshToken;
+  const TokenRefreshResult({required this.accessToken, this.refreshToken});
+}
+
+/// Result of `POST emergencies`. When the patient already has an open SOS the
+/// server returns that emergency with `alreadyActive: true` (HTTP 200).
+class CreateEmergencyResult {
+  final Emergency emergency;
+  final bool alreadyActive;
+  const CreateEmergencyResult({required this.emergency, this.alreadyActive = false});
+}
+
+/// Result of `POST payments/create-intent`.
+class PaymentIntentInfo {
+  final String clientSecret;
+  final String paymentIntentId;
+  const PaymentIntentInfo({required this.clientSecret, required this.paymentIntentId});
+}
 
 class MediFindApiClient {
   final Dio _dio;
   Dio get dio => _dio;
-  
+
+  /// Plain Dio (no auth/refresh interceptors) used ONLY for the refresh-token
+  /// call. Using the main Dio for refresh could deadlock: a 401 from the
+  /// refresh endpoint would re-enter the refresh interceptor and wait on itself.
+  late final Dio _refreshDio;
+
   // SHARED STATIC AUTH STATE
   static String? _authToken;
-  static bool _isRefreshing = false;
-  static final List<Completer<void>> _refreshQueue = [];
-  
+
+  /// Non-null while a token refresh is in flight. Every request that hits a
+  /// 401 during that window awaits the same future (true = refreshed).
+  static Completer<bool>? _refreshCompleter;
+  static String? _pendingLogoutReason;
+
+  /// Endpoints whose 401 means "bad credentials", not "expired token".
+  static const List<String> _noRefreshPaths = [
+    'auth/login',
+    'auth/register',
+    'auth/refresh-token',
+    'auth/logout',
+    'auth/verify-email',
+    'auth/forgot-password',
+    'auth/reset-password',
+  ];
+
   TokenRefreshCallback? onTokenExpired;
   LogoutCallback? onSessionExpired;
 
@@ -31,33 +73,39 @@ class MediFindApiClient {
     _configureDio();
   }
 
+  static BaseOptions _baseOptions() => BaseOptions(
+        baseUrl: AppConstants.baseUrl,
+        connectTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
+        receiveTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
+        headers: {
+          'Content-Type': 'application/json',
+          // Bypass ngrok interstitial warning page (ignored by real servers)
+          if (AppConstants.baseUrl.contains('ngrok'))
+            'ngrok-skip-browser-warning': 'true',
+        },
+      );
+
   void _configureDio() {
     // Prevent adding multiple copies of the same interceptors if Dio is shared
     _dio.interceptors.removeWhere((i) => i is LogInterceptor || i is InterceptorsWrapper);
-    
-    _dio.options = BaseOptions(
-      baseUrl: AppConstants.baseUrl,
-      connectTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
-      receiveTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
-      headers: {
-        'Content-Type': 'application/json',
-        // Bypass ngrok interstitial warning page (ignored by real servers)
-        if (AppConstants.baseUrl.contains('ngrok'))
-          'ngrok-skip-browser-warning': 'true',
-      },
-    );
 
-    // Add interceptor
+    _dio.options = _baseOptions();
+    _refreshDio = Dio(_baseOptions());
+
+    // Request/response logging: debug builds only, and never headers (they
+    // carry the bearer token). Release builds log nothing.
     if (kDebugMode) {
-      debugPrint('🚀 MediFind API Client initialized with Base URL: ${_dio.options.baseUrl}');
+      debugPrint('MediFind API Client initialized with Base URL: ${_dio.options.baseUrl}');
+      _dio.interceptors.add(
+        LogInterceptor(
+          requestHeader: false,
+          requestBody: true,
+          responseHeader: false,
+          responseBody: true,
+          logPrint: (obj) => debugPrint(obj.toString()),
+        ),
+      );
     }
-    _dio.interceptors.add(
-      LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (obj) => debugPrint(obj.toString()),
-      ),
-    );
 
     // Add interceptor for auth token
     _dio.interceptors.add(
@@ -65,87 +113,111 @@ class MediFindApiClient {
         onRequest: (options, handler) {
           if (_authToken != null) {
             options.headers['Authorization'] = 'Bearer $_authToken';
-            debugPrint('🔑 Adding Auth Header: Bearer ${_authToken!.substring(0, 10)}...');
-          } else {
-            debugPrint('⚠️ No Auth Token available in MediFindApiClient');
           }
           return handler.next(options);
         },
         onError: (error, handler) async {
-          if (error.response?.statusCode == 401) {
-            // Handle token expiration
-            debugPrint('🚨 401 Unauthorized detected for: ${error.requestOptions.path}');
-            
-            if (onTokenExpired != null) {
-              if (_isRefreshing) {
-                debugPrint('⏳ Refresh already in progress, queuing request...');
-                final completer = Completer<void>();
-                _refreshQueue.add(completer);
-                await completer.future;
-                
-                // Retry request with new token
-                return handler.resolve(await _retry(error.requestOptions));
-              }
+          final requestOptions = error.requestOptions;
+          final path = requestOptions.path;
+          final isAuthPath = _noRefreshPaths.any((p) => path.contains(p));
+          final alreadyRetried = requestOptions.extra['__retriedAfterRefresh'] == true;
 
-              _isRefreshing = true;
-              debugPrint('🔄 Attempting to refresh token...');
-              
-              try {
-                final newToken = await onTokenExpired!();
-                
-                if (newToken != null) {
-                  debugPrint('✅ Token refreshed successfully');
-                  _authToken = newToken;
-                  
-                  // Complete all queued requests
-                  for (var completer in _refreshQueue) {
-                    completer.complete();
-                  }
-                  _refreshQueue.clear();
-                  _isRefreshing = false;
-                  
-                  // Retry original request
-                  return handler.resolve(await _retry(error.requestOptions));
-                } else {
-                  debugPrint('❌ Token refresh failed (null returned)');
-                }
-              } catch (e) {
-                debugPrint('❌ Token refresh failed with error: $e');
-              } finally {
-                _isRefreshing = false;
-              }
-            }
+          // Login/register 401s are bad credentials — surface them as-is.
+          if (error.response?.statusCode != 401 || isAuthPath || alreadyRetried) {
+            return handler.next(error);
+          }
 
-            // If we get here, refresh failed or was not possible
-            debugPrint('🚪 Session expired, triggering logout...');
-            onSessionExpired?.call();
-
+          final serverMessage = _serverMessage(error.response?.data);
+          if (serverMessage != null && serverMessage.toLowerCase().contains('deactivated')) {
+            onSessionExpired?.call(serverMessage);
             return handler.reject(
               DioException(
-                requestOptions: error.requestOptions,
-                error: AuthenticationException(
-                  message: 'Session expired. Please login again.',
-                  code: 'TOKEN_EXPIRED',
-                ),
+                requestOptions: requestOptions,
+                error: AuthenticationException(message: serverMessage, code: 'ACCOUNT_DEACTIVATED'),
                 type: DioExceptionType.badResponse,
                 response: error.response,
               ),
             );
           }
-          return handler.next(error);
+
+          debugPrint('401 Unauthorized for: $path');
+
+          final refreshed = await _refreshTokenOnce();
+          if (refreshed) {
+            try {
+              return handler.resolve(await _retry(requestOptions));
+            } on DioException catch (retryError) {
+              return handler.next(retryError);
+            }
+          }
+
+          // Refresh failed or was not possible
+          debugPrint('Session expired, triggering logout...');
+          final reason = _pendingLogoutReason;
+          _pendingLogoutReason = null;
+          onSessionExpired?.call(reason);
+
+          return handler.reject(
+            DioException(
+              requestOptions: requestOptions,
+              error: AuthenticationException(
+                message: 'Session expired. Please login again.',
+                code: 'TOKEN_EXPIRED',
+              ),
+              type: DioExceptionType.badResponse,
+              response: error.response,
+            ),
+          );
         },
       ),
     );
   }
 
+  static String? _serverMessage(dynamic data) {
+    if (data is Map) {
+      final m = data['error'] ?? data['message'];
+      if (m is String && m.isNotEmpty) return m;
+    }
+    return null;
+  }
+
+  /// Runs at most one refresh at a time. Concurrent callers share the result,
+  /// and the shared future ALWAYS completes (true/false) so queued requests
+  /// are never left hanging when a refresh fails.
+  Future<bool> _refreshTokenOnce() async {
+    final inFlight = _refreshCompleter;
+    if (inFlight != null) return inFlight.future;
+
+    final completer = Completer<bool>();
+    _refreshCompleter = completer;
+    var success = false;
+    try {
+      if (onTokenExpired != null) {
+        final newToken = await onTokenExpired!();
+        if (newToken != null && newToken.isNotEmpty) {
+          _authToken = newToken;
+          _dio.options.headers['Authorization'] = 'Bearer $newToken';
+          success = true;
+        }
+      }
+    } catch (e) {
+      debugPrint('Token refresh failed with error: $e');
+      if (e is AppException && e.message.toLowerCase().contains('deactivated')) {
+        _pendingLogoutReason = e.message;
+      }
+    } finally {
+      _refreshCompleter = null;
+      completer.complete(success);
+    }
+    return success;
+  }
+
   void setAuthToken(String token) {
-    debugPrint('🔑 MediFindApiClient: Token has been SET globally (${token.substring(0, 10)}...)');
     _authToken = token;
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
   void clearAuthToken() {
-    debugPrint('🔑 MediFindApiClient: Token has been CLEARED globally');
     _authToken = null;
     _dio.options.headers.remove('Authorization');
   }
@@ -168,18 +240,26 @@ class MediFindApiClient {
   }
 
   Future<Response<dynamic>> _retry(RequestOptions requestOptions) {
+    final headers = Map<String, dynamic>.from(requestOptions.headers);
+    if (_authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
     final options = Options(
       method: requestOptions.method,
-      headers: requestOptions.headers,
+      headers: headers,
+      contentType: requestOptions.contentType,
+      responseType: requestOptions.responseType,
+      extra: {...requestOptions.extra, '__retriedAfterRefresh': true},
     );
-    // Update auth header
-    if (_authToken != null) {
-      options.headers?['Authorization'] = 'Bearer $_authToken';
-    }
-    
+
+    // A FormData body can only be sent once — clone it for the retry.
+    final data = requestOptions.data is FormData
+        ? (requestOptions.data as FormData).clone()
+        : requestOptions.data;
+
     return _dio.request<dynamic>(
       requestOptions.path,
-      data: requestOptions.data,
+      data: data,
       queryParameters: requestOptions.queryParameters,
       options: options,
     );
@@ -319,11 +399,40 @@ class MediFindApiClient {
     }
   }
 
-  Future<User> upgradeSubscription(String plan) async {
+  /// Creates a Stripe PaymentIntent for [plan]. The server only returns the
+  /// client secret; the PaymentIntent id is its prefix before `_secret_`.
+  Future<PaymentIntentInfo> createPaymentIntent(String plan) async {
+    try {
+      final response = await _dio.post(
+        'payments/create-intent',
+        data: {'plan': plan},
+      );
+      final data = response.data is Map ? response.data['data'] : null;
+      final clientSecret = (data is Map ? data['clientSecret'] : null)?.toString() ?? '';
+      if (clientSecret.isEmpty) {
+        throw NetworkException(message: 'Failed to create payment intent');
+      }
+      final explicitId = (data is Map ? (data['paymentIntentId'] ?? data['id']) : null)?.toString();
+      final idx = clientSecret.indexOf('_secret_');
+      final derivedId = idx > 0 ? clientSecret.substring(0, idx) : '';
+      final paymentIntentId =
+          (explicitId != null && explicitId.isNotEmpty) ? explicitId : derivedId;
+      if (paymentIntentId.isEmpty) {
+        throw NetworkException(message: 'Invalid payment intent returned by server');
+      }
+      return PaymentIntentInfo(clientSecret: clientSecret, paymentIntentId: paymentIntentId);
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Upgrades the plan. The server verifies with Stripe that [paymentIntentId]
+  /// succeeded for this user + plan before applying it.
+  Future<User> upgradeSubscription(String plan, {required String paymentIntentId}) async {
     try {
       final response = await _dio.patch(
         'users/upgrade',
-        data: {'plan': plan},
+        data: {'plan': plan, 'paymentIntentId': paymentIntentId},
       );
 
       if (response.statusCode == 200) {
@@ -388,23 +497,32 @@ class MediFindApiClient {
     }
   }
 
-  Future<AuthResponse> refreshToken(String token) async {
+  /// Uses the interceptor-free [_refreshDio] so a 401 here can never recurse
+  /// into the refresh logic. The server returns `token` and `accessToken`
+  /// (same value) and `refreshToken` (may be rotated).
+  Future<TokenRefreshResult> refreshToken(String token) async {
     try {
-      final response = await _dio.post(
+      final response = await _refreshDio.post(
         'auth/refresh-token',
         data: {'refreshToken': token},
       );
 
-      if (response.statusCode == 200) {
-        final data = response.data['data'] as Map<String, dynamic>;
-        final authResponse = AuthResponse.fromJson(data);
-        _authToken = authResponse.accessToken;
-        return authResponse;
+      final body = response.data;
+      final data = (body is Map && body['data'] is Map) ? body['data'] as Map : body;
+      if (response.statusCode == 200 && data is Map) {
+        final access = (data['accessToken'] ?? data['token'])?.toString();
+        if (access == null || access.isEmpty) {
+          throw NetworkException(message: 'Token refresh failed: no token in response');
+        }
+        final rotated = data['refreshToken']?.toString();
+        _authToken = access;
+        return TokenRefreshResult(
+          accessToken: access,
+          refreshToken: (rotated != null && rotated.isNotEmpty) ? rotated : null,
+        );
       }
 
-      throw NetworkException(
-        message: 'Token refresh failed',
-      );
+      throw NetworkException(message: 'Token refresh failed');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -471,7 +589,7 @@ class MediFindApiClient {
   }
 
   // EMERGENCY ENDPOINTS
-  Future<Emergency> createEmergency(
+  Future<CreateEmergencyResult> createEmergency(
     String emergencyType,
     double latitude,
     double longitude,
@@ -489,8 +607,14 @@ class MediFindApiClient {
         },
       );
 
-      if (response.statusCode == 201) {
-        return Emergency.fromJson(response.data['data'] as Map<String, dynamic>);
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        final body = response.data as Map;
+        final data = Map<String, dynamic>.from(body['data'] as Map);
+        final alreadyActive = body['alreadyActive'] == true || data['alreadyActive'] == true;
+        return CreateEmergencyResult(
+          emergency: Emergency.fromJson(data),
+          alreadyActive: alreadyActive,
+        );
       }
 
       throw NetworkException(message: 'Failed to create emergency');
@@ -560,14 +684,22 @@ class MediFindApiClient {
     }
   }
 
-  Future<void> updateEmergencyStatus(String emergencyId, String status) async {
+  /// Assigned responder progress update: EN_ROUTE, ARRIVED, TREATING,
+  /// TRANSPORTED or RESOLVED. The current position is recorded as tracking.
+  Future<void> updateEmergencyStatus(
+    String emergencyId,
+    String status, {
+    double? latitude,
+    double? longitude,
+  }) async {
     try {
-      // Backend doesn't have a direct 'status' PATCH on emergencies. 
-      // Usually status is updated via accept/reject/cancel.
-      // If we need a general status update, we'll need a new route.
       final response = await _dio.patch(
         'emergencies/$emergencyId/status',
-        data: {'status': status},
+        data: {
+          'status': status,
+          if (latitude != null) 'latitude': latitude,
+          if (longitude != null) 'longitude': longitude,
+        },
       );
 
       if (response.statusCode != 200) {
@@ -598,6 +730,36 @@ class MediFindApiClient {
       return (response.data['data'] as List)
           .map((e) => Emergency.fromJson(e))
           .toList();
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Raw `GET responders/emergencies` items (PENDING + ACCEPTED requests for
+  /// this responder), including `requests[]` with `distanceKm`,
+  /// `estimatedArrivalMinutes` and the nested `patient`.
+  Future<List<Map<String, dynamic>>> getResponderActiveRequestsRaw() async {
+    try {
+      final response = await _dio.get('responders/emergencies');
+      final list = response.data['data'];
+      if (list is! List) return [];
+      return list
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList();
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Raw `GET emergencies/:id`, including `emergencyRequests[]` (with the
+  /// responder) and `patient`, which the [Emergency] entity doesn't model.
+  Future<Map<String, dynamic>> getEmergencyRaw(String emergencyId) async {
+    try {
+      final response = await _dio.get('emergencies/$emergencyId');
+      final data = response.data['data'];
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw NetworkException(message: 'Failed to fetch emergency');
     } on DioException catch (e) {
       throw _handleDioException(e);
     }
@@ -786,12 +948,21 @@ class MediFindApiClient {
   }
 
   // CAREGIVER ENDPOINTS
-  Future<void> linkCaregiver(String email, String relationship) async {
+  /// POST /api/caregivers/link. The backend reads `email || caregiverEmail ||
+  /// patientEmail` and derives the link direction from the caller's JWT role.
+  /// [invitingCaregiver] = true for a PATIENT inviting a caregiver (sends
+  /// `caregiverEmail`); false for a CAREGIVER inviting a patient (`patientEmail`).
+  Future<void> linkCaregiver(
+    String email,
+    String relationship, {
+    bool invitingCaregiver = false,
+  }) async {
     try {
       final response = await _dio.post(
         'caregivers/link',
         data: {
-          'patientEmail': email, // Changed from caregiverEmail based on user requirement
+          'email': email,
+          if (invitingCaregiver) 'caregiverEmail': email else 'patientEmail': email,
           'relationship': relationship,
         },
       );

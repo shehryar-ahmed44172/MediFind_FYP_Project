@@ -383,7 +383,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
                       _AccountInfoCard(
                         user: user,
-                        fontMultiplier: settings.fontSizeMultiplier,
+                        // Text is scaled app-wide via MediaQuery.textScaler.
+                        fontMultiplier: 1.0,
                       ),
 
                       if (isOwn) ...[
@@ -787,7 +788,7 @@ class _PatientSection extends StatelessWidget {
               Icons.settings_accessibility_rounded,
               'Accessibility',
               'Font size, contrast & interface mode',
-              '/home/accessibility-settings',
+              '/accessibility-settings',
               AppColors.secondaryTeal,
             ),
           ]),
@@ -1056,7 +1057,7 @@ class _ResponderCredentials extends StatelessWidget {
         const SizedBox(height: 10),
         _QuickAccessCard(links: [
           _QLinkData(Icons.history_rounded, 'Response History',
-              'View past emergency responses', '/settings', rt.colorA),
+              'View past emergency responses', '/responder/history', rt.colorA),
           _QLinkData(Icons.tune_rounded, 'Responder Settings',
               'Availability and notifications', '/settings',
               Colors.grey.shade700),

@@ -32,6 +32,15 @@ class MedicalProfileRemoteDataSource {
     String? additionalNotes,
   }) async {
     try {
+      // The backend PUT (medicalProfileService.updateMedicalProfile) replaces
+      // any ABSENT array key with [] - so omitting `emergencyContacts`
+      // (or `disabilities` / `predefinedMessages`) would still wipe them.
+      // Contacts are managed through the dedicated add/remove endpoints, so a
+      // profile edit re-sends the server's current values for these lists
+      // untouched. If they can't be read, the update is aborted rather than
+      // risking data loss.
+      final current = await _fetchCurrentRawProfile();
+
       final response = await _dio.put(
         'medical-profile',
         data: {
@@ -40,7 +49,10 @@ class MedicalProfileRemoteDataSource {
           'chronicDiseases': chronicDiseases,
           'allergies': allergies,
           'medications': medications,
-          'emergencyContacts': emergencyContacts ?? [],
+          'emergencyContacts':
+              emergencyContacts ?? _listOrEmpty(current['emergencyContacts']),
+          'disabilities': _listOrEmpty(current['disabilities']),
+          'predefinedMessages': _listOrEmpty(current['predefinedMessages']),
           'additionalNotes': additionalNotes,
         },
       );
@@ -95,8 +107,25 @@ class MedicalProfileRemoteDataSource {
     }
   }
 
+  /// Reads the raw profile JSON currently stored on the server (throws on
+  /// failure so callers never overwrite lists they could not read).
+  Future<Map<String, dynamic>> _fetchCurrentRawProfile() async {
+    final response = await _dio.get('medical-profile');
+    final data = response.data;
+    if (response.statusCode == 200 && data is Map && data['data'] is Map) {
+      return Map<String, dynamic>.from(data['data'] as Map);
+    }
+    throw NetworkException(
+      message: 'Could not load your current profile. Please try again.',
+    );
+  }
+
+  List<dynamic> _listOrEmpty(dynamic value) => value is List ? value : const [];
+
   AppException _handleDioException(DioException e) {
-    final errorMessage = e.response?.data['error'] ?? 'Error occurred';
+    final data = e.response?.data;
+    final errorMessage =
+        (data is Map ? data['error']?.toString() : null) ?? 'Error occurred';
     return NetworkException(
       message: errorMessage,
       originalException: e,

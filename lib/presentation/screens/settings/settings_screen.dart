@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -43,15 +44,11 @@ class SettingsScreen extends ConsumerWidget {
                   _buildSettingsTile(
                     context,
                     Icons.format_size_rounded,
-                    'Text & Appearance',
-                    'Adjust font sizes and visual elements',
+                    'Accessibility & Text',
+                    'Text size, high contrast, vibration and text-only mode',
                     const Color(0xFF8B5CF6),
                     theme,
-                    () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Appearance settings coming soon!')),
-                      );
-                    },
+                    () => context.push('/accessibility-settings'),
                   ),
                   const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'Health & Security'),
@@ -111,6 +108,16 @@ class SettingsScreen extends ConsumerWidget {
                     theme,
                     () => _showThemeDialog(context, ref),
                   ),
+                  const SizedBox(height: 16),
+                  _buildSettingsTile(
+                    context,
+                    Icons.format_size_rounded,
+                    'Accessibility & Voice Alerts',
+                    'Text size, contrast, vibration and hands-free voice alerts',
+                    const Color(0xFF8B5CF6),
+                    theme,
+                    () => context.push('/accessibility-settings'),
+                  ),
                   const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'Response History'),
                   _buildSettingsTile(
@@ -158,6 +165,16 @@ class SettingsScreen extends ConsumerWidget {
                     theme,
                     () => _showThemeDialog(context, ref),
                   ),
+                  const SizedBox(height: 16),
+                  _buildSettingsTile(
+                    context,
+                    Icons.format_size_rounded,
+                    'Accessibility & Text',
+                    'Text size, high contrast and vibration',
+                    const Color(0xFF8B5CF6),
+                    theme,
+                    () => context.push('/accessibility-settings'),
+                  ),
                   const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'Account & Patients'),
                   _buildSettingsTile(
@@ -192,6 +209,7 @@ class SettingsScreen extends ConsumerWidget {
                   ),
                 ],
   
+                if (kDebugMode) ...[
                 const SizedBox(height: 32),
                 _buildSectionHeader(theme, 'Testing Tools'),
                 _buildSettingsTile(
@@ -226,6 +244,7 @@ class SettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
+                ],
 
                 const SizedBox(height: 48),
                 

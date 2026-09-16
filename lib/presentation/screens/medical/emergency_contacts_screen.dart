@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/app_theme.dart';
@@ -174,8 +174,35 @@ class _ContactsBody extends ConsumerWidget {
       },
       loading: () =>
           const Center(child: CircularProgressIndicator()),
-      error: (e, _) =>
-          Center(child: Text('Error loading contacts: $e')),
+      error: (e, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
+              const SizedBox(height: 16),
+              const Text(
+                'Unable to load contacts',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '$e',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => ref.invalidate(getMedicalProfileProvider(userId)),
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -192,6 +219,28 @@ class _ContactCard extends StatelessWidget {
     required this.userId,
     required this.ref,
   });
+
+  Future<void> _callContact(BuildContext context) async {
+    final number = contact.phoneNumber.replaceAll(RegExp(r'[\s\-()]'), '');
+    final uri = Uri(scheme: 'tel', path: number);
+    var launched = false;
+    if (number.isNotEmpty) {
+      try {
+        launched = await launchUrl(uri);
+      } catch (e) {
+        debugPrint('Could not launch dialer: $e');
+      }
+    }
+    if (!launched && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not start a call to ${contact.phoneNumber}'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -314,15 +363,8 @@ class _ContactCard extends StatelessWidget {
               icon: const Icon(Icons.call_rounded,
                   color: AppColors.success, size: 26),
               tooltip: 'Call ${contact.name}',
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Calling ${contact.name}…'),
-                    behavior: SnackBarBehavior.floating,
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              onPressed: () => _callContact(context),
             ),
           ),
         ),

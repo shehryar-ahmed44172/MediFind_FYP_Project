@@ -7,7 +7,10 @@ import '../../providers/auth_provider.dart';
 
 class PaymentSuccessScreen extends ConsumerWidget {
   final String planName;
-  const PaymentSuccessScreen({super.key, required this.planName});
+
+  /// Stripe PaymentIntent id (e.g. `pi_...`) of the confirmed payment.
+  final String? transactionId;
+  const PaymentSuccessScreen({super.key, required this.planName, this.transactionId});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -60,7 +63,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                 ),
                 child: Column(
                   children: [
-                    _buildReceiptRow('Transaction ID', 'MFD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}'),
+                    _buildReceiptRow('Transaction ID', transactionId ?? 'Not available'),
                     const SizedBox(height: 12),
                     _buildReceiptRow('Date', DateFormat('MMMM d, yyyy').format(DateTime.now())),
                     const SizedBox(height: 12),
@@ -107,12 +110,17 @@ class PaymentSuccessScreen extends ConsumerWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: isStatus ? const Color(0xFF10B981) : const Color(0xFF0F172A),
+        const SizedBox(width: 16),
+        Flexible(
+          child: SelectableText(
+            value,
+            textAlign: TextAlign.end,
+            maxLines: 1,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: isStatus ? const Color(0xFF10B981) : const Color(0xFF0F172A),
+            ),
           ),
         ),
       ],

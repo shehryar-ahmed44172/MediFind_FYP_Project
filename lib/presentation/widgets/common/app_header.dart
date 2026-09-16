@@ -251,24 +251,6 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
     );
   }
 
-  Widget _buildHeaderSkeleton(ThemeData theme) {
-    final shimmer = theme.colorScheme.surfaceContainerHighest;
-    return Row(
-      children: [
-        CircleAvatar(radius: 26, backgroundColor: shimmer),
-        const SizedBox(width: 16),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(width: 60, height: 12, color: shimmer),
-            const SizedBox(height: 8),
-            Container(width: 100, height: 20, color: shimmer),
-          ],
-        ),
-      ],
-    );
-  }
-
   void _showNotifications(BuildContext context, WidgetRef ref, ThemeData theme) {
      showModalBottomSheet(
       context: context,

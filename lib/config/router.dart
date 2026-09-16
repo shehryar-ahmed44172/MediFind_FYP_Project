@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing GoRouter for handling app navigation and routing
@@ -61,9 +60,21 @@ class AppRouter {
 
   static ProviderContainer? _container;
 
+  /// Notifies GoRouter whenever the auth state changes. Subscribes to the
+  /// PROVIDER (not a notifier instance), so it keeps working after
+  /// `ref.invalidate(authStateProvider)` recreates the notifier.
+  static final _AuthRefreshNotifier _authRefresh = _AuthRefreshNotifier();
+  static ProviderSubscription<AsyncValue<bool>>? _authSubscription;
+
   // Method to set the ProviderContainer for dependency injection
   static void setContainer(ProviderContainer container) {
+    if (identical(_container, container) && _authSubscription != null) return;
+    _authSubscription?.close();
     _container = container;
+    _authSubscription = container.listen<AsyncValue<bool>>(
+      authStateProvider,
+      (_, __) => _authRefresh.notify(),
+    );
   }
 
   /// When set, the NEXT redirect evaluation returns null (no redirect) and
@@ -100,9 +111,7 @@ class AppRouter {
   static final GoRouter router = GoRouter(
     navigatorKey: _navigatorKey,
     initialLocation: AppConfig.initialRoute,
-    refreshListenable: _container != null 
-        ? GoRouterRefreshStream(_container!.read(authStateProvider.notifier).stream)
-        : null,
+    refreshListenable: _authRefresh,
     redirect: (context, state) {
       // One-shot bypass for programmatic navigations (e.g. account deletion)
       if (_skipNextRedirect) {
@@ -383,8 +392,15 @@ class AppRouter {
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const EmergencyContactsScreen(),
       ),
+      // Legacy patient path — kept so existing links keep working.
       GoRoute(
         path: '/home/accessibility-settings',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const AccessibilitySettingsScreen(),
+      ),
+      // Shared route for every role (patients, responders, caregivers).
+      GoRoute(
+        path: '/accessibility-settings',
         name: 'accessibility-settings',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const AccessibilitySettingsScreen(),
@@ -487,7 +503,16 @@ class AppRouter {
         path: '/payment-success',
         name: 'payment-success',
         parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => PaymentSuccessScreen(planName: state.extra as String? ?? 'Premium'),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map) {
+            return PaymentSuccessScreen(
+              planName: extra['planName']?.toString() ?? 'Premium',
+              transactionId: extra['transactionId']?.toString(),
+            );
+          }
+          return PaymentSuccessScreen(planName: extra as String? ?? 'Premium');
+        },
       ),
       GoRoute(
         path: '/settings',
@@ -525,33 +550,7 @@ class AppRouter {
   );
 }
 
-/// A Listenable that notifies its listeners when a [Stream] emits a value.
-/// Used to refresh the [GoRouter] when the auth state changes.
-class GoRouterRefreshStream extends ChangeNotifier {
-  GoRouterRefreshStream(Stream<dynamic> stream) {
-    notifyListeners();
-    _subscription = stream.asBroadcastStream().listen(
-          (dynamic _) => notifyListeners(),
-        );
-  }
-
-  late final StreamSubscription<dynamic> _subscription;
-
-  @override
-  void dispose() {
-    _subscription.cancel();
-    super.dispose();
-  }
-}
-
-// Temporary placeholder since history is currently part of the dashboard view
-class _ResponderHistoryPlaceholder extends ConsumerWidget {
-  const _ResponderHistoryPlaceholder();
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // In the future, we could extract the history tab logic to a separate screen
-    // For now, we'll just show the home screen but set the tab to history
-    // But since we are using GoRouter, we should probably just use the home screen
-    return const ResponderHomeScreen(); 
-  }
+/// Listenable used as GoRouter's `refreshListenable`.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
 }

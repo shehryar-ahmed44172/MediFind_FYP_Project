@@ -26,7 +26,7 @@ class ChatRepositoryImpl implements ChatRepository {
       'roomId': roomId,
       'content': content,
       'messageType': type.toString().split('.').last,
-      'mediaUrl': mediaUrl,
+      if (mediaUrl != null) 'mediaUrl': mediaUrl,
     });
     return ChatMessage.fromJson(response as Map<String, dynamic>);
   }

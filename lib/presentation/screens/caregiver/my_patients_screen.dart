@@ -62,7 +62,26 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
                   );
                 },
                 loading: () => const Center(child: CircularProgressIndicator()),
-                error: (err, _) => Center(child: Text('Error: $err')),
+                error: (err, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.error),
+                        const SizedBox(height: 16),
+                        const Text('Could not load your patients.', textAlign: TextAlign.center),
+                        const SizedBox(height: 16),
+                        ElevatedButton.icon(
+                          onPressed: () => ref.invalidate(allCaregiverLinksProvider),
+                          icon: const Icon(Icons.refresh_rounded),
+                          label: const Text('Retry'),
+                          style: ElevatedButton.styleFrom(minimumSize: const Size(140, 48)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -80,23 +99,46 @@ class _MyPatientsScreenState extends ConsumerState<MyPatientsScreen> with Single
         ? links 
         : links.where((l) => l.status == statusFilter).toList();
 
+    Future<void> onRefresh() async {
+      try {
+        ref.invalidate(allCaregiverLinksProvider);
+        await ref.read(allCaregiverLinksProvider.future);
+      } catch (_) {}
+    }
+
     if (filteredLinks.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+      final emptyText = switch (statusFilter) {
+        'PENDING' => 'No pending invitations',
+        'REJECTED' => 'No declined invitations',
+        _ => 'No patients yet. Tap "Add Patient" to send an invitation.',
+      };
+      return RefreshIndicator(
+        onRefresh: onRefresh,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 32),
           children: [
-            Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey.shade300),
+            const SizedBox(height: 120),
+            Icon(Icons.people_outline_rounded, size: 64, color: Colors.grey.shade400),
             const SizedBox(height: 16),
-            Text('No patients found', style: TextStyle(color: Colors.grey.shade600)),
+            Text(emptyText, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
           ],
         ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-      itemCount: filteredLinks.length,
-      itemBuilder: (context, index) => _PatientManageCard(link: filteredLinks[index]),
+    return RefreshIndicator(
+      onRefresh: onRefresh,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        // Bottom padding keeps the last card clear of the FAB.
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 96),
+        itemCount: filteredLinks.length,
+        itemBuilder: (context, index) => Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _PatientManageCard(link: filteredLinks[index]),
+        ),
+      ),
     );
   }
 }
@@ -131,7 +173,7 @@ class _PatientManageCard extends ConsumerWidget {
             children: [
               CircleAvatar(
                 radius: 28,
-                backgroundColor: statusColor.withOpacity(0.1),
+                backgroundColor: statusColor.withValues(alpha: 0.1),
                 child: Icon(Icons.person_rounded, color: statusColor, size: 32),
               ),
               const SizedBox(width: 16),
@@ -149,11 +191,11 @@ class _PatientManageCard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
+                            color: statusColor.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
-                            isRejected ? 'FAILED' : link.status,
+                            isRejected ? 'DECLINED' : isPending ? 'PENDING' : link.status,
                             style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
                           ),
                         ),
@@ -167,15 +209,27 @@ class _PatientManageCard extends ConsumerWidget {
               if (isAccepted)
                 IconButton(
                   onPressed: () async {
-                    final room = await ref.read(getChatRoomForUserProvider(link.patientId).future);
-                    if (context.mounted) {
-                      context.push('/chat/${room.id}', extra: link.patientName);
+                    try {
+                      final room = await ref.read(getChatRoomForUserProvider(link.patientId).future);
+                      if (context.mounted) {
+                        context.push('/chat/${room.id}', extra: link.patientName ?? 'Patient');
+                      }
+                    } catch (e) {
+                      debugPrint('MyPatients: could not open chat: $e');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Could not open the chat. Please try again.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
                     }
                   },
                   icon: const Icon(Icons.chat_bubble_outline_rounded, color: AppColors.primary),
                   tooltip: 'Chat with Patient',
                 ),
-              if (!isAccepted)
+              if (isPending || isRejected)
                 IconButton(
                   onPressed: () => _showResendConfirm(context, ref),
                   icon: const Icon(Icons.refresh_rounded, color: AppColors.primary),
@@ -189,37 +243,35 @@ class _PatientManageCard extends ConsumerWidget {
   }
 
   void _showResendConfirm(BuildContext context, WidgetRef ref) {
+    final messenger = ScaffoldMessenger.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Resend Invitation?'),
         content: Text('This will send a new email notification to ${link.patientEmail ?? 'this patient'}.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               try {
                 await ref.read(resendInvitationProvider(link.patientId).future);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Invitation resent!'),
-                      backgroundColor: AppColors.success,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('Invitation resent!'),
+                    backgroundColor: AppColors.success,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Failed: $e'),
-                      backgroundColor: AppColors.error,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
+                debugPrint('MyPatients: resend failed: $e');
+                messenger.showSnackBar(
+                  SnackBar(
+                    content: Text('Could not resend the invitation: ${e.toString().replaceAll('Exception:', '').trim()}'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
             },
             child: const Text('Resend'),

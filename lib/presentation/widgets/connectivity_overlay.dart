@@ -1,121 +1,92 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/connectivity_provider.dart';
 
-/// Full-screen blocking overlay that appears whenever the device loses internet.
-/// Place this above [MaterialApp] using the `builder` parameter so it covers
-/// every screen in the app.
-class ConnectivityOverlay extends ConsumerStatefulWidget {
+/// App-wide NON-blocking offline banner.
+///
+/// Placed via `MaterialApp.router(builder:)`. When offline, a compact banner
+/// is shown above the app (taking the status-bar inset) with direct
+/// "Call 1122" / "SMS" actions. The app underneath stays fully usable, so the
+/// offline SOS fallback on the emergency screen keeps working.
+class ConnectivityOverlay extends ConsumerWidget {
   final Widget child;
   const ConnectivityOverlay({super.key, required this.child});
 
-  @override
-  ConsumerState<ConnectivityOverlay> createState() => _ConnectivityOverlayState();
-}
+  static const String emergencyNumber = '1122';
 
-class _ConnectivityOverlayState extends ConsumerState<ConnectivityOverlay> {
-  bool _isChecking = false;
-
-  Future<void> _retry() async {
-    setState(() => _isChecking = true);
-    // Trigger a manual check — the stream auto-updates, but this gives visual feedback
-    await Connectivity().checkConnectivity();
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) setState(() => _isChecking = false);
+  static Future<void> _launch(BuildContext context, Uri uri) async {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    try {
+      final ok = await launchUrl(uri);
+      if (!ok) throw Exception('launch failed');
+    } catch (_) {
+      messenger?.showSnackBar(
+        const SnackBar(content: Text('Could not open the dialer. Please dial 1122 manually.')),
+      );
+    }
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final isConnected = ref.watch(isConnectedProvider);
+    final mediaQuery = MediaQuery.of(context);
 
-    return Stack(
+    // IMPORTANT: the widget structure is identical online and offline (only
+    // the banner's content/size changes). Returning `child` directly when
+    // online would remount the navigator on every connectivity change and
+    // reset open screens such as an in-progress SOS.
+    return Column(
       children: [
-        widget.child,
-        if (!isConnected)
-          Positioned.fill(
-            child: Material(
-              color: Colors.black.withOpacity(0.72),
-              child: SafeArea(
-                child: Center(
-                  child: Card(
-                    margin: const EdgeInsets.symmetric(horizontal: 28),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 12,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(28, 32, 28, 28),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(18),
-                            decoration: BoxDecoration(
-                              color: Colors.red.shade50,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.wifi_off_rounded,
-                              color: Colors.red.shade600,
-                              size: 52,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          const Text(
-                            'No Internet Connection',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            'MediFind needs internet access to connect you to emergency services.\n\nPlease enable Wi-Fi or mobile data and try again.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey.shade600,
-                              height: 1.5,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 28),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton.icon(
-                              icon: _isChecking
-                                  ? const SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Colors.white,
-                                      ),
-                                    )
-                                  : const Icon(Icons.refresh_rounded),
-                              label: Text(
-                                _isChecking ? 'Checking...' : 'Retry Connection',
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.red.shade600,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              onPressed: _isChecking ? null : _retry,
-                            ),
-                          ),
-                        ],
+        if (isConnected)
+          const SizedBox.shrink()
+        else
+        Material(
+          color: const Color(0xFFD32F2F), // app SOS red
+          child: Padding(
+            padding: EdgeInsets.only(top: mediaQuery.padding.top),
+            child: Semantics(
+              liveRegion: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+                child: Row(
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'No internet. For emergencies call 1122.',
+                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                  ),
+                    TextButton.icon(
+                      onPressed: () => _launch(context, Uri(scheme: 'tel', path: emergencyNumber)),
+                      icon: const Icon(Icons.phone_rounded, size: 18, color: Colors.white),
+                      label: const Text('Call', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => _launch(context, Uri(scheme: 'sms', path: emergencyNumber)),
+                      icon: const Icon(Icons.sms_rounded, size: 18, color: Colors.white),
+                      label: const Text('SMS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+        ),
+        Expanded(
+          // When offline the banner consumes the status-bar inset.
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: !isConnected,
+            child: child,
+          ),
+        ),
       ],
     );
   }

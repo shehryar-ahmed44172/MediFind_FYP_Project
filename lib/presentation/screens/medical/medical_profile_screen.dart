@@ -13,7 +13,8 @@ class MedicalProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUserId = ref.watch(currentUserIdProvider);
     final settings = ref.watch(accessibilityProvider);
-    final m = settings.fontSizeMultiplier;
+    // Text is scaled app-wide via MediaQuery.textScaler (see main.dart).
+    const m = 1.0;
     
     return currentUserId.when(
       data: (userId) => _buildProfileContent(context, ref, userId ?? '', settings, m),
@@ -240,7 +241,6 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
 
     return Center(
       child: Container(

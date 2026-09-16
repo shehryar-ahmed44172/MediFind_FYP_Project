@@ -69,33 +69,51 @@ class AccessibilitySettings {
 }
 
 // ── SharedPreferences keys ────────────────────────────────────────────────
-const _kVoiceGuidance    = 'acc_voiceGuidance';
-const _kTextOnly         = 'acc_textOnly';
-const _kLargeButtons     = 'acc_largeButtons';
-const _kHighContrast     = 'acc_highContrast';
-const _kVibration        = 'acc_vibration';
-const _kFontMultiplier   = 'acc_fontMultiplier';
-const _kThemeMode        = 'acc_themeMode'; // 0=system, 1=light, 2=dark
+// Keys are namespaced per user id (`acc_<userId>_<name>`) so one account's
+// settings — e.g. DEAF defaults — never leak into another account on the
+// same device. Before login a `guest` namespace is used.
+const _kVoiceGuidance    = 'voiceGuidance';
+const _kTextOnly         = 'textOnly';
+const _kLargeButtons     = 'largeButtons';
+const _kHighContrast     = 'highContrast';
+const _kVibration        = 'vibration';
+const _kFontMultiplier   = 'fontMultiplier';
+const _kThemeMode        = 'themeMode'; // 0/1=light, 2=dark, 3=system
 
 /// Accessibility Settings Notifier - manages state changes
 class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
   AccessibilityNotifier() : super(AccessibilitySettings()) {
-    _loadFromPrefs();
+    loadForUser(null, null);
   }
 
-  // True once SharedPreferences have been successfully loaded into state.
-  // Guards initializeFromUser so it never overwrites user-saved settings.
-  bool _prefsLoaded = false;
+  String _namespace = 'guest';
+  String? _loadedUserId;
+  int _loadGeneration = 0;
+
+  String _key(String name) => 'acc_${_namespace}_$name';
 
   // ── Persistence helpers ──────────────────────────────────────────────────
 
-  Future<void> _loadFromPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    // Only apply if there are persisted values (first run returns null)
-    if (!prefs.containsKey(_kVoiceGuidance)) return;
+  /// Loads the settings saved for [userId]. If this user has never saved any,
+  /// role-appropriate defaults are applied (DEAF patients get text-only,
+  /// high-contrast, vibration and slightly larger text) and persisted.
+  /// Passing null switches back to guest defaults (after logout).
+  Future<void> loadForUser(String? userId, String? patientType) async {
+    if (userId != null && userId == _loadedUserId) return;
+    final generation = ++_loadGeneration;
+    _namespace = userId ?? 'guest';
+    _loadedUserId = userId;
 
-    // 0=light (default), 1=light, 2=dark, 3=system
-    final themeModeIdx = prefs.getInt(_kThemeMode) ?? 0;
+    final prefs = await SharedPreferences.getInstance();
+    if (generation != _loadGeneration) return; // a newer load started
+
+    if (!prefs.containsKey(_key(_kVoiceGuidance))) {
+      state = userId == null ? AccessibilitySettings() : _profileDefaults(patientType);
+      if (userId != null) await _saveToPrefs();
+      return;
+    }
+
+    final themeModeIdx = prefs.getInt(_key(_kThemeMode)) ?? 0;
     final themeMode = themeModeIdx == 2
         ? ThemeMode.dark
         : themeModeIdx == 3
@@ -103,32 +121,42 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
             : ThemeMode.light; // default to light
 
     state = AccessibilitySettings(
-      voiceGuidanceEnabled: prefs.getBool(_kVoiceGuidance) ?? false,
-      textOnlyMode:         prefs.getBool(_kTextOnly)      ?? false,
-      largeButtons:         prefs.getBool(_kLargeButtons)  ?? false,
-      highContrast:         prefs.getBool(_kHighContrast)  ?? false,
-      vibrationFeedback:    prefs.getBool(_kVibration)     ?? true,
-      fontSizeMultiplier:   prefs.getDouble(_kFontMultiplier) ?? 1.0,
+      voiceGuidanceEnabled: prefs.getBool(_key(_kVoiceGuidance)) ?? false,
+      textOnlyMode:         prefs.getBool(_key(_kTextOnly))      ?? false,
+      largeButtons:         prefs.getBool(_key(_kLargeButtons))  ?? false,
+      highContrast:         prefs.getBool(_key(_kHighContrast))  ?? false,
+      vibrationFeedback:    prefs.getBool(_key(_kVibration))     ?? true,
+      fontSizeMultiplier:   (prefs.getDouble(_key(_kFontMultiplier)) ?? 1.0).clamp(1.0, 1.5),
       themeMode:            themeMode,
     );
-    _prefsLoaded = true;
+  }
+
+  AccessibilitySettings _profileDefaults(String? patientType) {
+    if ((patientType ?? '').toUpperCase() == 'DEAF') {
+      return AccessibilitySettings(
+        textOnlyMode: true,
+        vibrationFeedback: true,
+        highContrast: true,
+        fontSizeMultiplier: 1.15,
+      );
+    }
+    return AccessibilitySettings();
   }
 
   Future<void> _saveToPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kVoiceGuidance,   state.voiceGuidanceEnabled);
-    await prefs.setBool(_kTextOnly,         state.textOnlyMode);
-    await prefs.setBool(_kLargeButtons,     state.largeButtons);
-    await prefs.setBool(_kHighContrast,     state.highContrast);
-    await prefs.setBool(_kVibration,        state.vibrationFeedback);
-    await prefs.setDouble(_kFontMultiplier, state.fontSizeMultiplier);
-    // 0=light, 1=light, 2=dark, 3=system
+    await prefs.setBool(_key(_kVoiceGuidance),   state.voiceGuidanceEnabled);
+    await prefs.setBool(_key(_kTextOnly),         state.textOnlyMode);
+    await prefs.setBool(_key(_kLargeButtons),     state.largeButtons);
+    await prefs.setBool(_key(_kHighContrast),     state.highContrast);
+    await prefs.setBool(_key(_kVibration),        state.vibrationFeedback);
+    await prefs.setDouble(_key(_kFontMultiplier), state.fontSizeMultiplier);
     final themeModeIdx = state.themeMode == ThemeMode.dark
         ? 2
         : state.themeMode == ThemeMode.system
             ? 3
             : 0; // light
-    await prefs.setInt(_kThemeMode, themeModeIdx);
+    await prefs.setInt(_key(_kThemeMode), themeModeIdx);
   }
 
   /// Toggle voice guidance
@@ -161,10 +189,9 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
     _saveToPrefs();
   }
 
-  /// Update font size multiplier
+  /// Update font size multiplier (100%–150%, applied app-wide).
   void setFontSizeMultiplier(double multiplier) {
-    // Clamp between 0.8 (20% smaller) and 1.5 (50% larger)
-    final clampedMultiplier = multiplier.clamp(0.8, 1.5);
+    final clampedMultiplier = multiplier.clamp(1.0, 1.5);
     state = state.copyWith(fontSizeMultiplier: clampedMultiplier);
     _saveToPrefs();
   }
@@ -175,40 +202,20 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
     _saveToPrefs();
   }
 
-  String? _initializedFromUserId;
-
-  /// Initialize based on user patient type.
-  /// Only applies role-appropriate defaults on the very first run (no saved prefs).
-  /// Never overwrites settings the user has already customized.
+  /// Ensures the given user's settings are loaded (safe to call repeatedly).
   void initializeFromUser(String? patientType, [String? userId]) {
-    if (userId != null && _initializedFromUserId == userId) return;
+    if (userId != null) loadForUser(userId, patientType);
+  }
 
-    // If prefs were already loaded, the user has saved settings — respect them.
-    if (!_prefsLoaded) {
-      final type = patientType?.toUpperCase() ?? 'NORMAL';
-      if (type == 'DEAF') {
-        // First-time DEAF user: apply accessible defaults and persist them.
-        state = AccessibilitySettings(
-          textOnlyMode: true,
-          vibrationFeedback: true,
-          highContrast: true,
-          fontSizeMultiplier: 1.15,
-        );
-        _saveToPrefs();
-      }
-      // NORMAL users keep the constructor defaults — nothing to change.
-    }
-
-    if (userId != null) {
-      _initializedFromUserId = userId;
-    }
+  /// Resets the CURRENT user's settings to their profile defaults.
+  void resetToProfileDefaults(String? patientType) {
+    state = _profileDefaults(patientType);
+    _saveToPrefs();
   }
 
   /// Force a re-initialization (e.g. settings reset).
   void reinitialize(String? patientType, [String? userId]) {
-    _initializedFromUserId = null;
-    _prefsLoaded = false;
-    initializeFromUser(patientType, userId);
+    resetToProfileDefaults(patientType);
   }
 
   /// Apply all settings at once (existing method preserved)
@@ -226,7 +233,8 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
       largeButtons: largeButtons,
       highContrast: highContrast,
       vibrationFeedback: vibration,
-      fontSizeMultiplier: fontSize,
+      fontSizeMultiplier: fontSize.clamp(1.0, 1.5),
+      themeMode: state.themeMode,
     );
     _saveToPrefs();
   }

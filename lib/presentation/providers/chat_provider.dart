@@ -41,6 +41,7 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
   }
 
   Future<void> fetchMessages() async {
+    if (state.hasError) state = const AsyncValue.loading();
     try {
       // Ensure auth is initialized before fetching (prevents race condition on startup)
       await _ref.read(authRepositoryProvider.future);
@@ -79,45 +80,52 @@ class ChatMessagesNotifier extends StateNotifier<AsyncValue<List<ChatMessage>>> 
       });
     });
   }
-  Future<void> sendMessage(String content, {MessageType type = MessageType.TEXT}) async {
+  /// Returns true when the message was accepted by the server. Errors are
+  /// logged and reported via the return value (never thrown) so fire-and-forget
+  /// callers stay safe; UI callers should check the result.
+  Future<bool> sendMessage(String content, {MessageType type = MessageType.TEXT}) async {
     try {
       final message = await _repo.sendMessage(_roomId, content, type: type);
-      
-      final currentMessages = state.value ?? [];
-      if (!currentMessages.any((m) => m.id == message.id)) {
-        state = AsyncValue.data([...currentMessages, message]);
-      }
+      _appendMessage(message);
+      return true;
     } catch (e) {
       debugPrint('❌ Error sending message: $e');
+      return false;
     }
   }
 
-  Future<void> sendVoiceMessage(String filePath) async {
+  void _appendMessage(ChatMessage message) {
+    if (!mounted) return;
+    final currentMessages = state.value ?? [];
+    if (!currentMessages.any((m) => m.id == message.id)) {
+      state = AsyncValue.data([...currentMessages, message]);
+    }
+  }
+
+  /// Returns true on success (see [sendMessage]).
+  Future<bool> sendVoiceMessage(String filePath) async {
     try {
       final mediaUrl = await _repo.uploadFile(File(filePath));
       final message = await _repo.sendMessage(_roomId, 'Voice Message', type: MessageType.AUDIO, mediaUrl: mediaUrl);
-      
-      final currentMessages = state.value ?? [];
-      if (!currentMessages.any((m) => m.id == message.id)) {
-        state = AsyncValue.data([...currentMessages, message]);
-      }
+      _appendMessage(message);
+      return true;
     } catch (e) {
       debugPrint('❌ Error sending voice message: $e');
+      return false;
     }
   }
 
-  Future<void> sendFileMessage(File file, MessageType type) async {
+  /// Returns true on success (see [sendMessage]).
+  Future<bool> sendFileMessage(File file, MessageType type) async {
     try {
       final mediaUrl = await _repo.uploadFile(file);
-      final filename = file.path.split('/').last;
+      final filename = file.path.split(RegExp(r'[/\\]')).last;
       final message = await _repo.sendMessage(_roomId, filename, type: type, mediaUrl: mediaUrl);
-      
-      final currentMessages = state.value ?? [];
-      if (!currentMessages.any((m) => m.id == message.id)) {
-        state = AsyncValue.data([...currentMessages, message]);
-      }
+      _appendMessage(message);
+      return true;
     } catch (e) {
       debugPrint('❌ Error sending file message: $e');
+      return false;
     }
   }
 

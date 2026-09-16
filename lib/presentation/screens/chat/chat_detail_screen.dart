@@ -13,7 +13,13 @@ import 'package:just_audio/just_audio.dart';
 import '../../../services/audio/voice_recorder_service.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import '../../../core/utils/exceptions.dart';
+import '../../../services/location/location_service.dart';
+
+final RegExp _urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -41,14 +47,43 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   DateTime? _recordingStartTime;
   Timer? _recordingTimer;
   String _recordingDuration = '0:00';
+  StreamSubscription<PlayerState>? _playerStateSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Single subscription for the lifetime of the screen (previously a new
+    // listener was added on every play).
+    _playerStateSub = _audioPlayer.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        if (mounted) setState(() => _playingMessageId = null);
+      }
+    });
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     _recordingTimer?.cancel();
+    if (_isRecording) {
+      _recorderService.stopRecording();
+    }
+    _playerStateSub?.cancel();
     _audioPlayer.dispose();
     super.dispose();
+  }
+
+  void _showSnack(String message, {bool isError = false, SnackBarAction? action}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? AppColors.error : null,
+        behavior: SnackBarBehavior.floating,
+        action: action,
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -77,6 +112,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.info_outline),
+            tooltip: 'Chat info',
             onPressed: () {
               showModalBottomSheet(
                 context: context,
@@ -140,7 +176,31 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 );
               },
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('Error: $e')),
+              error: (e, _) => Center(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Unable to load messages',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('$e', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => ref.read(chatMessagesProvider(widget.roomId).notifier).fetchMessages(),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ),
           _buildMessageInput(theme),
@@ -183,13 +243,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 if (message.messageType == MessageType.TEXT)
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      color: isMe ? Colors.white : Colors.black87,
-                      fontSize: 15,
-                    ),
-                  )
+                  _buildTextContent(message.content, isMe)
                 else if (message.messageType == MessageType.AUDIO)
                   GestureDetector(
                     onTap: () => _playVoiceNote(message.id, message.mediaUrl),
@@ -257,6 +311,52 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  Widget _buildTextContent(String content, bool isMe) {
+    final color = isMe ? Colors.white : Colors.black87;
+    final match = _urlRegex.firstMatch(content);
+    if (match == null) {
+      return Text(content, style: TextStyle(color: color, fontSize: 15));
+    }
+    final url = match.group(0)!;
+    return Semantics(
+      link: true,
+      label: 'Open link',
+      child: InkWell(
+        onTap: () => _openLink(url),
+        child: Text.rich(
+          TextSpan(
+            style: TextStyle(color: color, fontSize: 15),
+            children: [
+              TextSpan(text: content.substring(0, match.start)),
+              TextSpan(
+                text: url,
+                style: TextStyle(
+                  color: isMe ? Colors.white : AppColors.primary,
+                  decoration: TextDecoration.underline,
+                  decorationColor: isMe ? Colors.white : AppColors.primary,
+                ),
+              ),
+              TextSpan(text: content.substring(match.end)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openLink(String url) async {
+    final uri = Uri.tryParse(url);
+    var opened = false;
+    if (uri != null) {
+      try {
+        opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } catch (e) {
+        debugPrint('Could not open link: $e');
+      }
+    }
+    if (!opened) _showSnack('Could not open link', isError: true);
+  }
+
   void _showQuickPhrases() {
     final messages = ref.read(predefinedMessagesProvider);
     showModalBottomSheet(
@@ -279,9 +379,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 const SizedBox(width: 8),
                 const Text('Quick Phrases', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
                 const Spacer(),
-                GestureDetector(
-                  onTap: () => Navigator.pop(ctx),
-                  child: const Icon(Icons.close),
+                IconButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
                 ),
               ],
             ),
@@ -318,10 +419,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                     },
                     trailing: IconButton(
                       icon: const Icon(Icons.send_rounded, color: Color(0xFF0C637E), size: 20),
-                      onPressed: () {
+                      tooltip: 'Send phrase',
+                      onPressed: () async {
                         Navigator.pop(ctx);
-                        ref.read(chatMessagesProvider(widget.roomId).notifier)
+                        final ok = await ref
+                            .read(chatMessagesProvider(widget.roomId).notifier)
                             .sendMessage(messages[i]);
+                        if (!ok) _showSnack('Failed to send message. Please try again.', isError: true);
                       },
                     ),
                   ),
@@ -397,7 +501,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         children: [
           IconButton(
             icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
-            onPressed: _showAttachmentOptions,
+            tooltip: 'Attach',
+            onPressed: _isSending ? null : _showAttachmentOptions,
           ),
           if (isDeaf)
             IconButton(
@@ -435,7 +540,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                   final hasText = value.text.trim().isNotEmpty;
                   // Deaf/text-only patients cannot use voice recording
                   final canSend = hasText || isDeaf;
-                  return GestureDetector(
+                  return Semantics(
+                    button: true,
+                    label: (hasText || isDeaf) ? 'Send message' : 'Record voice message',
+                    child: GestureDetector(
                     onTap: canSend ? (hasText ? _sendMessage : null) : _startVoiceRecording,
                     child: Container(
                       padding: const EdgeInsets.all(12),
@@ -451,6 +559,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                         color: Colors.white,
                         size: 24,
                       ),
+                    ),
                     ),
                   );
                 },
@@ -480,7 +589,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               children: [
                 _buildAttachmentItem(Icons.image_rounded, 'Gallery', Colors.purple, _pickImage),
                 _buildAttachmentItem(Icons.description_rounded, 'Document', AppColors.primary, _pickDocument),
-                _buildAttachmentItem(Icons.location_on_rounded, 'Location', AppColors.success, () {}),
+                _buildAttachmentItem(Icons.location_on_rounded, 'Location', AppColors.success, _shareLocation),
               ],
             ),
           ],
@@ -493,10 +602,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     Navigator.pop(context);
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
+    if (image != null && mounted) {
       setState(() => _isSending = true);
       try {
-        await ref.read(chatMessagesProvider(widget.roomId).notifier).sendFileMessage(File(image.path), MessageType.IMAGE);
+        final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendFileMessage(File(image.path), MessageType.IMAGE);
+        if (!ok) _showSnack('Failed to send image. Please try again.', isError: true);
       } finally {
         if (mounted) setState(() => _isSending = false);
       }
@@ -506,13 +616,40 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Future<void> _pickDocument() async {
     Navigator.pop(context);
     final result = await FilePicker.platform.pickFiles(type: FileType.any);
-    if (result != null && result.files.single.path != null) {
+    if (result != null && result.files.single.path != null && mounted) {
       setState(() => _isSending = true);
       try {
-        await ref.read(chatMessagesProvider(widget.roomId).notifier).sendFileMessage(File(result.files.single.path!), MessageType.DOCUMENT);
+        final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendFileMessage(File(result.files.single.path!), MessageType.DOCUMENT);
+        if (!ok) _showSnack('Failed to send document. Please try again.', isError: true);
       } finally {
         if (mounted) setState(() => _isSending = false);
       }
+    }
+  }
+
+  /// Shares the current position as a normal TEXT message with a Maps link
+  /// (backend MessageType has no LOCATION value).
+  Future<void> _shareLocation() async {
+    Navigator.pop(context);
+    setState(() => _isSending = true);
+    try {
+      final position = await LocationService().getCurrentLocation();
+      final lat = position.latitude.toStringAsFixed(6);
+      final lng = position.longitude.toStringAsFixed(6);
+      final content = '📍 My location: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);
+      if (!ok) {
+        _showSnack('Failed to send location. Please try again.', isError: true);
+      } else {
+        _scrollToBottom();
+      }
+    } on LocationException catch (e) {
+      _showSnack(e.message, isError: true);
+    } catch (e) {
+      debugPrint('Share location failed: $e');
+      _showSnack('Could not get your location. Please try again.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isSending = false);
     }
   }
 
@@ -528,15 +665,20 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           const Spacer(),
           TextButton(
             onPressed: _cancelRecording,
+            style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
             child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: _stopRecording,
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
-              child: const Icon(Icons.check, color: Colors.white),
+          Semantics(
+            button: true,
+            label: 'Send voice message',
+            child: GestureDetector(
+              onTap: _stopRecording,
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
+                child: const Icon(Icons.check, color: Colors.white),
+              ),
             ),
           ),
         ],
@@ -545,7 +687,27 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   }
 
   void _startVoiceRecording() async {
+    final permission = await _recorderService.requestMicrophonePermission();
+    if (!mounted) return;
+    if (permission == MicPermissionResult.permanentlyDenied) {
+      _showSnack(
+        'Microphone access is blocked. Enable it in Settings to send voice messages.',
+        isError: true,
+        action: const SnackBarAction(
+          label: 'Open settings',
+          textColor: Colors.white,
+          onPressed: openAppSettings,
+        ),
+      );
+      return;
+    }
+    if (permission == MicPermissionResult.denied) {
+      _showSnack('Microphone permission is required to record a voice message.', isError: true);
+      return;
+    }
+
     final success = await _recorderService.startRecording();
+    if (!mounted) return;
     if (success) {
       setState(() {
         _isRecording = true;
@@ -553,48 +715,61 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         _recordingDuration = '0:00';
       });
       _recordingTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) return;
         final duration = DateTime.now().difference(_recordingStartTime!);
         setState(() {
           _recordingDuration = '${duration.inMinutes}:${(duration.inSeconds % 60).toString().padLeft(2, '0')}';
         });
       });
+    } else {
+      _showSnack('Could not start recording. Please try again.', isError: true);
     }
   }
 
   void _stopRecording() async {
     _recordingTimer?.cancel();
     final path = await _recorderService.stopRecording();
+    if (!mounted) return;
     setState(() {
       _isRecording = false;
       _isSending = true;
     });
     if (path != null) {
       try {
-        await ref.read(chatMessagesProvider(widget.roomId).notifier).sendVoiceMessage(path);
+        final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendVoiceMessage(path);
+        if (!ok) _showSnack('Failed to send voice message. Please try again.', isError: true);
       } finally {
         if (mounted) setState(() => _isSending = false);
       }
     } else {
       setState(() => _isSending = false);
+      _showSnack('Recording failed. Please try again.', isError: true);
     }
   }
 
   void _cancelRecording() async {
     _recordingTimer?.cancel();
     await _recorderService.stopRecording(); // Stop but don't send
-    setState(() => _isRecording = false);
+    if (mounted) setState(() => _isRecording = false);
   }
 
   void _sendMessage() async {
     final content = _messageController.text.trim();
-    if (content.isEmpty) return;
+    if (content.isEmpty || _isSending) return;
 
     HapticFeedback.lightImpact();
     setState(() => _isSending = true);
     try {
-      await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);
-      _messageController.clear();
-      _scrollToBottom();
+      final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);
+      if (!mounted) return;
+      if (ok) {
+        // Only clear the input once the server accepted the message, and only
+        // if the user hasn't typed something new meanwhile.
+        if (_messageController.text.trim() == content) _messageController.clear();
+        _scrollToBottom();
+      } else {
+        _showSnack('Message not sent. Please check your connection and try again.', isError: true);
+      }
     } finally {
       if (mounted) setState(() => _isSending = false);
     }
@@ -611,22 +786,25 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
     try {
       setState(() => _playingMessageId = messageId);
+      await _audioPlayer.stop();
       await _audioPlayer.setUrl(url);
-      await _audioPlayer.play();
-      
-      _audioPlayer.playerStateStream.listen((state) {
-        if (state.processingState == ProcessingState.completed) {
-          if (mounted) setState(() => _playingMessageId = null);
-        }
-      });
+      // play() completes when playback finishes/pauses; don't block on it.
+      unawaited(_audioPlayer.play());
     } catch (e) {
       debugPrint('❌ Error playing audio: $e');
-      if (mounted) setState(() => _playingMessageId = null);
+      if (mounted) {
+        setState(() => _playingMessageId = null);
+        _showSnack('Could not play voice message', isError: true);
+      }
     }
   }
 
   Widget _buildAttachmentItem(IconData icon, String label, Color color, VoidCallback onTap) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: GestureDetector(
       onTap: onTap,
       child: Column(
         children: [
@@ -641,6 +819,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
         ],
+      ),
       ),
     );
   }

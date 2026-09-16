@@ -5,7 +5,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/caregiver_providers.dart';
 import '../../theme/app_theme.dart';
 import '../../../domain/entities/caregiver_connection.dart';
-import '../../../core/utils/responsive.dart';
+import '../../providers/caregiver_dashboard_provider.dart';
 
 class CaregiverHomeScreen extends ConsumerStatefulWidget {
   const CaregiverHomeScreen({super.key});
@@ -19,11 +19,21 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final asyncPatients = ref.watch(getLinkedPatientsProvider);
+    // Refreshes emergency data on socket events while the caregiver is signed in.
+    ref.watch(caregiverEmergencySocketSyncProvider);
+    final activeEmergencies =
+        ref.watch(caregiverActiveEmergenciesProvider).valueOrNull ?? const <CaregiverEmergencyDetails>[];
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       body: RefreshIndicator(
-        onRefresh: () => ref.refresh(getLinkedPatientsProvider.future),
+        onRefresh: () async {
+          ref.invalidate(caregiverEmergencyHistoryProvider);
+          try {
+            ref.invalidate(getLinkedPatientsProvider);
+            await ref.read(getLinkedPatientsProvider.future);
+          } catch (_) {}
+        },
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           slivers: [
@@ -38,7 +48,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                       Text(
                         'CAREGIVER DASHBOARD',
                         style: TextStyle(
-                          color: AppColors.primaryLight.withOpacity(0.85),
+                          color: AppColors.primaryLight.withValues(alpha: 0.85),
                           fontWeight: FontWeight.w900,
                           fontSize: 11,
                           letterSpacing: 2,
@@ -61,6 +71,14 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
               ),
             ),
             
+            // 1b. Live SOS banners (updated on PATIENT_EMERGENCY / RESPONDER_ASSIGNED)
+            if (activeEmergencies.isNotEmpty)
+              SliverToBoxAdapter(
+                child: Column(
+                  children: activeEmergencies.map((e) => _buildActiveSosCard(context, e)).toList(),
+                ),
+              ),
+
             // 2. Quick Actions Grid
             SliverToBoxAdapter(
               child: _buildQuickActionGrid(theme),
@@ -72,7 +90,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                 data: (patients) => Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (patients.isNotEmpty) _buildStatsRow(context, patients, theme),
+                    if (patients.isNotEmpty) _buildStatsRow(context, patients, activeEmergencies, theme),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 16, 24, 12),
                       child: Row(
@@ -103,8 +121,12 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                 return SliverList(
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
+                      final patient = patients[index];
+                      final active = activeEmergencies
+                          .where((e) => e.patientId == patient.patientId)
+                          .firstOrNull;
                       return RepaintBoundary(
-                        child: _buildPatientCard(context, patients[index], theme),
+                        child: _buildPatientCard(context, patient, active, theme),
                       );
                     },
                     childCount: patients.length,
@@ -114,11 +136,101 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                 );
               },
               loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-              error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.error)))),
+              error: (err, _) => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    children: [
+                      const Icon(Icons.cloud_off_rounded, size: 48, color: AppColors.error),
+                      const SizedBox(height: 12),
+                      const Text('Could not load your patients.', textAlign: TextAlign.center),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => ref.invalidate(getLinkedPatientsProvider),
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Retry'),
+                        style: ElevatedButton.styleFrom(minimumSize: const Size(140, 48)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
             
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActiveSosCard(BuildContext context, CaregiverEmergencyDetails emergency) {
+    final type = emergency.emergencyType.replaceAll('_', ' ');
+    final who = emergency.patientName ?? 'A linked patient';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+      child: Semantics(
+        button: true,
+        liveRegion: true,
+        label: 'Active SOS from $who. ${caregiverStatusLabel(emergency.status)}. Track live.',
+        excludeSemantics: true,
+        child: Material(
+          color: AppColors.error,
+          borderRadius: BorderRadius.circular(20),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(20),
+            onTap: () => context.push('/caregiver/tracking/${emergency.id}'),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Icon(Icons.emergency_share_rounded, color: Colors.white, size: 32),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'ACTIVE SOS',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            fontSize: 12,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '$who - $type',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          caregiverStatusLabel(emergency.status),
+                          style: const TextStyle(color: Colors.white, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Track live',
+                      style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -182,8 +294,9 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, List<CaregiverConnection> patients, ThemeData theme) {
-    final activeAlerts = patients.where((p) => p.hasActiveEmergency == true).length;
+  Widget _buildStatsRow(BuildContext context, List<CaregiverConnection> patients,
+      List<CaregiverEmergencyDetails> activeEmergencies, ThemeData theme) {
+    final activeAlerts = activeEmergencies.length;
     
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
@@ -213,7 +326,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 28),
@@ -237,8 +350,11 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
     );
   }
 
-  Widget _buildPatientCard(BuildContext context, CaregiverConnection patient, ThemeData theme) {
-    final bool isActive = patient.hasActiveEmergency == true;
+  Widget _buildPatientCard(BuildContext context, CaregiverConnection patient,
+      CaregiverEmergencyDetails? activeEmergency, ThemeData theme) {
+    final String? activeEmergencyId = activeEmergency?.id ??
+        (patient.hasActiveEmergency == true ? patient.activeEmergencyId : null);
+    final bool isActive = activeEmergencyId != null;
     final Color statusColor = patient.status == 'PENDING' ? AppColors.warning : (isActive ? AppColors.error : AppColors.success);
     
     return Container(
@@ -254,8 +370,8 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
           color: Colors.transparent,
           child: InkWell(
             onTap: () {
-              if (isActive && patient.activeEmergencyId != null) {
-                context.push('/caregiver/tracking/${patient.activeEmergencyId}');
+              if (activeEmergencyId != null) {
+                context.push('/caregiver/tracking/$activeEmergencyId');
               } else {
                 context.go('/caregiver/my-patients');
               }
@@ -269,7 +385,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                     children: [
                       CircleAvatar(
                         radius: 34,
-                        backgroundColor: statusColor.withOpacity(0.12),
+                        backgroundColor: statusColor.withValues(alpha: 0.12),
                         child: Icon(Icons.person_rounded, size: 40, color: statusColor),
                       ),
                       Container(
@@ -292,6 +408,14 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                           patient.patientName ?? patient.patientEmail ?? 'Unknown Patient',
                           style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                         ),
+                        if (isActive) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            'EMERGENCY: ${caregiverStatusLabel(activeEmergency?.status ?? 'ACTIVE')}',
+                            style: const TextStyle(
+                                color: AppColors.error, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                         const SizedBox(height: 4),
                         Row(
                           children: [
@@ -308,7 +432,8 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                     ),
                   ),
                   if (isActive)
-                    const Icon(Icons.emergency_share_rounded, color: AppColors.error, size: 28)
+                    const Icon(Icons.emergency_share_rounded,
+                        color: AppColors.error, size: 28, semanticLabel: 'Active emergency, tap to track')
                   else
                     Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
                 ],

@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../services/location/location_service.dart';
+import '../../../core/utils/emergency_status.dart';
+import '../../../core/utils/exceptions.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
@@ -17,20 +19,23 @@ class EmergencyScreen extends ConsumerStatefulWidget {
 }
 
 class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
-  String _selectedEmergencyType = 'CARDIAC';
+  String _selectedEmergencyType = EmergencyTypes.cardiac;
   final _additionalInfoController = TextEditingController();
   final _symptomsController = TextEditingController();
   bool _isFetchingLocation = false;
   bool _isClassifying = false;
   final FocusNode _otherFocusNode = FocusNode();
 
+  // Values match the backend's specialist routing (SPECIALIST_MAP) + FALL/OTHER.
   static const List<Map<String, dynamic>> _emergencyTypes = [
-    {'value': 'CARDIAC', 'label': 'Cardiac Emergency', 'icon': Icons.favorite_rounded},
-    {'value': 'BREATHING', 'label': 'Breathing Issue', 'icon': Icons.wind_power_rounded},
-    {'value': 'TRAUMA', 'label': 'Injury / Trauma', 'icon': Icons.personal_injury_outlined},
-    {'value': 'FALL', 'label': 'Fall / Mobility', 'icon': Icons.accessibility_new_outlined},
-    {'value': 'STROKE', 'label': 'Stroke', 'icon': Icons.psychology_outlined},
-    {'value': 'OTHER', 'label': 'Other Emergency', 'icon': Icons.emergency_outlined},
+    {'value': EmergencyTypes.cardiac, 'label': 'Cardiac / Chest Pain', 'icon': Icons.favorite_rounded},
+    {'value': EmergencyTypes.breathing, 'label': 'Breathing', 'icon': Icons.air_rounded},
+    {'value': EmergencyTypes.stroke, 'label': 'Stroke', 'icon': Icons.psychology_outlined},
+    {'value': EmergencyTypes.trauma, 'label': 'Injury / Trauma', 'icon': Icons.personal_injury_outlined},
+    {'value': EmergencyTypes.fall, 'label': 'Fall', 'icon': Icons.accessibility_new_outlined},
+    {'value': EmergencyTypes.seizure, 'label': 'Seizure', 'icon': Icons.bolt_rounded},
+    {'value': EmergencyTypes.diabetic, 'label': 'Diabetic', 'icon': Icons.bloodtype_outlined},
+    {'value': EmergencyTypes.other, 'label': 'Other', 'icon': Icons.emergency_outlined},
   ];
 
   @override
@@ -56,7 +61,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
         final reasoning = result['reasoning'] as String?;
         setState(() {
           _selectedEmergencyType = mapped;
-          if (mapped == 'OTHER' && reasoning != null && reasoning.isNotEmpty) {
+          if (mapped == EmergencyTypes.other && reasoning != null && reasoning.isNotEmpty) {
             _additionalInfoController.text = reasoning;
           }
         });
@@ -87,16 +92,8 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   }
 
   String _mapClassifierType(String raw) {
-    const mapping = {
-      'CHEST_PAIN': 'CARDIAC',
-      'SHORTNESS_OF_BREATH': 'BREATHING',
-      'SEIZURE': 'OTHER',
-      'STROKE': 'STROKE',
-      'DIABETIC': 'OTHER',
-      'CARDIAC': 'CARDIAC',
-      'TRAUMA': 'TRAUMA',
-    };
-    return mapping[raw] ?? 'OTHER';
+    final normalized = EmergencyTypes.normalize(raw);
+    return EmergencyTypes.all.contains(normalized) ? normalized : EmergencyTypes.other;
   }
 
   Future<void> _triggerSOS() async {
@@ -121,6 +118,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
         return;
       }
 
+      // Real GPS fix or last known position only — never fake coordinates.
       final position = await locationService.getCurrentLocation();
 
       if (mounted) {
@@ -133,15 +131,12 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
               : null,
         });
       }
-    } catch (e) {
+    } on LocationException catch (e) {
+      if (mounted) _showLocationUnavailableDialog(e);
+    } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Location error: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        _showLocationUnavailableDialog(
+          LocationException(message: LocationService.unavailableMessage),
         );
       }
     } finally {
@@ -171,20 +166,82 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           OutlinedButton.icon(
             icon: const Icon(Icons.sms_outlined),
             label: const Text('Send SMS'),
-            onPressed: () async {
+            onPressed: () {
               Navigator.pop(ctx);
-              final uri = Uri.parse('smsto:1122');
-              if (await canLaunchUrl(uri)) await launchUrl(uri);
+              _launchEmergencyUri('sms:1122');
             },
           ),
           ElevatedButton.icon(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             icon: const Icon(Icons.phone, color: Colors.white),
             label: const Text('Call 1122', style: TextStyle(color: Colors.white)),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _launchEmergencyUri('tel:1122');
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchEmergencyUri(String uri) async {
+    try {
+      final ok = await launchUrl(Uri.parse(uri));
+      if (!ok) throw Exception('launch failed');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open the dialer. Please dial 1122 manually.')),
+        );
+      }
+    }
+  }
+
+  /// Location could not be determined: explain clearly and offer 1122.
+  void _showLocationUnavailableDialog(LocationException e) {
+    final permanentlyDenied = e.code == 'PERMISSION_PERMANENTLY_DENIED';
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.location_off_rounded, color: AppColors.error),
+            const SizedBox(width: 8),
+            const Expanded(child: Text('Location unavailable')),
+          ],
+        ),
+        content: Text(
+          '${e.message}\n\nAn SOS can only be sent with your real location. '
+          'If this is urgent, call 1122 now.',
+        ),
+        actionsOverflowButtonSpacing: 8,
+        actions: [
+          TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final uri = Uri.parse('tel:1122');
-              if (await canLaunchUrl(uri)) await launchUrl(uri);
+              if (permanentlyDenied) {
+                await LocationService().openAppSettings();
+              } else {
+                await LocationService().openLocationSettings();
+              }
+            },
+            child: Text(permanentlyDenied ? 'App settings' : 'GPS settings'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _triggerSOS();
+            },
+            child: const Text('Try again'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            icon: const Icon(Icons.phone),
+            label: const Text('Call 1122'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _launchEmergencyUri('tel:1122');
             },
           ),
         ],
@@ -204,19 +261,25 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           ],
         ),
         content: const Text(
-          'Location services are disabled. Please enable GPS to use SOS.',
+          'Location services are off. Turn on GPS so responders can find you, '
+          'or call 1122 if this is urgent.',
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await LocationService().openLocationSettings();
             },
             child: const Text('Open Settings'),
+          ),
+          ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            icon: const Icon(Icons.phone),
+            label: const Text('Call 1122'),
+            onPressed: () {
+              Navigator.pop(ctx);
+              _launchEmergencyUri('tel:1122');
+            },
           ),
         ],
       ),
@@ -244,6 +307,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface),
+            tooltip: 'Back',
             onPressed: () => context.go('/home'),
           ),
           title: Column(
@@ -288,7 +352,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          'Offline — SOS will fall back to SMS/Call.',
+                          'Offline — the alert button will offer Call / SMS 1122.',
                           style: TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w600),
                         ),
                       ),
@@ -393,11 +457,15 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                         childAspectRatio: 0.9,
                         children: _emergencyTypes.map((type) {
                           final isSelected = _selectedEmergencyType == type['value'];
-                          return GestureDetector(
+                          return Semantics(
+                            button: true,
+                            selected: isSelected,
+                            label: type['label'] as String,
+                            child: GestureDetector(
                             onTap: () {
                               HapticFeedback.lightImpact();
                               setState(() => _selectedEmergencyType = type['value'] as String);
-                              if (type['value'] == 'OTHER') _otherFocusNode.requestFocus();
+                              if (type['value'] == EmergencyTypes.other) _otherFocusNode.requestFocus();
                             },
                             child: AnimatedContainer(
                               duration: const Duration(milliseconds: 200),
@@ -457,6 +525,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                                 ],
                               ),
                             ),
+                          ),
                           );
                         }).toList(),
                       ),
@@ -477,21 +546,21 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                       TextFormField(
                         controller: _additionalInfoController,
                         focusNode: _otherFocusNode,
-                        maxLines: _selectedEmergencyType == 'OTHER' ? 4 : 3,
+                        maxLines: _selectedEmergencyType == EmergencyTypes.other ? 4 : 3,
                         style: TextStyle(
                           fontSize: 14,
                           color: theme.colorScheme.onSurface,
                         ),
                         decoration: InputDecoration(
-                          labelText: _selectedEmergencyType == 'OTHER'
+                          labelText: _selectedEmergencyType == EmergencyTypes.other
                               ? 'Describe your emergency *'
                               : 'Additional details (optional)',
-                          hintText: _selectedEmergencyType == 'OTHER'
+                          hintText: _selectedEmergencyType == EmergencyTypes.other
                               ? 'e.g. unconscious, severe bleeding...'
                               : 'e.g. exact floor, symptoms, landmarks...',
                           alignLabelWithHint: true,
                           filled: true,
-                          fillColor: _selectedEmergencyType == 'OTHER'
+                          fillColor: _selectedEmergencyType == EmergencyTypes.other
                               ? const Color(0xFFD32F2F).withOpacity(0.04)
                               : theme.colorScheme.surfaceContainer,
                           border: OutlineInputBorder(
@@ -503,10 +572,10 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
                             borderSide: BorderSide(
-                              color: _selectedEmergencyType == 'OTHER'
+                              color: _selectedEmergencyType == EmergencyTypes.other
                                   ? const Color(0xFFD32F2F)
                                   : theme.colorScheme.outline.withOpacity(0.2),
-                              width: _selectedEmergencyType == 'OTHER' ? 2 : 1,
+                              width: _selectedEmergencyType == EmergencyTypes.other ? 2 : 1,
                             ),
                           ),
                           focusedBorder: OutlineInputBorder(
@@ -517,7 +586,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                             ),
                           ),
                           labelStyle: TextStyle(
-                            color: _selectedEmergencyType == 'OTHER'
+                            color: _selectedEmergencyType == EmergencyTypes.other
                                 ? const Color(0xFFD32F2F)
                                 : theme.colorScheme.onSurface.withOpacity(0.55),
                             fontWeight: FontWeight.w600,

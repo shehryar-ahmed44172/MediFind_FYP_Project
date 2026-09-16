@@ -106,14 +106,25 @@ class LocationService {
     }
   }
 
-  /// Get current location once with fallback
-  Future<Position> getCurrentLocation() async {
+  /// User-facing message used when no real position can be obtained.
+  static const String unavailableMessage =
+      'Unable to get your location. Turn on GPS and try again.';
+
+  /// Get the device's REAL current location.
+  ///
+  /// Tries a fresh GPS fix first, then the last known position. It NEVER
+  /// returns made-up coordinates: if neither is available a
+  /// [LocationException] with a user-facing message is thrown, so an SOS is
+  /// never sent with a fake location.
+  Future<Position> getCurrentLocation({
+    Duration timeLimit = const Duration(seconds: 10),
+  }) async {
     try {
       // Step 1: Check if location service (GPS) is enabled at the OS level
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         throw LocationException(
-          message: 'Location services are disabled. Please enable GPS.',
+          message: 'Location services are off. Turn on GPS to share your location.',
           code: 'LOCATION_DISABLED',
         );
       }
@@ -125,53 +136,46 @@ class LocationService {
       }
       if (permission == LocationPermission.deniedForever) {
         throw LocationException(
-          message: 'Location permission is permanently denied.',
+          message: 'Location permission is permanently denied. Enable it in app settings.',
           code: 'PERMISSION_PERMANENTLY_DENIED',
         );
       }
       if (permission == LocationPermission.denied) {
         throw LocationException(
-          message: 'Location permission denied.',
+          message: 'Location permission denied. MediFind needs your location to send help.',
           code: 'PERMISSION_DENIED',
         );
       }
 
-      // 1. Try to get current position with short timeout
+      // Step 3: fresh fix with a timeout
       try {
         final pos = await Geolocator.getCurrentPosition(
-          timeLimit: const Duration(seconds: 5),
+          locationSettings: LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: timeLimit,
+          ),
         );
         return _applyDebugOffset(pos);
       } catch (e) {
         debugPrint('Geolocator.getCurrentPosition failed/timed out: $e');
-        
-        // 2. Fallback to last known position
-        final lastKnown = await Geolocator.getLastKnownPosition();
-        if (lastKnown != null) {
-          return _applyDebugOffset(lastKnown);
-        }
-
-        // 3. If in development, return a hardcoded Karachi coordinate
-        // This prevents the SOS button from being stuck on the emulator
-        return _applyDebugOffset(Position(
-          latitude: 24.8607,
-          longitude: 67.0011,
-          timestamp: DateTime.now(),
-          accuracy: 0.0,
-          altitude: 0.0,
-          heading: 0.0,
-          speed: 0.0,
-          speedAccuracy: 0.0,
-          altitudeAccuracy: 0.0,
-          headingAccuracy: 0.0,
-        ));
       }
+
+      // Step 4: last known REAL position (may be slightly stale)
+      final lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        return _applyDebugOffset(lastKnown);
+      }
+
+      throw LocationException(
+        message: unavailableMessage,
+        code: 'LOCATION_UNAVAILABLE',
+      );
     } catch (e) {
       if (e is LocationException) {
         rethrow;
       }
       throw LocationException(
-        message: 'Failed to access location services',
+        message: unavailableMessage,
         originalException: e,
       );
     }

@@ -1,5 +1,6 @@
 import 'dart:async';
-import 'package:socket_io_client/socket_io_client.dart' as IO;
+import 'package:flutter/foundation.dart';
+import 'package:socket_io_client/socket_io_client.dart' as io;
 import '../../core/constants/app_constants.dart';
 
 enum SocketEvent {
@@ -20,12 +21,31 @@ class SocketMessage {
   SocketMessage(this.event, this.data);
 }
 
+/// App-wide Socket.io connection (singleton).
+///
+/// Auth: the server authenticates the handshake with the JWT sent in
+/// `auth.token` and derives the user from it. `userId` is sent as well for
+/// older servers. After a token refresh/login call [updateAuthToken] so the
+/// socket reconnects with the new token.
+///
+/// Rooms joined through this service are remembered and automatically
+/// re-joined after every (re)connect, so screens don't lose live updates when
+/// the connection drops or the token rotates.
 class SocketService {
-  IO.Socket? _socket;
+  io.Socket? _socket;
   final StreamController<SocketMessage> _messageController =
       StreamController<SocketMessage>.broadcast();
   bool _isConnected = false;
   String? _authToken;
+  String? _userId;
+
+  /// Token the current socket was created with (to detect rotation).
+  String? _connectedWithToken;
+
+  final Set<String> _emergencyRooms = {};
+  final Set<String> _locationRooms = {};
+  final Set<String> _chatRooms = {};
+  bool _joinedResponders = false;
 
   SocketService._internal();
   static final SocketService instance = SocketService._internal();
@@ -33,130 +53,191 @@ class SocketService {
   Stream<SocketMessage> get messageStream => _messageController.stream;
   bool get isConnected => _isConnected;
 
+  /// Stores the token for the next [connect]. Does not reconnect by itself.
   void setAuthToken(String token) {
     _authToken = token;
   }
 
-  String? _userId;
+  /// Stores a new token and, if a user session is active, reconnects so the
+  /// server sees the fresh JWT. Rooms are re-joined on connect.
+  void updateAuthToken(String token) {
+    final changed = token != _authToken;
+    _authToken = token;
+    final userId = _userId;
+    if (changed && userId != null && _socket != null) {
+      debugPrint('Socket: auth token changed, reconnecting');
+      _openSocket(userId);
+    }
+  }
 
   void connect(String userId) {
-    // If already connected for the same user, skip
-    if (_isConnected && _userId == userId) return;
-    
-    // If connected for a different user, disconnect first
-    if (_isConnected) disconnect();
-    
+    final sameSession = _socket != null &&
+        _userId == userId &&
+        _connectedWithToken == _authToken;
+    // Already connected (or connecting) for this user with this token.
+    if (sameSession) {
+      if (!_isConnected && _socket!.disconnected) _socket!.connect();
+      return;
+    }
+
+    // Different user → forget the previous user's rooms.
+    if (_userId != null && _userId != userId) {
+      _clearRooms();
+    }
     _userId = userId;
+    _openSocket(userId);
+  }
 
-    _socket = IO.io(AppConstants.socketUrl, 
-      IO.OptionBuilder()
-        .setTransports(['websocket', 'polling']) // Allow polling as fallback
-        .enableAutoConnect()
-        .setAuth({'userId': userId})
-        .setExtraHeaders(_authToken != null ? {'Authorization': 'Bearer $_authToken'} : {})
-        .build()
+  void _openSocket(String userId) {
+    _disposeSocket();
+
+    final token = _authToken;
+    _connectedWithToken = token;
+
+    final socket = io.io(
+      AppConstants.socketUrl,
+      io.OptionBuilder()
+          .setTransports(['websocket', 'polling']) // Allow polling as fallback
+          .disableAutoConnect()
+          // Always create a fresh Manager so new auth options are applied
+          // (socket_io_client caches managers per URL otherwise).
+          .enableForceNew()
+          .enableReconnection()
+          .setAuth({
+            if (token != null) 'token': token,
+            'userId': userId,
+          })
+          .setExtraHeaders(token != null ? {'Authorization': 'Bearer $token'} : {})
+          .build(),
     );
+    _socket = socket;
 
-    _socket!.onConnect((_) {
+    socket.onConnect((_) {
       _isConnected = true;
       _messageController.add(SocketMessage(SocketEvent.connectionStatus, {'status': 'connected'}));
-      print('✅ Socket connected to ${AppConstants.socketUrl} for user: $userId');
+      debugPrint('Socket connected to ${AppConstants.socketUrl}');
+      _rejoinRooms();
     });
 
-    _socket!.onDisconnect((_) {
+    socket.onDisconnect((_) {
       _isConnected = false;
       _messageController.add(SocketMessage(SocketEvent.connectionStatus, {'status': 'disconnected'}));
-      print('Socket disconnected');
+      debugPrint('Socket disconnected');
     });
 
-    _socket!.onConnectError((data) => print('Socket Connect Error: $data'));
-    _socket!.onError((data) => print('Socket Error: $data'));
+    socket.onConnectError((data) => debugPrint('Socket connect error: $data'));
+    socket.onError((data) => debugPrint('Socket error: $data'));
 
-    // Generic notification listener (Plan v4)
-    _socket!.on('notification', (data) {
-      print('🔔 Global Socket Notification Received: $data');
-      // Pass the full notification object so type/title/body are accessible.
-      // The handler in socketNotificationHandlerProvider extracts data['data']
-      // separately for emergency-specific fields.
+    // Generic notification listener. The full envelope is forwarded so
+    // type/title/body are accessible; handlers read data['data'] themselves.
+    socket.on('notification', (data) {
       _messageController.add(SocketMessage(SocketEvent.notification, data));
     });
 
-    // Map guide events
-    _socket!.on('NEW_EMERGENCY', (data) {
-      print('🚨 NEW_EMERGENCY event received: $data');
-      // Unpack nested data field (server sends { type, data: {...} })
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      _messageController.add(SocketMessage(SocketEvent.newEmergency, unpackedData));
+    socket.on('NEW_EMERGENCY', (data) {
+      _messageController.add(SocketMessage(SocketEvent.newEmergency, _unpack(data)));
     });
 
-    _socket!.on('LOCATION_UPDATE', (data) {
-      // Unpack nested data if it exists (Backend sends { type: '...', data: { ... } })
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpackedData));
+    socket.on('LOCATION_UPDATE', (data) {
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, _unpack(data)));
     });
 
-    _socket!.on('EMERGENCY_STATUS_CHANGE', (data) {
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      print('🔄 EMERGENCY_STATUS_CHANGE received: $unpackedData');
-      _messageController.add(SocketMessage(SocketEvent.emergencyStatusChange, unpackedData));
+    // Some server paths emit this name (not wrapped in {type, data}).
+    socket.on('RESPONDER_LOCATION_UPDATE', (data) {
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, _unpack(data)));
     });
 
-    _socket!.on('RESPONDER_ARRIVED', (data) {
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      _messageController.add(SocketMessage(SocketEvent.responderArrived, unpackedData));
+    socket.on('EMERGENCY_STATUS_CHANGE', (data) {
+      _messageController.add(SocketMessage(SocketEvent.emergencyStatusChange, _unpack(data)));
     });
 
-    _socket!.on('message:new', (data) {
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      print('💬 New Chat Message Received: $unpackedData');
-      _messageController.add(SocketMessage(SocketEvent.newMessage, unpackedData));
+    socket.on('RESPONDER_ARRIVED', (data) {
+      _messageController.add(SocketMessage(SocketEvent.responderArrived, _unpack(data)));
+    });
+
+    socket.on('message:new', (data) {
+      _messageController.add(SocketMessage(SocketEvent.newMessage, _unpack(data)));
+    });
+
+    // Server-side automatic messages (e.g. deaf patient voice alert text)
+    socket.on('NEW_MESSAGE', (data) {
+      _messageController.add(SocketMessage(SocketEvent.newMessage, _unpack(data)));
     });
 
     // Server asks this client to join an emergency room (used for caregivers)
-    _socket!.on('JOIN_EMERGENCY_ROOM', (data) {
+    socket.on('JOIN_EMERGENCY_ROOM', (data) {
       final emergencyId = (data is Map ? data['emergencyId'] : null)?.toString();
       if (emergencyId != null && emergencyId.isNotEmpty) {
         joinEmergencyRoom(emergencyId);
         joinLocationRoom(emergencyId);
-        print('🏥 Auto-joined emergency room: $emergencyId (server-requested)');
       }
     });
 
-    // Also listen for the RESPONDER_LOCATION_UPDATE event name the backend uses
-    _socket!.on('RESPONDER_LOCATION_UPDATE', (data) {
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpackedData));
-    });
+    socket.connect();
+  }
+
+  /// Server events are usually `{ type, data: {...} }`; return the inner map.
+  dynamic _unpack(dynamic data) {
+    if (data is Map && data.containsKey('data') && data['data'] is Map) {
+      return Map<String, dynamic>.from(data['data'] as Map);
+    }
+    if (data is Map && data is! Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return data;
+  }
+
+  void _rejoinRooms() {
+    final socket = _socket;
+    if (socket == null) return;
+    if (_joinedResponders) socket.emit('join:responders', null);
+    for (final id in _emergencyRooms) {
+      socket.emit('join:emergency', id);
+    }
+    for (final id in _locationRooms) {
+      socket.emit('join:location', id);
+    }
+    for (final id in _chatRooms) {
+      socket.emit('join:chat', id);
+    }
+    if (_emergencyRooms.isNotEmpty || _locationRooms.isNotEmpty || _chatRooms.isNotEmpty) {
+      debugPrint('Socket: re-joined ${_emergencyRooms.length} emergency, '
+          '${_locationRooms.length} location, ${_chatRooms.length} chat rooms');
+    }
   }
 
   void joinRespondersRoom() {
-    if (!_isConnected || _socket == null) return;
-    _socket!.emit('join:responders', null);
-    print('Joined responders broadcast room');
+    _joinedResponders = true;
+    if (_isConnected) _socket?.emit('join:responders', null);
   }
 
   void joinEmergencyRoom(String emergencyId) {
-    if (!_isConnected || _socket == null) return;
-    _socket!.emit('join:emergency', emergencyId);
-    print('Joined emergency room: $emergencyId');
+    if (emergencyId.isEmpty) return;
+    _emergencyRooms.add(emergencyId);
+    if (_isConnected) _socket?.emit('join:emergency', emergencyId);
   }
 
   void joinLocationRoom(String emergencyId) {
-    if (!_isConnected || _socket == null) return;
-    _socket!.emit('join:location', emergencyId);
-    print('Joined location tracking room: $emergencyId');
+    if (emergencyId.isEmpty) return;
+    _locationRooms.add(emergencyId);
+    if (_isConnected) _socket?.emit('join:location', emergencyId);
+  }
+
+  /// Stop re-joining an emergency's rooms (e.g. after it is resolved).
+  void forgetEmergencyRooms(String emergencyId) {
+    _emergencyRooms.remove(emergencyId);
+    _locationRooms.remove(emergencyId);
   }
 
   void joinChatRoom(String roomId) {
-    if (!_isConnected || _socket == null) return;
-    _socket!.emit('join:chat', roomId);
-    print('Joined chat room: $roomId');
+    if (roomId.isEmpty) return;
+    _chatRooms.add(roomId);
+    if (_isConnected) _socket?.emit('join:chat', roomId);
   }
 
   void leaveChatRoom(String roomId) {
-    if (!_isConnected || _socket == null) return;
-    _socket!.emit('leave:chat', roomId); // Optional on backend but good practice
-    print('Left chat room: $roomId');
+    _chatRooms.remove(roomId);
+    if (_isConnected) _socket?.emit('leave:chat', roomId);
   }
 
   void sendLocationUpdate(
@@ -175,10 +256,32 @@ class SocketService {
     });
   }
 
-  void disconnect() {
-    _socket?.disconnect();
+  void _clearRooms() {
+    _emergencyRooms.clear();
+    _locationRooms.clear();
+    _chatRooms.clear();
+    _joinedResponders = false;
+  }
+
+  void _disposeSocket() {
+    final socket = _socket;
     _socket = null;
     _isConnected = false;
+    if (socket != null) {
+      socket.clearListeners();
+      socket.disconnect();
+      socket.dispose();
+    }
+  }
+
+  /// Ends the session (logout / account switch): closes the socket and
+  /// forgets the user, token and all joined rooms.
+  void disconnect() {
+    _disposeSocket();
+    _clearRooms();
+    _userId = null;
+    _authToken = null;
+    _connectedWithToken = null;
   }
 
   void dispose() {

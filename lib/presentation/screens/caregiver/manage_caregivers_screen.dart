@@ -37,11 +37,18 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
       );
       return;
     }
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a valid email address')),
+      );
+      return;
+    }
 
     setState(() => _isInviting = true);
     try {
+      // Patient inviting a caregiver -> the email belongs to the CAREGIVER.
       await ref.read(sendInvitationProvider({
-        'patientEmail': email,
+        'caregiverEmail': email,
         'relationship': relationship,
       }).future);
       
@@ -89,7 +96,11 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
                     Text('Invite Caregiver',
                         style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
                     const Spacer(),
-                    IconButton(onPressed: () => Navigator.pop(ctx), icon: const Icon(Icons.close)),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close),
+                      tooltip: 'Close',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -138,35 +149,45 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
     );
   }
 
-  void _handleRemove(CaregiverConnection connection) {
-    showDialog(
+  Future<void> _handleRemove(CaregiverConnection connection) async {
+    final isPending = connection.status.toUpperCase() == 'PENDING';
+    final name = connection.caregiverName ?? connection.caregiverEmail ?? 'this caregiver';
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove Caregiver'),
-        content: Text('Are you sure you want to remove ${connection.caregiverName ?? "this caregiver"}?'),
+        title: Text(isPending ? 'Cancel Invitation' : 'Remove Caregiver'),
+        content: Text(isPending
+            ? 'Cancel the pending invitation for $name?'
+            : 'Are you sure you want to remove $name? They will no longer be notified about your emergencies.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await ref.read(connectionRepositoryProvider).unlinkCaregiver(connection.caregiverId);
-                ref.invalidate(allCaregiverLinksProvider);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Caregiver removed')),
-                );
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
-                );
-              }
-            },
-            child: const Text('Remove', style: TextStyle(color: Colors.white)),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isPending ? 'Cancel Invite' : 'Remove',
+                style: const TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
+    if (confirmed != true) return;
+
+    try {
+      // DELETE /api/caregivers/:caregiverId (PATIENT only) expects the
+      // caregiver's USER id; the patient is taken from the JWT.
+      await ref.read(connectionRepositoryProvider).unlinkCaregiver(connection.caregiverId);
+      ref.invalidate(allCaregiverLinksProvider);
+      ref.invalidate(caregiverLinksProvider);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(isPending ? 'Invitation cancelled' : 'Caregiver removed')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
+      );
+    }
   }
 
   void _handleInvitationResponse(CaregiverConnection link, bool accept) async {
@@ -176,6 +197,7 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
         'accept': accept,
       }).future);
       ref.invalidate(allCaregiverLinksProvider);
+      ref.invalidate(caregiverLinksProvider);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -255,7 +277,31 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
           );
         },
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: ${e.toString()}')),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
+                const SizedBox(height: 16),
+                const Text(
+                  'Unable to load caregivers',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(height: 8),
+                Text(e.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: () => ref.invalidate(allCaregiverLinksProvider),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -324,7 +370,7 @@ class _CaregiverCard extends StatelessWidget {
                     radius: 28,
                     backgroundColor: statusColor.withOpacity(0.1),
                     child: Text(
-                      (link.caregiverName ?? '?')[0].toUpperCase(),
+                      (link.caregiverName?.isNotEmpty == true ? link.caregiverName! : '?')[0].toUpperCase(),
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -396,7 +442,7 @@ class _CaregiverCard extends StatelessWidget {
                       onPressed: onReject,
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
+                        minimumSize: const Size(48, 48),
                       ),
                       child: const Text('Reject', style: TextStyle(color: AppColors.error, fontSize: 13)),
                     ),
@@ -407,7 +453,7 @@ class _CaregiverCard extends StatelessWidget {
                         backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
-                        minimumSize: const Size(0, 32),
+                        minimumSize: const Size(48, 48),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       ),
                       child: const Text('Accept', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
@@ -417,16 +463,24 @@ class _CaregiverCard extends StatelessWidget {
                       Consumer(
                         builder: (context, ref, child) => TextButton.icon(
                           onPressed: () async {
-                            final room = await ref.read(getChatRoomForUserProvider(link.caregiverId).future);
-                            if (context.mounted) {
-                              context.push('/chat/${room.id}', extra: link.caregiverName);
+                            try {
+                              final room = await ref.read(getChatRoomForUserProvider(link.caregiverId).future);
+                              if (context.mounted) {
+                                context.push('/chat/${room.id}', extra: link.caregiverName);
+                              }
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text('Could not open chat: $e'), backgroundColor: AppColors.error),
+                                );
+                              }
                             }
                           },
                           icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
                           label: const Text('Chat', style: TextStyle(color: AppColors.primary, fontSize: 13)),
                           style: TextButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: Size.zero,
+                            minimumSize: const Size(48, 48),
                           ),
                         ),
                       ),
@@ -434,10 +488,13 @@ class _CaregiverCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: onDelete,
                       icon: const Icon(Icons.person_remove_outlined, size: 16, color: AppColors.error),
-                      label: const Text('Remove', style: TextStyle(color: AppColors.error, fontSize: 13)),
+                      label: Text(
+                        link.status.toUpperCase() == 'PENDING' ? 'Cancel' : 'Remove',
+                        style: const TextStyle(color: AppColors.error, fontSize: 13),
+                      ),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
+                        minimumSize: const Size(48, 48),
                       ),
                     ),
                   ],

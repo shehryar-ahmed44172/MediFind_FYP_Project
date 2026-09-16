@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
 import '../../theme/app_theme.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../../services/location/location_service.dart';
@@ -11,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
+import '../../../core/utils/emergency_status.dart';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -26,32 +26,28 @@ class _EmergencyRequestScreenState
   bool _isAccepting = false;
   bool _isRejecting = false;
   bool _isPlayingVoice = false;
-  int _countdown = 5;
-  Timer? _callTimer;
 
-  @override
-  void dispose() {
-    _callTimer?.cancel();
-    super.dispose();
-  }
+  /// Distance from the responder, computed ONCE (not on every rebuild).
+  Future<String>? _distanceFuture;
 
-  Future<void> _makePhoneCall(String phoneNumber) async {
-    final Uri launchUri = Uri(
-      scheme: 'tel',
-      path: phoneNumber,
-    );
-    if (await canLaunchUrl(launchUri)) {
-      await launchUrl(launchUri);
-    }
+  Future<String> _distanceTo(double lat, double lng) {
+    return _distanceFuture ??= () async {
+      try {
+        final position = await LocationService().getCurrentLocation();
+        final km = GeoUtils.haversineKm(position.latitude, position.longitude, lat, lng);
+        return '${GeoUtils.formatDistance(km)} away';
+      } catch (_) {
+        return 'Distance unavailable';
+      }
+    }();
   }
 
   Future<void> _accept() async {
     setState(() => _isAccepting = true);
     
     try {
-      final responderIdResult = await ref.read(currentUserIdProvider.future);
-      final responderId = responderIdResult ?? 'responder_generated_id';
-      
+      final responderId = await ref.read(currentUserIdProvider.future) ?? '';
+
       // Get the emergency data to find the userId
       final emergency = await ref.read(getEmergencyProvider(widget.requestId).future);
 
@@ -78,11 +74,16 @@ class _EmergencyRequestScreenState
           medical: profile,
         );
       }
-        } catch (e) {
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to accept: $e'), backgroundColor: AppColors.error),
+          SnackBar(
+            content: Text('Could not accept: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
+        ref.invalidate(getEmergencyProvider(widget.requestId));
         setState(() => _isAccepting = false);
       }
       return;
@@ -95,18 +96,34 @@ class _EmergencyRequestScreenState
   }
 
   Future<void> _reject() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Decline this request?'),
+        content: const Text('It will be offered to other nearby responders.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Decline'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
     setState(() => _isRejecting = true);
     try {
-      final responderIdResult = await ref.read(currentUserIdProvider.future);
-      final responderId = responderIdResult ?? 'responder_generated_id';
+      final responderId = await ref.read(currentUserIdProvider.future) ?? '';
       await ref.read(rejectEmergencyProvider(AcceptRejectParams(
         emergencyId: widget.requestId,
         responderId: responderId,
       )).future);
     } catch (e) {
-      print('Reject error: $e');
+      debugPrint('Reject error: $e');
     }
-    
+
     if (mounted) {
       context.go('/responder');
     }
@@ -124,6 +141,7 @@ class _EmergencyRequestScreenState
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
+          tooltip: 'Back',
           onPressed: () {
             if (context.canPop()) {
               context.pop();
@@ -136,7 +154,25 @@ class _EmergencyRequestScreenState
       body: emergencyAsync.when(
         data: (emergency) => _buildContent(context, theme, emergency as emergency_entity.Emergency?),
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error loading emergency: $e')),
+        error: (e, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
+                const SizedBox(height: 12),
+                Text('Could not load this emergency.\n$e', textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  onPressed: () => ref.invalidate(getEmergencyProvider(widget.requestId)),
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -144,22 +180,8 @@ class _EmergencyRequestScreenState
   Widget _buildContent(BuildContext context, ThemeData theme, emergency_entity.Emergency? emergency) {
     if (emergency == null) return const Center(child: Text('Emergency not found'));
 
-    // Calculate distance from responder's current location to emergency location
-    Future<String> _calculateDistance() async {
-      try {
-        final position = await LocationService().getCurrentLocation();
-        final distanceInMeters = LocationService().calculateDistance(
-          position.latitude,
-          position.longitude,
-          emergency.latitude,
-          emergency.longitude,
-        );
-        final distanceInKm = distanceInMeters / 1000;
-        return '${distanceInKm.toStringAsFixed(1)} km';
-      } catch (e) {
-        return 'Unable to calculate';
-      }
-    }
+    final distanceFuture = _distanceTo(emergency.latitude, emergency.longitude);
+    final priority = emergency.priority.toUpperCase() == 'HIGH' ? 'HIGH' : 'NORMAL';
 
     // If the server pre-captured a voiceSummary at SOS time, use it as the
     // primary source. This works even when the patient's phone is off.
@@ -175,7 +197,7 @@ class _EmergencyRequestScreenState
         error: (_, __) => 'Patient',
       );
       return FutureBuilder<String>(
-        future: _calculateDistance(),
+        future: distanceFuture,
         builder: (context, distanceSnapshot) {
           return _buildRequestDetails(
             context: context,
@@ -186,10 +208,11 @@ class _EmergencyRequestScreenState
             bloodGroup: _extractFromSummary(emergency.voiceSummary!, 'Blood Type') ?? 'See summary below',
             allergies: _extractFromSummary(emergency.voiceSummary!, 'Allergies') ?? 'See summary below',
             conditions: _extractFromSummary(emergency.voiceSummary!, 'Conditions') ?? 'See summary below',
-            priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+            priority: priority,
             isDeaf: emergency.patientType.toUpperCase() == 'DEAF',
             voiceSummary: emergency.voiceSummary,
             dataSource: 'snapshot',
+            status: emergency.status,
           );
         },
       );
@@ -207,7 +230,7 @@ class _EmergencyRequestScreenState
           error: (_, __) => 'Patient',
         );
         return FutureBuilder<String>(
-          future: _calculateDistance(),
+          future: distanceFuture,
           builder: (context, distanceSnapshot) {
             return _buildRequestDetails(
               context: context,
@@ -218,9 +241,10 @@ class _EmergencyRequestScreenState
               bloodGroup: profile?.bloodType ?? 'Not recorded',
               allergies: (profile?.allergies.isNotEmpty == true) ? profile!.allergies.join(', ') : 'None listed',
               conditions: (profile?.chronicDiseases.isNotEmpty == true) ? profile!.chronicDiseases.join(', ') : 'No chronic conditions',
-              priority: emergency.status == 'HIGH' ? 'HIGH' : 'NORMAL',
+              priority: priority,
               isDeaf: (profile?.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF'),
               dataSource: 'live',
+              status: emergency.status,
             );
           },
         );
@@ -236,6 +260,7 @@ class _EmergencyRequestScreenState
         allergies: 'Unavailable',
         conditions: 'Unavailable',
         dataSource: 'unavailable',
+        status: emergency.status,
       ),
     );
   }
@@ -266,7 +291,10 @@ class _EmergencyRequestScreenState
     bool isDeaf = false,
     String? voiceSummary,
     String dataSource = 'live',
+    String status = 'ACTIVE',
   }) {
+    final isClosed = EmergencyStatus.isTerminal(status);
+    final isTaken = EmergencyStatus.isAssigned(status);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -300,7 +328,7 @@ class _EmergencyRequestScreenState
                     color: Colors.white, size: 48),
                 const SizedBox(height: 8),
                 Text(
-                  emergencyType.replaceAll('_', ' '),
+                  EmergencyTypes.label(emergencyType),
                   style: const TextStyle(
                       color: Colors.white,
                       fontSize: 22,
@@ -535,6 +563,40 @@ class _EmergencyRequestScreenState
           ),
           const SizedBox(height: 24),
 
+          if (isClosed || isTaken) ...[
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(isClosed ? Icons.block_rounded : Icons.assignment_turned_in_rounded, color: Colors.grey.shade700),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      isClosed
+                          ? 'This emergency is ${EmergencyStatus.label(status).toLowerCase()} and no longer needs a responder.'
+                          : 'This emergency has already been accepted.',
+                      style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (isTaken)
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/responder/active/${widget.requestId}'),
+                  icon: const Icon(Icons.navigation_rounded),
+                  label: const Text('Open if assigned to me'),
+                ),
+              ),
+          ] else
           // Action Buttons
           Row(
             children: [

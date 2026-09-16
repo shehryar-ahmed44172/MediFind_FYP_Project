@@ -5,11 +5,15 @@ import '../../data/repositories/emergency_repository_impl.dart';
 import '../../domain/repositories/emergency_repository.dart';
 import '../../services/notification/push_notification_service.dart';
 import 'auth_provider.dart';
+import 'accessibility_provider.dart';
 import '../../services/socket/socket_service.dart';
 import '../../services/audio/voice_alert_service.dart';
 import '../../presentation/services/haptic_feedback_service.dart';
 import '../../services/location/location_service.dart';
 import '../../domain/entities/emergency.dart';
+import '../../domain/entities/responder_alert.dart';
+import '../../core/utils/emergency_status.dart';
+import '../../data/datasources/remote/medifind_api_client.dart' show CreateEmergencyResult;
 
 // Provider to track if a visual emergency alert should be shown (for accessibility)
 final visualEmergencyAlertProvider = StateProvider<String?>((ref) => null);
@@ -29,7 +33,8 @@ final emergencyRepositoryProvider = FutureProvider<EmergencyRepository>((ref) as
 });
 
 // Create emergency provider
-final createEmergencyProvider = FutureProvider.family<Emergency, CreateEmergencyParams>((ref, params) async {
+// autoDispose: every SOS must hit the API (params objects are never reused).
+final createEmergencyProvider = FutureProvider.autoDispose.family<CreateEmergencyResult, CreateEmergencyParams>((ref, params) async {
   final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
   return await emergencyRepo.createEmergency(
     params.emergencyType,
@@ -67,11 +72,11 @@ final watchUserEmergenciesProvider = StreamProvider.family<List<Emergency>, Stri
 final getActiveEmergenciesProvider = FutureProvider<List<Emergency>>((ref) async {
   final repo = await ref.watch(emergencyRepositoryProvider.future);
   final user = ref.read(currentUserProvider).valueOrNull;
-  
+
   if (user?.role == 'RESPONDER') {
     return await repo.getResponderActiveRequests();
   }
-  
+
   return await repo.getActiveEmergencies();
 });
 
@@ -81,44 +86,51 @@ final watchActiveEmergenciesProvider = StreamProvider<List<Emergency>>((ref) asy
   yield* repo.watchActiveEmergencies();
 });
 
-// Update emergency status provider
-final updateEmergencyStatusProvider = FutureProvider.family<void, UpdateEmergencyStatusParams>((ref, params) async {
-  final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
-  await emergencyRepo.updateEmergencyStatus(params.emergencyId, params.status);
+// Update emergency status provider (assigned responder progress updates)
+final updateEmergencyStatusProvider = FutureProvider.autoDispose.family<void, UpdateEmergencyStatusParams>((ref, params) async {
+  final emergencyRepo = await ref.read(emergencyRepositoryProvider.future);
+  await emergencyRepo.updateEmergencyStatus(
+    params.emergencyId,
+    params.status,
+    latitude: params.latitude,
+    longitude: params.longitude,
+  );
   ref.invalidate(getEmergencyProvider(params.emergencyId));
   ref.invalidate(getActiveEmergenciesProvider);
 });
 
-// Accept emergency provider
-final acceptEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
-  final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
+// Accept emergency provider (responder side).
+// NOTE: no patient-facing voice/visual alert here — this runs on the
+// RESPONDER's phone. Patients are notified via socket/push by the server.
+final acceptEmergencyProvider = FutureProvider.autoDispose.family<void, AcceptRejectParams>((ref, params) async {
+  final emergencyRepo = await ref.read(emergencyRepositoryProvider.future);
   await emergencyRepo.acceptEmergency(params.emergencyId, params.responderId);
-  ref.refresh(getEmergencyProvider(params.emergencyId));
+  ref.invalidate(getEmergencyProvider(params.emergencyId));
   ref.invalidate(watchActiveEmergenciesProvider);
-  
-  // Handle Accessibility-Aware Notifications
-  final user = ref.read(currentUserProvider).valueOrNull;
-  if (user?.patientType == 'DEAF') {
-    // For Deaf users: Haptic + Visual Alert
-    HapticFeedbackService.sosPattern();
-    ref.read(visualEmergencyAlertProvider.notifier).state = "Responder is on the way. Stay calm.";
-  } else {
-    // For others: Voice Alert
-    VoiceAlertService().speakMessage("Responder is on the way. Stay calm.");
-  }
+  ref.invalidate(responderAlertsProvider);
 });
 
 // Reject emergency provider
-final rejectEmergencyProvider = FutureProvider.family<void, AcceptRejectParams>((ref, params) async {
-  final emergencyRepo = await ref.watch(emergencyRepositoryProvider.future);
+final rejectEmergencyProvider = FutureProvider.autoDispose.family<void, AcceptRejectParams>((ref, params) async {
+  final emergencyRepo = await ref.read(emergencyRepositoryProvider.future);
   await emergencyRepo.rejectEmergency(params.emergencyId, params.responderId);
   ref.invalidate(watchActiveEmergenciesProvider);
+  ref.invalidate(responderAlertsProvider);
+});
+
+/// Live list of this responder's open requests, fetched from
+/// `GET responders/emergencies` (source of truth) and synced into the cache.
+/// Invalidate to refresh (polling, pull-to-refresh, socket events).
+final responderAlertsProvider = FutureProvider.autoDispose<List<ResponderAlert>>((ref) async {
+  final repo = await ref.read(emergencyRepositoryProvider.future);
+  final responderId = await ref.read(currentUserIdProvider.future);
+  return repo.syncResponderAlerts(responderId);
 });
 
 // Set responder availability provider
 final setResponderAvailabilityProvider = FutureProvider.family<void, bool>((ref, isAvailable) async {
   final repo = await ref.watch(emergencyRepositoryProvider.future);
-  
+
   if (isAvailable) {
     try {
       // CRITICAL FIX: The backend uses PostGIS `ST_DWithin`. If the responder
@@ -128,7 +140,7 @@ final setResponderAvailabilityProvider = FutureProvider.family<void, bool>((ref,
       debugPrint('📍 Pushed Responder Location to Backend: ${position.latitude}, ${position.longitude}');
     } catch (e) {
       debugPrint('❌ Failed to push responder location: $e');
-      // If we completely fail to get location, we might want to alert the UI, 
+      // If we completely fail to get location, we might want to alert the UI,
       // but we still attempt to set availability as a fallback.
     }
   }
@@ -153,16 +165,16 @@ final updateResponderLocationProvider = FutureProvider.family<void, Position>((r
 });
 
 // Cancel emergency provider
-final cancelEmergencyProvider = FutureProvider.family<void, String>((ref, emergencyId) async {
-  final repo = await ref.watch(emergencyRepositoryProvider.future);
+final cancelEmergencyProvider = FutureProvider.autoDispose.family<void, String>((ref, emergencyId) async {
+  final repo = await ref.read(emergencyRepositoryProvider.future);
   await repo.cancelEmergency(emergencyId);
   ref.invalidate(getEmergencyProvider(emergencyId));
   ref.invalidate(watchActiveEmergenciesProvider);
 });
 
 // Resolve emergency provider
-final resolveEmergencyProvider = FutureProvider.family<void, String>((ref, emergencyId) async {
-  final repo = await ref.watch(emergencyRepositoryProvider.future);
+final resolveEmergencyProvider = FutureProvider.autoDispose.family<void, String>((ref, emergencyId) async {
+  final repo = await ref.read(emergencyRepositoryProvider.future);
   await repo.resolveEmergency(emergencyId);
   ref.invalidate(getEmergencyProvider(emergencyId));
   ref.invalidate(getActiveEmergenciesProvider);
@@ -218,10 +230,14 @@ class CreateEmergencyParams {
 class UpdateEmergencyStatusParams {
   final String emergencyId;
   final String status;
+  final double? latitude;
+  final double? longitude;
 
   UpdateEmergencyStatusParams({
     required this.emergencyId,
     required this.status,
+    this.latitude,
+    this.longitude,
   });
 }
 
@@ -282,10 +298,11 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
             try {
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
+              ref.invalidate(responderAlertsProvider);
               PushNotificationService.showEmergencyAlert(payload);
-              debugPrint('✅ Socket: Responder Alerted for $emergencyId');
             } catch (e) {
-              debugPrint('❌ Socket Error: $e');
+              debugPrint('Socket: could not pre-fetch emergency $emergencyId: $e');
+              PushNotificationService.showEmergencyAlert(payload);
             }
           }
         }
@@ -320,10 +337,12 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
             try {
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
+              ref.invalidate(responderAlertsProvider);
               PushNotificationService.showEmergencyAlert(payload);
-              debugPrint('🚨 Socket: Responder Alerted for $emergencyId via generic notification');
             } catch (e) {
-              debugPrint('❌ Socket Error pre-fetching emergency: $e');
+              debugPrint('Socket: could not pre-fetch emergency $emergencyId: $e');
+              // Still alert the responder — caching must never block the alert.
+              PushNotificationService.showEmergencyAlert(payload);
             }
           }
         }
@@ -350,10 +369,13 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
           PushNotificationService.dismissCurrentEmergencyModal();
           ref.invalidate(getActiveEmergenciesProvider);
           ref.invalidate(watchActiveEmergenciesProvider);
+          ref.invalidate(responderAlertsProvider);
         }
 
         // --- CAREGIVER LOGIC: Patient SOS ---
-        else if (eventType == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
+        // Only the initial SOS notification (not later "Emergency Update"
+        // notifications, which carry a status) opens the caregiver dialog.
+        else if (eventType == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER' && payload['status'] == null) {
           debugPrint('🚨 Caregiver SOS Notification Received!');
           PushNotificationService.showEmergencyAlert({
             ...payload,
@@ -371,7 +393,7 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 
         final emergencyId = data['emergencyId']?.toString();
         final newStatus = (data['status'] ?? data['newStatus'] ?? '').toString().toUpperCase();
-        
+
         debugPrint('🔄 Status Change for $emergencyId: $newStatus');
 
         if (emergencyId != null) {
@@ -385,23 +407,32 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 
             // If status is terminal (cancelled/resolved), also invalidate stream
             // so responder home screen removes it immediately
-            if (newStatus == 'CANCELLED' || newStatus == 'RESOLVED' ||
-                newStatus == 'COMPLETED' || newStatus == 'ASSIGNED' ||
-                newStatus == 'RESPONDER_ASSIGNED') {
+            if (EmergencyStatus.isTerminal(newStatus) || EmergencyStatus.isAssigned(newStatus)) {
               ref.invalidate(watchActiveEmergenciesProvider);
-              debugPrint('🔄 watchActiveEmergencies invalidated for status: $newStatus');
+              if (user.role == 'RESPONDER') ref.invalidate(responderAlertsProvider);
             }
-            
+            if (EmergencyStatus.isTerminal(newStatus)) {
+              SocketService.instance.forgetEmergencyRooms(emergencyId);
+            }
+
             // --- ACCESSIBILITY LOGIC: DEAF Patient Feedback ---
-            if (user.role == 'PATIENT' && user.patientType == 'DEAF') {
+            final ownerId = data['patientId']?.toString();
+            final isOwnEmergency = ownerId == null || ownerId == user.id;
+            if (!isOwnEmergency) {
+              // Status change for someone else's emergency — no patient alert.
+            } else if (user.role == 'PATIENT' && user.patientType?.toUpperCase() == 'DEAF') {
               if (newStatus == 'ASSIGNED' || newStatus == 'RESPONDER_ASSIGNED') {
-                HapticFeedbackService.sosPattern();
-                ref.read(visualEmergencyAlertProvider.notifier).state = 
+                if (ref.read(accessibilityProvider).vibrationFeedback) HapticFeedbackService.sosPattern();
+                ref.read(visualEmergencyAlertProvider.notifier).state =
                     "HELP IS ON THE WAY: ${data['responderName'] ?? 'A responder'} has accepted your request.";
               } else if (newStatus == 'ARRIVED') {
-                HapticFeedbackService.heavy();
-                ref.read(visualEmergencyAlertProvider.notifier).state = 
+                if (ref.read(accessibilityProvider).vibrationFeedback) HapticFeedbackService.heavy();
+                ref.read(visualEmergencyAlertProvider.notifier).state =
                     "RESPONDER ARRIVED: Look around for ${data['responderName'] ?? 'help'}.";
+              } else if (newStatus == 'ACTIVE' && data['message'] != null) {
+                if (ref.read(accessibilityProvider).vibrationFeedback) HapticFeedbackService.heavy();
+                ref.read(visualEmergencyAlertProvider.notifier).state =
+                    'FINDING ANOTHER RESPONDER: ${data['message']}';
               }
             } else if (user.role == 'PATIENT') {
               // Voice feedback for normal patients
@@ -419,47 +450,45 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 });
 
 // Socket Stream Provider for Real-Time Updates (Socket.io)
-// Removing autoDispose to keep socket alive in background for SOS alerts
+// Not autoDispose: keeps the socket alive in background for SOS alerts.
 final socketStreamProvider = StreamProvider<SocketMessage>((ref) {
   final socketService = SocketService.instance;
-  
+
   // Ensure connected with auth token
   ref.watch(currentUserProvider).whenData((user) {
     if (user != null) {
-      // Get token from auth provider
       ref.watch(authRepositoryProvider).whenData((repo) async {
         final token = await repo.getAuthToken();
         if (token != null) {
           socketService.setAuthToken(token);
           socketService.connect(user.id);
-          // Responders join the broadcast room to receive NEW_EMERGENCY events
+          // Server auto-joins responders to their broadcast room from the
+          // token; the explicit join is kept for older servers.
           if (user.role == 'RESPONDER') {
-            // Small delay to ensure socket is fully connected before joining room
-            Future.delayed(const Duration(milliseconds: 500), () {
-              socketService.joinRespondersRoom();
-            });
+            socketService.joinRespondersRoom();
           }
         }
       });
     }
   });
 
-  ref.onDispose(() {
-    socketService.disconnect();
-  });
-  
+  // IMPORTANT: do NOT disconnect the shared singleton here. Rebuilds of this
+  // provider (e.g. when the user profile refreshes) would otherwise drop the
+  // connection and every joined room. Logout disconnects explicitly.
+
   return socketService.messageStream;
 });
 
 // Stream provider for tracking a specific responder's location (NEW)
 final responderLocationProvider = StreamProvider.family<Map<String, dynamic>, String>((ref, emergencyId) {
   final socketService = SocketService.instance;
-  
+
   // CRITICAL: Join the location room for this specific emergency
   socketService.joinLocationRoom(emergencyId);
-  
+
   return socketService.messageStream
       .where((msg) => msg.event == SocketEvent.responderLocationUpdate)
-      .map((msg) => msg.data as Map<String, dynamic>)
-      .where((data) => data['emergencyId'] == emergencyId);
+      .where((msg) => msg.data is Map)
+      .map((msg) => Map<String, dynamic>.from(msg.data as Map))
+      .where((data) => data['emergencyId']?.toString() == emergencyId);
 });

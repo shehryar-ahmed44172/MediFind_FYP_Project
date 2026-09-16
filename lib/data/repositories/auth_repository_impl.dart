@@ -45,12 +45,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<AuthResponse> refreshToken(String token) async {
+  Future<TokenRefreshResult> refreshToken(String token) async {
     final response = await apiClient.refreshToken(token);
     await localDataSource.saveAuthToken(response.accessToken);
-    await localDataSource.saveRefreshToken(response.refreshToken);
+    if (response.refreshToken != null) {
+      await localDataSource.saveRefreshToken(response.refreshToken!);
+    }
     apiClient.setAuthToken(response.accessToken);
-    SocketService.instance.setAuthToken(response.accessToken);
+    SocketService.instance.updateAuthToken(response.accessToken);
     return response;
   }
 
@@ -176,16 +178,8 @@ class AuthRepositoryImpl implements AuthRepository {
     return response['url'] as String;
   }
   @override
-  Future<User> upgradeSubscription(String plan) async {
-    return await apiClient.upgradeSubscription(plan);
-  }
-
-  @override
-  Future<bool> processPayment(double amount, String method) async {
-    // Simulate network delay for payment processing
-    await Future.delayed(const Duration(seconds: 2));
-    debugPrint('💰 [MockPayment] Processed $amount via $method successfully.');
-    return true;
+  Future<User> upgradeSubscription(String plan, {required String paymentIntentId}) async {
+    return await apiClient.upgradeSubscription(plan, paymentIntentId: paymentIntentId);
   }
 
   @override

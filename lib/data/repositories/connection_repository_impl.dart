@@ -7,9 +7,20 @@ class ConnectionRepositoryImpl implements ConnectionRepository {
 
   ConnectionRepositoryImpl({required this.apiClient});
 
+  /// [email] is the invited user's email. Set [invitingCaregiver] when a
+  /// PATIENT invites a caregiver; default (false) is a CAREGIVER inviting a
+  /// patient, which keeps the existing interface call compatible.
   @override
-  Future<void> sendInvitation(String patientEmail, String relationship) async {
-    await apiClient.linkCaregiver(patientEmail, relationship);
+  Future<void> sendInvitation(
+    String email,
+    String relationship, {
+    bool invitingCaregiver = false,
+  }) async {
+    await apiClient.linkCaregiver(
+      email,
+      relationship,
+      invitingCaregiver: invitingCaregiver,
+    );
   }
 
   @override

@@ -25,7 +25,16 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
 
   Future<void> _sendInvitation() async {
     final email = _emailController.text.trim();
-    if (email.isEmpty) return;
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter a valid email address.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+    FocusScope.of(context).unfocus();
 
     setState(() => _isLoading = true);
 
@@ -86,13 +95,16 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
             const SizedBox(height: 8),
             const Text(
               'Enter the patient\'s registered email address to send them a connection request.',
-              style: TextStyle(color: Colors.grey),
+              style: TextStyle(color: Color(0xFF616161)),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => _isLoading ? null : _sendInvitation(),
               decoration: InputDecoration(
                 labelText: 'Patient Email',
                 prefixIcon: const Icon(Icons.email_outlined),
@@ -123,10 +135,14 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
             ElevatedButton(
               onPressed: _isLoading ? null : _sendInvitation,
               style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 16),
+                minimumSize: const Size.fromHeight(52),
               ),
-              child: _isLoading 
-                  ? const CircularProgressIndicator(color: Colors.white)
+              child: _isLoading
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                    )
                   : const Text('Send Invitation', style: TextStyle(fontSize: 16)),
             ),
           ],

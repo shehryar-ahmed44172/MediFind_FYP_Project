@@ -7,7 +7,6 @@ import '../../../services/socket/socket_service.dart';
 import '../../../services/notification/push_notification_service.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/common/app_header.dart';
-import 'package:go_router/go_router.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
   const DiagnosticsScreen({super.key});
@@ -18,7 +17,6 @@ class DiagnosticsScreen extends ConsumerStatefulWidget {
 
 class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
   String? _fcmToken;
-  final List<String> _rooms = [];
   bool _isPinging = false;
 
   @override
@@ -175,7 +173,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                       ),
                       const SizedBox(height: 12),
                       ElevatedButton.icon(
-                        onPressed: _checkSocketRooms,
+                        onPressed: _isPinging ? null : _checkSocketRooms,
                         icon: const Icon(Icons.refresh_rounded),
                         label: const Text('Refresh Socket Status'),
                         style: ElevatedButton.styleFrom(

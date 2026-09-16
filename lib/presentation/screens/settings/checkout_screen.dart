@@ -4,7 +4,6 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
-import '../../../data/datasources/remote/medifind_api_client.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   final String planId;
@@ -106,8 +105,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
                 const SizedBox(height: 16),
 
                 _buildPaymentTile('CARD', 'Credit / Debit Card (Stripe)', Icons.credit_card_rounded, const Color(0xFF6366F1)),
-                _buildPaymentTile('JAZZCASH', 'JazzCash Wallet', Icons.account_balance_wallet_rounded, const Color(0xFFF59E0B)),
-                _buildPaymentTile('EASYPAISA', 'EasyPaisa Wallet', Icons.payments_rounded, const Color(0xFF10B981)),
+                // Wallet gateways are not integrated yet — shown but disabled so
+                // no plan can be upgraded without a verified payment.
+                _buildPaymentTile('JAZZCASH', 'JazzCash Wallet', Icons.account_balance_wallet_rounded, const Color(0xFFF59E0B), enabled: false),
+                _buildPaymentTile('EASYPAISA', 'EasyPaisa Wallet', Icons.payments_rounded, const Color(0xFF10B981), enabled: false),
 
                 const SizedBox(height: 40),
 
@@ -188,30 +189,58 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     );
   }
 
-  Widget _buildPaymentTile(String id, String title, IconData icon, Color color) {
-    final isSelected = _selectedMethod == id;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedMethod = id),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? color : Colors.transparent, width: 2),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.01), blurRadius: 10, offset: const Offset(0, 2))],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-              child: Icon(icon, color: color, size: 24),
+  Widget _buildPaymentTile(String id, String title, IconData icon, Color color, {bool enabled = true}) {
+    final isSelected = enabled && _selectedMethod == id;
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      selected: isSelected,
+      label: enabled ? title : '$title, coming soon',
+      excludeSemantics: true,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.55,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            child: InkWell(
+              onTap: enabled ? () => setState(() => _selectedMethod = id) : null,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: isSelected ? color : Colors.transparent, width: 2),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Icon(icon, color: color, size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
+                    if (!enabled)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade200,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: Text(
+                          'Coming soon',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade800),
+                        ),
+                      )
+                    else if (isSelected)
+                      Icon(Icons.check_circle_rounded, color: color),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(width: 16),
-            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-            if (isSelected) Icon(Icons.check_circle_rounded, color: color),
-          ],
+          ),
         ),
       ),
     );
@@ -222,10 +251,22 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     final plan = _getPlanDetails();
 
     try {
-      if (_selectedMethod == 'CARD') {
-        await _handleStripePayment(plan);
-      } else {
-        await _handleMockPayment(plan);
+      // Only card payments (Stripe) are supported; wallet options are disabled.
+      await _handleStripePayment(plan);
+    } on StripeException catch (e) {
+      if (mounted) {
+        final cancelled = e.error.code == FailureCode.Canceled;
+        final reason = e.error.localizedMessage ?? e.error.message ?? 'Unknown error';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(cancelled
+                ? 'Payment cancelled. You have not been charged.'
+                : 'Payment failed: $reason'),
+            backgroundColor: cancelled ? Colors.grey.shade800 : AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -247,17 +288,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   Future<void> _handleStripePayment(Map<String, dynamic> plan) async {
     // 1. Create PaymentIntent on the backend
     final apiClient = ref.read(apiClientProvider);
-    final response = await apiClient.dio.post(
-      'payments/create-intent',
-      data: {'plan': widget.planId},
-    );
-    final clientSecret = (response.data['data']['clientSecret'] as String?) ?? '';
-    if (clientSecret.isEmpty) throw Exception('Failed to create payment intent');
+    final intent = await apiClient.createPaymentIntent(widget.planId);
 
     // 2. Initialise the Payment Sheet
     await Stripe.instance.initPaymentSheet(
       paymentSheetParameters: SetupPaymentSheetParameters(
-        paymentIntentClientSecret: clientSecret,
+        paymentIntentClientSecret: intent.clientSecret,
         merchantDisplayName: 'MediFind',
         style: ThemeMode.light,
       ),
@@ -266,23 +302,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     // 3. Present the Payment Sheet — throws StripeException if user cancels
     await Stripe.instance.presentPaymentSheet();
 
-    // 4. Payment confirmed by Stripe — apply the upgrade immediately via the
-    //    client-side endpoint (which now supports all roles). The webhook also
-    //    updates the DB for reliability, but should not be the primary path in dev.
-    if (mounted) {
-      await ref.read(upgradeSubscriptionProvider(widget.planId).future);
-      // Force-refresh user profile so Plans screen shows the new plan
-      ref.invalidate(currentUserProvider);
-      context.pushReplacement('/payment-success', extra: plan['name']);
-    }
-  }
-
-  /// Mock flow for JazzCash / EasyPaisa (no real gateway in sandbox).
-  Future<void> _handleMockPayment(Map<String, dynamic> plan) async {
-    await Future.delayed(const Duration(seconds: 2));
-    if (mounted) {
-      await ref.read(upgradeSubscriptionProvider(widget.planId).future);
-      context.pushReplacement('/payment-success', extra: plan['name']);
-    }
+    // 4. Payment confirmed by Stripe — ask the server to apply the upgrade.
+    //    The server verifies the PaymentIntent succeeded for this user + plan.
+    if (!mounted) return;
+    await ref.read(upgradeSubscriptionProvider(UpgradeSubscriptionParams(
+      plan: widget.planId,
+      paymentIntentId: intent.paymentIntentId,
+    )).future);
+    ref.invalidate(currentUserProvider);
+    if (!mounted) return;
+    context.pushReplacement('/payment-success', extra: {
+      'planName': plan['name'],
+      'transactionId': intent.paymentIntentId,
+    });
   }
 }

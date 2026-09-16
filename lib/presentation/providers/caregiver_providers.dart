@@ -23,14 +23,29 @@ final pendingInvitationsProvider = FutureProvider<List<CaregiverConnection>>((re
   return repo.getPendingInvitations();
 });
 
-// Send invitation action
+// Send invitation action.
+// Keys: `caregiverEmail` when a PATIENT invites a caregiver, or `patientEmail`
+// when a CAREGIVER invites a patient; plus `relationship`.
 final sendInvitationProvider = FutureProvider.family<void, Map<String, String>>((ref, data) async {
   await ref.watch(authRepositoryProvider.future);
   final repo = ref.watch(connectionRepositoryProvider);
-  await repo.sendInvitation(data['patientEmail']!, data['relationship']!);
-  
+  final caregiverEmail = data['caregiverEmail'];
+  final relationship = data['relationship']!;
+
+  if (caregiverEmail != null && repo is ConnectionRepositoryImpl) {
+    await repo.sendInvitation(caregiverEmail, relationship, invitingCaregiver: true);
+  } else {
+    // Backend derives the direction from the caller's role, so the generic
+    // path is still correct for any other implementation.
+    await repo.sendInvitation(
+      caregiverEmail ?? data['patientEmail'] ?? data['email']!,
+      relationship,
+    );
+  }
+
   ref.invalidate(getLinkedPatientsProvider);
   ref.invalidate(allCaregiverLinksProvider);
+  ref.invalidate(caregiverLinksProvider);
 });
 
 final allCaregiverLinksProvider = FutureProvider<List<CaregiverConnection>>((ref) async {

@@ -9,7 +9,6 @@ import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../providers/chat_provider.dart';
-import '../../../data/datasources/remote/medifind_api_client.dart';
 import '../../theme/app_theme.dart';
 import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
@@ -19,6 +18,8 @@ import '../../../services/audio/voice_alert_service.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/utils/map_utils.dart';
 import '../../widgets/map_ambulance_overlay.dart';
+import '../../widgets/map/ambulance_mascot.dart';
+import '../../../core/utils/emergency_status.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -30,13 +31,9 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
 
 class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScreen> {
   GoogleMapController? _mapController;
-  final Completer<GoogleMapController> _controller = Completer<GoogleMapController>();
-  
+
   double? _responderLat;
   double? _responderLong;
-  // Tracks last marker positions so _updateMarkers skips work when nothing moved
-  LatLng? _lastPatientPos;
-  LatLng? _lastResponderPos;
   String? _responderName;
   String? _responderPhone;
   String? _responderProfileImage;
@@ -46,16 +43,29 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   String? _vehicleType;
   String? _organization;
   String? _responderId;
-  String _currentStatus = 'PENDING';
-  String _eta = 'Calculating...';
+
+  /// Server status: ACTIVE (searching), ASSIGNED, EN_ROUTE, ARRIVED, ... RESOLVED.
+  String _currentStatus = 'ACTIVE';
+  bool _statusLoaded = false;
+  String _eta = 'Waiting for responder';
   int _selectedStars = 0;
   bool _ratingSubmitted = false;
 
+  /// Deaf "responder arrived" overlay dismissed by the patient. Dismissing
+  /// only hides the overlay — it never changes the emergency status.
+  bool _arrivedAlertDismissed = false;
+  bool _leftForTerminal = false;
+
+  StreamSubscription<SocketMessage>? _socketSub;
+
   // AI-personalized quick replies for deaf patients (loaded lazily on first open)
   List<Map<String, dynamic>>? _aiQuickReplies;
-  
-  BitmapDescriptor? _ambulanceIcon;
-  final Set<Marker> _markers = {};
+
+  /// Animated motorbike-ambulance marker for the assigned responder.
+  AnimatedMascotMarker _responderMarker = AnimatedMascotMarker(
+    markerId: const MarkerId('responder'),
+    infoWindow: const InfoWindow(title: 'Responder'),
+  );
 
   // ── Simulation overlay state ─────────────────────────────────────────────
   bool _simActive = false;
@@ -68,71 +78,263 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   @override
   void initState() {
     super.initState();
-    _loadMarkerIcons();
+    final socketService = SocketService.instance;
+    socketService.joinEmergencyRoom(widget.emergencyId);
+    socketService.joinLocationRoom(widget.emergencyId);
+    _socketSub = socketService.messageStream.listen(_onSocketMessage);
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final socketService = SocketService.instance;
-      socketService.joinEmergencyRoom(widget.emergencyId);
-      socketService.joinLocationRoom(widget.emergencyId);
+      if (!mounted) return;
       ref.read(socketStreamProvider);
+      // Simulation mode (testing) is started/stopped outside build().
+      ref.listenManual<bool>(simulationModeProvider, (_, isSim) {
+        if (isSim) _startSimulation();
+      }, fireImmediately: true);
+    });
+
+    _loadInitialState();
+  }
+
+  @override
+  void dispose() {
+    _simTimer?.cancel();
+    _simTimer = null;
+    _socketSub?.cancel();
+    _responderMarker.dispose();
+    super.dispose();
+  }
+
+  /// Initial status + assigned responder from the server, so reopening this
+  /// screen (or opening it from a notification) doesn't show "searching".
+  Future<void> _loadInitialState() async {
+    try {
+      final api = ref.read(apiClientProvider);
+      final data = await api.getEmergencyRaw(widget.emergencyId);
+      if (!mounted) return;
+
+      String? responderId = data['assignedResponderId']?.toString();
+      String? responderName = data['assignedResponderName']?.toString();
+      final requests = data['emergencyRequests'];
+      if (responderId == null && requests is List) {
+        for (final r in requests.whereType<Map>()) {
+          final st = r['status']?.toString().toUpperCase();
+          if (st == 'ACCEPTED' || st == 'COMPLETED') {
+            responderId = r['responderId']?.toString();
+            final responder = r['responder'];
+            if (responder is Map && responder['user'] is Map) {
+              responderName ??= (responder['user'] as Map)['fullName']?.toString();
+            }
+            if (responder is Map) {
+              _responderType ??= responder['responderType']?.toString();
+              _vehicleType ??= responder['vehicleType']?.toString();
+              _motorbikeNumber ??= responder['motorbikeNumber']?.toString();
+              _organization ??= responder['organization']?.toString();
+            }
+            break;
+          }
+        }
+      }
+
+      setState(() {
+        final serverStatus = EmergencyStatus.normalize(data['status']?.toString());
+        if (!_statusLoaded && serverStatus.isNotEmpty) _currentStatus = serverStatus;
+        _statusLoaded = true;
+        _responderId ??= responderId;
+        _responderName ??= responderName;
+        if (_responderId != null && _eta == 'Waiting for responder') _eta = 'Calculating…';
+      });
+      _handleTerminalStatus();
+
+      if (responderId != null) {
+        _loadResponderProfile(responderId);
+        _loadLatestResponderPosition();
+      }
+    } catch (e) {
+      debugPrint('Tracking: could not load emergency details: $e');
+      if (mounted) setState(() => _statusLoaded = true);
+    }
+  }
+
+  Future<void> _loadResponderProfile(String responderId) async {
+    try {
+      final profile = await ref.read(apiClientProvider).getUserProfile(responderId);
+      if (!mounted || profile == null) return;
+      setState(() {
+        _responderName ??= profile.fullName;
+        if (profile.phoneNumber.isNotEmpty) _responderPhone ??= profile.phoneNumber;
+        _responderProfileImage ??= profile.profileImageUrl;
+        _responderRating ??= profile.rating;
+        _responderType ??= profile.responderType;
+        _vehicleType ??= profile.vehicleType;
+        _organization ??= profile.organization;
+      });
+    } catch (e) {
+      debugPrint('Tracking: could not load responder profile: $e');
+    }
+  }
+
+  Future<void> _loadLatestResponderPosition() async {
+    try {
+      final latest = await ref.read(apiClientProvider).getLatestTracking(widget.emergencyId);
+      if (!mounted || latest is! Map) return;
+      final lat = double.tryParse(latest['latitude']?.toString() ?? '');
+      final lng = double.tryParse(latest['longitude']?.toString() ?? '');
+      if (lat != null && lng != null && _responderLat == null) {
+        _applyResponderPosition(lat, lng, null);
+      }
+    } catch (_) {
+      // No tracking yet (404) — the socket will deliver positions.
+    }
+  }
+
+  void _applyResponderPosition(double lat, double lng, dynamic etaMinutes) {
+    final patient = _patientLatLng;
+    final serverEta = etaMinutes == null ? null : num.tryParse(etaMinutes.toString());
+    String eta;
+    if (serverEta != null) {
+      eta = serverEta <= 0 ? 'Arriving' : '${serverEta.round()} min';
+    } else if (patient != null) {
+      final km = GeoUtils.haversineKm(lat, lng, patient.latitude, patient.longitude);
+      final minutes = GeoUtils.etaMinutes(km);
+      eta = minutes == 0 ? 'Arriving' : '$minutes min';
+    } else {
+      eta = _eta;
+    }
+    setState(() {
+      _responderLat = lat;
+      _responderLong = lng;
+      _eta = eta;
+    });
+    _responderMarker.moveTo(LatLng(lat, lng));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _animateToResponder();
+        if (_simActive) _updateOverlayPositions();
+      }
     });
   }
 
-  Future<void> _loadMarkerIcons() async {
-    final icon = await MapUtils.getAmbulanceMarker();
-    if (mounted) {
+  void _onSocketMessage(SocketMessage message) {
+    if (!mounted || _simActive || message.data is! Map) return;
+    final data = Map<String, dynamic>.from(message.data as Map);
+    // Only events for THIS emergency.
+    if (message.event == SocketEvent.notification) {
+      final inner = data['data'] is Map ? Map<String, dynamic>.from(data['data'] as Map) : data;
+      if (inner['emergencyId']?.toString() != widget.emergencyId) return;
+      final type = data['type']?.toString();
+      if (type == 'RESPONDER_ASSIGNED' || type == 'EMERGENCY_RESOLVED') {
+        _loadInitialState();
+      }
+      return;
+    }
+    if (data['emergencyId']?.toString() != widget.emergencyId) return;
+
+    final settings = ref.read(accessibilityProvider);
+    final user = ref.read(currentUserProvider).valueOrNull;
+    final isDeafPatient = (user?.patientType?.toUpperCase() == 'DEAF') || settings.textOnlyMode;
+
+    if (message.event == SocketEvent.emergencyStatusChange) {
+      final newStatus = EmergencyStatus.normalize(
+        (data['newStatus'] ?? data['status'])?.toString() ?? _currentStatus,
+      );
+
+      // Responder dropped out → back to searching, clear their details.
+      if (newStatus == 'ACTIVE' && EmergencyStatus.isAssigned(_currentStatus)) {
+        final old = _responderMarker;
+        setState(() {
+          _currentStatus = 'ACTIVE';
+          _responderId = null;
+          _responderName = null;
+          _responderPhone = null;
+          _responderProfileImage = null;
+          _responderRating = null;
+          _responderLat = null;
+          _responderLong = null;
+          _eta = 'Waiting for responder';
+          _responderMarker = AnimatedMascotMarker(
+            markerId: const MarkerId('responder'),
+            infoWindow: const InfoWindow(title: 'Responder'),
+          );
+        });
+        WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message']?.toString() ?? 'Finding another responder for you…'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        return;
+      }
+
+      if (newStatus != _currentStatus && !isDeafPatient) {
+        // Voice alerts for progress — deaf patients rely on visual/haptic cues
+        if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
+          VoiceAlertService().speakMessage('A responder has been assigned and is on the way.');
+        } else if (newStatus == 'ARRIVED') {
+          VoiceAlertService().speakMessage('The responder has arrived at your location.');
+        }
+      }
+
       setState(() {
-        _ambulanceIcon = icon;
+        _currentStatus = newStatus;
+        if (data['responderId']           != null) _responderId           = data['responderId'].toString();
+        if (data['responderName']         != null) _responderName         = data['responderName'].toString();
+        if (data['responderPhone']        != null) _responderPhone        = data['responderPhone'].toString();
+        if (data['responderProfileImage'] != null) _responderProfileImage = data['responderProfileImage'].toString();
+        if (data['responderRating']       != null) _responderRating       = double.tryParse(data['responderRating'].toString());
+        if (data['responderType']         != null) _responderType         = data['responderType'].toString();
+        if (data['motorbikeNumber']       != null) _motorbikeNumber       = data['motorbikeNumber'].toString();
+        if (data['vehicleType']           != null) _vehicleType           = data['vehicleType'].toString();
+        if (data['organization']          != null) _organization          = data['organization'].toString();
+        if (newStatus == 'ARRIVED') _arrivedAlertDismissed = false;
+        if (_responderId != null && _eta == 'Waiting for responder') _eta = 'Calculating…';
       });
+
+      if (newStatus == 'ARRIVED' && isDeafPatient && settings.vibrationFeedback) {
+        HapticFeedbackService.sosPattern();
+      }
+      _handleTerminalStatus();
+    } else if (message.event == SocketEvent.responderLocationUpdate) {
+      final lat = double.tryParse(data['latitude']?.toString() ?? '');
+      final lng = double.tryParse(data['longitude']?.toString() ?? '');
+      if (lat == null || lng == null) return;
+      _applyResponderPosition(lat, lng, data['estimatedArrivalMinutes'] ?? data['etaMinutes']);
+    } else if (message.event == SocketEvent.responderArrived) {
+      if (_currentStatus != 'ARRIVED') {
+        setState(() {
+          _currentStatus = 'ARRIVED';
+          _arrivedAlertDismissed = false;
+        });
+      }
     }
   }
 
-  void _updateMarkers(Emergency emergency) {
-    final patientPos = LatLng(emergency.latitude, emergency.longitude);
-    _patientLatLng = patientPos; // used by overlay position tracker
-
-    final responderPos = (_responderLat != null && _responderLong != null)
-        ? LatLng(_responderLat!, _responderLong!)
-        : null;
-
-    // Skip expensive marker rebuild when positions haven't changed
-    if (patientPos == _lastPatientPos && responderPos == _lastResponderPos) return;
-    _lastPatientPos = patientPos;
-    _lastResponderPos = responderPos;
-
-    _markers.clear();
-
-    // During simulation the Flutter overlay widgets replace both markers so
-    // we skip adding them here to avoid double rendering on the map.
-    if (_simActive) return;
-
-    // Patient marker — always fixed at the original SOS coordinates.
-    // The device's built-in blue dot (myLocationEnabled: true) shows the
-    // patient's real-time position separately, so these two must never be mixed.
-    _markers.add(
-      Marker(
-        markerId: const MarkerId('patient'),
-        position: patientPos,
-        infoWindow: const InfoWindow(title: 'SOS Location'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueCyan),
+  /// Cancelled elsewhere (auto-cancel, another device): leave with a message.
+  void _handleTerminalStatus() {
+    if (!mounted || _leftForTerminal || !EmergencyStatus.isCancelled(_currentStatus)) return;
+    _leftForTerminal = true;
+    SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('This emergency was cancelled. If you still need help, call 1122.'),
+        behavior: SnackBarBehavior.floating,
       ),
     );
+    context.go('/home');
+  }
 
-    // Responder marker — updated only when the socket delivers a new position.
-    // _animateToResponder() is intentionally NOT called here: calling a camera
-    // animation inside build() causes it to fire on every rebuild (timer ticks,
-    // provider refreshes, etc.), which makes the map snap away from wherever
-    // the patient is looking. Camera moves are triggered from the socket listener.
-    if (responderPos != null) {
-      _markers.add(
-        Marker(
-          markerId: const MarkerId('responder'),
-          position: responderPos,
-          icon: _ambulanceIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-          infoWindow: InfoWindow(title: _responderName ?? 'Responder'),
-          rotation: 0,
-        ),
-      );
-    }
+  Set<Marker> _patientMarkers(Emergency emergency) {
+    _patientLatLng = LatLng(emergency.latitude, emergency.longitude);
+    // During simulation the Flutter overlay widgets replace the markers.
+    if (_simActive) return {};
+    return {
+      Marker(
+        markerId: const MarkerId('patient'),
+        position: _patientLatLng!,
+        infoWindow: const InfoWindow(title: 'SOS Location'),
+        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+      ),
+    };
   }
 
   void _animateToResponder() async {
@@ -180,67 +382,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     final settings = ref.watch(accessibilityProvider);
     final user = ref.watch(currentUserProvider).valueOrNull;
     final isDeafPatient = (user?.patientType?.toUpperCase() == 'DEAF') || settings.textOnlyMode;
-    final isSimulation = ref.watch(simulationModeProvider);
-    _simActive = isSimulation; // keep marker logic in sync
+    _simActive = ref.watch(simulationModeProvider); // keep marker logic in sync
     final emergencyAsync = ref.watch(getEmergencyProvider(widget.emergencyId));
-    
-    ref.listen(socketStreamProvider, (previous, next) {
-      if (next.hasValue && !isSimulation) { // Only listen to real socket if NOT simulating
-        final message = next.value!;
-        final data = message.data as Map<String, dynamic>;
-
-        if (message.event == SocketEvent.emergencyStatusChange) {
-          final newStatus = data['status']?.toString() ?? data['newStatus']?.toString() ?? _currentStatus;
-          
-          if (newStatus != _currentStatus) {
-            // Voice Alerts for progress — skip for deaf patients who rely on visual/haptic cues
-            if (!isDeafPatient) {
-              if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
-                VoiceAlertService().speakMessage("A responder has been assigned and is on the way.");
-              } else if (newStatus == 'ARRIVED') {
-                VoiceAlertService().speakMessage("The responder has arrived at your location.");
-              }
-            }
-          }
-
-          setState(() {
-            _currentStatus = newStatus;
-            if (data['responderName']         != null) _responderName         = data['responderName'];
-            if (data['responderPhone']        != null) _responderPhone        = data['responderPhone'];
-            if (data['responderProfileImage'] != null) _responderProfileImage = data['responderProfileImage'];
-            if (data['responderRating']       != null) _responderRating       = double.tryParse(data['responderRating'].toString());
-            if (data['responderType']         != null) _responderType         = data['responderType'];
-            if (data['motorbikeNumber']       != null) _motorbikeNumber       = data['motorbikeNumber'];
-            if (data['vehicleType']           != null) _vehicleType           = data['vehicleType'];
-            if (data['organization']          != null) _organization          = data['organization'];
-          });
-          
-          if (newStatus == 'ARRIVED' && isDeafPatient) {
-            if (settings.vibrationFeedback) HapticFeedbackService.sosPattern();
-          }
-        } 
-        else if (message.event == SocketEvent.responderLocationUpdate) {
-          setState(() {
-            _responderLat = double.tryParse(data['latitude'].toString());
-            _responderLong = double.tryParse(data['longitude'].toString());
-            _eta = data['eta']?.toString() ?? _eta;
-          });
-          // Animate camera ONLY here — after a genuine responder GPS update.
-          // Never call this inside build() or _updateMarkers().
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              _animateToResponder();
-              _updateOverlayPositions();
-            }
-          });
-        }
-      }
-    });
-
-    // Handle Simulation logic
-    if (isSimulation) {
-      _startSimulation();
-    }
 
     final theme = AppTheme.buildTheme(settings);
 
@@ -249,17 +392,32 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       child: Scaffold(
         backgroundColor: theme.scaffoldBackgroundColor,
         body: emergencyAsync.when(
-          data: (emergency) {
-            _updateMarkers(emergency);
-            if (_responderId == null && emergency.responderId != null) {
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) setState(() => _responderId = emergency.responderId);
-              });
-            }
-            return _buildModernBody(context, theme, emergency, settings, isDeafPatient);
-          },
+          data: (emergency) => _buildModernBody(context, theme, emergency, settings, isDeafPatient),
           loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('Error: $e')),
+          error: (e, _) => Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
+                  const SizedBox(height: 12),
+                  Text('Could not load emergency status.\n$e', textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      ref.invalidate(getEmergencyProvider(widget.emergencyId));
+                      _loadInitialState();
+                    },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: const Text('Retry'),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: () => context.go('/home'), child: const Text('Back to home')),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -494,7 +652,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     try {
       final repo = ref.read(chatRepositoryProvider);
       final room = await repo.createOrGetEmergencyChatRoom(widget.emergencyId);
-      ref.read(chatMessagesProvider(room.id).notifier).sendMessage(message);
+      final sent = await ref.read(chatMessagesProvider(room.id).notifier).sendMessage(message);
+      if (!sent) throw Exception('message was not delivered');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -537,13 +696,20 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       children: [
         // 1. Dark Map
         Positioned.fill(
-          child: GoogleMap(
+          // Only the map rebuilds while the responder mascot animates.
+          child: ValueListenableBuilder<Marker?>(
+            valueListenable: _responderMarker.marker,
+            builder: (context, responderMarker, _) => GoogleMap(
             mapType: MapType.normal,
             initialCameraPosition: CameraPosition(
               target: LatLng(emergency.latitude, emergency.longitude),
               zoom: 15,
             ),
-            markers: _markers,
+            markers: {
+              ..._patientMarkers(emergency),
+              if (responderMarker != null && !_simActive && EmergencyStatus.isAssigned(_currentStatus))
+                responderMarker,
+            },
             myLocationEnabled: true,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
@@ -553,7 +719,6 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             tiltGesturesEnabled: false,
             style: MapUtils.getDarkMapStyle(),
             onMapCreated: (GoogleMapController controller) {
-              if (!_controller.isCompleted) _controller.complete(controller);
               _mapController = controller;
             },
             onCameraIdle: () {
@@ -561,6 +726,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               // so the Flutter widgets stay pinned to the correct lat/lng.
               if (mounted && _simActive) _updateOverlayPositions();
             },
+          ),
           ),
         ),
 
@@ -594,7 +760,10 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           right: 16,
           child: Row(
             children: [
-              GestureDetector(
+              Semantics(
+                button: true,
+                label: 'Back to home',
+                child: GestureDetector(
                 onTap: () => context.go('/home'),
                 child: Container(
                   padding: const EdgeInsets.all(10),
@@ -604,8 +773,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                     border: Border.all(color: AppColors.primary.withOpacity(0.15)),
                     boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.10), blurRadius: 12, offset: const Offset(0, 4))],
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, color: AppColors.onSurface, size: 22),
+                  child: const Icon(Icons.arrow_back_rounded, color: AppColors.onSurface, size: 28),
                 ),
+              ),
               ),
               const SizedBox(width: 12),
               Expanded(child: _buildGlassHeader(theme, settings)),
@@ -620,16 +790,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           child: Column(
             children: [
               _buildFloatingMapButton(Icons.my_location, () => _animateToResponder()),
-              const SizedBox(height: 12),
-              _buildFloatingMapButton(Icons.layers_rounded, () {}),
             ],
           ),
         ),
 
         // 3b. AAC Quick Message Button (left side — deaf patients only)
-        if (isDeafPatient &&
-            _currentStatus != 'RESOLVED' &&
-            _currentStatus != 'COMPLETED')
+        if (isDeafPatient && !EmergencyStatus.isTerminal(_currentStatus))
           Positioned(
             left: 16,
             bottom: 120,
@@ -667,11 +833,11 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         if (isDeafPatient && (_currentStatus == 'EN_ROUTE' || _currentStatus == 'ARRIVED'))
           _buildDeafVisualPulse(theme),
 
-        if (_currentStatus == 'ARRIVED' && isDeafPatient)
+        if (_currentStatus == 'ARRIVED' && isDeafPatient && !_arrivedAlertDismissed)
           _buildArrivedVisualAlert(theme),
 
-        // 5. Resolution / Completion Overlay
-        if (_currentStatus == 'RESOLVED' || _currentStatus == 'COMPLETED')
+        // 5. Resolution / Completion Overlay (RESOLVED or legacy COMPLETED)
+        if (EmergencyStatus.isResolved(_currentStatus))
           _buildResolutionOverlay(context, theme),
       ],
     );
@@ -778,10 +944,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   }
 
   Widget _buildFloatingMapButton(IconData icon, VoidCallback onTap) {
-    return GestureDetector(
+    return Semantics(
+      button: true,
+      label: 'Show responder on map',
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(13),
         decoration: BoxDecoration(
           color: Colors.white,
           shape: BoxShape.circle,
@@ -790,6 +959,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           ],
         ),
         child: Icon(icon, color: AppColors.primary, size: 22),
+      ),
       ),
     );
   }
@@ -832,7 +1002,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                         Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
                         const SizedBox(width: 6),
                         Text(
-                          _responderName != null ? 'RESPONDER ASSIGNED' : 'FINDING RESPONDER...',
+                          EmergencyStatus.isAssigned(_currentStatus) || _responderName != null
+                              ? EmergencyStatus.label(_currentStatus).toUpperCase()
+                              : 'FINDING RESPONDER…',
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontSize: 10,
@@ -876,7 +1048,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                           child: _responderProfileImage != null
                               ? Image.network(_responderProfileImage!, fit: BoxFit.cover,
                                   errorBuilder: (_, __, ___) => _buildInitialsAvatar())
-                              : _buildInitialsAvatar(),
+                              : _responderName == null
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(6),
+                                      child: AmbulanceMascotBadge(size: 48),
+                                    )
+                                  : _buildInitialsAvatar(),
                         ),
                         const SizedBox(width: 14),
 
@@ -886,7 +1063,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                _responderName ?? 'Assigning...',
+                                _responderName ?? 'Finding a responder…',
                                 style: const TextStyle(
                                   fontWeight: FontWeight.w800,
                                   fontSize: 17,
@@ -941,12 +1118,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                         // Action buttons
                         Column(
                           children: [
-                            if (!isDeafPatient)
-                              _buildPremiumAction(Icons.phone_rounded, AppColors.success, () {
-                                if (_responderPhone != null) _makePhoneCall(_responderPhone!);
-                              }),
-                            if (!isDeafPatient) const SizedBox(height: 10),
-                            _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, _openChat),
+                            if (!isDeafPatient && _responderPhone != null) ...[
+                              _buildPremiumAction(Icons.phone_rounded, AppColors.success, () => _makePhoneCall(_responderPhone!), 'Call responder'),
+                              const SizedBox(height: 10),
+                            ],
+                            if (_responderId != null || _responderName != null)
+                              _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, _openChat, 'Chat with responder'),
                           ],
                         ),
                       ],
@@ -1016,6 +1193,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               const SizedBox(height: 20),
               _buildModernStatusTimeline(theme, settings),
               const SizedBox(height: 28),
+              if (_currentStatus == 'ACTIVE' || _currentStatus == 'PENDING')
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton(
@@ -1053,8 +1231,11 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     );
   }
 
-  Widget _buildPremiumAction(IconData icon, Color color, VoidCallback onTap) {
-    return GestureDetector(
+  Widget _buildPremiumAction(IconData icon, Color color, VoidCallback onTap, String label) {
+    return Semantics(
+      button: true,
+      label: label,
+      child: GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(12),
@@ -1065,13 +1246,21 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         ),
         child: Icon(icon, color: color, size: 22),
       ),
+      ),
     );
   }
 
   void _makePhoneCall(String phoneNumber) async {
-    final uri = Uri.parse('tel:$phoneNumber');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
+    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
+    try {
+      final ok = await launchUrl(uri);
+      if (!ok) throw Exception('launch failed');
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not start a call to $phoneNumber')),
+        );
+      }
     }
   }
 
@@ -1105,14 +1294,14 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   }
 
   Widget _buildModernStatusTimeline(ThemeData theme, AccessibilitySettings settings) {
-    final statusOrder = ['PENDING', 'ACTIVE', 'ASSIGNED', 'RESPONDER_ASSIGNED', 'ACCEPTED', 'EN_ROUTE', 'ARRIVED', 'RESOLVED', 'COMPLETED'];
-    final currentIndex = statusOrder.indexOf(_currentStatus).clamp(0, statusOrder.length - 1);
-    
-    // Normalize index for a 4-step UI
+    // 4-step UI: 0 searching, 1 assigned, 2 en route, 3 arrived (or later)
+    final status = EmergencyStatus.normalize(_currentStatus);
     int uiIndex = 0;
-    if (currentIndex >= 1 && currentIndex <= 4) uiIndex = 1;
-    if (currentIndex == 5) uiIndex = 2;
-    if (currentIndex >= 6) uiIndex = 3;
+    if (status == 'ASSIGNED' || status == 'RESPONDER_ASSIGNED' || status == 'ACCEPTED') uiIndex = 1;
+    if (status == 'EN_ROUTE') uiIndex = 2;
+    if (status == 'ARRIVED' || status == 'TREATING' || status == 'TRANSPORTED' || EmergencyStatus.isResolved(status)) {
+      uiIndex = 3;
+    }
 
     return Column(
       children: [
@@ -1190,7 +1379,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             ),
             const SizedBox(height: 64),
             ElevatedButton(
-              onPressed: () => setState(() => _currentStatus = 'RESOLVED'),
+              // Only hides this overlay — the emergency stays open until the
+              // responder resolves it.
+              onPressed: () => setState(() => _arrivedAlertDismissed = true),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: AppColors.success,
@@ -1361,15 +1552,32 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         title: const Text('Cancel Emergency?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.onSurface)),
         content: const Text('Are you sure you want to cancel the active emergency?', style: TextStyle(color: Color(0xFF64748B))),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('No', style: TextStyle(color: Color(0xFF94A3B8)))),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Keep waiting', style: TextStyle(color: Color(0xFF64748B)))),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             onPressed: () async {
               Navigator.pop(ctx);
-              await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
-              if (mounted) context.go('/home');
+              try {
+                await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
+                SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
+                if (mounted) context.go('/home');
+              } catch (e) {
+                if (!mounted) return;
+                final msg = e.toString().toLowerCase();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(msg.contains('expired')
+                        ? 'Too late to cancel — responders are already being dispatched.'
+                        : msg.contains('not active')
+                            ? 'A responder has already accepted, so this can no longer be cancelled.'
+                            : 'Could not cancel: $e'),
+                    backgroundColor: AppColors.error,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
-            child: const Text('Cancel'),
+            child: const Text('Yes, cancel'),
           ),
         ],
       ),

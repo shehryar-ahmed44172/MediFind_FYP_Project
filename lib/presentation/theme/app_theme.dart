@@ -252,7 +252,7 @@ class AppTheme {
         iconTheme: const IconThemeData(color: AppColors.onSurface),
         titleTextStyle: TextStyle(
           fontFamily: 'Montserrat',
-          fontSize: 18 * settings.fontSizeMultiplier,
+          fontSize: 18, // scaled app-wide via MediaQuery.textScaler
           fontWeight: FontWeight.w700,
           color: AppColors.onSurface,
         ),
@@ -407,7 +407,9 @@ class AppTheme {
 
   static TextTheme _buildTextTheme(AccessibilitySettings settings) {
     const baseTextTheme = Typography.blackMountainView;
-    final m = settings.fontSizeMultiplier;
+    // Font scaling is applied app-wide via MediaQuery.textScaler in main.dart;
+    // multiplying here as well would scale text twice.
+    const m = 1.0;
 
     return baseTextTheme.copyWith(
       displayLarge: AppTextStyles.displayLarge.copyWith(fontSize: 57 * m),
@@ -448,7 +450,7 @@ class AppTheme {
           horizontal: 24,
         ),
         textStyle: TextStyle(
-          fontSize: 16 * settings.fontSizeMultiplier,
+          fontSize: 16, // scaled app-wide via MediaQuery.textScaler
           fontWeight: FontWeight.bold,
           fontFamily: 'Montserrat',
           letterSpacing: 0.3,

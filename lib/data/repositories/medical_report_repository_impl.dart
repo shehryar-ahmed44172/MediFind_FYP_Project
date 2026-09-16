@@ -12,7 +12,7 @@ class MedicalReportRepositoryImpl implements MedicalReportRepository {
   }) : _apiClient = apiClient;
 
   @override
-  Future<List<MedicalReport>> getMedicalReports(String userId) async {
+  Future<List<MedicalReport>> getMedicalReports() async {
     final reportsJson = await _apiClient.getReports();
     return reportsJson.map((json) {
       final normalized = _normalizeReportJson(json as Map<String, dynamic>);

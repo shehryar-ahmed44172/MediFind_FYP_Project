@@ -7,7 +7,6 @@ import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../theme/app_theme.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
-import 'package:medifind_mobile_application/presentation/services/haptic_feedback_service.dart';
 import '../../providers/accessibility_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -18,7 +17,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final int _currentIndex = 0;
 
   @override
   void initState() {

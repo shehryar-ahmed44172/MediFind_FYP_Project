@@ -1,6 +1,8 @@
 import 'dart:async';
 import '../../domain/entities/emergency.dart';
 import '../../domain/entities/user.dart';
+import '../../domain/entities/responder_alert.dart';
+import '../../core/utils/emergency_status.dart';
 import '../../core/utils/parsers.dart';
 
 import '../../domain/repositories/emergency_repository.dart';
@@ -42,7 +44,7 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     await apiClient.resolveEmergency(emergencyId);
     final cached = await localDataSource.getEmergency(emergencyId);
     if (cached != null) {
-      cached['status'] = 'COMPLETED';
+      cached['status'] = 'RESOLVED';
       await localDataSource.saveEmergency(cached);
     }
   }
@@ -85,35 +87,68 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
 
   @override
   Stream<List<Emergency>> watchActiveEmergencies() async* {
+    bool isOpenRequest(Emergency e) =>
+        !EmergencyStatus.isTerminal(e.status) &&
+        e.status != 'REJECTED' &&
+        !EmergencyStatus.isAssigned(e.status);
+
     // 1. Yield initial state immediately from cache
     final initial = await localDataSource.getAllEmergencies();
-    yield initial
-        .map((e) => _mapToEmergency(e))
-        .where((e) => 
-            e.status != 'COMPLETED' && 
-            e.status != 'RESOLVED' && 
-            e.status != 'CANCELLED' && 
-            e.status != 'REJECTED' && 
-            e.status != 'RESPONDER_ASSIGNED' &&
-            e.status != 'ASSIGNED')
-        .toList();
+    yield initial.map(_mapToEmergency).where(isOpenRequest).toList();
 
     // 2. Then listen for updates
     await for (final _ in localDataSource.watchEmergencies()) {
       final all = await localDataSource.getAllEmergencies();
-      yield all
-          .map((e) => _mapToEmergency(e))
-          .where((e) => 
-              e.status != 'COMPLETED' && 
-              e.status != 'RESOLVED' && 
-              e.status != 'CANCELLED' && 
-              e.status != 'REJECTED' && 
-              e.status != 'RESPONDER_ASSIGNED' &&
-              e.status != 'ASSIGNED')
-          .toList();
+      yield all.map(_mapToEmergency).where(isOpenRequest).toList();
     }
   }
 
+  @override
+  Future<List<ResponderAlert>> syncResponderAlerts(String? responderId) async {
+    try {
+      final raw = await apiClient.getResponderActiveRequestsRaw();
+      final alerts = raw
+          .map((json) => ResponderAlert.fromServerJson(json, responderId: responderId))
+          .where((a) => a.id.isNotEmpty && !EmergencyStatus.isTerminal(a.emergency.status))
+          .toList();
+
+      final liveIds = alerts.map((a) => a.id).toSet();
+
+      // Remove cached requests the server no longer considers live
+      // (cancelled, taken by another responder, expired).
+      for (final cached in await localDataSource.getAllEmergencies()) {
+        final id = cached['id']?.toString();
+        if (id == null || liveIds.contains(id)) continue;
+        if (cached['isResponderAlert'] == true || !EmergencyStatus.isTerminal(cached['status']?.toString())) {
+          await localDataSource.deleteEmergency(id);
+        }
+      }
+
+      for (final alert in alerts) {
+        await localDataSource.saveEmergency({
+          ..._emergencyToMap(alert.emergency),
+          ...alert.toCacheExtras(),
+          'isResponderAlert': true,
+        });
+      }
+      return alerts;
+    } catch (e) {
+      // Offline / server error → show what we have cached, clearly partial.
+      final cached = await localDataSource.getAllEmergencies();
+      final fallback = cached
+          .where((m) => m['isResponderAlert'] == true && !EmergencyStatus.isTerminal(m['status']?.toString()))
+          .map((m) => ResponderAlert(
+                emergency: _mapToEmergency(m),
+                distanceKm: (m['distanceKm'] as num?)?.toDouble(),
+                estimatedArrivalMinutes: (m['estimatedArrivalMinutes'] as num?)?.toInt(),
+                patientName: m['patientName']?.toString(),
+                requestStatus: m['requestStatus']?.toString() ?? 'PENDING',
+              ))
+          .toList();
+      if (fallback.isEmpty) rethrow;
+      return fallback;
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Helper: convert Emergency → Map (for local storage)
@@ -128,6 +163,9 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
         'longitude': e.longitude,
         'additionalInfo': e.additionalInfo,
         'voiceAlertGenerated': e.voiceAlertGenerated,
+        'priority': e.priority,
+        'patientType': e.patientType,
+        'voiceSummary': e.voiceSummary,
         'createdAt': e.createdAt?.toIso8601String(),
         'updatedAt': e.updatedAt?.toIso8601String(),
       };
@@ -145,6 +183,9 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
       latitude: doubleFromJson(map['latitude']),
       longitude: doubleFromJson(map['longitude']),
       additionalInfo: map['additionalInfo'] as String?,
+      priority: map['priority'] as String? ?? 'NORMAL',
+      patientType: map['patientType'] as String? ?? 'NORMAL',
+      voiceSummary: map['voiceSummary'] as String?,
       voiceAlertGenerated: map['voiceAlertGenerated'] as bool? ?? false,
       createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? DateTime.now(),
@@ -152,20 +193,20 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   }
 
   @override
-  Future<Emergency> createEmergency(
+  Future<CreateEmergencyResult> createEmergency(
     String emergencyType,
     double latitude,
     double longitude,
     String? additionalInfo,
   ) async {
-    final emergency = await apiClient.createEmergency(
+    final result = await apiClient.createEmergency(
       emergencyType,
       latitude,
       longitude,
       additionalInfo,
     );
-    await localDataSource.saveEmergency(_emergencyToMap(emergency));
-    return emergency;
+    await localDataSource.saveEmergency(_emergencyToMap(result.emergency));
+    return result;
   }
 
   @override
@@ -207,8 +248,8 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   }
 
   @override
-  Future<void> updateEmergencyStatus(String emergencyId, String status) async {
-    await apiClient.updateEmergencyStatus(emergencyId, status);
+  Future<void> updateEmergencyStatus(String emergencyId, String status, {double? latitude, double? longitude}) async {
+    await apiClient.updateEmergencyStatus(emergencyId, status, latitude: latitude, longitude: longitude);
     final cached = await localDataSource.getEmergency(emergencyId);
     if (cached != null) {
       cached['status'] = status;
@@ -227,7 +268,7 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     final cached = await localDataSource.getEmergency(emergencyId);
     if (cached != null) {
       cached['responderId'] = responderId;
-      cached['status'] = 'RESPONDER_ASSIGNED';
+      cached['status'] = 'ASSIGNED';
       await localDataSource.saveEmergency(cached);
     }
   }

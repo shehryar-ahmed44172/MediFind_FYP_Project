@@ -78,20 +78,29 @@ class AppConstants {
   static const String roleAdmin = 'ADMIN';
   static const String roleCaregiver = 'CAREGIVER';
   
-  // Emergency Types
+  // Emergency Types (aligned with backend SPECIALIST_MAP; see EmergencyTypes)
   static const String emergencyTypeCardiac = 'CARDIAC';
-  static const String emergencyTypeTrauma = 'TRAUMA';
   static const String emergencyTypeStroke = 'STROKE';
   static const String emergencyTypeShortnessOfBreath = 'SHORTNESS_OF_BREATH';
-  static const String emergencyTypeChestPain = 'CHEST_PAIN';
+  static const String emergencyTypeTrauma = 'TRAUMA';
+  static const String emergencyTypeFall = 'FALL';
+  static const String emergencyTypeSeizure = 'SEIZURE';
+  static const String emergencyTypeDiabetic = 'DIABETIC';
   static const String emergencyTypeOther = 'OTHER';
+  /// Legacy alias — the app now sends CARDIAC for chest pain.
+  static const String emergencyTypeChestPain = 'CHEST_PAIN';
 
-  // Emergency Status
+  // Emergency Status (backend values)
+  static const String statusActive = 'ACTIVE';
+  static const String statusAssigned = 'ASSIGNED';
+  static const String statusArrived = 'ARRIVED';
+  static const String statusResolved = 'RESOLVED';
+  static const String statusCancelled = 'CANCELLED';
+  /// Legacy values still seen in older cached data.
   static const String statusInitiated = 'INITIATED';
   static const String statusInProgress = 'IN_PROGRESS';
   static const String statusResponderAssigned = 'RESPONDER_ASSIGNED';
   static const String statusCompleted = 'COMPLETED';
-  static const String statusCancelled = 'CANCELLED';
   
   // Emergency contact related
   static const int maxEmergencyContacts = 5;

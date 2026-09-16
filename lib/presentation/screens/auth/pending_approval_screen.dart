@@ -226,13 +226,13 @@ class _PendingBadgeState extends State<_PendingBadge>
           shape: BoxShape.circle,
           gradient: RadialGradient(
             colors: [
-              Colors.amber.shade300,
-              Colors.orange.shade600,
+              AppColors.warning.withOpacity(0.65),
+              AppColors.warning,
             ],
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.35),
+              color: AppColors.warning.withOpacity(0.35),
               blurRadius: 28,
               spreadRadius: 4,
             ),
@@ -261,13 +261,13 @@ class _StepTrackerCard extends StatelessWidget {
       _Step(
         icon: Icons.how_to_reg_rounded,
         label: 'Registration\nSubmitted',
-        color: Colors.green,
+        color: AppColors.success,
         done: true,
       ),
       _Step(
         icon: Icons.admin_panel_settings_rounded,
         label: 'Admin\nReview',
-        color: Colors.orange,
+        color: AppColors.warning,
         done: false,
         active: true,
       ),
@@ -300,7 +300,7 @@ class _StepTrackerCard extends StatelessWidget {
             return Expanded(
               child: Container(
                 height: 2,
-                color: leftDone ? Colors.green : Colors.grey.shade300,
+                color: leftDone ? AppColors.success : Colors.grey.shade300,
               ),
             );
           }
@@ -342,15 +342,15 @@ class _StepNode extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: step.done
-                ? Colors.green.withOpacity(0.15)
+                ? AppColors.success.withOpacity(0.15)
                 : step.active
-                    ? Colors.orange.withOpacity(0.15)
+                    ? AppColors.warning.withOpacity(0.15)
                     : Colors.grey.withOpacity(0.1),
             border: Border.all(
               color: step.done
-                  ? Colors.green
+                  ? AppColors.success
                   : step.active
-                      ? Colors.orange
+                      ? AppColors.warning
                       : Colors.grey.shade400,
               width: 2,
             ),
@@ -358,9 +358,9 @@ class _StepNode extends StatelessWidget {
           child: Icon(
             step.done ? Icons.check_rounded : step.icon,
             color: step.done
-                ? Colors.green
+                ? AppColors.success
                 : step.active
-                    ? Colors.orange
+                    ? AppColors.warning
                     : Colors.grey.shade400,
             size: 22,
           ),
@@ -373,9 +373,9 @@ class _StepNode extends StatelessWidget {
             fontWeight:
                 step.active ? FontWeight.bold : FontWeight.w500,
             color: step.done
-                ? Colors.green
+                ? AppColors.success
                 : step.active
-                    ? Colors.orange
+                    ? AppColors.warning
                     : Colors.grey.shade500,
             height: 1.4,
           ),

@@ -137,7 +137,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
               children: [
                 Icon(
                   emergency.status == 'RESOLVED' ? Icons.check_circle : Icons.local_hospital_rounded,
-                  color: emergency.status == 'RESOLVED' ? Colors.green : Colors.orange,
+                  color: emergency.status == 'RESOLVED' ? AppColors.success : AppColors.warning,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -148,14 +148,14 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
                         emergency.status == 'RESOLVED' ? 'Emergency Resolved' : 'Responder ${_getStatusLabel(emergency.status)}',
                         style: TextStyle(
                             fontWeight: FontWeight.bold,
-                            color: emergency.status == 'RESOLVED' ? Colors.green : Colors.orange)),
+                            color: emergency.status == 'RESOLVED' ? AppColors.success : AppColors.warning)),
                       const SizedBox(height: 4),
                       Text('Emergency Type: ${emergency.emergencyType.replaceAll('_', ' ')}',
                           style: const TextStyle(fontSize: 13)),
                       if (emergency.status != 'RESOLVED')
-                        const Text('ETA: ~8 minutes', 
+                        const Text('ETA: ~8 minutes',
                             style: TextStyle(
-                                color: Colors.green,
+                                color: AppColors.success,
                                 fontWeight: FontWeight.bold)),
                     ],
                   ),
@@ -279,7 +279,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
               icon: const Icon(Icons.call),
               label: const Text('Call Emergency Responder', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: AppColors.success,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
               ),

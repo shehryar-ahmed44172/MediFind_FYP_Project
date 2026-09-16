@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
+import '../../theme/app_theme.dart';
 
 class ResetNewPasswordScreen extends ConsumerStatefulWidget {
   final String email;
@@ -41,7 +42,7 @@ class _ResetNewPasswordScreenState
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Session expired. Please start over.'),
-              backgroundColor: Colors.orange,
+              backgroundColor: AppColors.warning,
               behavior: SnackBarBehavior.floating,
             ),
           );
@@ -74,13 +75,13 @@ class _ResetNewPasswordScreenState
   Color get _strengthColor {
     switch (_strength) {
       case 1:
-        return Colors.red;
+        return AppColors.error;
       case 2:
-        return Colors.orange;
+        return AppColors.warning;
       case 3:
-        return Colors.yellow.shade700;
+        return const Color(0xFFEAB308);
       case 4:
-        return Colors.green;
+        return AppColors.success;
       default:
         return Colors.grey.shade300;
     }
@@ -129,7 +130,7 @@ class _ResetNewPasswordScreenState
               borderRadius: BorderRadius.circular(20)),
           title: const Row(
             children: [
-              Icon(Icons.check_circle_rounded, color: Colors.green, size: 32),
+              Icon(Icons.check_circle_rounded, color: AppColors.success, size: 32),
               SizedBox(width: 10),
               Expanded(child: Text('Password Reset!')),
             ],
@@ -145,7 +146,7 @@ class _ResetNewPasswordScreenState
                 context.go('/login');
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: AppColors.success,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
@@ -175,7 +176,7 @@ class _ResetNewPasswordScreenState
                 isOtpError
                     ? Icons.timer_off_rounded
                     : Icons.error_outline_rounded,
-                color: Colors.red,
+                color: AppColors.error,
                 size: 28,
               ),
               const SizedBox(width: 10),
@@ -204,7 +205,7 @@ class _ResetNewPasswordScreenState
             ElevatedButton(
               onPressed: () => Navigator.pop(ctx),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
@@ -247,13 +248,13 @@ class _ResetNewPasswordScreenState
                   child: Container(
                     padding: EdgeInsets.all(5.wp),
                     decoration: BoxDecoration(
-                      color: Colors.green.withOpacity(0.1),
+                      color: AppColors.success.withOpacity(0.1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.lock_open_rounded,
                       size: 18.wp,
-                      color: Colors.green.shade600,
+                      color: AppColors.success,
                     ),
                   ),
                 ),
@@ -401,9 +402,9 @@ class _ResetNewPasswordScreenState
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _submit,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.green.shade200,
+                      disabledBackgroundColor: AppColors.success.withOpacity(0.4),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14)),
                       elevation: 0,
@@ -486,14 +487,14 @@ class _ResetNewPasswordScreenState
                   ? Icons.check_circle_rounded
                   : Icons.radio_button_unchecked_rounded,
               size: 16,
-              color: met ? Colors.green : Colors.grey.shade400,
+              color: met ? AppColors.success : Colors.grey.shade400,
             ),
             SizedBox(width: 2.wp),
             Text(
               label,
               style: TextStyle(
                 fontSize: 12.sp,
-                color: met ? Colors.green.shade700 : Colors.grey.shade500,
+                color: met ? AppColors.success : Colors.grey.shade500,
               ),
             ),
           ],

@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 class MapUtils {
+  // Static caches — drawn once per app session, reused on every subsequent call.
+  static BitmapDescriptor? _cachedAmbulanceMarker;
+  static BitmapDescriptor? _cachedPatientMarker;
+  static BitmapDescriptor? _cachedConfirmedResponderMarker;
+
   // ─── Ambulance / Responder Marker ─────────────────────────────────────────
   // Canvas-drawn — no PNG file needed.
   // Shows a teal circle with white medical cross + soft glow ring.
@@ -12,6 +17,7 @@ class MapUtils {
     Color color = const Color(0xFF0E9AA7),
     double heading = 0,
   }) async {
+    if (heading == 0 && _cachedAmbulanceMarker != null) return _cachedAmbulanceMarker!;
     const double size = 90.0;
     const double cx = size / 2;
     const double cy = size / 2;
@@ -94,12 +100,15 @@ class MapUtils {
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    final descriptor = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    if (heading == 0) _cachedAmbulanceMarker = descriptor;
+    return descriptor;
   }
 
   // ─── Patient / SOS Marker ─────────────────────────────────────────────────
   // Red pulsing pin with "SOS" label. Looks nothing like the default cyan pin.
   static Future<BitmapDescriptor> getPatientMarker() async {
+    if (_cachedPatientMarker != null) return _cachedPatientMarker!;
     const double w = 80.0;
     const double h = 96.0; // taller than wide — pin shape
     const double cx = w / 2;
@@ -168,13 +177,15 @@ class MapUtils {
     final picture = recorder.endRecording();
     final image = await picture.toImage(w.toInt(), h.toInt());
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    _cachedPatientMarker = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    return _cachedPatientMarker!;
   }
 
   // ─── Confirmed Real Responder Marker ──────────────────────────────────────
   // Used when a real responder accepts and we switch from simulation to real.
   // Green circle with a checkmark — visually distinct from simulated bikes.
   static Future<BitmapDescriptor> getConfirmedResponderMarker() async {
+    if (_cachedConfirmedResponderMarker != null) return _cachedConfirmedResponderMarker!;
     const double size = 90.0;
     const double cx = size / 2;
     const double cy = size / 2;
@@ -230,27 +241,31 @@ class MapUtils {
     final picture = recorder.endRecording();
     final image = await picture.toImage(size.toInt(), size.toInt());
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    return BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    _cachedConfirmedResponderMarker = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    return _cachedConfirmedResponderMarker!;
   }
 
-  // ─── Map Style ────────────────────────────────────────────────────────────
-  static String getDarkMapStyle() {
-    return '''
+  // ─── Map Styles ───────────────────────────────────────────────────────────
+  // Light teal-tinted style matching MediFind brand (#0C637E / #2496A7)
+  static const String _kLightMapStyle = '''
 [
-  {"elementType":"geometry","stylers":[{"color":"#1a1f2e"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#6b7280"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#1a1f2e"}]},
-  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#9ca3af"}]},
   {"featureType":"poi","elementType":"labels","stylers":[{"visibility":"off"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2d3748"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1a202c"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#6b7280"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#374151"}]},
-  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#1f2937"}]},
-  {"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#9ca3af"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#1f2937"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0f172a"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#374151"}]}
+  {"featureType":"poi.business","stylers":[{"visibility":"off"}]},
+  {"featureType":"transit","elementType":"labels.icon","stylers":[{"visibility":"off"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#b3d9e8"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#2496A7"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#e2f0f3"}]},
+  {"featureType":"road.highway","elementType":"geometry.stroke","stylers":[{"color":"#b7d9e0"}]},
+  {"featureType":"road.highway","elementType":"labels.text.fill","stylers":[{"color":"#0C637E"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#f8fafc"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#e2e8f0"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#64748b"}]},
+  {"featureType":"landscape","elementType":"geometry","stylers":[{"color":"#f1f5f9"}]},
+  {"featureType":"administrative","elementType":"geometry.stroke","stylers":[{"color":"#cbd5e1"}]},
+  {"featureType":"administrative.locality","elementType":"labels.text.fill","stylers":[{"color":"#0C637E"}]},
+  {"featureType":"administrative.neighborhood","elementType":"labels.text.fill","stylers":[{"color":"#64748b"}]}
 ]''';
-  }
+
+  static String getDarkMapStyle() => _kLightMapStyle;
+  static String getLightMapStyle() => _kLightMapStyle;
 }

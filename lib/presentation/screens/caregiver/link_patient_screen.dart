@@ -37,7 +37,11 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invitation sent successfully!'), backgroundColor: Colors.green),
+          const SnackBar(
+            content: Text('Invitation sent successfully!'),
+            backgroundColor: AppColors.success,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
         context.pop();
       }
@@ -45,7 +49,11 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
       if (mounted) {
         final message = e.toString().replaceAll('Exception:', '').trim();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text(message),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } finally {

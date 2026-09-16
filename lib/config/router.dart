@@ -351,15 +351,6 @@ class AppRouter {
               ),
             ],
           ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/responder/chats',
-                name: 'responder-chats',
-                builder: (context, state) => const ChatListScreen(),
-              ),
-            ],
-          ),
         ],
       ),
 

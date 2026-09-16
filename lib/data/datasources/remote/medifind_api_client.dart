@@ -41,6 +41,9 @@ class MediFindApiClient {
       receiveTimeout: const Duration(milliseconds: AppConstants.apiTimeout),
       headers: {
         'Content-Type': 'application/json',
+        // Bypass ngrok interstitial warning page (ignored by real servers)
+        if (AppConstants.baseUrl.contains('ngrok'))
+          'ngrok-skip-browser-warning': 'true',
       },
     );
 
@@ -1109,6 +1112,38 @@ class MediFindApiClient {
     }
   }
 
+  /// AI-powered emergency type classification from symptom text.
+  Future<Map<String, dynamic>> classifyEmergencySymptoms(String symptoms) async {
+    try {
+      final response = await _dio.post(
+        'emergencies/classify',
+        data: {'symptoms': symptoms},
+      );
+      if (response.statusCode == 200) {
+        return response.data['data'] as Map<String, dynamic>;
+      }
+      throw NetworkException(message: 'Failed to classify symptoms');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// AI-personalized AAC quick-reply cards for deaf patients.
+  Future<List<Map<String, dynamic>>> getDeafQuickReplies(String emergencyId) async {
+    try {
+      final response = await _dio.post('emergencies/$emergencyId/quick-replies');
+      if (response.statusCode == 200) {
+        final raw = response.data['data'];
+        if (raw is List) {
+          return raw.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        }
+      }
+      throw NetworkException(message: 'Failed to fetch quick replies');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   /// Create or get an emergency chat room — patient side, no responderId needed.
   /// Backend auto-resolves the assigned responder from the emergency record.
   Future<dynamic> createOrGetEmergencyChatRoom(String emergencyId) async {
@@ -1160,6 +1195,24 @@ class MediFindApiClient {
     }
   }
 
+  /// POST /api/responders/:responderId/rate
+  /// Patient submits 1–5 star rating for a responder after emergency resolution.
+  Future<Map<String, dynamic>> rateResponder(
+      String responderId, String emergencyId, int stars) async {
+    try {
+      final response = await _dio.post(
+        'responders/$responderId/rate',
+        data: {'emergencyId': emergencyId, 'stars': stars},
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return (response.data['data'] as Map<String, dynamic>?) ?? {};
+      }
+      throw NetworkException(message: 'Failed to submit rating');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   AppException _handleDioException(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -1171,7 +1224,8 @@ class MediFindApiClient {
         );
       case DioExceptionType.badResponse:
         final statusCode = e.response?.statusCode;
-        final errorMessage = e.response?.data['error'] ?? 'Error occurred';
+        final responseData = e.response?.data;
+        final errorMessage = (responseData is Map ? responseData['error'] : null) ?? 'Error occurred (status $statusCode)';
         if (statusCode == 401) {
           return AuthenticationException(
             message: errorMessage,

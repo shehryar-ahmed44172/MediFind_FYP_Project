@@ -55,6 +55,46 @@ class MedicalProfileRemoteDataSource {
     }
   }
 
+  /// POST /api/medical-profile/emergency-contacts
+  Future<List<Map<String, dynamic>>> addEmergencyContact({
+    required String name,
+    required String phoneNumber,
+    required String relationship,
+  }) async {
+    try {
+      final response = await _dio.post(
+        'medical-profile/emergency-contacts',
+        data: {
+          'name': name,
+          'phoneNumber': phoneNumber,
+          'relationship': relationship,
+        },
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final contacts = response.data['data']['emergencyContacts'] as List<dynamic>;
+        return contacts.map((c) => Map<String, dynamic>.from(c as Map)).toList();
+      }
+      throw NetworkException(message: 'Failed to add emergency contact');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// DELETE /api/medical-profile/emergency-contacts/:phone
+  Future<void> removeEmergencyContact(String phoneNumber) async {
+    try {
+      final encoded = Uri.encodeComponent(phoneNumber);
+      final response = await _dio.delete(
+        'medical-profile/emergency-contacts/$encoded',
+      );
+      if (response.statusCode != 200) {
+        throw NetworkException(message: 'Failed to remove emergency contact');
+      }
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   AppException _handleDioException(DioException e) {
     final errorMessage = e.response?.data['error'] ?? 'Error occurred';
     return NetworkException(

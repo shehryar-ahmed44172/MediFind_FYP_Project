@@ -1,34 +1,50 @@
 /// API and app configuration constants
 class AppConstants {
   // ── Environment Flag ──────────────────────────────────────────────────────
-  // true  = use LAN IP below (local testing, phone + PC on same WiFi)
+  // true  = use LAN IP or ngrok below (local/university testing)
   // false = use production URLs
   static const bool isDevelopment = true;
 
-  // ── LAN / Local Testing ───────────────────────────────────────────────────
-  // Your PC's local IP address. To find it:
-  //   Windows → open CMD → type `ipconfig` → look for "IPv4 Address"
-  //   It usually looks like 192.168.x.x
+  // ── ngrok Flag ────────────────────────────────────────────────────────────
+  // true  = use ngrok tunnel URL (works on ANY network — home, Riphah-G, etc.)
+  // false = use LAN IP below (requires phone + PC on SAME WiFi)
   //
-  // Requirements:
-  //   • Phone and PC must be on the SAME WiFi network
-  //   • Backend must be running: `npm run dev` in medifind-backend
-  //   • Windows Firewall must allow port 3000 (see README if blocked)
-  static const String _lanIp       = '192.168.100.5'; // ← your PC's IPv4
+  // HOW TO USE:
+  //   1. Run backend:  npm run dev
+  //   2. Run ngrok:    ngrok http 3000
+  //   3. Copy the https://xxxx.ngrok-free.app URL into _ngrokHost below
+  //   4. Set _useNgrok = true  → build & run app
+  static const bool   _useNgrok   = true;
+  static const String _ngrokHost  = 'https://wastingly-glariest-gearldine.ngrok-free.dev';
+
+  // ── LAN / Local Testing (same WiFi only) ──────────────────────────────────
+  // Windows → CMD → ipconfig → look for "IPv4 Address"
+  static const String _lanIp       = '172.17.16.56'; // ← your PC's IPv4
   static const int    _backendPort = 3000;
 
-  static const String _devBaseUrl   = 'http://$_lanIp:$_backendPort/api/';
-  static const String _devWsUrl     = 'ws://$_lanIp:$_backendPort/';
-  static const String _devSocketUrl = 'http://$_lanIp:$_backendPort';
+  // ── Dev URL sets ──────────────────────────────────────────────────────────
+  static const String _ngrokBaseUrl   = '$_ngrokHost/api/';
+  static const String _ngrokWsUrl     = 'wss://wastingly-glariest-gearldine.ngrok-free.dev/';
+  static const String _ngrokSocketUrl = _ngrokHost;
+
+  static const String _lanBaseUrl   = 'http://$_lanIp:$_backendPort/api/';
+  static const String _lanWsUrl     = 'ws://$_lanIp:$_backendPort/';
+  static const String _lanSocketUrl = 'http://$_lanIp:$_backendPort';
 
   // ── Production URLs ───────────────────────────────────────────────────────
   static const String _prodBaseUrl   = 'https://api.medifind.com/api/';
   static const String _prodWsUrl     = 'wss://api.medifind.com/';
   static const String _prodSocketUrl = 'https://api.medifind.com';
 
-  static String get baseUrl   => isDevelopment ? _devBaseUrl   : _prodBaseUrl;
-  static String get wsUrl     => isDevelopment ? _devWsUrl     : _prodWsUrl;
-  static String get socketUrl => isDevelopment ? _devSocketUrl : _prodSocketUrl;
+  static String get baseUrl   => isDevelopment
+      ? (_useNgrok ? _ngrokBaseUrl   : _lanBaseUrl)
+      : _prodBaseUrl;
+  static String get wsUrl     => isDevelopment
+      ? (_useNgrok ? _ngrokWsUrl     : _lanWsUrl)
+      : _prodWsUrl;
+  static String get socketUrl => isDevelopment
+      ? (_useNgrok ? _ngrokSocketUrl : _lanSocketUrl)
+      : _prodSocketUrl;
 
   static const String apiVersion = 'v1';
   static const int apiTimeout = 60000; // Increased to 60 seconds for local dev
@@ -48,6 +64,10 @@ class AppConstants {
   static const double locationUpdateIntervalSeconds = 10;
   static const double locationAccuracyMeters = 10;
   
+  // Stripe (sandbox/test mode)
+  // Get from https://dashboard.stripe.com/test/apikeys → Publishable key
+  static const String stripePublishableKey = 'pk_test_51TnGC8RHmdsfec97QXV2OwFGD1szpvIFIOrPtg91J38XtQVnkcaoLINfjXfmHhSuwMB4739s2IkZldsWAkTRe3x000409DqnXO';
+
   // App Info
   static const String appName = 'MediFind';
   static const String appVersion = '1.0.0';

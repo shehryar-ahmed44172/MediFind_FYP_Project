@@ -57,7 +57,6 @@ class _ResponderShellState extends ConsumerState<ResponderShell> {
       case 0: title = 'Dashboard'; break;
       case 1: title = 'History'; break;
       case 2: title = 'Profile'; break;
-      case 3: title = 'Messages'; break;
       default: title = null;
     }
 
@@ -99,7 +98,6 @@ class _ResponderShellState extends ConsumerState<ResponderShell> {
             BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Home'),
             BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
             BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_rounded), label: 'Chats'),
           ],
         ),
       ),

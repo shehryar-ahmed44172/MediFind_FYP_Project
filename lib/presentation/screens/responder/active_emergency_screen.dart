@@ -306,7 +306,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                               vertical: 10,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white,
+                              color: AppColors.surface,
                               borderRadius: BorderRadius.circular(12),
                               boxShadow: [
                                 BoxShadow(
@@ -679,13 +679,13 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
+                              color: AppColors.primary.withOpacity(0.07),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.blue.shade100),
+                              border: Border.all(color: AppColors.primary.withOpacity(0.15)),
                             ),
                             child: Row(
                               children: [
-                                Icon(Icons.medical_services, size: 18, color: Colors.blue.shade900),
+                                const Icon(Icons.medical_services, size: 18, color: AppColors.primary),
                                 const SizedBox(width: 8),
                                 const Expanded(
                                   child: Text(

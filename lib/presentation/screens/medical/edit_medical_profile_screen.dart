@@ -74,7 +74,7 @@ class _EditMedicalProfileScreenState
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Medical profile updated!'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -89,7 +89,7 @@ class _EditMedicalProfileScreenState
                 borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
-                Icon(Icons.error_outline_rounded, color: Colors.red, size: 28),
+                Icon(Icons.error_outline_rounded, color: AppColors.error, size: 28),
                 SizedBox(width: 10),
                 Text('Save Failed'),
               ],
@@ -101,7 +101,7 @@ class _EditMedicalProfileScreenState
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: AppColors.error,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
@@ -195,21 +195,21 @@ class _EditMedicalProfileScreenState
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppColors.primary.withOpacity(0.07),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade100),
+                border: Border.all(color: AppColors.primary.withOpacity(0.15)),
               ),
               child: Row(
                 children: [
                   Icon(Icons.shield_outlined,
-                      size: 16, color: Colors.blue.shade700),
+                      size: 16, color: AppColors.primary),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'This data is encrypted and only shared with your assigned responder during an active emergency.',
                       style: TextStyle(
                           fontSize: 11.5,
-                          color: Colors.blue.shade700,
+                          color: AppColors.primary,
                           height: 1.4),
                     ),
                   ),
@@ -228,8 +228,6 @@ class _EditMedicalProfileScreenState
               child: DropdownButtonFormField<String>(
                 value: _selectedBloodGroup,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.bloodtype_rounded,
-                      color: Color(0xFFD32F2F), size: 20),
                   labelText: 'Select blood group',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -266,8 +264,6 @@ class _EditMedicalProfileScreenState
               child: DropdownButtonFormField<String>(
                 value: _selectedDisabilityType,
                 decoration: InputDecoration(
-                  prefixIcon: const Icon(Icons.accessibility_new_rounded,
-                      color: Color(0xFF7B1FA2), size: 20),
                   labelText: 'Select disability / accessibility type',
                   border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12)),
@@ -307,11 +303,6 @@ class _EditMedicalProfileScreenState
                 maxLines: 3,
                 maxLength: 300,
                 decoration: InputDecoration(
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 48),
-                    child: Icon(Icons.warning_amber_rounded,
-                        color: Color(0xFFE65100), size: 20),
-                  ),
                   labelText: 'Known allergies',
                   hintText: 'e.g. Penicillin, Peanuts, Latex',
                   helperText: 'Separate multiple entries with commas',
@@ -350,11 +341,6 @@ class _EditMedicalProfileScreenState
                 maxLines: 3,
                 maxLength: 300,
                 decoration: InputDecoration(
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 48),
-                    child: Icon(Icons.monitor_heart_rounded,
-                        color: Color(0xFFC62828), size: 20),
-                  ),
                   labelText: 'Chronic conditions',
                   hintText:
                       'e.g. Diabetes Type 2, Hypertension, Asthma',
@@ -394,11 +380,6 @@ class _EditMedicalProfileScreenState
                 maxLines: 3,
                 maxLength: 500,
                 decoration: InputDecoration(
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 48),
-                    child: Icon(Icons.medication_rounded,
-                        color: Color(0xFF0277BD), size: 20),
-                  ),
                   labelText: 'Current medications',
                   hintText: 'e.g. Metformin 500mg, Lisinopril 10mg',
                   helperText: 'Separate multiple medications with commas',
@@ -437,11 +418,6 @@ class _EditMedicalProfileScreenState
                 maxLines: 4,
                 maxLength: 500,
                 decoration: InputDecoration(
-                  prefixIcon: const Padding(
-                    padding: EdgeInsets.only(bottom: 64),
-                    child: Icon(Icons.description_rounded,
-                        color: Color(0xFF00695C), size: 20),
-                  ),
                   labelText: 'Additional medical information',
                   hintText:
                       'e.g. DNR order, previous surgeries, implants, blood pressure notes...',

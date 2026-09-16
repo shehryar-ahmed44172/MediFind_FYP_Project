@@ -100,7 +100,7 @@ class _ResetPasswordOtpScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text('Please enter all 6 digits of the code.'),
-          backgroundColor: Colors.orange.shade700,
+          backgroundColor: AppColors.warning,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -131,7 +131,7 @@ class _ResetPasswordOtpScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('New code sent to ${_maskEmail(widget.email)}'),
-          backgroundColor: Colors.green.shade600,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -144,7 +144,7 @@ class _ResetPasswordOtpScreenState
         SnackBar(
           content: Text(
               msg.isNotEmpty ? msg : 'Failed to resend. Please try again.'),
-          backgroundColor: Colors.red.shade600,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

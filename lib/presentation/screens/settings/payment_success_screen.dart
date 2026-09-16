@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import '../../theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 
-class PaymentSuccessScreen extends StatelessWidget {
+class PaymentSuccessScreen extends ConsumerWidget {
   final String planName;
   const PaymentSuccessScreen({super.key, required this.planName});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.surface,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -59,7 +62,7 @@ class PaymentSuccessScreen extends StatelessWidget {
                   children: [
                     _buildReceiptRow('Transaction ID', 'MFD-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}'),
                     const SizedBox(height: 12),
-                    _buildReceiptRow('Date', 'April 30, 2026'),
+                    _buildReceiptRow('Date', DateFormat('MMMM d, yyyy').format(DateTime.now())),
                     const SizedBox(height: 12),
                     _buildReceiptRow('Plan', planName),
                     const Divider(height: 32),
@@ -74,7 +77,15 @@ class PaymentSuccessScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton(
-                  onPressed: () => context.go('/home'),
+                  onPressed: () {
+                    final role = ref.read(currentUserProvider).valueOrNull?.role ?? 'PATIENT';
+                    final route = role == 'CAREGIVER'
+                        ? '/caregiver'
+                        : role == 'RESPONDER'
+                            ? '/responder'
+                            : '/home';
+                    context.go(route);
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primaryNavy,
                     foregroundColor: Colors.white,

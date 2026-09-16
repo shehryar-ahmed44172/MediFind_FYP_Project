@@ -54,7 +54,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       if (isNotFound) {
         _showDialog(
           icon: Icons.warning_amber_rounded,
-          iconColor: Colors.orange,
+          iconColor: AppColors.warning,
           title: 'Email Not Registered',
           message:
               '"$email" is not linked to any MediFind account.\n\nPlease check the spelling or create a new account.',
@@ -81,7 +81,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
       } else {
         _showDialog(
           icon: Icons.error_outline_rounded,
-          iconColor: Colors.red,
+          iconColor: AppColors.error,
           title: 'Request Failed',
           message:
               'Could not send the reset code right now.\n\nPlease check your internet connection and try again.',
@@ -89,7 +89,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
             ElevatedButton(
               onPressed: () => Navigator.pop(context),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
@@ -279,15 +279,15 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 Container(
                   padding: EdgeInsets.all(3.5.wp),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: AppColors.primary.withOpacity(0.07),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade100),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.15)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Icon(Icons.info_outline_rounded,
-                          color: Colors.blue.shade600, size: 20),
+                          color: AppColors.primary, size: 20),
                       SizedBox(width: 2.wp),
                       Expanded(
                         child: Text(
@@ -296,7 +296,7 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                           'The code expires in 15 minutes.',
                           style: TextStyle(
                             fontSize: 12.sp,
-                            color: Colors.blue.shade700,
+                            color: AppColors.primary,
                             height: 1.5,
                           ),
                         ),

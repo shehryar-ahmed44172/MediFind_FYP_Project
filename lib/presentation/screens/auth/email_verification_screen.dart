@@ -78,7 +78,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     if (otp.length < 6) {
       _showInfoDialog(
         icon: Icons.info_outline_rounded,
-        iconColor: Colors.orange,
+        iconColor: AppColors.warning,
         title: 'Incomplete Code',
         message: 'Please enter the complete 6-digit verification code.',
       );
@@ -91,7 +91,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
       if (mounted) {
         _showInfoDialog(
           icon: Icons.verified_rounded,
-          iconColor: Colors.green,
+          iconColor: AppColors.success,
           title: 'Account Verified Successfully',
           message: 'Your account has been verified. You can now use MediFind.',
           buttonLabel: 'Continue',
@@ -103,7 +103,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
         final msg = e.toString().replaceAll('Exception:', '').trim();
         _showInfoDialog(
           icon: Icons.error_outline_rounded,
-          iconColor: Colors.red,
+          iconColor: AppColors.error,
           title: 'Verification Failed',
           message: msg.isNotEmpty ? msg : 'Invalid or expired code. Please try again.',
         );
@@ -122,7 +122,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
           const SnackBar(
             content: Text('A new code has been sent to your email.'),
             behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       }
@@ -131,7 +131,7 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
         final msg = e.toString().replaceAll('Exception:', '').trim();
         _showInfoDialog(
           icon: Icons.error_outline_rounded,
-          iconColor: Colors.red,
+          iconColor: AppColors.error,
           title: 'Resend Failed',
           message: msg.isNotEmpty ? msg : 'Unable to resend the code. Please wait a moment and try again.',
         );

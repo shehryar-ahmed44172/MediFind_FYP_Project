@@ -106,7 +106,7 @@ class _HistoryItemCard extends StatelessWidget {
         statusIcon = Icons.task_alt;
         break;
       case 'CANCELLED':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         statusIcon = Icons.event_busy_rounded;
         break;
       default:

@@ -15,6 +15,8 @@ import 'presentation/theme/app_theme.dart';
 import 'presentation/providers/accessibility_provider.dart';
 // Importing push notification service
 import 'services/notification/push_notification_service.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
+import 'core/constants/app_constants.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
@@ -27,6 +29,10 @@ import 'presentation/widgets/connectivity_overlay.dart';
 void main() async {
   // Ensures that widget binding is initialized before running the app
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Stripe
+  Stripe.publishableKey = AppConstants.stripePublishableKey;
+  await Stripe.instance.applySettings();
 
   // Initialize Firebase First
   await Firebase.initializeApp(

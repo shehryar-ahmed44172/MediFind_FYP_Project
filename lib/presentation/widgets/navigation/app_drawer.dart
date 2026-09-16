@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -138,13 +139,30 @@ class AppDrawer extends ConsumerWidget {
   }
 
   Widget _buildHeader(BuildContext context, dynamic user, ThemeData theme) {
+    // The backend stores profileImageUrl as a full absolute URL using the host
+    // that received the upload request (e.g. http://192.168.x.x:3000/uploads/...
+    // or an old ngrok URL). We extract only the path portion and rebuild the URL
+    // using the *current* server address so it always resolves correctly,
+    // regardless of which network was active when the photo was uploaded.
     String? fullImageUrl;
-    if (user?.profileImageUrl != null) {
-      final rootUrl = AppConstants.socketUrl.endsWith('/') 
+    final stored = user?.profileImageUrl as String?;
+    if (stored != null && stored.isNotEmpty) {
+      String path;
+      try {
+        path = Uri.parse(stored).path; // e.g. "/uploads/profile/xyz.jpg"
+      } catch (_) {
+        path = stored;
+      }
+      final root = AppConstants.socketUrl.endsWith('/')
           ? AppConstants.socketUrl.substring(0, AppConstants.socketUrl.length - 1)
           : AppConstants.socketUrl;
-      fullImageUrl = '$rootUrl${user.profileImageUrl}';
+      fullImageUrl = '$root$path';
     }
+
+    // CachedNetworkImage requires the ngrok bypass header; ignored on production.
+    final Map<String, String> imgHeaders = AppConstants.baseUrl.contains('ngrok')
+        ? const {'ngrok-skip-browser-warning': 'true'}
+        : const {};
 
     return Container(
       padding: EdgeInsets.fromLTRB(20, 6.hp, 20, 3.hp),
@@ -160,13 +178,32 @@ class AppDrawer extends ConsumerWidget {
       ),
       child: Row(
         children: [
-          CircleAvatar(
-            radius: 30,
-            backgroundColor: Colors.white.withOpacity(0.2),
-            backgroundImage: fullImageUrl != null ? NetworkImage(fullImageUrl) : null,
-            child: fullImageUrl == null 
-                ? const Icon(Icons.person_rounded, color: Colors.white, size: 30)
-                : null,
+          ClipOval(
+            child: Container(
+              width: 60,
+              height: 60,
+              color: Colors.white.withOpacity(0.2),
+              child: fullImageUrl != null
+                  ? CachedNetworkImage(
+                      imageUrl: fullImageUrl,
+                      httpHeaders: imgHeaders,
+                      width: 60,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      placeholder: (_, __) => const Center(
+                        child: Icon(Icons.person_rounded,
+                            color: Colors.white, size: 30),
+                      ),
+                      errorWidget: (_, __, ___) => const Center(
+                        child: Icon(Icons.person_rounded,
+                            color: Colors.white, size: 30),
+                      ),
+                    )
+                  : const Center(
+                      child: Icon(Icons.person_rounded,
+                          color: Colors.white, size: 30),
+                    ),
+            ),
           ),
           SizedBox(width: 4.wp),
           Expanded(

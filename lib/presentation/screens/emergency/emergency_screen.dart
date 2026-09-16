@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../services/location/location_service.dart';
 import '../../providers/connectivity_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/accessibility_provider.dart';
 import '../../theme/app_theme.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
@@ -17,7 +19,9 @@ class EmergencyScreen extends ConsumerStatefulWidget {
 class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   String _selectedEmergencyType = 'CARDIAC';
   final _additionalInfoController = TextEditingController();
+  final _symptomsController = TextEditingController();
   bool _isFetchingLocation = false;
+  bool _isClassifying = false;
   final FocusNode _otherFocusNode = FocusNode();
 
   static const List<Map<String, dynamic>> _emergencyTypes = [
@@ -32,8 +36,67 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   @override
   void dispose() {
     _additionalInfoController.dispose();
+    _symptomsController.dispose();
     _otherFocusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _classifySymptoms() async {
+    final symptoms = _symptomsController.text.trim();
+    if (symptoms.isEmpty) return;
+    setState(() => _isClassifying = true);
+    try {
+      final apiClient = ref.read(apiClientProvider);
+      final result = await apiClient.classifyEmergencySymptoms(symptoms);
+      final type = result['emergencyType'] as String?;
+      if (type != null && mounted) {
+        final knownValues = _emergencyTypes.map((e) => e['value'] as String).toSet();
+        // Map classifier output to the screen's type list (best-effort)
+        final mapped = knownValues.contains(type) ? type : _mapClassifierType(type);
+        final reasoning = result['reasoning'] as String?;
+        setState(() {
+          _selectedEmergencyType = mapped;
+          if (mapped == 'OTHER' && reasoning != null && reasoning.isNotEmpty) {
+            _additionalInfoController.text = reasoning;
+          }
+        });
+        HapticFeedback.mediumImpact();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
+              const SizedBox(width: 8),
+              Expanded(child: Text('AI suggested: ${_emergencyTypes.firstWhere((e) => e['value'] == mapped, orElse: () => {'label': mapped})['label']}')),
+            ]),
+            backgroundColor: AppColors.primary,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('AI classification unavailable — please select manually.'), behavior: SnackBarBehavior.floating),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isClassifying = false);
+    }
+  }
+
+  String _mapClassifierType(String raw) {
+    const mapping = {
+      'CHEST_PAIN': 'CARDIAC',
+      'SHORTNESS_OF_BREATH': 'BREATHING',
+      'SEIZURE': 'OTHER',
+      'STROKE': 'STROKE',
+      'DIABETIC': 'OTHER',
+      'CARDIAC': 'CARDIAC',
+      'TRAUMA': 'TRAUMA',
+    };
+    return mapping[raw] ?? 'OTHER';
   }
 
   Future<void> _triggerSOS() async {
@@ -75,8 +138,9 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Location error: $e'),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -89,11 +153,11 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.signal_wifi_off, color: Colors.red),
-            SizedBox(width: 8),
-            Text('No Internet Connection'),
+            Icon(Icons.signal_wifi_off, color: AppColors.error),
+            const SizedBox(width: 8),
+            const Text('No Internet Connection'),
           ],
         ),
         content: const Text(
@@ -114,7 +178,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
             },
           ),
           ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             icon: const Icon(Icons.phone, color: Colors.white),
             label: const Text('Call 1122', style: TextStyle(color: Colors.white)),
             onPressed: () async {
@@ -132,11 +196,11 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.location_off, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('GPS Disabled'),
+            Icon(Icons.location_off, color: AppColors.warning),
+            const SizedBox(width: 8),
+            const Text('GPS Disabled'),
           ],
         ),
         content: const Text(
@@ -163,6 +227,9 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isConnected = ref.watch(isConnectedProvider);
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final settings = ref.watch(accessibilityProvider);
+    final isDeafPatient = (user?.patientType?.toUpperCase() == 'DEAF') || settings.textOnlyMode;
 
     return PopScope(
       canPop: false,
@@ -211,18 +278,18 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                   margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
+                    color: AppColors.warning.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.orange.shade300),
+                    border: Border.all(color: AppColors.warning.withOpacity(0.4)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.signal_wifi_off, color: Colors.orange.shade700, size: 18),
+                      Icon(Icons.signal_wifi_off, color: AppColors.warning, size: 18),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           'Offline — SOS will fall back to SMS/Call.',
-                          style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w600),
+                          style: TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w600),
                         ),
                       ),
                     ],
@@ -236,6 +303,74 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // ── Deaf patient: AI symptom classifier ────────────────
+                      if (isDeafPatient) ...[
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'AI Symptom Classifier',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.primary,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              TextFormField(
+                                controller: _symptomsController,
+                                maxLines: 2,
+                                style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
+                                decoration: InputDecoration(
+                                  hintText: 'Type what you feel (e.g. chest pain, difficulty breathing)...',
+                                  hintStyle: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.4)),
+                                  filled: true,
+                                  fillColor: theme.colorScheme.surface,
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: _isClassifying ? null : _classifySymptoms,
+                                  icon: _isClassifying
+                                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                      : const Icon(Icons.auto_awesome_rounded, size: 16),
+                                  label: Text(_isClassifying ? 'Classifying...' : 'AI Suggest Emergency Type'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
                       // Section label
                       Text(
                         'What is happening?',
@@ -424,7 +559,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                       onPressed: _isFetchingLocation ? null : _triggerSOS,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFD32F2F),
-                        disabledBackgroundColor: Colors.red.shade100,
+                        disabledBackgroundColor: const Color(0xFFD32F2F).withOpacity(0.3),
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),

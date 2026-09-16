@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/chat_provider.dart';
 import '../../providers/auth_provider.dart';
@@ -423,7 +424,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             ),
           ),
           const SizedBox(width: 8),
-          _isSending 
+          _isSending
             ? const Padding(
                 padding: EdgeInsets.all(12),
                 child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -432,16 +433,21 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
                 valueListenable: _messageController,
                 builder: (context, value, child) {
                   final hasText = value.text.trim().isNotEmpty;
+                  // Deaf/text-only patients cannot use voice recording
+                  final canSend = hasText || isDeaf;
                   return GestureDetector(
-                    onTap: hasText ? _sendMessage : _startVoiceRecording,
+                    onTap: canSend ? (hasText ? _sendMessage : null) : _startVoiceRecording,
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
+                      decoration: BoxDecoration(
+                        color: (canSend && !hasText)
+                            ? AppColors.primary.withOpacity(0.35)
+                            : AppColors.primary,
                         shape: BoxShape.circle,
                       ),
                       child: Icon(
-                        hasText ? Icons.send_rounded : Icons.mic_none_rounded,
+                        // Always show send icon for deaf users; mic only for hearing users
+                        (hasText || isDeaf) ? Icons.send_rounded : Icons.mic_none_rounded,
                         color: Colors.white,
                         size: 24,
                       ),
@@ -473,8 +479,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _buildAttachmentItem(Icons.image_rounded, 'Gallery', Colors.purple, _pickImage),
-                _buildAttachmentItem(Icons.description_rounded, 'Document', Colors.blue, _pickDocument),
-                _buildAttachmentItem(Icons.location_on_rounded, 'Location', Colors.green, () {}),
+                _buildAttachmentItem(Icons.description_rounded, 'Document', AppColors.primary, _pickDocument),
+                _buildAttachmentItem(Icons.location_on_rounded, 'Location', AppColors.success, () {}),
               ],
             ),
           ],
@@ -516,7 +522,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       color: Colors.white,
       child: Row(
         children: [
-          const Icon(Icons.mic, color: Colors.red, size: 20),
+          const Icon(Icons.mic, color: AppColors.error, size: 20),
           const SizedBox(width: 12),
           Text(_recordingDuration, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           const Spacer(),
@@ -529,7 +535,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
             onTap: _stopRecording,
             child: Container(
               padding: const EdgeInsets.all(12),
-              decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+              decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
               child: const Icon(Icons.check, color: Colors.white),
             ),
           ),
@@ -583,6 +589,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     final content = _messageController.text.trim();
     if (content.isEmpty) return;
 
+    HapticFeedback.lightImpact();
     setState(() => _isSending = true);
     try {
       await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);

@@ -112,9 +112,9 @@ class _PatientManageCard extends ConsumerWidget {
     final bool isRejected = link.status == 'REJECTED';
     final bool isPending = link.status == 'PENDING';
 
-    Color statusColor = Colors.orange;
-    if (isAccepted) statusColor = Colors.green;
-    if (isRejected) statusColor = Colors.red;
+    Color statusColor = AppColors.warning;
+    if (isAccepted) statusColor = AppColors.success;
+    if (isRejected) statusColor = AppColors.error;
 
     return InkWell(
       onTap: () => context.push('/caregiver/my-patients/patient-profile/${link.patientId}'),
@@ -203,13 +203,21 @@ class _PatientManageCard extends ConsumerWidget {
                 await ref.read(resendInvitationProvider(link.patientId).future);
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Invitation resent!'), backgroundColor: Colors.green),
+                    const SnackBar(
+                      content: Text('Invitation resent!'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 }
               } catch (e) {
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Failed: $e'), backgroundColor: Colors.red),
+                    SnackBar(
+                      content: Text('Failed: $e'),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                    ),
                   );
                 }
               }

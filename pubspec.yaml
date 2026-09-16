@@ -56,6 +56,9 @@ dependencies:
   json_annotation: ^4.8.0
   freezed_annotation: ^2.4.0
 
+  # Payments
+  flutter_stripe: ^11.1.0
+
   # Audio for SOS
   audio_session: ^0.1.0
   just_audio: ^0.9.0

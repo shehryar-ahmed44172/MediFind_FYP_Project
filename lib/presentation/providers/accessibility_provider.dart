@@ -83,6 +83,10 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
     _loadFromPrefs();
   }
 
+  // True once SharedPreferences have been successfully loaded into state.
+  // Guards initializeFromUser so it never overwrites user-saved settings.
+  bool _prefsLoaded = false;
+
   // ── Persistence helpers ──────────────────────────────────────────────────
 
   Future<void> _loadFromPrefs() async {
@@ -107,6 +111,7 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
       fontSizeMultiplier:   prefs.getDouble(_kFontMultiplier) ?? 1.0,
       themeMode:            themeMode,
     );
+    _prefsLoaded = true;
   }
 
   Future<void> _saveToPrefs() async {
@@ -172,34 +177,37 @@ class AccessibilityNotifier extends StateNotifier<AccessibilitySettings> {
 
   String? _initializedFromUserId;
 
-  /// Initialize based on user patient type
+  /// Initialize based on user patient type.
+  /// Only applies role-appropriate defaults on the very first run (no saved prefs).
+  /// Never overwrites settings the user has already customized.
   void initializeFromUser(String? patientType, [String? userId]) {
-    // Avoid re-initialization for the same user if already state-synced
     if (userId != null && _initializedFromUserId == userId) return;
-    
-    final type = patientType?.toUpperCase() ?? 'NORMAL';
-    
-    if (type == 'DEAF') {
-      state = AccessibilitySettings(
-        textOnlyMode: true,
-        vibrationFeedback: true,
-        highContrast: true,
-        fontSizeMultiplier: 1.15,
-      );
-    } else {
-      state = AccessibilitySettings();
-    }
 
-    _saveToPrefs();
+    // If prefs were already loaded, the user has saved settings — respect them.
+    if (!_prefsLoaded) {
+      final type = patientType?.toUpperCase() ?? 'NORMAL';
+      if (type == 'DEAF') {
+        // First-time DEAF user: apply accessible defaults and persist them.
+        state = AccessibilitySettings(
+          textOnlyMode: true,
+          vibrationFeedback: true,
+          highContrast: true,
+          fontSizeMultiplier: 1.15,
+        );
+        _saveToPrefs();
+      }
+      // NORMAL users keep the constructor defaults — nothing to change.
+    }
 
     if (userId != null) {
       _initializedFromUserId = userId;
     }
   }
 
-  /// Force a re-initialization (e.g. settings reset)
+  /// Force a re-initialization (e.g. settings reset).
   void reinitialize(String? patientType, [String? userId]) {
     _initializedFromUserId = null;
+    _prefsLoaded = false;
     initializeFromUser(patientType, userId);
   }
 

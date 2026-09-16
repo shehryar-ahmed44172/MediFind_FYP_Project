@@ -114,7 +114,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                 );
               },
               loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-              error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: Colors.red)))),
+              error: (err, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $err', style: const TextStyle(color: AppColors.error)))),
             ),
             
             const SliverToBoxAdapter(child: SizedBox(height: 32)),
@@ -191,7 +191,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
         children: [
           _buildStatCard(context, 'Total Monitored', patients.length.toString(), Icons.people_rounded, AppColors.primary, theme),
           const SizedBox(width: 20),
-          _buildStatCard(context, 'Active Alerts', activeAlerts.toString(), Icons.warning_amber_rounded, activeAlerts > 0 ? Colors.red : Colors.green, theme),
+          _buildStatCard(context, 'Active Alerts', activeAlerts.toString(), Icons.warning_amber_rounded, activeAlerts > 0 ? AppColors.error : AppColors.success, theme),
         ],
       ),
     );
@@ -239,7 +239,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
 
   Widget _buildPatientCard(BuildContext context, CaregiverConnection patient, ThemeData theme) {
     final bool isActive = patient.hasActiveEmergency == true;
-    final Color statusColor = patient.status == 'PENDING' ? Colors.orange : (isActive ? Colors.red : Colors.green);
+    final Color statusColor = patient.status == 'PENDING' ? AppColors.warning : (isActive ? AppColors.error : AppColors.success);
     
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
@@ -300,7 +300,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                             if (patient.bloodType != null) ...[
                               Container(width: 4, height: 4, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.grey.shade400)),
                               const SizedBox(width: 8),
-                              Text('Blood: ${patient.bloodType}', style: TextStyle(color: Colors.red.shade400, fontSize: 13, fontWeight: FontWeight.w600)),
+                              Text('Blood: ${patient.bloodType}', style: const TextStyle(color: AppColors.error, fontSize: 13, fontWeight: FontWeight.w600)),
                             ],
                           ],
                         ),
@@ -308,7 +308,7 @@ class _CaregiverHomeScreenState extends ConsumerState<CaregiverHomeScreen> {
                     ),
                   ),
                   if (isActive)
-                    const Icon(Icons.emergency_share_rounded, color: Colors.red, size: 28)
+                    const Icon(Icons.emergency_share_rounded, color: AppColors.error, size: 28)
                   else
                     Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
                 ],

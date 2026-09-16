@@ -196,7 +196,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(children: [
-          Icon(Icons.location_off_rounded, color: Colors.orange),
+          Icon(Icons.location_off_rounded, color: AppColors.warning),
           SizedBox(width: 10),
           Text('Location Unavailable'),
         ]),
@@ -227,7 +227,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(children: [
-          Icon(Icons.location_off_rounded, color: Colors.orange),
+          Icon(Icons.location_off_rounded, color: AppColors.warning),
           SizedBox(width: 10),
           Expanded(child: Text('Location Turned Off')),
         ]),
@@ -260,7 +260,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: const Row(children: [
-          Icon(Icons.location_disabled_rounded, color: Colors.red),
+          Icon(Icons.location_disabled_rounded, color: AppColors.error),
           SizedBox(width: 10),
           Expanded(child: Text('Permission Denied')),
         ]),
@@ -308,7 +308,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Location fetched successfully!'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -324,7 +324,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         else {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
           ));
         }
@@ -336,7 +336,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         else {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text('Location unavailable. $remaining attempt${remaining == 1 ? '' : 's'} remaining.'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
           ));
         }
@@ -355,7 +355,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_cnicFront == null || _cnicBack == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('⚠ Please upload both sides of your CNIC before submitting.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
         return;
@@ -363,7 +363,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_employeeCardFront == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('⚠ Please upload the front of your Employee Card before submitting.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
         return;
@@ -371,7 +371,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_drivingLicense == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('⚠ Please upload your Driving License before submitting.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
         return;
@@ -379,7 +379,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (_motorbikeDoc == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('⚠ Please upload your Motorbike Documents before submitting.'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
         return;
@@ -494,7 +494,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             title: Row(children: [
               Icon(
                 Icons.check_circle_rounded,
-                color: isResponder ? Colors.orange : Colors.green,
+                color: isResponder ? AppColors.warning : AppColors.success,
                 size: 28,
               ),
               const SizedBox(width: 10),
@@ -505,7 +505,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(ctx),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: isResponder ? Colors.orange : Colors.green,
+                  backgroundColor: isResponder ? AppColors.warning : AppColors.success,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -528,7 +528,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Registration failed: ${e.toString().replaceAll('Exception:', '').trim()}'),
-          backgroundColor: Colors.red.shade700,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -612,14 +612,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: AppColors.warning.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.shade300),
+                      border: Border.all(color: AppColors.warning.withOpacity(0.3)),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded, color: Colors.orange.shade700, size: 20),
+                        Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 20),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Column(
@@ -628,14 +628,14 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                               Text('Account Pending Admin Approval',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade800,
+                                  color: AppColors.warning,
                                   fontSize: 1.4.hp,
                                 )),
                               const SizedBox(height: 4),
                               Text(
                                 'After submitting, your credentials will be reviewed by an admin. '
                                 'You will receive an activation email with a verification code once approved.',
-                                style: TextStyle(color: Colors.orange.shade700, fontSize: 1.2.hp),
+                                style: TextStyle(color: AppColors.warning.withOpacity(0.85), fontSize: 1.2.hp),
                               ),
                             ],
                           ),
@@ -1400,7 +1400,7 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: widget.isRequired
-                              ? Colors.red.shade50
+                              ? AppColors.error.withOpacity(0.08)
                               : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(6),
                         ),
@@ -1409,7 +1409,7 @@ class _DocumentUploadCardState extends State<_DocumentUploadCard> {
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.bold,
-                            color: widget.isRequired ? Colors.red.shade400 : Colors.grey.shade500,
+                            color: widget.isRequired ? AppColors.error : Colors.grey.shade500,
                           ),
                         ),
                       ),

@@ -100,20 +100,20 @@ class MedicalProfileScreen extends ConsumerWidget {
               _SectionCard(
                 title: 'Blood Group',
                 icon: Icons.bloodtype_rounded,
-                iconColor: Colors.red,
+                iconColor: AppColors.error,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade50,
+                    color: AppColors.error.withOpacity(0.07),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.shade200),
+                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
                   ),
                   child: Text(
                     profile.bloodType.isNotEmpty ? profile.bloodType : 'Not set',
                     style: TextStyle(
                       fontSize: 28 * m,
                       fontWeight: FontWeight.bold,
-                      color: settings.highContrast ? Colors.black : Colors.red.shade700,
+                      color: settings.highContrast ? Colors.black : AppColors.error,
                     ),
                   ),
                 ),
@@ -136,9 +136,9 @@ class MedicalProfileScreen extends ConsumerWidget {
               _ChipListSection(
                 title: 'Allergies',
                 icon: Icons.science_outlined,
-                iconColor: Colors.orange,
+                iconColor: AppColors.warning,
                 items: profile.allergies,
-                color: Colors.orange,
+                color: AppColors.warning,
               ),
               const SizedBox(height: 16),
 
@@ -173,14 +173,14 @@ class MedicalProfileScreen extends ConsumerWidget {
               _SectionCard(
                 title: 'Emergency Contacts',
                 icon: Icons.contact_phone_outlined,
-                iconColor: Colors.orange,
+                iconColor: AppColors.warning,
                 child: profile.emergencyContacts.isEmpty
                     ? const Text('None', style: TextStyle(color: Colors.grey))
                     : Column(
                         children: profile.emergencyContacts
                             .map((c) => ListTile(
                                   dense: true,
-                                  leading: const Icon(Icons.person, size: 20, color: Colors.orange),
+                                  leading: const Icon(Icons.person, size: 20, color: AppColors.warning),
                                   title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                                   subtitle: Text('${c.relationship} • ${c.phoneNumber}'),
                                   contentPadding: EdgeInsets.zero,
@@ -258,11 +258,11 @@ class _ErrorView extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppColors.error.withOpacity(0.07),
                 shape: BoxShape.circle,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.red.withOpacity(0.2),
+                    color: AppColors.error.withOpacity(0.2),
                     blurRadius: 20,
                     spreadRadius: 5,
                   ),
@@ -271,7 +271,7 @@ class _ErrorView extends StatelessWidget {
               child: Icon(
                 Icons.wifi_off_rounded,
                 size: 48,
-                color: Colors.red.shade700,
+                color: AppColors.error,
               ),
             ),
             const SizedBox(height: 24),

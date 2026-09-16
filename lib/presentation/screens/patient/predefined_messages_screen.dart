@@ -213,7 +213,7 @@ class _PredefinedMessagesScreenState
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.2),
+                      color: AppColors.error.withOpacity(0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(_syncError!, style: const TextStyle(color: Colors.white, fontSize: 12)),
@@ -289,7 +289,7 @@ class _PredefinedMessagesScreenState
                         content: const Text('This will replace all your custom phrases with the default set.'),
                         actions: [
                           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset', style: TextStyle(color: Colors.red))),
+                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset', style: TextStyle(color: AppColors.error))),
                         ],
                       ),
                     );
@@ -297,7 +297,7 @@ class _PredefinedMessagesScreenState
                       ref.read(predefinedMessagesProvider.notifier).reset();
                     }
                   },
-                  child: const Text('Reset', style: TextStyle(fontSize: 12, color: Colors.red)),
+                  child: const Text('Reset', style: TextStyle(fontSize: 12, color: AppColors.error)),
                 ),
               ],
             ),
@@ -334,10 +334,10 @@ class _PredefinedMessagesScreenState
                           padding: const EdgeInsets.only(right: 20),
                           margin: const EdgeInsets.only(bottom: 10),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: AppColors.error.withOpacity(0.07),
                             borderRadius: BorderRadius.circular(14),
                           ),
-                          child: const Icon(Icons.delete_outline, color: Colors.red),
+                          child: const Icon(Icons.delete_outline, color: AppColors.error),
                         ),
                         onDismissed: (_) =>
                             ref.read(predefinedMessagesProvider.notifier).remove(msg),

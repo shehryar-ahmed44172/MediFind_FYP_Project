@@ -59,10 +59,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       } else if (raw.toLowerCase().contains('verify your email') ||
                  raw.toLowerCase().contains('email') && raw.toLowerCase().contains('verif')) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please verify your email before logging in.'),
-            backgroundColor: Colors.orange,
+          SnackBar(
+            content: const Text('Please verify your email before logging in.'),
+            backgroundColor: AppColors.warning,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
         context.go('/verify-email',
@@ -91,10 +92,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ),
               ],
             ),
-            backgroundColor: Colors.red.shade700,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -134,13 +134,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade100,
+                      color: AppColors.error.withOpacity(0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
                       Icons.lock_person_rounded,
                       size: 48,
-                      color: Colors.red.shade700,
+                      color: AppColors.error,
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -150,7 +150,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red.shade800,
+                      color: AppColors.error,
                     ),
                   ),
                 ],
@@ -177,23 +177,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       padding: const EdgeInsets.symmetric(
                           vertical: 12, horizontal: 20),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade50,
+                        color: AppColors.warning.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: Colors.orange.shade200),
+                        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
                       ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.timer_outlined,
-                              color: Colors.orange.shade700, size: 20),
+                          Icon(Icons.timer_outlined, color: AppColors.warning, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Try again in $minutesRemaining minute${minutesRemaining == 1 ? '' : 's'}',
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
-                              color: Colors.orange.shade800,
+                              color: AppColors.warning,
                             ),
                           ),
                         ],
@@ -241,10 +239,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     child: ElevatedButton(
                       onPressed: () => Navigator.pop(ctx),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red.shade600,
+                        backgroundColor: AppColors.error,
                         foregroundColor: Colors.white,
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12)),
                         elevation: 0,
@@ -275,8 +272,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         duration: const Duration(seconds: 5),
-        backgroundColor:
-            isLastAttempt ? Colors.red.shade800 : Colors.orange.shade700,
+        backgroundColor: isLastAttempt ? AppColors.error : AppColors.warning,
         behavior: SnackBarBehavior.floating,
         shape:
             RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

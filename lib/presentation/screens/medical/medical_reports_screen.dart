@@ -40,7 +40,7 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: const Row(
               children: [
-                Icon(Icons.camera_alt_outlined, color: Colors.orange, size: 28),
+                Icon(Icons.camera_alt_outlined, color: AppColors.warning, size: 28),
                 SizedBox(width: 10),
                 Text('Camera Permission'),
               ],
@@ -101,7 +101,7 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Medical report uploaded successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -118,7 +118,7 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: AppColors.error,
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -192,7 +192,7 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -229,8 +229,8 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              leading: const Icon(Icons.delete_outline, color: AppColors.error),
+              title: const Text('Delete', style: TextStyle(color: AppColors.error)),
               onTap: () {
                 Navigator.pop(ctx);
                 _deleteReport(report);

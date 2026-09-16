@@ -108,38 +108,29 @@ class MedicalProfileRepositoryImpl implements MedicalProfileRepository {
 
   @override
   Future<void> addEmergencyContact(String userId, EmergencyContact contact) async {
-    final profile = await getMedicalProfile(userId);
-    if (profile == null) return;
-    final updatedContacts = [...profile.emergencyContacts, contact];
-    final updated = await remoteDataSource.updateMedicalProfile(
-      bloodType: profile.bloodType,
-      disabilityType: profile.disabilityType,
-      allergies: profile.allergies,
-      chronicDiseases: profile.chronicDiseases,
-      medications: profile.medications.map((m) => m.toJson()).toList(),
-      emergencyContacts: updatedContacts.map((c) => c.toJson()).toList(),
-      additionalNotes: profile.additionalNotes,
+    // Uses dedicated POST /api/medical-profile/emergency-contacts endpoint.
+    // No need to fetch + rebuild the whole profile — single targeted request.
+    await remoteDataSource.addEmergencyContact(
+      name:         contact.name,
+      phoneNumber:  contact.phoneNumber,
+      relationship: contact.relationship,
     );
-    await localDataSource.saveMedicalProfile(updated.toJson());
+    // Invalidate local cache so next read reflects the new contact
+    await localDataSource.deleteMedicalProfile(userId);
   }
 
   @override
   Future<void> removeEmergencyContact(String userId, String contactName) async {
+    // Find the phone number of the contact by name from local/remote profile
     final profile = await getMedicalProfile(userId);
-    if (profile == null) return;
-    final updatedContacts = profile.emergencyContacts
-        .where((c) => c.name != contactName)
-        .toList();
-    final updated = await remoteDataSource.updateMedicalProfile(
-      bloodType: profile.bloodType,
-      disabilityType: profile.disabilityType,
-      allergies: profile.allergies,
-      chronicDiseases: profile.chronicDiseases,
-      medications: profile.medications.map((m) => m.toJson()).toList(),
-      emergencyContacts: updatedContacts.map((c) => c.toJson()).toList(),
-      additionalNotes: profile.additionalNotes,
-    );
-    await localDataSource.saveMedicalProfile(updated.toJson());
+    final contact = profile?.emergencyContacts
+        .firstWhere((c) => c.name == contactName,
+            orElse: () => const EmergencyContact(name: '', phoneNumber: ''));
+    if (contact == null || contact.phoneNumber.isEmpty) return;
+
+    // Uses dedicated DELETE /api/medical-profile/emergency-contacts/:phone
+    await remoteDataSource.removeEmergencyContact(contact.phoneNumber);
+    await localDataSource.deleteMedicalProfile(userId);
   }
 
   @override

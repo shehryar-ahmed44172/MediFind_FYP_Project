@@ -83,7 +83,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                         _buildInfoRow('User ID', user?.id ?? 'Unknown'),
                         _buildInfoRow('Name', user?.fullName ?? 'Unknown'),
                         _buildInfoRow('Role', user?.role ?? 'Unknown'),
-                        _buildInfoRow('Active Status', user?.isActive == true ? 'ACTIVE' : 'INACTIVE', color: user?.isActive == true ? Colors.green : Colors.red),
+                        _buildInfoRow('Active Status', user?.isActive == true ? 'ACTIVE' : 'INACTIVE', color: user?.isActive == true ? AppColors.success : AppColors.error),
                       ],
                     ),
                     loading: () => const CircularProgressIndicator(),
@@ -106,10 +106,10 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                           );
                         }
                       },
-                      icon: const Icon(Icons.delete_sweep_rounded, color: Colors.orange),
-                      label: const Text('Clear Local Cache', style: TextStyle(color: Colors.orange)),
+                      icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.warning),
+                      label: const Text('Clear Local Cache', style: TextStyle(color: AppColors.warning)),
                       style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Colors.orange),
+                        side: const BorderSide(color: AppColors.warning),
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       ),
                     ),
@@ -136,7 +136,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                       icon: const Icon(Icons.cleaning_services_rounded),
                       label: const Text('Clean All My Emergencies (Backend + Local)'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
+                        backgroundColor: AppColors.error,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                       ),
@@ -153,7 +153,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                       _buildInfoRow(
                         'Socket.io', 
                         isSocketConnected ? 'CONNECTED' : 'DISCONNECTED',
-                        color: isSocketConnected ? Colors.green : Colors.red,
+                        color: isSocketConnected ? AppColors.success : AppColors.error,
                       ),
                       const Divider(height: 32),
                       Row(
@@ -207,7 +207,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildInfoRow('Token Status', _fcmToken != null ? 'READY' : 'MISSING', color: _fcmToken != null ? Colors.green : Colors.red),
+                      _buildInfoRow('Token Status', _fcmToken != null ? 'READY' : 'MISSING', color: _fcmToken != null ? AppColors.success : AppColors.error),
                       if (_fcmToken != null) ...[
                         const SizedBox(height: 8),
                         Container(
@@ -257,7 +257,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
                               icon: const Icon(Icons.sync_rounded),
                               label: const Text('Sync to Backend'),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
+                                backgroundColor: AppColors.success,
                                 foregroundColor: Colors.white,
                               ),
                             ),

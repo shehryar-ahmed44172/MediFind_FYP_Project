@@ -202,9 +202,9 @@ class _ContactCard extends StatelessWidget {
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: AppColors.error.withOpacity(0.07),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(color: AppColors.error.withOpacity(0.3)),
         ),
         child: const Icon(Icons.delete_outline_rounded,
             color: Colors.redAccent, size: 28),
@@ -226,7 +226,7 @@ class _ContactCard extends StatelessWidget {
               TextButton(
                   onPressed: () => Navigator.pop(ctx, true),
                   child: const Text('Remove',
-                      style: TextStyle(color: Colors.red))),
+                      style: TextStyle(color: AppColors.error))),
             ],
           ),
         );
@@ -247,7 +247,7 @@ class _ContactCard extends StatelessWidget {
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(SnackBar(
               content: Text('Failed to remove: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppColors.error,
               behavior: SnackBarBehavior.floating,
             ));
           }
@@ -312,7 +312,7 @@ class _ContactCard extends StatelessWidget {
             ),
             trailing: IconButton(
               icon: const Icon(Icons.call_rounded,
-                  color: Colors.green, size: 26),
+                  color: AppColors.success, size: 26),
               tooltip: 'Call ${contact.name}',
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -392,7 +392,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('${contact.name} added to emergency contacts ✓'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppColors.success,
           behavior: SnackBarBehavior.floating,
         ));
       }
@@ -401,7 +401,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Failed to add contact: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
         ));
       }

@@ -99,7 +99,7 @@ class CaregiverMapScreen extends ConsumerWidget {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.location_on, color: Colors.green, size: 14),
+                        const Icon(Icons.location_on, color: AppColors.success, size: 14),
                         const SizedBox(width: 4),
                         Text('Active', style: TextStyle(fontSize: 11, color: Colors.grey.shade800)),
                       ],
@@ -116,7 +116,7 @@ class CaregiverMapScreen extends ConsumerWidget {
           flex: 3,
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.surface,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(32),
                 topRight: Radius.circular(32),
@@ -162,8 +162,8 @@ class CaregiverMapScreen extends ConsumerWidget {
         children: [
           CircleAvatar(
             radius: 24,
-            backgroundColor: (isActive ? Colors.red : AppColors.primary).withOpacity(0.1),
-            child: Icon(Icons.person, color: isActive ? Colors.red : AppColors.primary),
+            backgroundColor: (isActive ? AppColors.error : AppColors.primary).withOpacity(0.1),
+            child: Icon(Icons.person, color: isActive ? AppColors.error : AppColors.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -182,7 +182,7 @@ class CaregiverMapScreen extends ConsumerWidget {
                     Text(
                       isActive ? 'EMERGENCY ACTIVE' : 'Last update: Just now',
                       style: TextStyle(
-                        color: isActive ? Colors.red : Colors.grey.shade600,
+                        color: isActive ? AppColors.error : Colors.grey.shade600,
                         fontSize: 12,
                         fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
                       ),
@@ -196,7 +196,7 @@ class CaregiverMapScreen extends ConsumerWidget {
             ElevatedButton(
               onPressed: () {},
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
+                backgroundColor: AppColors.error,
                 foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 minimumSize: Size.zero,

@@ -15,12 +15,21 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
   String? _loadingPlan;
 
   @override
+  void initState() {
+    super.initState();
+    // Always fetch fresh user data so subscription status is up to date
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.invalidate(currentUserProvider);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
@@ -70,31 +79,44 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
             ),
           ),
           SliverToBoxAdapter(
-            child: Container(
-              padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
-              child: Column(
-                children: [
-                  Text(
-                    'Elevate Your Experience',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primaryNavy,
-                    ),
-                    textAlign: TextAlign.center,
+            child: userAsync.when(
+              data: (user) {
+                final role = (user?.role ?? 'PATIENT').toUpperCase();
+                final headline = role == 'CAREGIVER'
+                    ? 'Care More, Worry Less'
+                    : role == 'RESPONDER'
+                        ? 'Advance Your Response Career'
+                        : 'Elevate Your Experience';
+                final subtitle = role == 'CAREGIVER'
+                    ? 'Monitor more patients, get faster alerts, and access complete medical histories.'
+                    : role == 'RESPONDER'
+                        ? 'Get priority dispatch, advanced case tools, and full analytics to grow your impact.'
+                        : 'Unlock advanced medical tracking, unlimited caregivers, and priority emergency dispatch.';
+                return Container(
+                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
+                  child: Column(
+                    children: [
+                      Text(
+                        headline,
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primaryNavy,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(fontSize: 15, color: Colors.grey, height: 1.5),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Unlock advanced medical tracking, unlimited caregivers, and priority emergency dispatch.',
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: Colors.grey,
-                      height: 1.5,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                ],
-              ),
+                );
+              },
+              loading: () => const SizedBox(height: 120),
+              error: (_, __) => const SizedBox(height: 120),
             ),
           ),
           SliverPadding(
@@ -102,52 +124,18 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
             sliver: userAsync.when(
               data: (user) {
                 final currentPlan = user?.subscriptionPlan ?? 'FREE';
+                final role = (user?.role ?? 'PATIENT').toUpperCase();
+                final plans = _plansForRole(role);
                 return SliverList(
                   delegate: SliverChildListDelegate([
-                    _buildPlanCard(
-                      context,
-                      'FREE',
-                      'Standard',
-                      '0',
-                      currentPlan == 'FREE',
-                      [
-                        'Standard SOS Response',
-                        'Basic Medical Profile',
-                        '1 Caregiver Connection',
-                      ],
-                      const Color(0xFF94A3B8),
-                    ),
+                    _buildPlanCard(context, 'FREE', 'Standard', '0', currentPlan == 'FREE',
+                        plans['FREE']!, const Color(0xFF94A3B8)),
                     const SizedBox(height: 20),
-                    _buildPlanCard(
-                      context,
-                      'PROFESSIONAL',
-                      'Professional',
-                      '1,500',
-                      currentPlan == 'PROFESSIONAL',
-                      [
-                        'Priority SOS Dispatch',
-                        'Enhanced Medical History',
-                        'Up to 5 Caregivers',
-                        'Live Tracking for Family',
-                      ],
-                      const Color(0xFF2496A7),
-                    ),
+                    _buildPlanCard(context, 'PROFESSIONAL', 'Professional', '499',
+                        currentPlan == 'PROFESSIONAL', plans['PROFESSIONAL']!, const Color(0xFF2496A7)),
                     const SizedBox(height: 20),
-                    _buildPlanCard(
-                      context,
-                      'EXECUTIVE',
-                      'Executive',
-                      '4,500',
-                      currentPlan == 'EXECUTIVE',
-                      [
-                        'Instant Elite Dispatch',
-                        'Full Digital Health Record',
-                        'Unlimited Caregivers',
-                        'Unlimited Report Storage',
-                        'VIP Support Access',
-                      ],
-                      const Color(0xFF0C637E),
-                    ),
+                    _buildPlanCard(context, 'EXECUTIVE', 'Executive', '2,499',
+                        currentPlan == 'EXECUTIVE', plans['EXECUTIVE']!, const Color(0xFF0C637E)),
                     const SizedBox(height: 40),
                   ]),
                 );
@@ -324,6 +312,62 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
         ],
       ),
     );
+  }
+
+  Map<String, List<String>> _plansForRole(String role) {
+    if (role == 'CAREGIVER') {
+      return {
+        'FREE': ['Monitor 1 Patient', 'Basic Emergency Alerts', 'Location Access'],
+        'PROFESSIONAL': [
+          'Monitor Up to 5 Patients',
+          'Priority Alerts',
+          'Full Medical History View',
+          'Live Patient Tracking',
+        ],
+        'EXECUTIVE': [
+          'Unlimited Patients',
+          'Instant Critical Alerts',
+          'Full Health Records',
+          'Multi-patient Dashboard',
+          'VIP Support Access',
+        ],
+      };
+    }
+    if (role == 'RESPONDER') {
+      return {
+        'FREE': ['Standard Emergency Dispatch', 'Basic Profile & Credentials', '30-day Case History'],
+        'PROFESSIONAL': [
+          'Priority Dispatch Queue',
+          'Advanced Case Management',
+          '1-year Case History',
+          'Enhanced Profile Visibility',
+        ],
+        'EXECUTIVE': [
+          'Elite Priority Dispatch',
+          'Full Analytics Dashboard',
+          'Unlimited Case History',
+          'Custom Specialization Badge',
+          'VIP Support Access',
+        ],
+      };
+    }
+    // PATIENT (default)
+    return {
+      'FREE': ['Standard SOS Response', 'Basic Medical Profile', '1 Caregiver Connection'],
+      'PROFESSIONAL': [
+        'Priority SOS Dispatch',
+        'Enhanced Medical History',
+        'Up to 5 Caregivers',
+        'Live Tracking for Family',
+      ],
+      'EXECUTIVE': [
+        'Instant Elite Dispatch',
+        'Full Digital Health Record',
+        'Unlimited Caregivers',
+        'Unlimited Report Storage',
+        'VIP Support Access',
+      ],
+    };
   }
 
   Future<void> _handleUpgrade(String planId) async {

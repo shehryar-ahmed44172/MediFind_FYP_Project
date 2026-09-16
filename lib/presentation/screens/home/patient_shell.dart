@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../widgets/common/app_header.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/navigation/app_drawer.dart';
+import '../../providers/emergency_provider.dart';
+import '../../providers/auth_provider.dart';
 
 class PatientShell extends ConsumerStatefulWidget {
   final StatefulNavigationShell navigationShell;
@@ -52,6 +54,9 @@ class _PatientShellState extends ConsumerState<PatientShell> {
     final theme = Theme.of(context);
     final currentIndex = widget.navigationShell.currentIndex;
     final location = widget.state.matchedLocation.toLowerCase();
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isDeafPatient = user?.patientType?.toUpperCase() == 'DEAF';
+    final visualAlert = isDeafPatient ? ref.watch(visualEmergencyAlertProvider) : null;
 
     String? title;
     switch (currentIndex) {
@@ -76,7 +81,7 @@ class _PatientShellState extends ConsumerState<PatientShell> {
             location.contains('tracking')) &&
         !location.contains('contacts');
 
-    return PopScope(
+    final scaffold = PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
@@ -124,6 +129,79 @@ class _PatientShellState extends ConsumerState<PatientShell> {
               )
             : null,
       ),
+    );
+
+    if (visualAlert != null) {
+      return Stack(
+        children: [
+          scaffold,
+          Positioned.fill(
+            child: _DeafFullScreenAlert(
+              message: visualAlert,
+              onDismiss: () => ref.read(visualEmergencyAlertProvider.notifier).state = null,
+            ),
+          ),
+        ],
+      );
+    }
+    return scaffold;
+  }
+}
+
+class _DeafFullScreenAlert extends StatelessWidget {
+  final String message;
+  final VoidCallback onDismiss;
+
+  const _DeafFullScreenAlert({required this.message, required this.onDismiss});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0.0, end: 1.0),
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut,
+          builder: (context, value, child) => Opacity(opacity: value, child: child),
+          child: Container(
+            color: const Color(0xFFD32F2F).withOpacity(0.97),
+            child: SafeArea(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 96),
+                  const SizedBox(height: 32),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 32),
+                    child: Text(
+                      message,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.2,
+                        height: 1.3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  ElevatedButton(
+                    onPressed: onDismiss,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: const Color(0xFFD32F2F),
+                      padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 18),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
+                      elevation: 8,
+                    ),
+                    child: const Text('DISMISS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
     );
   }
 }

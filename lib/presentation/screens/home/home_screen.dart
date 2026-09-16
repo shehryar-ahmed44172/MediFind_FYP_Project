@@ -145,10 +145,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: Colors.redAccent.withOpacity(0.15),
+                              color: AppColors.error.withOpacity(0.12),
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(Icons.health_and_safety_rounded, color: Colors.redAccent, size: 20),
+                            child: Icon(Icons.health_and_safety_rounded, color: AppColors.error, size: 20),
                           ),
                           const SizedBox(width: 12),
                           Expanded(
@@ -171,9 +171,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          _buildIDStat('BLOOD', profile?.bloodType ?? '--', Colors.redAccent, labelColor),
-                          _buildIDStat('ALLERGIES', (profile?.allergies.isNotEmpty == true) ? 'ACTIVE' : 'NONE', Colors.orangeAccent, labelColor),
-                          _buildIDStat('STATUS', isVerified ? 'VERIFIED' : 'PENDING', isVerified ? Colors.greenAccent : Colors.orangeAccent, labelColor),
+                          _buildIDStat('BLOOD', profile?.bloodType ?? '--', AppColors.error, labelColor),
+                          _buildIDStat('ALLERGIES', (profile?.allergies.isNotEmpty == true) ? 'ACTIVE' : 'NONE', AppColors.warning, labelColor),
+                          _buildIDStat('STATUS', isVerified ? 'VERIFIED' : 'PENDING', isVerified ? AppColors.success : AppColors.warning, labelColor),
                         ],
                       ),
                     ],
@@ -364,17 +364,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: AppColors.warning.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.orange.withOpacity(0.35)),
+                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.hearing_disabled, color: Colors.orange, size: 16),
-                    SizedBox(width: 8),
+                    Icon(Icons.hearing_disabled, color: AppColors.warning, size: 16),
+                    const SizedBox(width: 8),
                     Text('DEAF / MUTE status included in QR',
-                        style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 12)),
+                        style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 12)),
                   ],
                 ),
               ),

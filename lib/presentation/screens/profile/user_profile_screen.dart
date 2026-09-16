@@ -89,7 +89,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Profile picture updated!'),
-            backgroundColor: Color(0xFF0E9AA7),
+            backgroundColor: AppColors.secondaryTeal,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
@@ -117,7 +118,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Sign Out'),
           ),
@@ -157,7 +158,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Sign out failed: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -172,9 +173,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: const [
-            Icon(Icons.warning_amber_rounded, color: Colors.red, size: 26),
+            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 26),
             SizedBox(width: 8),
-            Text('Delete Account', style: TextStyle(color: Colors.red)),
+            Text('Delete Account', style: TextStyle(color: AppColors.error)),
           ],
         ),
         content: const Text(
@@ -191,7 +192,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Continue'),
           ),
@@ -240,7 +241,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               TextButton(
                 style: TextButton.styleFrom(
                   foregroundColor:
-                      matches ? Colors.red : Colors.red.withOpacity(0.4),
+                      matches ? AppColors.error : AppColors.error.withOpacity(0.4),
                 ),
                 onPressed: matches ? () => Navigator.pop(ctx, true) : null,
                 child: const Text('Delete My Account'),
@@ -273,12 +274,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
       if (!mounted) return;
 
+      // ── Clear overlay BEFORE navigating ───────────────────────────────
+      // _isDeleting keeps a 55 % black overlay on screen. If we navigate
+      // while it's still true the overlay persists during the page-transition
+      // animation, producing a fully-black flash. Resetting it here makes the
+      // current screen fully transparent again before GoRouter starts the fade.
+      setState(() => _isDeleting = false);
+
       // ── Bypass GoRouter's redirect for this navigation ─────────────────
-      // Without this, the redirect reads authStateProvider which may still
-      // hold data(true) (stale) and intercepts context.go('/login') by
-      // returning '/splash', which causes the black-screen bug.
-      // skipNextRedirect() makes the next redirect evaluation return null
-      // unconditionally (one-shot flag, clears itself immediately).
       AppRouter.skipNextRedirect();
       context.go('/login');
     } catch (e) {
@@ -289,7 +292,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to delete account: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
           ),
         );
@@ -310,7 +313,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
         Scaffold(
       appBar: !isOwn
           ? AppBar(
-              backgroundColor: Colors.transparent,
+              title: const Text(
+                'Patient Profile',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
+              ),
+              centerTitle: true,
               elevation: 0,
               leading: IconButton(
                 icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -354,7 +361,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (settings.textOnlyMode) ...[
+                      // Only show accessibility banner on own profile —
+                      // caregiver's textOnlyMode should not bleed into a patient's profile view
+                      if (isOwn && settings.textOnlyMode) ...[
                         _AccessibilityBanner(),
                         const SizedBox(height: 16),
                       ],
@@ -571,7 +580,55 @@ class _ProfileCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 8),
+                // Subscription plan badge
+                _SubscriptionBadge(plan: user.subscriptionPlan ?? 'FREE'),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SubscriptionBadge extends StatelessWidget {
+  final String plan;
+  const _SubscriptionBadge({required this.plan});
+
+  @override
+  Widget build(BuildContext context) {
+    final isPro = plan == 'PROFESSIONAL';
+    final isExec = plan == 'EXECUTIVE';
+
+    if (!isPro && !isExec) return const SizedBox.shrink();
+
+    final IconData icon = isExec ? Icons.workspace_premium_rounded : Icons.star_rounded;
+    final String label = isExec ? 'Executive' : 'Professional';
+    final Color bg = isExec ? const Color(0xFFFFD700) : const Color(0xFF38BDF8);
+    final Color textColor = isExec ? const Color(0xFF7C5200) : const Color(0xFF0C3D5E);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: bg.withOpacity(0.5), blurRadius: 6, offset: const Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: textColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: textColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
             ),
           ),
         ],
@@ -621,27 +678,27 @@ class _AccessibilityBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       decoration: BoxDecoration(
-        color: Colors.amber.shade50,
+        color: AppColors.warning.withOpacity(0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.amber.shade300),
+        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.visibility_rounded,
-              color: Colors.amber.shade800, size: 20),
+          const Icon(Icons.visibility_rounded,
+              color: AppColors.warning, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Visual Accessibility Active',
+                const Text('Visual Accessibility Active',
                     style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.amber.shade900,
+                        color: AppColors.warning,
                         fontSize: 13)),
                 Text('High-contrast & icon-only interface enabled',
                     style: TextStyle(
-                        color: Colors.amber.shade700, fontSize: 12)),
+                        color: AppColors.warning.withOpacity(0.75), fontSize: 12)),
               ],
             ),
           ),
@@ -675,7 +732,7 @@ class _PatientSection extends StatelessWidget {
                     ? Icons.hearing_disabled_rounded
                     : Icons.hearing_rounded,
                 label: isDeaf ? 'Deaf & Mute' : 'Standard Mode',
-                color: isDeaf ? Colors.teal : const Color(0xFF10B981),
+                color: isDeaf ? AppColors.secondaryTeal : AppColors.success,
               ),
             ),
             const SizedBox(width: 10),
@@ -698,9 +755,11 @@ class _PatientSection extends StatelessWidget {
           const SizedBox(height: 12),
           _InfoBanner(
             icon: Icons.sign_language_rounded,
-            title: 'Deaf & Mute Mode Active',
-            subtitle: 'Silent SOS  •  Icon-only UI  •  Haptic + Flash alerts',
-            color: Colors.teal,
+            title: 'Deaf & Mute Patient',
+            subtitle: isOwnProfile
+                ? 'Silent SOS  •  Icon-only UI  •  Haptic + Flash alerts'
+                : 'Communicate via text chat  •  Cannot receive voice calls  •  Uses visual alerts',
+            color: AppColors.secondaryTeal,
           ),
         ],
         const SizedBox(height: 20),
@@ -715,21 +774,21 @@ class _PatientSection extends StatelessWidget {
               'Medical Profile',
               'View your full health record',
               '/home/medical-profile',
-              Colors.red.shade400,
+              AppColors.error,
             ),
             _QLinkData(
               Icons.contacts_rounded,
               'Emergency Contacts',
               'Manage people to contact in emergencies',
               '/home/emergency-contacts',
-              Colors.orange.shade700,
+              AppColors.warning,
             ),
             _QLinkData(
               Icons.settings_accessibility_rounded,
               'Accessibility',
               'Font size, contrast & interface mode',
               '/home/accessibility-settings',
-              Colors.teal.shade600,
+              AppColors.secondaryTeal,
             ),
           ]),
         ]
@@ -1040,7 +1099,7 @@ class _CaregiverSection extends StatelessWidget {
               usePush: true),
           _QLinkData(Icons.map_rounded, 'Live Map',
               'See patients on the live location map', '/caregiver/maps',
-              Colors.orange.shade700,
+              AppColors.warning,
               usePush: false),
           _QLinkData(Icons.history_rounded, 'Activity History',
               'View past emergencies and reports', '/caregiver/history',
@@ -1187,14 +1246,14 @@ class _SignOutButton extends StatelessWidget {
       height: 54,
       child: OutlinedButton.icon(
         onPressed: onTap,
-        icon: const Icon(Icons.logout_rounded, size: 19, color: Colors.red),
+        icon: const Icon(Icons.logout_rounded, size: 19, color: AppColors.error),
         label: const Text('Sign Out',
             style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.bold,
-                color: Colors.red)),
+                color: AppColors.error)),
         style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: Colors.red, width: 1.5),
+          side: const BorderSide(color: AppColors.error, width: 1.5),
           shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(16)),
         ),
@@ -1215,11 +1274,11 @@ class _DeleteAccountButton extends StatelessWidget {
       child: TextButton.icon(
         onPressed: onTap,
         icon: const Icon(Icons.delete_forever_rounded,
-            color: Colors.red, size: 18),
+            color: AppColors.error, size: 18),
         label: const Text(
           'Delete My Account',
           style: TextStyle(
-            color: Colors.red,
+            color: AppColors.error,
             fontWeight: FontWeight.w600,
             fontSize: 14,
           ),
@@ -1228,7 +1287,7 @@ class _DeleteAccountButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 14),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: Colors.red.withOpacity(0.3), width: 1),
+            side: BorderSide(color: AppColors.error.withOpacity(0.3), width: 1),
           ),
         ),
       ),

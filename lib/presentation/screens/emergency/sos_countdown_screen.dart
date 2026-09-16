@@ -288,7 +288,12 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       debugPrint('❌ [SOS] Failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to trigger SOS: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Failed to trigger SOS: $e'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
         );
       }
     }
@@ -309,10 +314,11 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No responders available. Emergency cancelled automatically.'),
-          backgroundColor: Colors.red,
+        SnackBar(
+          content: const Text('No responders available. Emergency cancelled automatically.'),
+          backgroundColor: AppColors.error,
           behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
       context.go('/home');
@@ -333,7 +339,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
             Text('SOS Alert Cancelled', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
-        backgroundColor: Colors.green.shade600,
+        backgroundColor: AppColors.success,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -499,11 +505,11 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade900,
+                  color: AppColors.primary,
                   borderRadius: BorderRadius.circular(12),
-                  boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+                  boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 10, offset: const Offset(0, 4))],
                 ),
-                child: Row(
+                child: const Row(
                   children: [
                     Icon(Icons.hearing_disabled, color: Colors.white, size: 20),
                     SizedBox(width: 12),
@@ -513,13 +519,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
                       ),
                     ),
-                    Container(
+                    Padding(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text('VISUAL ALERTS ON', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                      child: Text('VISUAL ALERTS ON', style: TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
@@ -596,23 +598,23 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                                 shape: BoxShape.circle,
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.red.withOpacity(0.15),
+                                    color: const Color(0xFFD32F2F).withOpacity(0.15),
                                     blurRadius: 40,
                                     spreadRadius: 20,
                                   ),
                                 ],
                               ),
                             ),
-                            
+
                             // Progress Ring indicator
                             CircularProgressIndicator(
                               value: _secondsLeft / _maxSeconds,
                               strokeWidth: 12,
-                              backgroundColor: Colors.red.shade50,
-                              color: Colors.red.shade600,
+                              backgroundColor: const Color(0xFFD32F2F).withOpacity(0.08),
+                              color: const Color(0xFFD32F2F),
                               strokeCap: StrokeCap.round,
                             ),
-                            
+
                             // Inner Text
                             Center(
                               child: Column(
@@ -623,7 +625,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                                     style: const TextStyle(
                                       fontSize: 48,
                                       fontWeight: FontWeight.w900,
-                                      color: Colors.red,
+                                      color: Color(0xFFD32F2F),
                                       letterSpacing: -1.5,
                                     ),
                                   ),
@@ -632,7 +634,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.redAccent,
+                                      color: Color(0xFFD32F2F),
                                       letterSpacing: 2,
                                     ),
                                   ),
@@ -659,7 +661,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         onPressed: _cancel,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: theme.scaffoldBackgroundColor,
-                          foregroundColor: Colors.red,
+                          foregroundColor: const Color(0xFFD32F2F),
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(20),

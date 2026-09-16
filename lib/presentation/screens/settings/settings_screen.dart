@@ -123,6 +123,17 @@ class SettingsScreen extends ConsumerWidget {
                     () => context.go('/responder/history'),
                   ),
                   const SizedBox(height: 32),
+                  _buildSectionHeader(theme, 'Subscription'),
+                  _buildSettingsTile(
+                    context,
+                    Icons.card_membership_rounded,
+                    'Subscription Plans',
+                    'Upgrade your plan for priority dispatch & full history',
+                    const Color(0xFF10B981),
+                    theme,
+                    () => context.push('/subscription-plans'),
+                  ),
+                  const SizedBox(height: 32),
                   _buildSectionHeader(theme, 'System Tools'),
                   _buildSettingsTile(
                     context,
@@ -168,6 +179,17 @@ class SettingsScreen extends ConsumerWidget {
                     theme,
                     () => context.go('/caregiver/my-patients/link-patient'),
                   ),
+                  const SizedBox(height: 32),
+                  _buildSectionHeader(theme, 'Subscription'),
+                  _buildSettingsTile(
+                    context,
+                    Icons.card_membership_rounded,
+                    'Subscription Plans',
+                    'Upgrade your plan to monitor more patients',
+                    const Color(0xFF10B981),
+                    theme,
+                    () => context.push('/subscription-plans'),
+                  ),
                 ],
   
                 const SizedBox(height: 32),
@@ -177,7 +199,7 @@ class SettingsScreen extends ConsumerWidget {
                   Icons.location_searching_rounded,
                   'Simulate Distance',
                   LocationService.debugLatOffset == 0 ? 'Disabled' : 'Active (500m Offset)',
-                  Colors.teal,
+                  AppColors.secondaryTeal,
                   theme,
                   () {
                     // Toggle 500m offset (~0.005 degrees)
@@ -188,17 +210,18 @@ class SettingsScreen extends ConsumerWidget {
                       LocationService.debugLatOffset = 0.0;
                       LocationService.debugLngOffset = 0.0;
                     }
-                    
+
                     // Force rebuild of settings screen to update subtitle
                     (context as Element).markNeedsBuild();
-                    
+
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text(LocationService.debugLatOffset == 0 
-                          ? 'Location spoofing disabled' 
+                        content: Text(LocationService.debugLatOffset == 0
+                          ? 'Location spoofing disabled'
                           : 'Location spoofed (500m offset applied)'),
-                        backgroundColor: Colors.teal,
+                        backgroundColor: AppColors.secondaryTeal,
                         behavior: SnackBarBehavior.floating,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       ),
                     );
                   },
@@ -212,7 +235,7 @@ class SettingsScreen extends ConsumerWidget {
                     borderRadius: BorderRadius.circular(24),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.red.withOpacity(0.1),
+                        color: AppColors.error.withOpacity(0.08),
                         blurRadius: 20,
                         offset: const Offset(0, 10),
                       ),
@@ -225,12 +248,12 @@ class SettingsScreen extends ConsumerWidget {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: theme.colorScheme.surface,
-                      foregroundColor: Colors.red,
+                      foregroundColor: AppColors.error,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 18),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: Colors.red.withOpacity(0.2)),
+                        side: BorderSide(color: AppColors.error.withOpacity(0.2)),
                       ),
                     ),
                     child: const Row(

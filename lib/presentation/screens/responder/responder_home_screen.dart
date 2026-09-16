@@ -84,10 +84,11 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
       if (mounted) {
         setState(() { _optimisticAvailability = null; _isUpdatingStatus = false; });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not update status — check your connection and try again.'),
-            backgroundColor: Colors.redAccent,
+          SnackBar(
+            content: const Text('Could not update status — check your connection and try again.'),
+            backgroundColor: AppColors.error,
             behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         );
       }
@@ -205,10 +206,10 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
   Widget _buildQuickActionGrid(ThemeData theme) {
     final actions = [
-      {'title': 'My Profile', 'icon': Icons.person_rounded,     'color': AppColors.primary,       'route': '/responder/profile'},
-      {'title': 'History',    'icon': Icons.history_rounded,     'color': AppColors.secondaryTeal, 'route': '/responder/history'},
-      {'title': 'Messages',   'icon': Icons.chat_bubble_rounded, 'color': AppColors.warning,       'route': '/responder/chats'},
-      {'title': 'My Rating',  'icon': Icons.star_rounded,        'color': const Color(0xFFF59E0B), 'route': null}, // null = inline bottom sheet
+      {'title': 'My Profile',    'icon': Icons.person_rounded,         'color': AppColors.primary,       'route': '/responder/profile'},
+      {'title': 'History',       'icon': Icons.history_rounded,         'color': AppColors.secondaryTeal, 'route': '/responder/history'},
+      {'title': 'Settings',      'icon': Icons.settings_rounded,        'color': AppColors.warning,       'route': '/settings'},
+      {'title': 'My Rating',     'icon': Icons.star_rounded,            'color': const Color(0xFFF59E0B), 'route': null}, // null = inline bottom sheet
     ];
 
     return GridView.builder(
@@ -443,7 +444,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
           String statusLabel;
           String subLabel;
           if (!isConnected) {
-            iconColor  = Colors.orange;
+            iconColor  = AppColors.warning;
             statusLabel = 'No Internet Connection';
             subLabel   = 'Toggle unavailable while offline';
           } else if (_isUpdatingStatus) {
@@ -465,7 +466,7 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
               boxShadow: AppShadows.cardShadow,
               border: Border.all(
                 color: !isConnected
-                    ? Colors.orange.withOpacity(0.45)
+                    ? AppColors.warning.withOpacity(0.45)
                     : Colors.transparent,
                 width: 1.5,
               ),

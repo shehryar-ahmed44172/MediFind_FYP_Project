@@ -55,7 +55,7 @@ class CaregiverHistoryScreen extends ConsumerWidget {
         'time': '2 hours ago',
         'status': 'RESOLVED',
         'icon': Icons.emergency_rounded,
-        'color': Colors.red,
+        'color': AppColors.error,
       },
       {
         'type': 'REPORT',
@@ -73,7 +73,7 @@ class CaregiverHistoryScreen extends ConsumerWidget {
         'time': '3 days ago',
         'status': 'RESOLVED',
         'icon': Icons.health_and_safety_rounded,
-        'color': Colors.orange,
+        'color': AppColors.warning,
       },
       {
         'type': 'REPORT',
@@ -82,7 +82,7 @@ class CaregiverHistoryScreen extends ConsumerWidget {
         'time': '1 week ago',
         'status': 'NEW',
         'icon': Icons.biotech_rounded,
-        'color': Colors.blue,
+        'color': AppColors.primaryLight,
       },
     ];
 

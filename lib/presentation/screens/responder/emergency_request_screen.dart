@@ -372,13 +372,13 @@ class _EmergencyRequestScreenState
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: AppColors.warning.withOpacity(0.08),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.shade300),
+              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                Icon(Icons.lock_outline_rounded, size: 15, color: Colors.amber.shade800),
+                Icon(Icons.lock_outline_rounded, size: 15, color: AppColors.warning),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -389,7 +389,7 @@ class _EmergencyRequestScreenState
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w800,
-                          color: Colors.amber.shade900,
+                          color: AppColors.warning,
                           letterSpacing: 0.3,
                         ),
                       ),
@@ -399,7 +399,7 @@ class _EmergencyRequestScreenState
                         'Do not share or screenshot this information.',
                         style: TextStyle(
                           fontSize: 10.5,
-                          color: Colors.amber.shade800,
+                          color: AppColors.warning,
                           height: 1.4,
                         ),
                       ),

@@ -182,6 +182,24 @@ final getResponderHistoryProvider = FutureProvider<List<dynamic>>((ref) async {
   return await repo.getResponderHistory();
 });
 
+// Rate responder provider
+final rateResponderProvider = FutureProvider.family<Map<String, dynamic>, RateResponderParams>((ref, params) async {
+  final apiClient = ref.watch(apiClientProvider);
+  return await apiClient.rateResponder(params.responderId, params.emergencyId, params.stars);
+});
+
+class RateResponderParams {
+  final String responderId;
+  final String emergencyId;
+  final int stars;
+
+  const RateResponderParams({
+    required this.responderId,
+    required this.emergencyId,
+    required this.stars,
+  });
+}
+
 // Parameters
 class CreateEmergencyParams {
   final String emergencyType;
@@ -223,31 +241,48 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
     next.whenData((message) async {
       final data = message.data;
       if (data is! Map<String, dynamic>) return;
-      
+
       final user = ref.read(currentUserProvider).valueOrNull;
       if (user == null) return;
 
+      // For `notification` events the server sends the full envelope:
+      //   { type, title, body, data: { emergencyId, patientId, ... }, timestamp }
+      // For other events (newEmergency, emergencyStatusChange) the socket service
+      // already unpacks to the inner data object.
+      // Extract type and inner payload accordingly.
+      final String? eventType;
+      final Map<String, dynamic> payload;
+      if (message.event == SocketEvent.notification) {
+        eventType = data['type']?.toString();
+        payload = (data['data'] is Map<String, dynamic>)
+            ? Map<String, dynamic>.from(data['data'] as Map)
+            : data;
+      } else {
+        eventType = data['type']?.toString();
+        payload = data;
+      }
+
       // --- SELF-FILTER: Never alert a user about their own SOS ---
-      final targetPatientId = (data['patientId'] ?? data['userId'] ?? data['id'])?.toString();
+      final targetPatientId = (payload['patientId'] ?? payload['userId'] ?? payload['id'])?.toString();
       final currentUserId = user.id.toString();
-      
+
       if (targetPatientId != null && targetPatientId == currentUserId) {
         debugPrint('🛡️ [Filter] Self-SOS Detected ($targetPatientId). Blocking alert for Patient.');
         return;
       }
-      
-      debugPrint('📩 [Socket] Event: ${message.event}, Type: ${data['type']}, Target: $targetPatientId, Me: $currentUserId');
+
+      debugPrint('📩 [Socket] Event: ${message.event}, Type: $eventType, Target: $targetPatientId, Me: $currentUserId');
 
       // --- 1. Handle NEW_EMERGENCY (Responder Only) ---
       if (message.event == SocketEvent.newEmergency) {
         if (user.role == 'RESPONDER') {
           final repo = await ref.read(emergencyRepositoryProvider.future);
-          final emergencyId = data['id'] ?? data['emergencyId'];
+          final emergencyId = payload['id'] ?? payload['emergencyId'];
           if (emergencyId != null) {
             try {
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
-              PushNotificationService.showEmergencyAlert(data);
+              PushNotificationService.showEmergencyAlert(payload);
               debugPrint('✅ Socket: Responder Alerted for $emergencyId');
             } catch (e) {
               debugPrint('❌ Socket Error: $e');
@@ -258,42 +293,34 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
 
       // --- 2. Handle Generic NOTIFICATION (Responders & Caregivers) ---
       else if (message.event == SocketEvent.notification) {
-        final type = data['type'];
-        debugPrint('🔔 Notification Type: $type for Role: ${user.role}');
+        debugPrint('🔔 Notification Type: $eventType for Role: ${user.role}');
 
-        // PRIVACY FIX: SYSTEM_ALERT from admin — only show to the intended recipient.
-        // The backend emits to notifications:{userId} room, but if the recipientId
-        // field is present, double-check it matches the current user.
-        if (type == 'SYSTEM_ALERT') {
-          final recipientId = data['recipientId']?.toString();
+        // PRIVACY FIX: SYSTEM_ALERT from admin
+        if (eventType == 'SYSTEM_ALERT') {
+          final recipientId = (payload['recipientId'] ?? data['recipientId'])?.toString();
           if (recipientId != null && recipientId.isNotEmpty && recipientId != user.id) {
             debugPrint('🛡️ [Privacy] SYSTEM_ALERT for $recipientId blocked — current user is ${user.id}');
             return;
           }
-          // Show as an in-app snackbar/banner for the correct user
           debugPrint('📣 [Admin] SYSTEM_ALERT received for current user: ${data['title']}');
-          // Notification is handled by FCM/push layer; nothing else to do here.
           return;
         }
 
         // PRIVACY FIX: Responders should NEVER receive chat notifications
-        if (type == 'CHAT_MESSAGE' && user.role == 'RESPONDER') {
+        if (eventType == 'CHAT_MESSAGE' && user.role == 'RESPONDER') {
           debugPrint('🛡️ [Privacy] Blocked chat notification for Responder');
           return;
         }
 
         // --- RESPONDER LOGIC: SOS Triggered ---
-        if ((type == 'SOS_TRIGGERED' || type == 'EMERGENCY_REQUEST') && user.role == 'RESPONDER') {
+        if ((eventType == 'SOS_TRIGGERED' || eventType == 'EMERGENCY_REQUEST') && user.role == 'RESPONDER') {
           final repo = await ref.read(emergencyRepositoryProvider.future);
-          final emergencyId = data['id'] ?? data['emergencyId'];
+          final emergencyId = payload['id'] ?? payload['emergencyId'];
           if (emergencyId != null) {
             try {
-              // Pre-fetch emergency details to ensure they are in cache
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
-              
-              // Trigger Visual & Voice Alert
-              PushNotificationService.showEmergencyAlert(data);
+              PushNotificationService.showEmergencyAlert(payload);
               debugPrint('🚨 Socket: Responder Alerted for $emergencyId via generic notification');
             } catch (e) {
               debugPrint('❌ Socket Error pre-fetching emergency: $e');
@@ -302,17 +329,16 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
         }
 
         // --- RESPONDER LOGIC: Emergency Cancelled/Resolved by others ---
-        else if ((type == 'EMERGENCY_RESOLVED' || type == 'EMERGENCY_CANCELLED' || type == 'EMERGENCY_ACCEPTED_BY_OTHER') && user.role == 'RESPONDER') {
-          debugPrint('🧹 SOS Request no longer active: $type');
+        else if ((eventType == 'EMERGENCY_RESOLVED' || eventType == 'EMERGENCY_CANCELLED' || eventType == 'EMERGENCY_ACCEPTED_BY_OTHER') && user.role == 'RESPONDER') {
+          debugPrint('🧹 SOS Request no longer active: $eventType');
 
-          // Update local cache status so stream filters it out immediately
-          final emergencyId = data['emergencyId'] ?? data['id'];
+          final emergencyId = payload['emergencyId'] ?? payload['id'];
           if (emergencyId != null) {
             try {
               final localDs = await ref.read(localDataSourceProvider.future);
               final cached = await localDs.getEmergency(emergencyId.toString());
               if (cached != null) {
-                cached['status'] = type == 'EMERGENCY_CANCELLED' ? 'CANCELLED' : 'RESOLVED';
+                cached['status'] = eventType == 'EMERGENCY_CANCELLED' ? 'CANCELLED' : 'RESOLVED';
                 await localDs.saveEmergency(cached);
                 debugPrint('📦 Local cache updated: $emergencyId → ${cached['status']}');
               }
@@ -321,19 +347,16 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
             }
           }
 
-          // Dismiss any active alert modal
           PushNotificationService.dismissCurrentEmergencyModal();
-
-          // Invalidate BOTH providers so responder home screen refreshes immediately
           ref.invalidate(getActiveEmergenciesProvider);
           ref.invalidate(watchActiveEmergenciesProvider);
         }
 
         // --- CAREGIVER LOGIC: Patient SOS ---
-        else if (type == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
+        else if (eventType == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER') {
           debugPrint('🚨 Caregiver SOS Notification Received!');
           PushNotificationService.showEmergencyAlert({
-            ...data,
+            ...payload,
             'isCaregiverAlert': true,
           });
           ref.invalidate(getActiveEmergenciesProvider);
@@ -408,8 +431,14 @@ final socketStreamProvider = StreamProvider<SocketMessage>((ref) {
         final token = await repo.getAuthToken();
         if (token != null) {
           socketService.setAuthToken(token);
-          // Plan v4: Pass userId to initiate the server-side room joining
           socketService.connect(user.id);
+          // Responders join the broadcast room to receive NEW_EMERGENCY events
+          if (user.role == 'RESPONDER') {
+            // Small delay to ensure socket is fully connected before joining room
+            Future.delayed(const Duration(milliseconds: 500), () {
+              socketService.joinRespondersRoom();
+            });
+          }
         }
       });
     }

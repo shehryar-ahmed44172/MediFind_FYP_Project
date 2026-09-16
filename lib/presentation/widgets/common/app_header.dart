@@ -97,23 +97,22 @@ class AppHeader extends ConsumerWidget implements PreferredSizeWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                    _buildActionButton(
-                      icon: Icons.chat_bubble_outline_rounded,
-                      theme: theme,
-                      onTap: () {
-                        final user = userAsync.valueOrNull;
-                        final role = user?.role ?? 'PATIENT';
-                        if (role == 'PATIENT') {
-                          context.go('/chats');
-                        } else if (role == 'CAREGIVER') {
-                          context.go('/caregiver/chats');
-                        } else if (role == 'RESPONDER') {
-                          context.go('/responder/chats');
-                        }
-                      },
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
+                    if ((userAsync.valueOrNull?.role ?? '') != 'RESPONDER') ...[
+                      _buildActionButton(
+                        icon: Icons.chat_bubble_outline_rounded,
+                        theme: theme,
+                        onTap: () {
+                          final role = userAsync.valueOrNull?.role ?? 'PATIENT';
+                          if (role == 'CAREGIVER') {
+                            context.go('/caregiver/chats');
+                          } else {
+                            context.go('/chats');
+                          }
+                        },
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Stack(
                       clipBehavior: Clip.none,
                       children: [

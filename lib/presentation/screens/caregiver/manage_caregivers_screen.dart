@@ -52,14 +52,14 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invitation sent successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppColors.success,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
         );
       }
     } finally {
@@ -147,7 +147,7 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
             onPressed: () async {
               Navigator.pop(ctx);
               try {
@@ -158,7 +158,7 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
                 );
               } catch (e) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+                  SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
                 );
               }
             },
@@ -180,14 +180,14 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(accept ? 'Invitation accepted' : 'Invitation rejected'),
-            backgroundColor: accept ? Colors.green : Colors.red,
+            backgroundColor: accept ? AppColors.success : AppColors.error,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
         );
       }
     }
@@ -214,10 +214,10 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
                   Container(
                     padding: const EdgeInsets.all(24),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.05),
+                      color: AppColors.primary.withOpacity(0.07),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.group_add_outlined, size: 80, color: Colors.blue.shade300),
+                    child: Icon(Icons.group_add_outlined, size: 80, color: AppColors.primary.withOpacity(0.4)),
                   ),
                   const SizedBox(height: 24),
                   const Text('No Caregivers Yet',
@@ -283,15 +283,15 @@ class _CaregiverCard extends StatelessWidget {
 
     switch (link.status.toUpperCase()) {
       case 'ACCEPTED':
-        statusColor = Colors.green;
+        statusColor = AppColors.success;
         statusText = 'Connected';
         break;
       case 'PENDING':
-        statusColor = Colors.orange;
+        statusColor = AppColors.warning;
         statusText = 'Pending Approval';
         break;
       case 'REJECTED':
-        statusColor = Colors.red;
+        statusColor = AppColors.error;
         statusText = 'Rejected';
         break;
       default:
@@ -398,13 +398,13 @@ class _CaregiverCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,
                       ),
-                      child: const Text('Reject', style: TextStyle(color: Colors.red, fontSize: 13)),
+                      child: const Text('Reject', style: TextStyle(color: AppColors.error, fontSize: 13)),
                     ),
                     const SizedBox(width: 4),
                     ElevatedButton(
                       onPressed: onAccept,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: AppColors.success,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         minimumSize: const Size(0, 32),
@@ -433,8 +433,8 @@ class _CaregiverCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     TextButton.icon(
                       onPressed: onDelete,
-                      icon: const Icon(Icons.person_remove_outlined, size: 16, color: Colors.red),
-                      label: const Text('Remove', style: TextStyle(color: Colors.red, fontSize: 13)),
+                      icon: const Icon(Icons.person_remove_outlined, size: 16, color: AppColors.error),
+                      label: const Text('Remove', style: TextStyle(color: AppColors.error, fontSize: 13)),
                       style: TextButton.styleFrom(
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         minimumSize: Size.zero,

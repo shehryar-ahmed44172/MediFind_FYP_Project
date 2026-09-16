@@ -74,15 +74,19 @@ class SocketService {
 
     // Generic notification listener (Plan v4)
     _socket!.on('notification', (data) {
-      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
-      print('🔔 Global Socket Notification Received: $unpackedData');
-      _messageController.add(SocketMessage(SocketEvent.notification, unpackedData));
+      print('🔔 Global Socket Notification Received: $data');
+      // Pass the full notification object so type/title/body are accessible.
+      // The handler in socketNotificationHandlerProvider extracts data['data']
+      // separately for emergency-specific fields.
+      _messageController.add(SocketMessage(SocketEvent.notification, data));
     });
 
     // Map guide events
     _socket!.on('NEW_EMERGENCY', (data) {
       print('🚨 NEW_EMERGENCY event received: $data');
-      _messageController.add(SocketMessage(SocketEvent.newEmergency, data));
+      // Unpack nested data field (server sends { type, data: {...} })
+      final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
+      _messageController.add(SocketMessage(SocketEvent.newEmergency, unpackedData));
     });
 
     _socket!.on('LOCATION_UPDATE', (data) {
@@ -123,6 +127,12 @@ class SocketService {
       final unpackedData = (data is Map && data.containsKey('data')) ? data['data'] : data;
       _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpackedData));
     });
+  }
+
+  void joinRespondersRoom() {
+    if (!_isConnected || _socket == null) return;
+    _socket!.emit('join:responders', null);
+    print('Joined responders broadcast room');
   }
 
   void joinEmergencyRoom(String emergencyId) {

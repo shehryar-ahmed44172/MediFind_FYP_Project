@@ -52,4 +52,7 @@ dependencies {
     // For example, for Firebase Cloud Messaging:
     implementation("com.google.firebase:firebase-messaging")
     implementation("com.google.firebase:firebase-analytics")
+
+    // Required by flutter_stripe for Theme.MaterialComponents
+    implementation("com.google.android.material:material:1.12.0")
 }

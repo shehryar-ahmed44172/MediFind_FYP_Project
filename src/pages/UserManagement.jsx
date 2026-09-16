@@ -125,7 +125,8 @@ export default function UserManagement() {
     return api.get(url)
       .then(res => {
         if (id !== requestId.current) return; // a newer request superseded this one
-        setUsers(res.data?.success ? res.data.data : []);
+        // Administrator accounts are managed outside this screen
+        setUsers(res.data?.success ? res.data.data.filter(u => u.role !== 'ADMIN') : []);
         setError('');
       })
       .catch(err => {
@@ -520,6 +521,7 @@ const iconBtn = (bg, color) => ({
 function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactivate, onDelete }) {
   const stop = (fn) => (e) => { e.stopPropagation(); fn(); };
   const name = user.fullName || user.email;
+  const isAdmin = user.role === 'ADMIN';
 
   return (
     <>
@@ -544,7 +546,7 @@ function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactiva
           <ExternalLink size={13} />
           {effStatus === 'REJECTED' ? 'Review' : 'Verify'}
         </Link>
-      ) : effStatus === 'ACTIVE' ? (
+      ) : isAdmin ? null : effStatus === 'ACTIVE' ? (
         <button type="button" onClick={stop(() => onDeactivate(user.id, name))} title="Deactivate account" aria-label={`Deactivate ${name}`} style={iconBtn('var(--tint-amber)', 'var(--warning-fg)')}>
           <ShieldOff size={15} />
         </button>
@@ -554,9 +556,9 @@ function ActionButtons({ user, role, effStatus, onView, onDeactivate, onReactiva
         </button>
       )}
 
-      <button type="button" onClick={stop(() => onDelete(user.id, name))} title="Delete account" aria-label={`Delete ${name}`} style={iconBtn('var(--tint-red)', 'var(--error-fg)')}>
+      {!isAdmin && <button type="button" onClick={stop(() => onDelete(user.id, name))} title="Delete account" aria-label={`Delete ${name}`} style={iconBtn('var(--tint-red)', 'var(--error-fg)')}>
         <Trash2 size={15} />
-      </button>
+      </button>}
     </>
   );
 }

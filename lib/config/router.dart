@@ -36,6 +36,8 @@ import '../presentation/screens/settings/settings_screen.dart';
 import '../presentation/screens/home/patient_shell.dart';
 import '../presentation/screens/home/patient_type_info_screen.dart';
 import '../presentation/screens/medical/emergency_contacts_screen.dart';
+import '../presentation/screens/medical/medical_id_screen.dart';
+import '../presentation/screens/patient/deaf_communication_card_screen.dart';
 
 import '../presentation/screens/home/caregiver_shell.dart';
 import '../presentation/screens/home/responder_shell.dart';
@@ -50,6 +52,7 @@ import '../presentation/screens/auth/pending_approval_screen.dart';
 import '../presentation/screens/auth/reset_password_otp_screen.dart';
 import '../presentation/screens/auth/reset_new_password_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
+import '../presentation/widgets/design_system/design_system.dart';
 
 // AppRouter class manages all the navigation paths within the app
 class AppRouter {
@@ -218,7 +221,9 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // PATIENT DASHBOARD (Stateful)
+      // PATIENT DASHBOARD — 4 tabs: SOS (Home) · Messages · Medical ID · Profile
+      // Sub-pages are nested under their tab with parentNavigatorKey so they
+      // render ABOVE the shell AND keep a back stack when reached via go().
       // -----------------------------------------------------------------------
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PatientShell(navigationShell: navigationShell, state: state),
@@ -229,35 +234,88 @@ class AppRouter {
                 path: '/home',
                 name: 'home',
                 builder: (context, state) => const HomeScreen(),
-                // Sub-pages are top-level routes with parentNavigatorKey so they
-                // render ABOVE the shell and get automatic back-button behaviour.
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/home/medical-reports',
-                name: 'medical-reports',
-                builder: (context, state) => const MedicalReportsScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/home/caregivers',
-                name: 'caregivers',
-                builder: (context, state) => const ManageCaregiversScreen(),
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/profile',
-                name: 'profile',
-                builder: (context, state) => const UserProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'medical-profile',
+                    name: 'medical-profile',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const MedicalProfileScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'edit',
+                        name: 'edit-medical-profile',
+                        parentNavigatorKey: _navigatorKey,
+                        builder: (context, state) => const EditMedicalProfileScreen(),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'medical-reports',
+                    name: 'medical-reports',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const MedicalReportsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'caregivers',
+                    name: 'caregivers',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const ManageCaregiversScreen(),
+                  ),
+                  GoRoute(
+                    path: 'patient-type-info',
+                    name: 'patient-type-info',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const PatientTypeInfoScreen(),
+                  ),
+                  GoRoute(
+                    path: 'emergency-contacts',
+                    name: 'emergency-contacts',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const EmergencyContactsScreen(),
+                  ),
+                  // Deaf communication card ("Show to people nearby").
+                  GoRoute(
+                    path: 'show-card',
+                    name: 'show-card',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => DeafCommunicationCardScreen(
+                      message: state.extra is String ? state.extra as String : null,
+                    ),
+                  ),
+                  // Legacy patient path — kept so existing links keep working.
+                  GoRoute(
+                    path: 'accessibility-settings',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const AccessibilitySettingsScreen(),
+                  ),
+                  GoRoute(
+                    path: 'emergency',
+                    name: 'emergency',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const EmergencyScreen(),
+                  ),
+                  GoRoute(
+                    path: 'sos-countdown',
+                    name: 'sos-countdown',
+                    parentNavigatorKey: _navigatorKey,
+                    pageBuilder: (context, state) {
+                      final extra = state.extra as Map<String, dynamic>? ?? {};
+                      return CustomTransitionPage(
+                        key: state.pageKey,
+                        transitionDuration: const Duration(milliseconds: 200),
+                        child: SosCountdownScreen(
+                          emergencyType: extra['emergencyType'] ?? 'OTHER',
+                          latitude: (extra['latitude'] as num?)?.toDouble() ?? 0.0,
+                          longitude: (extra['longitude'] as num?)?.toDouble() ?? 0.0,
+                          additionalInfo: extra['additionalInfo'],
+                          isMocked: extra['isMocked'] == true,
+                        ),
+                        transitionsBuilder: (context, animation, secondaryAnimation, child) =>
+                            FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -270,10 +328,28 @@ class AppRouter {
               ),
             ],
           ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/medical-id',
+                name: 'medical-id',
+                builder: (context, state) => const MedicalIdScreen(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/profile',
+                name: 'profile',
+                builder: (context, state) => const UserProfileScreen(),
+              ),
+            ],
+          ),
         ],
       ),
       // -----------------------------------------------------------------------
-      // CAREGIVER DASHBOARD (Stateful)
+      // CAREGIVER DASHBOARD — 4 tabs: Patients (Home) · Live Map · Messages · Profile
       // -----------------------------------------------------------------------
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => CaregiverShell(navigationShell: navigationShell, state: state),
@@ -284,16 +360,42 @@ class AppRouter {
                 path: '/caregiver',
                 name: 'caregiver-home',
                 builder: (context, state) => const CaregiverHomeScreen(),
-                // caregiver/history is a top-level overlay route (see below)
-              ),
-            ],
-          ),
-          StatefulShellBranch(
-            routes: [
-              GoRoute(
-                path: '/caregiver/my-patients',
-                name: 'caregiver-my-patients',
-                builder: (context, state) => const MyPatientsScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'history',
+                    name: 'caregiver-history',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const CaregiverHistoryScreen(),
+                  ),
+                  GoRoute(
+                    path: 'my-patients',
+                    name: 'caregiver-my-patients',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => const MyPatientsScreen(),
+                    routes: [
+                      GoRoute(
+                        path: 'patient-profile/:userId',
+                        name: 'patient-profile',
+                        parentNavigatorKey: _navigatorKey,
+                        builder: (context, state) => UserProfileScreen(
+                          userId: state.pathParameters['userId'],
+                        ),
+                      ),
+                      GoRoute(
+                        path: 'link-patient',
+                        name: 'caregiver-link-patient',
+                        parentNavigatorKey: _navigatorKey,
+                        builder: (context, state) => const LinkPatientScreen(),
+                      ),
+                    ],
+                  ),
+                  GoRoute(
+                    path: 'tracking/:emergencyId',
+                    name: 'caregiver-tracking',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => CaregiverTrackingScreen(emergencyId: state.pathParameters['emergencyId']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -309,18 +411,18 @@ class AppRouter {
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/caregiver/profile',
-                name: 'caregiver-profile',
-                builder: (context, state) => const UserProfileScreen(),
+                path: '/caregiver/chats',
+                name: 'caregiver-chats',
+                builder: (context, state) => const ChatListScreen(),
               ),
             ],
           ),
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/caregiver/chats',
-                name: 'caregiver-chats',
-                builder: (context, state) => const ChatListScreen(),
+                path: '/caregiver/profile',
+                name: 'caregiver-profile',
+                builder: (context, state) => const UserProfileScreen(),
               ),
             ],
           ),
@@ -328,7 +430,7 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // RESPONDER DASHBOARD (Stateful)
+      // RESPONDER DASHBOARD — 3 tabs: Requests (Home) · History · Profile
       // -----------------------------------------------------------------------
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => ResponderShell(navigationShell: navigationShell, state: state),
@@ -339,6 +441,20 @@ class AppRouter {
                 path: '/responder',
                 name: 'responder-home',
                 builder: (context, state) => const ResponderHomeScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'request/:requestId',
+                    name: 'emergency-request',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => EmergencyRequestScreen(requestId: state.pathParameters['requestId']!),
+                  ),
+                  GoRoute(
+                    path: 'active/:emergencyId',
+                    name: 'active-emergency',
+                    parentNavigatorKey: _navigatorKey,
+                    builder: (context, state) => ActiveEmergencyScreen(emergencyId: state.pathParameters['emergencyId']!),
+                  ),
+                ],
               ),
             ],
           ),
@@ -364,102 +480,13 @@ class AppRouter {
       ),
 
       // -----------------------------------------------------------------------
-      // Patient Sub-Pages (Full Screen overlays above shell)
-      // Lifted out of StatefulShellBranch so they render above the shell and
-      // get automatic back-navigation (AppBar leading arrow / system back).
+      // Shared full-screen routes (all roles)
       // -----------------------------------------------------------------------
-      GoRoute(
-        path: '/home/medical-profile',
-        name: 'medical-profile',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const MedicalProfileScreen(),
-      ),
-      GoRoute(
-        path: '/home/medical-profile/edit',
-        name: 'edit-medical-profile',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const EditMedicalProfileScreen(),
-      ),
-      GoRoute(
-        path: '/home/patient-type-info',
-        name: 'patient-type-info',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const PatientTypeInfoScreen(),
-      ),
-      GoRoute(
-        path: '/home/emergency-contacts',
-        name: 'emergency-contacts',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const EmergencyContactsScreen(),
-      ),
-      // Legacy patient path — kept so existing links keep working.
-      GoRoute(
-        path: '/home/accessibility-settings',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const AccessibilitySettingsScreen(),
-      ),
-      // Shared route for every role (patients, responders, caregivers).
       GoRoute(
         path: '/accessibility-settings',
         name: 'accessibility-settings',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const AccessibilitySettingsScreen(),
-      ),
-
-      // -----------------------------------------------------------------------
-      // Caregiver Sub-Pages (Full Screen overlays above shell)
-      // -----------------------------------------------------------------------
-      GoRoute(
-        path: '/caregiver/history',
-        name: 'caregiver-history',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const CaregiverHistoryScreen(),
-      ),
-
-      // -----------------------------------------------------------------------
-      // Overlay & Emergency Routes (Full Screen)
-      // -----------------------------------------------------------------------
-      GoRoute(
-        path: '/home/emergency',
-        name: 'emergency',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const EmergencyScreen(),
-      ),
-      GoRoute(
-        path: '/home/sos-countdown',
-        name: 'sos-countdown',
-        parentNavigatorKey: _navigatorKey,
-        pageBuilder: (context, state) {
-          final extra = state.extra as Map<String, dynamic>? ?? {};
-          return CustomTransitionPage(
-            key: state.pageKey,
-            child: SosCountdownScreen(
-              emergencyType: extra['emergencyType'] ?? 'OTHER',
-              latitude: (extra['latitude'] as num?)?.toDouble() ?? 0.0,
-              longitude: (extra['longitude'] as num?)?.toDouble() ?? 0.0,
-              additionalInfo: extra['additionalInfo'],
-            ),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) => ScaleTransition(scale: animation, child: child),
-          );
-        },
-      ),
-      GoRoute(
-        path: '/responder/request/:requestId',
-        name: 'emergency-request',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => EmergencyRequestScreen(requestId: state.pathParameters['requestId']!),
-      ),
-      GoRoute(
-        path: '/responder/active/:emergencyId',
-        name: 'active-emergency',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => ActiveEmergencyScreen(emergencyId: state.pathParameters['emergencyId']!),
-      ),
-      GoRoute(
-        path: '/caregiver/tracking/:emergencyId',
-        name: 'caregiver-tracking',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => CaregiverTrackingScreen(emergencyId: state.pathParameters['emergencyId']!),
       ),
       GoRoute(
         path: '/emergency/:emergencyId/tracking',
@@ -472,20 +499,6 @@ class AppRouter {
         name: 'edit-profile',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const EditProfileScreen(),
-      ),
-      GoRoute(
-        path: '/caregiver/my-patients/patient-profile/:userId',
-        name: 'patient-profile',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => UserProfileScreen(
-          userId: state.pathParameters['userId'],
-        ),
-      ),
-      GoRoute(
-        path: '/caregiver/my-patients/link-patient',
-        name: 'caregiver-link-patient',
-        parentNavigatorKey: _navigatorKey,
-        builder: (context, state) => const LinkPatientScreen(),
       ),
       GoRoute(
         path: '/subscription-plans',
@@ -543,9 +556,16 @@ class AppRouter {
         builder: (context, state) => const PredefinedMessagesScreen(),
       ),
     ],
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Error')),
-      body: Center(child: Text('Page not found: ${state.uri}')),
+    errorBuilder: (context, state) => MfScaffold(
+      title: 'Page not found',
+      fallbackRoute: '/splash',
+      body: MfEmptyState(
+        icon: Icons.link_off_rounded,
+        title: 'This page does not exist',
+        message: state.uri.toString(),
+        actionLabel: 'Go home',
+        onAction: () => context.go('/splash'),
+      ),
     ),
   );
 }

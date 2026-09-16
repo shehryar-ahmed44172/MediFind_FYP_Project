@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/design_system/design_system.dart';
 
 // ── Local cache key ───────────────────────────────────────────────────────────
 const _kPredefinedMessages = 'predefined_messages';
@@ -11,7 +11,7 @@ const _kPredefinedMessages = 'predefined_messages';
 // ── Default messages for deaf patients ───────────────────────────────────────
 const _defaultMessages = [
   'I need immediate medical help!',
-  'I am deaf — please communicate via text.',
+  'I am deaf. Please communicate via text.',
   'I have chest pain.',
   'I cannot breathe properly.',
   'I am having a seizure.',
@@ -19,6 +19,8 @@ const _defaultMessages = [
   'I am diabetic and feeling faint.',
   'I am allergic to penicillin.',
 ];
+
+const _maxPhraseLength = 100;
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 final predefinedMessagesProvider =
@@ -54,8 +56,28 @@ class PredefinedMessagesNotifier extends StateNotifier<List<String>> {
     await _persist();
   }
 
+  /// Replaces the phrase at [index]. Ignored when empty or a duplicate.
+  Future<void> update(int index, String message) async {
+    final text = message.trim();
+    if (index < 0 || index >= state.length || text.isEmpty) return;
+    if (state.asMap().entries.any((e) => e.key != index && e.value == text)) return;
+    final list = [...state];
+    list[index] = text;
+    state = list;
+    await _persist();
+  }
+
   Future<void> remove(String message) async {
     state = state.where((m) => m != message).toList();
+    await _persist();
+  }
+
+  /// Puts back a phrase removed with [remove] (undo).
+  Future<void> insertAt(int index, String message) async {
+    if (state.contains(message)) return;
+    final list = [...state];
+    list.insert(index.clamp(0, list.length), message);
+    state = list;
     await _persist();
   }
 
@@ -79,15 +101,14 @@ class PredefinedMessagesScreen extends ConsumerStatefulWidget {
   const PredefinedMessagesScreen({super.key});
 
   @override
-  ConsumerState<PredefinedMessagesScreen> createState() =>
-      _PredefinedMessagesScreenState();
+  ConsumerState<PredefinedMessagesScreen> createState() => _PredefinedMessagesScreenState();
 }
 
-class _PredefinedMessagesScreenState
-    extends ConsumerState<PredefinedMessagesScreen> {
+class _PredefinedMessagesScreenState extends ConsumerState<PredefinedMessagesScreen> {
   final _controller = TextEditingController();
   bool _isSyncing = false;
   String? _syncError;
+  bool _dirty = false;
 
   @override
   void dispose() {
@@ -119,16 +140,13 @@ class _PredefinedMessagesScreenState
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Messages synced to your profile ✓'),
-            backgroundColor: Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        setState(() => _dirty = false);
+        showMfSnackBar(context, 'Quick phrases saved to your medical profile.', tone: MfTone.success);
       }
     } catch (e) {
-      setState(() => _syncError = 'Sync failed: ${e.toString()}');
+      if (mounted) {
+        setState(() => _syncError = e.toString().replaceAll('Exception:', '').trim());
+      }
     } finally {
       if (mounted) setState(() => _isSyncing = false);
     }
@@ -137,263 +155,279 @@ class _PredefinedMessagesScreenState
   void _addMessage() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    if (ref.read(predefinedMessagesProvider).contains(text)) {
+      showMfSnackBar(context, 'That phrase is already in your list.', tone: MfTone.warning);
+      return;
+    }
     ref.read(predefinedMessagesProvider.notifier).add(text);
     _controller.clear();
+    setState(() => _dirty = true);
+  }
+
+  Future<void> _editMessage(int index, String current) async {
+    final controller = TextEditingController(text: current);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Edit phrase'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLength: _maxPhraseLength,
+          minLines: 1,
+          maxLines: 3,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(labelText: 'Phrase'),
+          onSubmitted: (v) => Navigator.pop(ctx, v),
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.md),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, controller.text), child: const Text('Save')),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (result == null || result.trim().isEmpty || result.trim() == current) return;
+    await ref.read(predefinedMessagesProvider.notifier).update(index, result);
+    if (mounted) setState(() => _dirty = true);
+  }
+
+  Future<void> _deleteMessage(int index, String msg) async {
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Delete this phrase?',
+      message: '"$msg"',
+      confirmLabel: 'Delete',
+      destructive: true,
+      icon: Icons.delete_outline_rounded,
+    );
+    if (!confirmed || !mounted) return;
+    await ref.read(predefinedMessagesProvider.notifier).remove(msg);
+    if (!mounted) return;
+    setState(() => _dirty = true);
+    showMfSnackBar(
+      context,
+      'Phrase deleted',
+      actionLabel: 'Undo',
+      onAction: () => ref.read(predefinedMessagesProvider.notifier).insertAt(index, msg),
+    );
+  }
+
+  Future<void> _move(int index, int delta) async {
+    final target = index + delta;
+    final length = ref.read(predefinedMessagesProvider).length;
+    if (target < 0 || target >= length) return;
+    // ReorderableList semantics: newIndex is the slot before removal.
+    await ref.read(predefinedMessagesProvider.notifier).reorder(index, delta > 0 ? target + 1 : target);
+    if (mounted) setState(() => _dirty = true);
+  }
+
+  Future<void> _resetDefaults() async {
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Reset to default phrases?',
+      message: 'This will replace all your custom phrases with the default set.',
+      confirmLabel: 'Reset',
+      destructive: true,
+      icon: Icons.restart_alt_rounded,
+    );
+    if (confirmed) {
+      await ref.read(predefinedMessagesProvider.notifier).reset();
+      if (mounted) setState(() => _dirty = true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final messages = ref.watch(predefinedMessagesProvider);
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Predefined Messages'),
-        centerTitle: true,
-        actions: [
-          if (_isSyncing)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-            )
-          else
-            IconButton(
-              icon: const Icon(Icons.cloud_upload_outlined),
-              tooltip: 'Save to Profile',
-              onPressed: _syncToServer,
-            ),
-        ],
+    return MfScaffold(
+      title: 'Quick phrases',
+      subtitle: 'One-tap messages for text-only communication',
+      actions: [
+        MfIconButton(
+          icon: Icons.restart_alt_rounded,
+          tooltip: 'Reset to default phrases',
+          onPressed: _resetDefaults,
+        ),
+      ],
+      bottomBar: MfPrimaryButton(
+        label: _isSyncing
+            ? 'Saving to profile'
+            : (_dirty ? 'Save changes to medical profile' : 'Save to medical profile'),
+        icon: Icons.cloud_upload_outlined,
+        loading: _isSyncing,
+        onPressed: _syncToServer,
       ),
-      body: Column(
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
-              ),
-              boxShadow: AppShadows.neumorphicOut,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: CustomScrollView(
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, 0),
+            sliver: SliverList.list(
               children: [
+                const MfInfoBanner(
+                  icon: Icons.quickreply_outlined,
+                  tone: MfTone.primary,
+                  title: 'Sent instantly from chat',
+                  message: 'These phrases appear above the chat input and on your home screen. '
+                      'Put the most important ones first.',
+                ),
+                if (_syncError != null) ...[
+                  const SizedBox(height: MfSpace.sm),
+                  MfInfoBanner(
+                    icon: Icons.cloud_off_outlined,
+                    tone: MfTone.danger,
+                    title: 'Could not save to your profile',
+                    message: _syncError,
+                    actionLabel: 'Try again',
+                    onAction: _syncToServer,
+                  ),
+                ],
+                const SizedBox(height: MfSpace.lg),
+                const MfSectionTitle('Add a phrase'),
+                const SizedBox(height: MfSpace.xs),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        maxLength: _maxPhraseLength,
+                        textCapitalization: TextCapitalization.sentences,
+                        textInputAction: TextInputAction.done,
+                        decoration: const InputDecoration(
+                          labelText: 'New phrase',
+                          hintText: 'e.g. Please write it down for me',
+                        ),
+                        onSubmitted: (_) => _addMessage(),
                       ),
-                      child: const Icon(Icons.hearing_disabled, color: Colors.white, size: 24),
                     ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Quick Communication Phrases',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          Text(
-                            'Tap any phrase during an emergency to send instantly.',
-                            style: TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                        ],
+                    const SizedBox(width: MfSpace.xs),
+                    Padding(
+                      padding: const EdgeInsets.only(top: MfSpace.xxs),
+                      child: MfPrimaryButton(
+                        label: 'Add',
+                        icon: Icons.add_rounded,
+                        expanded: false,
+                        height: MfSize.minTouch + MfSpace.xs,
+                        onPressed: _addMessage,
                       ),
                     ),
                   ],
                 ),
-                if (_syncError != null) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(_syncError!, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                  ),
-                ],
+                const SizedBox(height: MfSpace.sm),
+                MfSectionTitle(
+                  'Your phrases',
+                  subtitle: messages.isEmpty
+                      ? null
+                      : '${messages.length} phrase${messages.length == 1 ? '' : 's'}. Drag the handle or use the arrows to reorder.',
+                ),
+                const SizedBox(height: MfSpace.xs),
               ],
             ),
           ),
-
-          // Add New Message
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: theme.scaffoldBackgroundColor,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppShadows.neumorphicOut,
-                    ),
-                    child: TextField(
-                      controller: _controller,
-                      maxLength: 100,
-                      decoration: const InputDecoration(
-                        hintText: 'Type a new phrase...',
-                        border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        counterText: '',
-                      ),
-                      onSubmitted: (_) => _addMessage(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                GestureDetector(
-                  onTap: _addMessage,
-                  child: Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF0C637E), Color(0xFF2496A7)],
-                      ),
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: AppShadows.neumorphicOut,
-                    ),
-                    child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Hint
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Icon(Icons.drag_indicator, size: 16, color: Colors.grey.shade400),
-                const SizedBox(width: 6),
-                Text(
-                  'Long-press to reorder • Swipe left to delete',
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Reset to Defaults?'),
-                        content: const Text('This will replace all your custom phrases with the default set.'),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-                          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Reset', style: TextStyle(color: AppColors.error))),
-                        ],
-                      ),
-                    );
-                    if (confirmed == true) {
-                      ref.read(predefinedMessagesProvider.notifier).reset();
-                    }
-                  },
-                  child: const Text('Reset', style: TextStyle(fontSize: 12, color: AppColors.error)),
-                ),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // Messages List
-          Expanded(
-            child: messages.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.chat_bubble_outline, size: 64, color: Colors.grey.shade300),
-                        const SizedBox(height: 16),
-                        Text('No phrases yet. Add one above!',
-                            style: TextStyle(color: Colors.grey.shade400, fontSize: 15)),
-                      ],
-                    ),
-                  )
-                : ReorderableListView.builder(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                    itemCount: messages.length,
-                    onReorder: (oldIndex, newIndex) =>
-                        ref.read(predefinedMessagesProvider.notifier).reorder(oldIndex, newIndex),
-                    itemBuilder: (context, index) {
-                      final msg = messages[index];
-                      return Dismissible(
-                        key: ValueKey(msg),
-                        direction: DismissDirection.endToStart,
-                        background: Container(
-                          alignment: Alignment.centerRight,
-                          padding: const EdgeInsets.only(right: 20),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.07),
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: const Icon(Icons.delete_outline, color: AppColors.error),
-                        ),
-                        onDismissed: (_) =>
-                            ref.read(predefinedMessagesProvider.notifier).remove(msg),
-                        child: Container(
-                          key: ValueKey('card_$msg'),
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: theme.scaffoldBackgroundColor,
-                            borderRadius: BorderRadius.circular(14),
-                            boxShadow: AppShadows.neumorphicOut,
-                          ),
-                          child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                            leading: Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFF0C637E).withOpacity(0.08),
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: Text(
-                                '${index + 1}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF0C637E),
+          if (messages.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: MfEmptyState(
+                compact: true,
+                icon: Icons.chat_bubble_outline_rounded,
+                title: 'No phrases yet',
+                message: 'Add a phrase above, or reset to the default set.',
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(MfSpace.gutter, 0, MfSpace.gutter, MfSpace.xl),
+              sliver: SliverReorderableList(
+                itemCount: messages.length,
+                onReorder: (oldIndex, newIndex) {
+                  ref.read(predefinedMessagesProvider.notifier).reorder(oldIndex, newIndex);
+                  setState(() => _dirty = true);
+                },
+                itemBuilder: (context, index) {
+                  final msg = messages[index];
+                  return Padding(
+                    key: ValueKey('phrase_$msg'),
+                    padding: const EdgeInsets.only(bottom: MfSpace.xs),
+                    child: MfCard(
+                      padding: const EdgeInsets.fromLTRB(MfSpace.xxs, MfSpace.xxs, MfSpace.xxs, MfSpace.xxs),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            children: [
+                              ReorderableDragStartListener(
+                                index: index,
+                                child: Semantics(
+                                  label: 'Reorder handle for phrase ${index + 1}',
+                                  child: SizedBox(
+                                    width: MfSize.minTouch,
+                                    height: MfSize.minTouch,
+                                    child: Icon(Icons.drag_indicator_rounded, color: cs.onSurfaceVariant),
+                                  ),
                                 ),
                               ),
-                            ),
-                            title: Text(
-                              msg,
-                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                            ),
-                            trailing: const Icon(Icons.drag_indicator, color: Colors.grey),
+                              Container(
+                                width: 28,
+                                height: 28,
+                                alignment: Alignment.center,
+                                decoration: BoxDecoration(
+                                  color: MfColors.tone(context, MfTone.primary).container,
+                                  borderRadius: MfRadius.smAll,
+                                ),
+                                child: Text(
+                                  '${index + 1}',
+                                  style: text.labelMedium?.copyWith(
+                                    color: MfColors.tone(context, MfTone.primary).foreground,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: MfSpace.sm),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: MfSpace.xs),
+                                  child: Text(msg, style: text.bodyLarge),
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                      );
-                    },
-                  ),
-          ),
-
-          // Save Button
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: _isSyncing ? null : _syncToServer,
-                icon: const Icon(Icons.cloud_upload_rounded),
-                label: const Text('Save to Medical Profile', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0C637E),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                ),
+                          Wrap(
+                            alignment: WrapAlignment.end,
+                            children: [
+                              MfIconButton(
+                                icon: Icons.arrow_upward_rounded,
+                                tooltip: 'Move up',
+                                onPressed: index == 0 ? null : () => _move(index, -1),
+                              ),
+                              MfIconButton(
+                                icon: Icons.arrow_downward_rounded,
+                                tooltip: 'Move down',
+                                onPressed: index == messages.length - 1 ? null : () => _move(index, 1),
+                              ),
+                              MfTextButton(
+                                label: 'Edit',
+                                icon: Icons.edit_outlined,
+                                onPressed: () => _editMessage(index, msg),
+                              ),
+                              MfTextButton(
+                                label: 'Delete',
+                                icon: Icons.delete_outline_rounded,
+                                tone: MfTone.danger,
+                                onPressed: () => _deleteMessage(index, msg),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
-          ),
         ],
       ),
     );

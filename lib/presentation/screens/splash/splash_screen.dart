@@ -1,8 +1,7 @@
-import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../core/utils/responsive.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 
@@ -13,45 +12,16 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProviderStateMixin {
-  late AnimationController _logoController;
-  late AnimationController _loaderController;
-  late Animation<double> _logoScale;
-  late Animation<double> _logoOpacity;
-  late Animation<double> _loaderOpacity;
+class _SplashScreenState extends ConsumerState<SplashScreen> {
+  bool _visible = false;
 
   @override
   void initState() {
     super.initState();
-    
-    // Logo entrance animation (Scale + Fade)
-    _logoController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
 
-    _logoScale = Tween<double>(begin: 0.8, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.easeOutBack),
-    );
-
-    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: const Interval(0.0, 0.8, curve: Curves.easeIn)),
-    );
-    
-    // Loader fade in animation
-    _loaderController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
-    
-    _loaderOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _loaderController, curve: Curves.easeIn),
-    );
-    
-    // Start animations sequence
-    _logoController.forward();
-    Timer(const Duration(milliseconds: 800), () {
-      if (mounted) _loaderController.forward();
+    // Short, restrained fade-in of the logo and loader.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) setState(() => _visible = true);
     });
 
     _handleNavigation();
@@ -73,7 +43,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProvider
           const Duration(seconds: 10),
           onTimeout: () => null,
         );
-        
+        if (!mounted) return;
+
         if (user != null) {
           // Check if email is verified
           if (!user.isEmailVerified) {
@@ -116,85 +87,58 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with TickerProvider
   }
 
   @override
-  void dispose() {
-    _logoController.dispose();
-    _loaderController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final duration = MfMotion.of(context);
+
     return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        // Premium subtle gradient background
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.white,
-              AppColors.primary.withOpacity(0.05),
-              Colors.white,
-            ],
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Spacer(flex: 3),
-            
-            // Animated Logo
-            AnimatedBuilder(
-              animation: _logoController,
-              builder: (context, child) {
-                return Opacity(
-                  opacity: _logoOpacity.value,
-                  child: Transform.scale(
-                    scale: _logoScale.value,
-                    child: child,
-                  ),
-                );
-              },
-              child: Image.asset(
-                'assets/logos/Medifind_New_Logo-removebg-preview.png',
-                width: 85.wp, 
-                fit: BoxFit.contain,
-              ),
-            ),
-            
-            const Spacer(flex: 2),
-            
-            // Fade in Loader and Text
-            FadeTransition(
-              opacity: _loaderOpacity,
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: 32,
-                    height: 32,
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                      strokeWidth: 2.5,
+      backgroundColor: cs.surface,
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final logoWidth = math.min(constraints.maxWidth * 0.5, 220.0);
+            return AnimatedOpacity(
+              opacity: _visible ? 1 : 0,
+              duration: duration,
+              curve: Curves.easeOut,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: MfSpace.gutter),
+                child: Column(
+                  children: [
+                    const Spacer(flex: 3),
+                    Semantics(
+                      label: 'MediFind',
+                      image: true,
+                      child: Image.asset(
+                        'assets/logos/medifind_logo_full.png',
+                        width: logoWidth,
+                        fit: BoxFit.contain,
+                        excludeFromSemantics: true,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'SECURE • RELIABLE • IMMEDIATE',
-                    style: TextStyle(
-                      fontFamily: 'Montserrat',
-                      fontSize: 10,
-                      color: AppColors.primary.withOpacity(0.6),
-                      letterSpacing: 4.0,
-                      fontWeight: FontWeight.bold,
+                    const Spacer(flex: 2),
+                    Semantics(
+                      liveRegion: true,
+                      label: 'Loading MediFind',
+                      child: SizedBox(
+                        width: 28,
+                        height: 28,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 48),
-                ],
+                    const SizedBox(height: MfSpace.md),
+                    Text(
+                      'Secure. Reliable. Immediate.',
+                      textAlign: TextAlign.center,
+                      style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: MfSpace.xxl),
+                  ],
+                ),
               ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );

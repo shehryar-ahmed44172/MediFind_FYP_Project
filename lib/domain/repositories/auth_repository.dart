@@ -13,7 +13,6 @@ abstract class AuthRepository {
   Future<void> saveAuthToken(String token);
   Future<void> clearAuthToken();
   Future<User> getMe();
-  Future<void> updateFcmToken(String token);
   Future<User?> getUser(String userId);
   Future<void> forgotPassword(String email);
   Future<void> resetPassword(String email, String token, String newPassword);

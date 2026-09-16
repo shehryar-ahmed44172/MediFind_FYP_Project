@@ -143,7 +143,8 @@ class _$EmergencyCopyWithImpl<$Res, $Val extends Emergency>
               as bool,
       voiceSummary: freezed == voiceSummary
           ? _value.voiceSummary
-          : voiceSummary as String?,
+          : voiceSummary // ignore: cast_nullable_to_non_nullable
+              as String?,
       additionalInfo: freezed == additionalInfo
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
@@ -266,7 +267,8 @@ class __$$EmergencyImplCopyWithImpl<$Res>
               as bool,
       voiceSummary: freezed == voiceSummary
           ? _value.voiceSummary
-          : voiceSummary as String?,
+          : voiceSummary // ignore: cast_nullable_to_non_nullable
+              as String?,
       additionalInfo: freezed == additionalInfo
           ? _value.additionalInfo
           : additionalInfo // ignore: cast_nullable_to_non_nullable
@@ -359,7 +361,7 @@ class _$EmergencyImpl implements _Emergency {
 
   @override
   String toString() {
-    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, patientType: $patientType)';
+    return 'Emergency(id: $id, userId: $userId, status: $status, emergencyType: $emergencyType, latitude: $latitude, longitude: $longitude, createdAt: $createdAt, updatedAt: $updatedAt, responderId: $responderId, voiceAlertGenerated: $voiceAlertGenerated, voiceSummary: $voiceSummary, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, patientType: $patientType)';
   }
 
   @override
@@ -384,6 +386,8 @@ class _$EmergencyImpl implements _Emergency {
                 other.responderId == responderId) &&
             (identical(other.voiceAlertGenerated, voiceAlertGenerated) ||
                 other.voiceAlertGenerated == voiceAlertGenerated) &&
+            (identical(other.voiceSummary, voiceSummary) ||
+                other.voiceSummary == voiceSummary) &&
             (identical(other.additionalInfo, additionalInfo) ||
                 other.additionalInfo == additionalInfo) &&
             (identical(other.completedAt, completedAt) ||
@@ -410,6 +414,7 @@ class _$EmergencyImpl implements _Emergency {
       updatedAt,
       responderId,
       voiceAlertGenerated,
+      voiceSummary,
       additionalInfo,
       completedAt,
       priority,

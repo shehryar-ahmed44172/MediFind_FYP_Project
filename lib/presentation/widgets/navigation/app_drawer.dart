@@ -1,301 +1,256 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../config/router.dart';
+import '../../../services/location/responder_location_tracker.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
-import '../../../core/utils/responsive.dart';
-import '../../../core/constants/app_constants.dart';
+import '../design_system/design_system.dart';
 
+/// One destination in the [AppDrawer].
+class _DrawerItem {
+  final IconData icon;
+  final String label;
+  final String route;
+
+  /// Tab roots switch branches with go(); other pages are pushed on top.
+  final bool isTab;
+  const _DrawerItem(this.icon, this.label, this.route, {this.isTab = false});
+}
+
+/// Unified sidebar navigation (SRS FR8.1) shared by every role shell.
+///
+/// Items are role-specific; the bottom navigation bar keeps the most used
+/// destinations one tap away while the drawer lists everything.
 class AppDrawer extends ConsumerWidget {
   const AppDrawer({super.key});
 
+  static List<({String? title, List<_DrawerItem> items})> _sectionsFor(String role, bool isDeaf) {
+    switch (role) {
+      case 'CAREGIVER':
+        return [
+          (title: null, items: const [
+            _DrawerItem(Icons.groups_outlined, 'My patients', '/caregiver', isTab: true),
+            _DrawerItem(Icons.map_outlined, 'Live map', '/caregiver/maps', isTab: true),
+            _DrawerItem(Icons.chat_bubble_outline_rounded, 'Messages', '/caregiver/chats', isTab: true),
+            _DrawerItem(Icons.person_outline_rounded, 'Profile', '/caregiver/profile', isTab: true),
+          ]),
+          (title: 'Care', items: const [
+            _DrawerItem(Icons.history_rounded, 'Emergency history', '/caregiver/history'),
+            _DrawerItem(Icons.person_add_alt_1_outlined, 'Link a patient', '/caregiver/my-patients/link-patient'),
+          ]),
+        ];
+      case 'RESPONDER':
+        return [
+          (title: null, items: const [
+            _DrawerItem(Icons.notifications_active_outlined, 'Requests', '/responder', isTab: true),
+            _DrawerItem(Icons.history_rounded, 'Response history', '/responder/history', isTab: true),
+            _DrawerItem(Icons.person_outline_rounded, 'Profile', '/responder/profile', isTab: true),
+          ]),
+        ];
+      default:
+        return [
+          (title: null, items: const [
+            _DrawerItem(Icons.emergency_outlined, 'SOS home', '/home', isTab: true),
+            _DrawerItem(Icons.chat_bubble_outline_rounded, 'Messages', '/chats', isTab: true),
+            _DrawerItem(Icons.medical_information_outlined, 'Medical ID', '/medical-id', isTab: true),
+            _DrawerItem(Icons.person_outline_rounded, 'Profile', '/profile', isTab: true),
+          ]),
+          (title: 'Health', items: const [
+            _DrawerItem(Icons.monitor_heart_outlined, 'Medical profile', '/home/medical-profile'),
+            _DrawerItem(Icons.content_paste_rounded, 'Medical reports', '/home/medical-reports'),
+            _DrawerItem(Icons.contacts_outlined, 'Emergency contacts', '/home/emergency-contacts'),
+            _DrawerItem(Icons.people_outline_rounded, 'My caregivers', '/home/caregivers'),
+          ]),
+          (title: 'Communication', items: [
+            if (isDeaf) const _DrawerItem(Icons.quickreply_outlined, 'Quick phrases', '/predefined-messages'),
+            if (isDeaf) const _DrawerItem(Icons.badge_outlined, 'Show to people nearby', '/home/show-card'),
+            const _DrawerItem(Icons.hearing_disabled_outlined, 'Deaf & hearing modes', '/home/patient-type-info'),
+          ]),
+        ];
+    }
+  }
+
+  static const _common = [
+    _DrawerItem(Icons.settings_accessibility_rounded, 'Accessibility', '/accessibility-settings'),
+    _DrawerItem(Icons.workspace_premium_outlined, 'Subscription plans', '/subscription-plans'),
+    _DrawerItem(Icons.settings_outlined, 'Settings', '/settings'),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    final userAsync = ref.watch(currentUserProvider);
-    final user = userAsync.valueOrNull;
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final role = (user?.role ?? 'PATIENT').toUpperCase();
+    final isDeaf = role == 'PATIENT' && (user?.patientType ?? '').toUpperCase() == 'DEAF';
+    final location = GoRouter.maybeOf(context)?.routeInformationProvider.value.uri.path ?? '';
 
-    return Drawer(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      child: Column(
-        children: [
-          _buildHeader(context, user, theme),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
+    final roleLabel = switch (role) {
+      'CAREGIVER' => 'Caregiver',
+      'RESPONDER' => 'Emergency responder',
+      _ => isDeaf ? 'Patient · Deaf mode' : 'Patient',
+    };
+
+    final sections = [
+      ..._sectionsFor(role, isDeaf),
+      (title: 'App', items: _common),
+    ];
+
+    return NavigationDrawer(
+      backgroundColor: cs.surface,
+      selectedIndex: null,
+      children: [
+        // ── Brand + account header ───────────────────────────────────────
+        SafeArea(
+          bottom: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.md, MfSpace.md, 0),
+            child: Row(
               children: [
-                _buildMenuItem(
-                  context,
-                  icon: Icons.dashboard_rounded,
-                  title: 'Home',
-                  onTap: () {
-                    Navigator.pop(context);
-                    final role = user?.role ?? 'PATIENT';
-                    if (role == 'PATIENT') {
-                      context.go('/home');
-                    } else if (role == 'CAREGIVER') context.go('/caregiver');
-                    else context.go('/responder');
-                  },
+                Image.asset('assets/logos/medifind_mark.png', width: 28, height: 28, excludeFromSemantics: true),
+                const SizedBox(width: MfSpace.xs),
+                Text('MediFind', style: text.titleMedium?.copyWith(color: cs.primary, fontWeight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.sm, MfSpace.md, MfSpace.sm),
+            child: Row(
+              children: [
+                MfAvatar(imageUrl: user?.profileImageUrl, name: user?.fullName, size: 52),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user?.fullName ?? 'MediFind user',
+                        style: text.titleMedium,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(roleLabel, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
                 ),
-                _buildMenuItem(
-                  context,
-                  icon: Icons.person_outline_rounded,
-                  title: 'My Profile',
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.go('/profile');
-                  },
-                ),
-                if (user?.role == 'PATIENT') ...[
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.content_paste_rounded,
-                    title: 'Medical Reports',
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/home/medical-reports');
-                    },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.people_outline_rounded,
-                    title: 'My Caregivers',
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/home/caregivers');
-                    },
-                  ),
-                ],
-                if (user?.role == 'CAREGIVER') ...[
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.people_rounded,
-                    title: 'My Patients',
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/caregiver/my-patients');
-                    },
-                  ),
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.map_outlined,
-                    title: 'Patient Tracking',
-                    onTap: () {
-                      Navigator.pop(context);
-                      context.go('/caregiver/maps');
-                    },
-                  ),
-                ],
-                _buildMenuItem(
-                  context,
-                  icon: Icons.history_rounded,
-                  title: 'History',
-                  onTap: () {
-                    final role = user?.role ?? 'PATIENT';
-                    Navigator.pop(context); // close drawer first
-                    if (role == 'PATIENT') {
-                      context.go('/home/medical-reports'); // tab switch — go() OK
-                    } else if (role == 'CAREGIVER') {
-                      context.push('/caregiver/history'); // overlay — push() required
-                    } else if (role == 'RESPONDER') {
-                      context.go('/responder/history'); // tab switch — go() OK
-                    }
-                  },
-                ),
-                if (user?.role == 'PATIENT' || user?.role == 'CAREGIVER')
-                  _buildMenuItem(
-                    context,
-                    icon: Icons.chat_bubble_outline_rounded,
-                    title: 'Messages',
-                    onTap: () {
-                      Navigator.pop(context);
-                      final role = user?.role ?? 'PATIENT';
-                      if (role == 'PATIENT') {
-                        context.go('/chats');
-                      } else if (role == 'CAREGIVER') {
-                        context.go('/caregiver/chats');
-                      }
-                    },
-                  ),
-                const Divider(indent: 20, endIndent: 20),
-                _buildMenuItem(
-                  context,
-                  icon: Icons.settings_outlined,
-                  title: 'Settings',
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.go('/settings');
-                  },
+                MfIconButton(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Close menu',
+                  onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
           ),
-          _buildLogoutButton(context, ref, theme),
-          SizedBox(height: 2.hp),
+        ),
+        const Divider(height: 1),
+        const SizedBox(height: MfSpace.xs),
+
+        for (final section in sections) ...[
+          if (section.title != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(MfSpace.lg, MfSpace.sm, MfSpace.md, MfSpace.xxs),
+              child: Semantics(
+                header: true,
+                child: Text(section.title!, style: text.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+              ),
+            ),
+          for (final item in section.items)
+            _DrawerTile(
+              item: item,
+              selected: item.isTab
+                  ? (location == item.route)
+                  : location.startsWith(item.route),
+              onTap: () {
+                Navigator.pop(context);
+                if (item.isTab) {
+                  context.go(item.route);
+                } else {
+                  context.push(item.route);
+                }
+              },
+            ),
         ],
-      ),
+
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.xs),
+          child: Divider(height: 1),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: MfSpace.sm),
+          child: ListTile(
+            minTileHeight: MfSize.minTouch + MfSpace.xs,
+            shape: const RoundedRectangleBorder(borderRadius: MfRadius.mdAll),
+            leading: Icon(Icons.logout_rounded, color: MfColors.sos(context)),
+            title: Text('Sign out', style: text.titleSmall?.copyWith(color: MfColors.sos(context))),
+            onTap: () => _handleLogout(context, ref),
+          ),
+        ),
+        const SizedBox(height: MfSpace.md),
+      ],
     );
   }
 
-  Widget _buildHeader(BuildContext context, dynamic user, ThemeData theme) {
-    // The backend stores profileImageUrl as a full absolute URL using the host
-    // that received the upload request (e.g. http://192.168.x.x:3000/uploads/...
-    // or an old ngrok URL). We extract only the path portion and rebuild the URL
-    // using the *current* server address so it always resolves correctly,
-    // regardless of which network was active when the photo was uploaded.
-    String? fullImageUrl;
-    final stored = user?.profileImageUrl as String?;
-    if (stored != null && stored.isNotEmpty) {
-      String path;
-      try {
-        path = Uri.parse(stored).path; // e.g. "/uploads/profile/xyz.jpg"
-      } catch (_) {
-        path = stored;
+  Future<void> _handleLogout(BuildContext context, WidgetRef ref) async {
+    final ok = await showMfConfirmDialog(
+      context,
+      title: 'Sign out',
+      message: 'Are you sure you want to sign out of MediFind?',
+      confirmLabel: 'Sign out',
+      destructive: true,
+      icon: Icons.logout_rounded,
+    );
+    if (!ok || !context.mounted) return;
+
+    try {
+      // Same sequence as the profile screen: clear tokens, force the auth
+      // state to logged-out synchronously, then invalidate derived providers.
+      final authRepo = await ref.read(authRepositoryProvider.future);
+      await authRepo.logout();
+      ref.read(authStateProvider.notifier).forceLoggedOut();
+      ref.invalidate(currentUserIdProvider);
+      ref.invalidate(currentUserRoleProvider);
+      ref.invalidate(currentUserProvider);
+      ref.invalidate(responderLocationTrackerProvider);
+
+      if (!context.mounted) return;
+      AppRouter.skipNextRedirect();
+      context.go('/login');
+    } catch (e) {
+      if (context.mounted) {
+        showMfSnackBar(context, 'Sign out failed. Please try again.', tone: MfTone.danger);
       }
-      final root = AppConstants.socketUrl.endsWith('/')
-          ? AppConstants.socketUrl.substring(0, AppConstants.socketUrl.length - 1)
-          : AppConstants.socketUrl;
-      fullImageUrl = '$root$path';
     }
-
-    // CachedNetworkImage requires the ngrok bypass header; ignored on production.
-    final Map<String, String> imgHeaders = AppConstants.baseUrl.contains('ngrok')
-        ? const {'ngrok-skip-browser-warning': 'true'}
-        : const {};
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 6.hp, 20, 3.hp),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: AppColors.medifindGradient,
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.only(
-          bottomRight: Radius.circular(32),
-        ),
-      ),
-      child: Row(
-        children: [
-          ClipOval(
-            child: Container(
-              width: 60,
-              height: 60,
-              color: Colors.white.withOpacity(0.2),
-              child: fullImageUrl != null
-                  ? CachedNetworkImage(
-                      imageUrl: fullImageUrl,
-                      httpHeaders: imgHeaders,
-                      width: 60,
-                      height: 60,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => const Center(
-                        child: Icon(Icons.person_rounded,
-                            color: Colors.white, size: 30),
-                      ),
-                      errorWidget: (_, __, ___) => const Center(
-                        child: Icon(Icons.person_rounded,
-                            color: Colors.white, size: 30),
-                      ),
-                    )
-                  : const Center(
-                      child: Icon(Icons.person_rounded,
-                          color: Colors.white, size: 30),
-                    ),
-            ),
-          ),
-          SizedBox(width: 4.wp),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user?.fullName ?? 'MediFind User',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  user?.role ?? 'User',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
-                    fontSize: 12,
-                    letterSpacing: 1.2,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
   }
+}
 
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primary, size: 24),
-      title: Text(
-        title,
-        style: const TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: 15,
-        ),
-      ),
-      onTap: onTap,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
-    );
-  }
+class _DrawerTile extends StatelessWidget {
+  final _DrawerItem item;
+  final bool selected;
+  final VoidCallback onTap;
 
-  Widget _buildLogoutButton(BuildContext context, WidgetRef ref, ThemeData theme) {
+  const _DrawerTile({required this.item, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final t = MfColors.tone(context, MfTone.primary);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: MfSpace.sm, vertical: 1),
       child: ListTile(
-        leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-        title: const Text(
-          'Logout',
-          style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-        ),
-        onTap: () => _handleLogout(context, ref),
-        tileColor: Colors.red.withOpacity(0.05),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      ),
-    );
-  }
-
-  void _handleLogout(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
-        actions: [
-          TextButton(
-            child: const Text('Cancel'),
-            onPressed: () => Navigator.pop(context),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Logout'),
-            onPressed: () async {
-              Navigator.pop(context);
-              await ref.read(logoutProvider.future);
-              if (context.mounted) {
-                context.go('/login');
-              }
-            },
-          ),
-        ],
+        minTileHeight: MfSize.minTouch + MfSpace.xs,
+        selected: selected,
+        selectedTileColor: t.container,
+        selectedColor: t.foreground,
+        iconColor: cs.onSurfaceVariant,
+        shape: const RoundedRectangleBorder(borderRadius: MfRadius.mdAll),
+        leading: Icon(item.icon),
+        title: Text(item.label, style: text.titleSmall?.copyWith(color: selected ? t.foreground : null)),
+        trailing: item.isTab ? null : Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+        onTap: onTap,
       ),
     );
   }

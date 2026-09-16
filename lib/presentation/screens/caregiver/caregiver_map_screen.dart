@@ -4,13 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import '../../theme/app_theme.dart';
+import '../../../core/utils/map_utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/caregiver_dashboard_provider.dart';
 import '../../../services/socket/socket_service.dart';
+import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
 
-/// Live map of linked patients' ACTIVE emergencies.
+/// Live map of linked patients' ACTIVE emergencies (Live map tab root; the
+/// shell draws the header). The map fills the tab; the legend and the list of
+/// active emergencies float over it.
 class CaregiverMapScreen extends ConsumerWidget {
   const CaregiverMapScreen({super.key});
 
@@ -23,11 +26,11 @@ class CaregiverMapScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
     final activeAsync = ref.watch(caregiverActiveEmergenciesProvider);
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
+      backgroundColor: cs.surface,
       body: activeAsync.when(
         skipLoadingOnRefresh: true,
         skipLoadingOnReload: true,
@@ -35,27 +38,23 @@ class CaregiverMapScreen extends ConsumerWidget {
           if (active.isEmpty) {
             return _buildMessageState(
               onRefresh: () => _refresh(ref),
-              icon: Icons.verified_user_outlined,
-              iconColor: AppColors.success,
-              title: 'No active emergencies',
-              body: 'Your linked patients are safe. If a patient triggers an SOS, '
-                  'their location will appear here.',
+              child: const MfEmptyState(
+                icon: Icons.verified_user_outlined,
+                title: 'No active emergencies',
+                message: 'Your linked patients are safe. If a patient triggers an SOS, '
+                    'their location will appear here.',
+              ),
             );
           }
-          return _buildMapLayout(context, ref, theme, active);
+          return _buildMapLayout(context, ref, active);
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const MfLoading(label: 'Loading live map'),
         error: (e, _) => _buildMessageState(
           onRefresh: () => _refresh(ref),
-          icon: Icons.cloud_off_rounded,
-          iconColor: AppColors.error,
-          title: 'Could not load emergencies',
-          body: 'Check your connection and try again.',
-          action: ElevatedButton.icon(
-            onPressed: () => _refresh(ref),
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(minimumSize: const Size(140, 48)),
+          child: MfErrorState(
+            title: 'Could not load emergencies',
+            message: 'Check your connection and try again.',
+            onRetry: () => _refresh(ref),
           ),
         ),
       ),
@@ -65,81 +64,91 @@ class CaregiverMapScreen extends ConsumerWidget {
   Widget _buildMapLayout(
     BuildContext context,
     WidgetRef ref,
-    ThemeData theme,
     List<CaregiverEmergencyDetails> active,
   ) {
     final located = active.where((e) => e.hasLocation).toList();
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final maxPanelHeight = MediaQuery.sizeOf(context).height * 0.42;
 
-    return Column(
+    return Stack(
       children: [
-        Expanded(
-          flex: 2,
-          child: Container(
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(24),
-              boxShadow: AppShadows.neumorphicOut,
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(24),
-              child: located.isEmpty
-                  ? Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Text(
-                          'Location data is not available for the active emergencies yet.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey.shade700),
-                        ),
-                      ),
-                    )
-                  : _ActiveEmergencyMap(emergencies: located),
-            ),
-          ),
+        // Map fills the tab.
+        Positioned.fill(
+          child: located.isEmpty
+              ? ColoredBox(
+                  color: cs.surfaceContainer,
+                  child: const Align(
+                    alignment: Alignment.topCenter,
+                    child: MfEmptyState(
+                      compact: true,
+                      icon: Icons.location_off_outlined,
+                      title: 'Location unavailable',
+                      message: 'Location data is not available for the active emergencies yet.',
+                    ),
+                  ),
+                )
+              : _ActiveEmergencyMap(emergencies: located),
         ),
-        Expanded(
-          flex: 3,
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(32),
-                topRight: Radius.circular(32),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 40,
-                  offset: const Offset(0, -10),
-                ),
-              ],
+
+        // Legend
+        if (located.isNotEmpty)
+          const Positioned(
+            top: MfSpace.sm,
+            left: MfSpace.sm,
+            child: _MapLegend(),
+          ),
+
+        // Active emergencies panel
+        Align(
+          alignment: Alignment.bottomCenter,
+          child: Material(
+            color: cs.surface,
+            elevation: 1,
+            shape: RoundedRectangleBorder(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(MfRadius.lg)),
+              side: BorderSide(color: cs.outlineVariant, width: MfColors.isHighContrast(context) ? 2 : 1),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
-                  child: Semantics(
-                    header: true,
-                    child: Text(
-                      'Active emergencies (${active.length})',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            clipBehavior: Clip.antiAlias,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxPanelHeight),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xs),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Semantics(
+                            header: true,
+                            child: Text('Active emergencies', style: text.titleMedium),
+                          ),
+                        ),
+                        MfStatusChip(
+                          label: '${active.length} active',
+                          tone: MfTone.danger,
+                          icon: Icons.sos_rounded,
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () => _refresh(ref),
-                    child: ListView.builder(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                      itemCount: active.length,
-                      itemBuilder: (context, index) => _buildEmergencyCard(context, active[index], theme),
+                  Flexible(
+                    child: RefreshIndicator(
+                      onRefresh: () => _refresh(ref),
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.xs, MfSpace.gutter, MfSpace.md),
+                        itemCount: active.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: MfSpace.sm),
+                        itemBuilder: (context, index) => _buildEmergencyCard(context, active[index]),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -147,101 +156,89 @@ class CaregiverMapScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmergencyCard(BuildContext context, CaregiverEmergencyDetails e, ThemeData theme) {
+  Widget _buildEmergencyCard(BuildContext context, CaregiverEmergencyDetails e) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final type = e.emergencyType.replaceAll('_', ' ');
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: theme.scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.sosMassiveGlow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () => context.push('/caregiver/tracking/${e.id}'),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
+    final name = e.patientName ?? 'Linked patient';
+    return MfCard(
+      tone: MfTone.danger,
+      padding: const EdgeInsets.all(MfSpace.sm),
+      onTap: () => context.push('/caregiver/tracking/${e.id}'),
+      semanticLabel: '$name, $type, ${caregiverStatusLabel(e.status)}',
+      child: Row(
+        children: [
+          MfAvatar(name: name, size: 40),
+          const SizedBox(width: MfSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.error.withValues(alpha: 0.1),
-                  child: const Icon(Icons.emergency_rounded, color: AppColors.error),
+                Text(name, style: text.titleSmall, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  e.createdAt != null ? '$type  ·  Started ${caregiverRelativeTime(e.createdAt)}' : type,
+                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        e.patientName ?? 'Linked patient',
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '$type - ${caregiverStatusLabel(e.status)}',
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      if (e.createdAt != null)
-                        Text(
-                          'Started ${caregiverRelativeTime(e.createdAt)}',
-                          style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => context.push('/caregiver/tracking/${e.id}'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(72, 48),
-                  ),
-                  child: const Text('Track', style: TextStyle(fontWeight: FontWeight.bold)),
-                ),
+                const SizedBox(height: MfSpace.xxs),
+                MfStatusChip.emergency(e.status),
               ],
             ),
           ),
-        ),
+          const SizedBox(width: MfSpace.xs),
+          MfPrimaryButton(
+            label: 'Track',
+            icon: Icons.my_location_rounded,
+            tone: MfTone.danger,
+            expanded: false,
+            height: MfSize.minTouch,
+            semanticLabel: 'Track $name live',
+            onPressed: () => context.push('/caregiver/tracking/${e.id}'),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildMessageState({
     required Future<void> Function() onRefresh,
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String body,
-    Widget? action,
+    required Widget child,
   }) {
     return RefreshIndicator(
       onRefresh: onRefresh,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: LayoutBuilder(
+        builder: (context, constraints) => SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: constraints.maxHeight),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Explains the two marker types on the map.
+class _MapLegend extends StatelessWidget {
+  const _MapLegend();
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final sos = MfColors.sos(context);
+    final primary = MfColors.tone(context, MfTone.primary).foreground;
+    return MfCard(
+      padding: const EdgeInsets.symmetric(horizontal: MfSpace.sm, vertical: MfSpace.xs),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          const SizedBox(height: 120),
-          Icon(icon, size: 64, color: iconColor),
-          const SizedBox(height: 16),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Text(body, textAlign: TextAlign.center, style: TextStyle(color: Colors.grey.shade700)),
-          if (action != null) ...[
-            const SizedBox(height: 24),
-            Center(child: action),
-          ],
+          Icon(Icons.location_on_rounded, size: 18, color: sos),
+          const SizedBox(width: MfSpace.xxs),
+          Text('Patient', style: text.labelMedium),
+          const SizedBox(width: MfSpace.sm),
+          Icon(Icons.two_wheeler_rounded, size: 18, color: primary),
+          const SizedBox(width: MfSpace.xxs),
+          Text('Responder', style: text.labelMedium),
         ],
       ),
     );
@@ -391,6 +388,7 @@ class _ActiveEmergencyMapState extends ConsumerState<_ActiveEmergencyMap> {
           target: LatLng(located.first.latitude!, located.first.longitude!),
           zoom: 13,
         ),
+        style: MapUtils.getLightMapStyle(),
         markers: {
           ...patientMarkers,
           for (final m in _mascots.values)
@@ -398,6 +396,11 @@ class _ActiveEmergencyMapState extends ConsumerState<_ActiveEmergencyMap> {
         },
         myLocationEnabled: false,
         zoomControlsEnabled: false,
+        // Keep markers clear of the legend and the emergencies panel overlays.
+        padding: EdgeInsets.only(
+          top: MfSize.primaryButton,
+          bottom: MediaQuery.sizeOf(context).height * 0.3,
+        ),
         onMapCreated: _fitAll,
       ),
     );

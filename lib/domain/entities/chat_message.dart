@@ -33,10 +33,14 @@ class ChatRoom with _$ChatRoom {
     required String id,
     required String patientId,
     String? caregiverId,
+    String? responderId,
+    String? emergencyId,
+    String? roomType,
     required DateTime createdAt,
     required DateTime updatedAt,
     Map<String, dynamic>? patient,
     Map<String, dynamic>? caregiver,
+    Map<String, dynamic>? responder,
     List<ChatMessage>? messages,
   }) = _ChatRoom;
 

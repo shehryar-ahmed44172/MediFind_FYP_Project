@@ -1,9 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:medifind_mobile_application/core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
+import 'widgets/auth_common.dart';
 
 class EmailVerificationScreen extends ConsumerStatefulWidget {
   final String email;
@@ -18,10 +19,26 @@ class EmailVerificationScreen extends ConsumerStatefulWidget {
 }
 
 class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScreen> {
+  static const _cooldownSeconds = 60;
+
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
   bool _isLoading = false;
   bool _isResending = false;
+
+  /// Inline error under the code boxes (wrong / expired code).
+  String? _codeError;
+
+  int _resendCooldown = 0;
+  Timer? _cooldownTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focusNodes[0].requestFocus();
+    });
+  }
 
   @override
   void dispose() {
@@ -31,68 +48,53 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     for (var node in _focusNodes) {
       node.dispose();
     }
+    _cooldownTimer?.cancel();
     super.dispose();
   }
 
-  void _showInfoDialog({
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    required String message,
-    String buttonLabel = 'OK',
-    VoidCallback? onConfirm,
-  }) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(icon, color: iconColor, size: 28),
-            const SizedBox(width: 10),
-            Expanded(child: Text(title)),
-          ],
-        ),
-        content: Text(message),
-        actions: [
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              onConfirm?.call();
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: iconColor,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: Text(buttonLabel),
-          ),
-        ],
-      ),
-    );
+  void _startCooldown() {
+    _cooldownTimer?.cancel();
+    setState(() => _resendCooldown = _cooldownSeconds);
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        _resendCooldown--;
+        if (_resendCooldown <= 0) t.cancel();
+      });
+    });
   }
 
-  void _onVerify() async {
+  void _clearCode() {
+    for (final c in _controllers) {
+      c.clear();
+    }
+    _focusNodes[0].requestFocus();
+  }
+
+  Future<void> _onVerify() async {
+    if (_isLoading) return;
     final otp = _controllers.map((c) => c.text).join();
     if (otp.length < 6) {
-      _showInfoDialog(
-        icon: Icons.info_outline_rounded,
-        iconColor: AppColors.warning,
-        title: 'Incomplete Code',
-        message: 'Please enter the complete 6-digit verification code.',
-      );
+      setState(() => _codeError = 'Enter all 6 digits of the verification code.');
       return;
     }
 
-    setState(() => _isLoading = true);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isLoading = true;
+      _codeError = null;
+    });
     try {
       await ref.read(verifyEmailProvider(VerifyEmailParams(email: widget.email, otp: otp)).future);
       if (mounted) {
-        _showInfoDialog(
-          icon: Icons.verified_rounded,
-          iconColor: AppColors.success,
-          title: 'Account Verified Successfully',
+        await showAuthMessageDialog(
+          context,
+          icon: Icons.verified_outlined,
+          tone: MfTone.success,
+          title: 'Account verified',
           message: 'Your account has been verified. You can now use MediFind.',
           buttonLabel: 'Continue',
           onConfirm: () => context.go('/splash'),
@@ -101,39 +103,32 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception:', '').trim();
-        _showInfoDialog(
-          icon: Icons.error_outline_rounded,
-          iconColor: AppColors.error,
-          title: 'Verification Failed',
-          message: msg.isNotEmpty ? msg : 'Invalid or expired code. Please try again.',
-        );
+        setState(() => _codeError = msg.isNotEmpty ? msg : 'Invalid or expired code. Please try again.');
+        _clearCode();
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _onResend() async {
+  Future<void> _onResend() async {
+    if (_resendCooldown > 0 || _isResending) return;
     setState(() => _isResending = true);
     try {
       await ref.read(resendOTPProvider(widget.email).future);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('A new code has been sent to your email.'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: AppColors.success,
-          ),
-        );
+        _startCooldown();
+        setState(() => _codeError = null);
+        _clearCode();
+        showMfSnackBar(context, 'A new code has been sent to your email.', tone: MfTone.success);
       }
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceAll('Exception:', '').trim();
-        _showInfoDialog(
-          icon: Icons.error_outline_rounded,
-          iconColor: AppColors.error,
-          title: 'Resend Failed',
-          message: msg.isNotEmpty ? msg : 'Unable to resend the code. Please wait a moment and try again.',
+        showMfSnackBar(
+          context,
+          msg.isNotEmpty ? msg : 'Unable to resend the code. Please wait a moment and try again.',
+          tone: MfTone.danger,
         );
       }
     } finally {
@@ -154,135 +149,114 @@ class _EmailVerificationScreenState extends ConsumerState<EmailVerificationScree
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Verify Email',
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-        centerTitle: true,
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-          onPressed: () {
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            } else {
-              context.go('/login');
-            }
-          },
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(3.hp),
-        child: Column(
-          children: [
-            SizedBox(height: 4.hp),
-            Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: theme.primaryColor.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.email_outlined, size: 64, color: theme.primaryColor),
-            ),
-            SizedBox(height: 4.hp),
-            Text(
-              'Enter Verification Code',
-              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 1.hp),
-            Text(
-              'We have sent a 6-digit code to',
-              style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey),
-            ),
-            Text(
-              _maskEmail(widget.email),
-              style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            SizedBox(height: 6.hp),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(6, (index) => _buildOtpBox(index)),
-            ),
-            SizedBox(height: 6.hp),
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _onVerify,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: theme.primaryColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                  elevation: 0,
-                ),
-                child: _isLoading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : Text('Verify Account', style: TextStyle(fontSize: 1.8.hp, fontWeight: FontWeight.bold)),
-              ),
-            ),
-            SizedBox(height: 3.hp),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Didn't receive the code? "),
-                TextButton(
-                  onPressed: _isResending ? null : _onResend,
-                  child: _isResending
-                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text('Resend Code', style: TextStyle(color: theme.primaryColor, fontWeight: FontWeight.bold)),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
+  void _onDigitChanged(int index, String value) {
+    if (_codeError != null) setState(() => _codeError = null);
+    if (value.isNotEmpty && index < 5) {
+      _focusNodes[index + 1].requestFocus();
+    } else if (value.isEmpty && index > 0) {
+      _focusNodes[index - 1].requestFocus();
+    }
+    if (_controllers.every((c) => c.text.isNotEmpty)) {
+      _onVerify();
+    }
   }
 
-  Widget _buildOtpBox(int index) {
-    return Container(
-      width: 48,
-      height: 56,
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: AppShadows.cardShadow,
-        border: Border.all(
-          color: _focusNodes[index].hasFocus ? Theme.of(context).primaryColor : Colors.transparent,
-          width: 2,
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return MfScaffold(
+      title: 'Verify email',
+      onBack: () {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        } else {
+          context.go('/login');
+        }
+      },
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: MfSpace.gutter, vertical: MfSpace.lg),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  AuthStepIntro(
+                    icon: Icons.mark_email_unread_outlined,
+                    title: 'Enter verification code',
+                    messageWidget: Text.rich(
+                      TextSpan(
+                        text: 'We sent a 6-digit code to\n',
+                        children: [
+                          TextSpan(
+                            text: _maskEmail(widget.email),
+                            style: text.bodyMedium?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
+                      textAlign: TextAlign.center,
+                      style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                  const SizedBox(height: MfSpace.lg),
+                  AuthOtpRow(
+                    controllers: _controllers,
+                    focusNodes: _focusNodes,
+                    onChanged: _onDigitChanged,
+                  ),
+                  if (_codeError != null) ...[
+                    const SizedBox(height: MfSpace.sm),
+                    Semantics(
+                      liveRegion: true,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.error_outline_rounded, size: 18, color: cs.error),
+                          const SizedBox(width: MfSpace.xxs),
+                          Flexible(
+                            child: Text(
+                              _codeError!,
+                              textAlign: TextAlign.center,
+                              style: text.bodySmall?.copyWith(color: cs.error),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: MfSpace.lg),
+                  MfPrimaryButton(
+                    label: _isLoading ? 'Verifying' : 'Verify account',
+                    icon: Icons.verified_user_outlined,
+                    loading: _isLoading,
+                    onPressed: _onVerify,
+                  ),
+                  const SizedBox(height: MfSpace.md),
+                  Text(
+                    "Didn't receive the code?",
+                    textAlign: TextAlign.center,
+                    style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: MfSpace.xxs),
+                  Center(
+                    child: MfSecondaryButton(
+                      expanded: false,
+                      icon: Icons.refresh_rounded,
+                      loading: _isResending,
+                      label: _resendCooldown > 0
+                          ? 'Resend code in ${_resendCooldown}s'
+                          : (_isResending ? 'Sending' : 'Resend code'),
+                      onPressed: _resendCooldown > 0 ? null : _onResend,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
-      child: TextField(
-        controller: _controllers[index],
-        focusNode: _focusNodes[index],
-        textAlign: TextAlign.center,
-        textAlignVertical: TextAlignVertical.center, // Center text vertically
-        keyboardType: TextInputType.number,
-        maxLength: 1,
-        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        decoration: const InputDecoration(
-          counterText: '',
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero, // Remove default padding for better alignment
-        ),
-        onChanged: (value) {
-          if (value.isNotEmpty && index < 5) {
-            _focusNodes[index + 1].requestFocus();
-          } else if (value.isEmpty && index > 0) {
-            _focusNodes[index - 1].requestFocus();
-          }
-          if (_controllers.every((c) => c.text.isNotEmpty)) {
-            _onVerify();
-          }
-        },
       ),
     );
   }

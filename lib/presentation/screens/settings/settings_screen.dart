@@ -2,447 +2,336 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
-import '../../widgets/common/app_header.dart';
+import '../../widgets/design_system/design_system.dart';
 import '../../../services/location/location_service.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   final bool showHeader;
   const SettingsScreen({super.key, this.showHeader = true});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider).valueOrNull;
     final role = user?.role ?? 'PATIENT';
+    final themeMode = ref.watch(accessibilityProvider).themeMode;
+    final isDeaf = (user?.patientType?.toUpperCase() ?? '') == 'DEAF';
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          if (showHeader) const AppHeader(greetingOverride: 'Settings', canPop: true),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-              children: [
-  
-                // ── PATIENT ──────────────────────────────────────────────────
-                if (role == 'PATIENT') ...[
-                  _buildSectionHeader(theme, 'Appearance'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.palette_rounded,
-                    'App Theme',
-                    'Switch between Light, Dark and System modes',
-                    const Color(0xFF6366F1),
-                    theme,
-                    () => _showThemeDialog(context, ref),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsTile(
-                    context,
-                    Icons.format_size_rounded,
-                    'Accessibility & Text',
-                    'Text size, high contrast, vibration and text-only mode',
-                    const Color(0xFF8B5CF6),
-                    theme,
-                    () => context.push('/accessibility-settings'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'Health & Security'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.medical_services_rounded,
-                    'Medical Profile',
-                    'Update blood group, allergies & conditions',
-                    const Color(0xFFEF4444),
-                    theme,
-                    () => context.push('/home/medical-profile'),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsTile(
-                    context,
-                    Icons.people_alt_rounded,
-                    'My Caregivers',
-                    'Manage trusted caregiver accounts',
-                    const Color(0xFFF59E0B),
-                    theme,
-                    () => context.go('/home/caregivers'),
-                  ),
-                  const SizedBox(height: 16),
-                  // Deaf Patient — predefined messages
-                  if ((user?.patientType?.toUpperCase() ?? '') == 'DEAF') ...[
-                    _buildSettingsTile(
-                      context,
-                      Icons.hearing_disabled_rounded,
-                      'Quick Phrases',
-                      'Set up pre-written phrases for silent SOS communication',
-                      const Color(0xFF2496A7),
-                      theme,
-                      () => context.push('/predefined-messages'),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  _buildSettingsTile(
-                    context,
-                    Icons.card_membership_rounded,
-                    'Subscription Plans',
-                    'Upgrade your plan for premium features',
-                    const Color(0xFF10B981),
-                    theme,
-                    () => context.push('/subscription-plans'),
-                  ),
-                ],
-  
-                // ── RESPONDER ─────────────────────────────────────────────────
-                if (role == 'RESPONDER') ...[
-                  _buildSectionHeader(theme, 'App Experience'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.palette_rounded,
-                    'Theme & Appearance',
-                    'Customize the look and feel of your dashboard',
-                    const Color(0xFF6366F1),
-                    theme,
-                    () => _showThemeDialog(context, ref),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsTile(
-                    context,
-                    Icons.format_size_rounded,
-                    'Accessibility & Voice Alerts',
-                    'Text size, contrast, vibration and hands-free voice alerts',
-                    const Color(0xFF8B5CF6),
-                    theme,
-                    () => context.push('/accessibility-settings'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'Response History'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.history_rounded,
-                    'Emergency Logs',
-                    'Review your past emergency responses',
-                    const Color(0xFF4F46E5),
-                    theme,
-                    () => context.go('/responder/history'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'Subscription'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.card_membership_rounded,
-                    'Subscription Plans',
-                    'Upgrade your plan for priority dispatch & full history',
-                    const Color(0xFF10B981),
-                    theme,
-                    () => context.push('/subscription-plans'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'System Tools'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.terminal_rounded,
-                    'Diagnostics',
-                    'Socket status, FCM & system monitoring',
-                    const Color(0xFF64748B),
-                    theme,
-                    () => context.go('/diagnostics'),
-                  ),
-                ],
-  
-                // ── CAREGIVER ─────────────────────────────────────────────────
-                if (role == 'CAREGIVER') ...[
-                  _buildSectionHeader(theme, 'App Experience'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.palette_rounded,
-                    'Theme & Appearance',
-                    'Customize colors and layout preferences',
-                    const Color(0xFF6366F1),
-                    theme,
-                    () => _showThemeDialog(context, ref),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsTile(
-                    context,
-                    Icons.format_size_rounded,
-                    'Accessibility & Text',
-                    'Text size, high contrast and vibration',
-                    const Color(0xFF8B5CF6),
-                    theme,
-                    () => context.push('/accessibility-settings'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'Account & Patients'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.supervisor_account_rounded,
-                    'My Patients',
-                    'View and manage your linked patients',
-                    const Color(0xFF8B5CF6),
-                    theme,
-                    () => context.go('/caregiver/my-patients'),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildSettingsTile(
-                    context,
-                    Icons.person_add_rounded,
-                    'Link New Patient',
-                    'Connect with a new patient via email',
-                    const Color(0xFFEC4899),
-                    theme,
-                    () => context.go('/caregiver/my-patients/link-patient'),
-                  ),
-                  const SizedBox(height: 32),
-                  _buildSectionHeader(theme, 'Subscription'),
-                  _buildSettingsTile(
-                    context,
-                    Icons.card_membership_rounded,
-                    'Subscription Plans',
-                    'Upgrade your plan to monitor more patients',
-                    const Color(0xFF10B981),
-                    theme,
-                    () => context.push('/subscription-plans'),
-                  ),
-                ],
-  
-                if (kDebugMode) ...[
-                const SizedBox(height: 32),
-                _buildSectionHeader(theme, 'Testing Tools'),
-                _buildSettingsTile(
-                  context,
-                  Icons.location_searching_rounded,
-                  'Simulate Distance',
-                  LocationService.debugLatOffset == 0 ? 'Disabled' : 'Active (500m Offset)',
-                  AppColors.secondaryTeal,
-                  theme,
-                  () {
-                    // Toggle 500m offset (~0.005 degrees)
-                    if (LocationService.debugLatOffset == 0) {
-                      LocationService.debugLatOffset = 0.005;
-                      LocationService.debugLngOffset = 0.005;
-                    } else {
-                      LocationService.debugLatOffset = 0.0;
-                      LocationService.debugLngOffset = 0.0;
-                    }
-
-                    // Force rebuild of settings screen to update subtitle
-                    (context as Element).markNeedsBuild();
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(LocationService.debugLatOffset == 0
-                          ? 'Location spoofing disabled'
-                          : 'Location spoofed (500m offset applied)'),
-                        backgroundColor: AppColors.secondaryTeal,
-                        behavior: SnackBarBehavior.floating,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    );
-                  },
-                ),
-                ],
-
-                const SizedBox(height: 48),
-                
-                // Premium Logout Button
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.error.withOpacity(0.08),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      await ref.read(logoutProvider.future);
-                      if (context.mounted) context.go('/login');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.colorScheme.surface,
-                      foregroundColor: AppColors.error,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(vertical: 18),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(24),
-                        side: BorderSide(color: AppColors.error.withOpacity(0.2)),
-                      ),
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.logout_rounded, size: 20),
-                        SizedBox(width: 12),
-                        Text(
-                          'Log Out',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(height: 40),
-                Center(
-                  child: Column(
-                    children: [
-                      Text(
-                        'MediFind Mobile App',
-                        style: TextStyle(
-                          color: Colors.grey.shade400, 
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Version 1.0.0 Build 44',
-                        style: TextStyle(color: Colors.grey.shade300, fontSize: 10),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-            ),
+    final sections = <Widget>[
+      // ── PATIENT ──────────────────────────────────────────────────
+      if (role == 'PATIENT') ...[
+        _section('Appearance & accessibility', [
+          MfIconTile(
+            icon: Icons.contrast_rounded,
+            label: 'App theme',
+            subtitle: _themeLabel(themeMode),
+            onTap: _showThemeDialog,
           ),
+          MfIconTile(
+            icon: Icons.accessibility_new_rounded,
+            label: 'Accessibility & text',
+            subtitle: 'Text size, high contrast, vibration and text-only mode',
+            onTap: () => context.push('/accessibility-settings'),
+          ),
+        ]),
+        _section('Health & safety', [
+          MfIconTile(
+            icon: Icons.medical_information_outlined,
+            label: 'Medical profile',
+            subtitle: 'Blood group, allergies and conditions',
+            onTap: () => context.push('/home/medical-profile'),
+          ),
+          MfIconTile(
+            icon: Icons.people_outline_rounded,
+            label: 'My caregivers',
+            subtitle: 'Manage trusted caregiver accounts',
+            onTap: () => context.push('/home/caregivers'),
+          ),
+          // Deaf patient — predefined messages
+          if (isDeaf)
+            MfIconTile(
+              icon: Icons.chat_outlined,
+              label: 'Quick phrases',
+              subtitle: 'Pre-written phrases for silent SOS communication',
+              onTap: () => context.push('/predefined-messages'),
+            ),
+        ]),
+        _section('Plan', [
+          MfIconTile(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Subscription plans',
+            subtitle: 'Upgrade your plan for premium features',
+            onTap: () => context.push('/subscription-plans'),
+          ),
+        ]),
+      ],
+
+      // ── RESPONDER ─────────────────────────────────────────────────
+      if (role == 'RESPONDER') ...[
+        _section('Appearance & accessibility', [
+          MfIconTile(
+            icon: Icons.contrast_rounded,
+            label: 'Theme & appearance',
+            subtitle: _themeLabel(themeMode),
+            onTap: _showThemeDialog,
+          ),
+          MfIconTile(
+            icon: Icons.accessibility_new_rounded,
+            label: 'Accessibility & voice alerts',
+            subtitle: 'Text size, contrast, vibration and hands-free voice alerts',
+            onTap: () => context.push('/accessibility-settings'),
+          ),
+        ]),
+        _section('Response history', [
+          MfIconTile(
+            icon: Icons.history_rounded,
+            label: 'Emergency logs',
+            subtitle: 'Review your past emergency responses',
+            onTap: () => context.go('/responder/history'),
+          ),
+        ]),
+        _section('Plan', [
+          MfIconTile(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Subscription plans',
+            subtitle: 'Priority dispatch and full history',
+            onTap: () => context.push('/subscription-plans'),
+          ),
+        ]),
+        _section('System tools', [
+          MfIconTile(
+            icon: Icons.monitor_heart_outlined,
+            label: 'Diagnostics',
+            subtitle: 'Socket status, push token and system monitoring',
+            tone: MfTone.neutral,
+            onTap: () => context.push('/diagnostics'),
+          ),
+        ]),
+      ],
+
+      // ── CAREGIVER ─────────────────────────────────────────────────
+      if (role == 'CAREGIVER') ...[
+        _section('Appearance & accessibility', [
+          MfIconTile(
+            icon: Icons.contrast_rounded,
+            label: 'Theme & appearance',
+            subtitle: _themeLabel(themeMode),
+            onTap: _showThemeDialog,
+          ),
+          MfIconTile(
+            icon: Icons.accessibility_new_rounded,
+            label: 'Accessibility & text',
+            subtitle: 'Text size, high contrast and vibration',
+            onTap: () => context.push('/accessibility-settings'),
+          ),
+        ]),
+        _section('Account & patients', [
+          MfIconTile(
+            icon: Icons.supervisor_account_outlined,
+            label: 'My patients',
+            subtitle: 'View and manage your linked patients',
+            onTap: () => context.push('/caregiver/my-patients'),
+          ),
+          MfIconTile(
+            icon: Icons.person_add_alt_outlined,
+            label: 'Link new patient',
+            subtitle: 'Connect with a new patient via email',
+            onTap: () => context.push('/caregiver/my-patients/link-patient'),
+          ),
+        ]),
+        _section('Plan', [
+          MfIconTile(
+            icon: Icons.workspace_premium_outlined,
+            label: 'Subscription plans',
+            subtitle: 'Upgrade your plan to monitor more patients',
+            onTap: () => context.push('/subscription-plans'),
+          ),
+        ]),
+      ],
+
+      // ── ALL ROLES ─────────────────────────────────────────────────
+      _section('Notifications', [
+        MfIconTile(
+          icon: Icons.notifications_none_rounded,
+          label: 'Notifications',
+          subtitle: 'Emergency updates and messages',
+          onTap: () => showMfNotificationsSheet(context),
+        ),
+      ]),
+
+      if (kDebugMode)
+        _section('Testing tools', [
+          MfIconTile(
+            icon: Icons.location_searching_rounded,
+            label: 'Simulate distance',
+            subtitle: LocationService.debugLatOffset == 0 ? 'Disabled' : 'Active (500 m offset)',
+            tone: MfTone.neutral,
+            onTap: _toggleSimulatedDistance,
+          ),
+        ]),
+
+      _section('Account', [
+        MfIconTile(
+          icon: Icons.logout_rounded,
+          label: 'Sign out',
+          subtitle: user?.email,
+          tone: MfTone.danger,
+          showChevron: false,
+          onTap: _confirmSignOut,
+        ),
+      ]),
+    ];
+
+    final body = ListView(
+      padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+      children: [
+        ...sections,
+        const SizedBox(height: MfSpace.xs),
+        _VersionFooter(),
+      ],
+    );
+
+    if (!widget.showHeader) return body;
+    return MfScaffold(title: 'Settings', body: body);
+  }
+
+  Widget _section(String title, List<Widget> rows) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: MfSpace.lg),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MfSectionTitle(title),
+          MfListGroup(children: rows),
         ],
       ),
     );
   }
 
+  String _themeLabel(ThemeMode mode) {
+    switch (mode) {
+      case ThemeMode.dark:
+        return 'Dark mode';
+      case ThemeMode.system:
+        return 'System default';
+      case ThemeMode.light:
+        return 'Light mode';
+    }
+  }
 
-  void _showThemeDialog(BuildContext context, WidgetRef ref) {
+  void _toggleSimulatedDistance() {
+    // Toggle 500m offset (~0.005 degrees)
+    if (LocationService.debugLatOffset == 0) {
+      LocationService.debugLatOffset = 0.005;
+      LocationService.debugLngOffset = 0.005;
+    } else {
+      LocationService.debugLatOffset = 0.0;
+      LocationService.debugLngOffset = 0.0;
+    }
+
+    // Rebuild to update the subtitle
+    setState(() {});
+
+    showMfSnackBar(
+      context,
+      LocationService.debugLatOffset == 0
+          ? 'Location spoofing disabled'
+          : 'Location spoofed (500 m offset applied)',
+      tone: MfTone.info,
+    );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Sign out?',
+      message: 'You will need to sign in again to send SOS alerts and receive updates.',
+      confirmLabel: 'Sign out',
+      destructive: true,
+      icon: Icons.logout_rounded,
+    );
+    if (!confirmed) return;
+    await ref.read(logoutProvider.future);
+    if (mounted) context.go('/login');
+  }
+
+  void _showThemeDialog() {
     showDialog(
       context: context,
-      builder: (context) {
-        final currentMode = ref.watch(accessibilityProvider).themeMode;
-        return AlertDialog(
-          title: const Text('Select App Theme'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildThemeOption(context, ref, 'System Default', Icons.brightness_auto, ThemeMode.system, currentMode),
-              _buildThemeOption(context, ref, 'Light Mode', Icons.light_mode_rounded, ThemeMode.light, currentMode),
-              _buildThemeOption(context, ref, 'Dark Mode', Icons.dark_mode_rounded, ThemeMode.dark, currentMode),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
-          ],
+      builder: (dialogContext) {
+        return Consumer(
+          builder: (context, ref, _) {
+            final currentMode = ref.watch(accessibilityProvider).themeMode;
+            return AlertDialog(
+              title: const Text('App theme'),
+              contentPadding: const EdgeInsets.symmetric(vertical: MfSpace.sm),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _themeOption(context, ref, 'System default', Icons.brightness_auto_outlined, ThemeMode.system, currentMode),
+                  _themeOption(context, ref, 'Light mode', Icons.light_mode_outlined, ThemeMode.light, currentMode),
+                  _themeOption(context, ref, 'Dark mode', Icons.dark_mode_outlined, ThemeMode.dark, currentMode),
+                ],
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Close')),
+              ],
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildThemeOption(BuildContext context, WidgetRef ref, String label, IconData icon, ThemeMode mode, ThemeMode currentMode) {
-    final isSelected = mode == currentMode;
-    return ListTile(
-      leading: Icon(icon, color: isSelected ? AppColors.primary : Colors.grey),
-      title: Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.normal)),
-      trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.primary) : null,
-      onTap: () {
-        ref.read(accessibilityProvider.notifier).setThemeMode(mode);
-        Navigator.pop(context);
-      },
-    );
-  }
-
-  Widget _buildSectionHeader(ThemeData theme, String title) {
-    return Padding(
-      padding: const EdgeInsets.only(left: 4, bottom: 16),
-      child: Row(
-        children: [
-          Container(
-            width: 4,
-            height: 16,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: Colors.grey.shade600,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingsTile(
+  Widget _themeOption(
     BuildContext context,
+    WidgetRef ref,
+    String label,
     IconData icon,
-    String title,
-    String subtitle,
-    Color color,
-    ThemeData theme,
-    VoidCallback onTap,
+    ThemeMode mode,
+    ThemeMode currentMode,
   ) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color ?? theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(theme.brightness == Brightness.dark ? 0.2 : 0.03),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
+    final cs = Theme.of(context).colorScheme;
+    final isSelected = mode == currentMode;
+    return Semantics(
+      selected: isSelected,
       child: ListTile(
-        onTap: onTap,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(icon, color: color, size: 24),
-        ),
+        minTileHeight: MfSize.primaryButton,
+        leading: Icon(icon, color: isSelected ? cs.primary : cs.onSurfaceVariant),
         title: Text(
-          title, 
-          style: const TextStyle(
-            fontWeight: FontWeight.bold, 
-            fontSize: 16,
-            letterSpacing: -0.2,
-          )
+          label,
+          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+              ),
         ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 2),
-          child: Text(
-            subtitle, 
-            style: TextStyle(color: Colors.grey.shade500, fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ),
-        trailing: Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(
-            color: theme.brightness == Brightness.dark ? Colors.white.withOpacity(0.05) : Colors.grey.shade50,
-            shape: BoxShape.circle,
-          ),
-          child: const Icon(Icons.chevron_right_rounded, color: Colors.grey, size: 20),
-        ),
+        trailing: isSelected ? Icon(Icons.check_rounded, color: cs.primary) : null,
+        onTap: () {
+          ref.read(accessibilityProvider.notifier).setThemeMode(mode);
+          Navigator.pop(context);
+        },
+      ),
+    );
+  }
+}
+
+class _VersionFooter extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        children: [
+          Text('MediFind Mobile App', style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: MfSpace.xxs),
+          Text('Version 1.0.0 Build 44', style: text.labelSmall?.copyWith(color: cs.onSurfaceVariant)),
+        ],
       ),
     );
   }

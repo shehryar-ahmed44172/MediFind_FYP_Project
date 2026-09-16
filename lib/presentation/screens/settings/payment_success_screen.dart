@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class PaymentSuccessScreen extends ConsumerWidget {
   final String planName;
@@ -14,116 +14,99 @@ class PaymentSuccessScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final success = MfColors.tone(context, MfTone.success);
+
+    return MfScaffold(
+      title: 'Payment complete',
+      showBack: false,
+      bottomBar: MfPrimaryButton(
+        label: 'Continue',
+        icon: Icons.arrow_forward_rounded,
+        onPressed: () {
+          final role = ref.read(currentUserProvider).valueOrNull?.role ?? 'PATIENT';
+          final route = role == 'CAREGIVER'
+              ? '/caregiver'
+              : role == 'RESPONDER'
+                  ? '/responder'
+                  : '/home';
+          context.go(route);
+        },
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.xl, MfSpace.gutter, MfSpace.xl),
+        children: [
+          Center(
+            child: Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: success.container,
+                shape: BoxShape.circle,
+                border: Border.all(color: success.border),
+              ),
+              child: Icon(Icons.check_rounded, color: success.foreground, size: 40, semanticLabel: 'Success'),
+            ),
+          ),
+          const SizedBox(height: MfSpace.lg),
+          Semantics(
+            header: true,
+            liveRegion: true,
+            child: Text('Payment successful', style: text.headlineSmall, textAlign: TextAlign.center),
+          ),
+          const SizedBox(height: MfSpace.xs),
+          Text(
+            'Your account is now on the $planName plan. Premium features are available right away.',
+            style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: MfSpace.xl),
+
+          // Receipt Details
+          const MfSectionTitle('Receipt'),
+          MfListGroup(
             children: [
-              const Spacer(),
-              // Animated Success Icon
-              Container(
-                width: 120,
-                height: 120,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF10B981).withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: const Center(
-                  child: Icon(
-                    Icons.verified_rounded,
-                    color: Color(0xFF10B981),
-                    size: 80,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                'Payment Successful!',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Welcome to the $planName plan. Your medical account has been upgraded with premium life-saving features.',
-                style: const TextStyle(fontSize: 16, color: Colors.grey, height: 1.5),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 48),
-              
-              // Receipt Details
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: Colors.grey.withOpacity(0.1)),
-                ),
-                child: Column(
+              _buildReceiptRow(context, 'Plan', planName),
+              _buildReceiptRow(context, 'Transaction ID', transactionId ?? 'Not available', selectable: true),
+              _buildReceiptRow(context, 'Date', DateFormat('MMMM d, yyyy').format(DateTime.now())),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
+                child: Row(
                   children: [
-                    _buildReceiptRow('Transaction ID', transactionId ?? 'Not available'),
-                    const SizedBox(height: 12),
-                    _buildReceiptRow('Date', DateFormat('MMMM d, yyyy').format(DateTime.now())),
-                    const SizedBox(height: 12),
-                    _buildReceiptRow('Plan', planName),
-                    const Divider(height: 32),
-                    _buildReceiptRow('Status', 'COMPLETED', isStatus: true),
+                    Expanded(
+                      child: Text('Status', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ),
+                    const MfStatusChip(
+                      label: 'Completed',
+                      tone: MfTone.success,
+                      icon: Icons.check_circle_outline_rounded,
+                    ),
                   ],
-                ),
-              ),
-              
-              const Spacer(),
-              
-              SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    final role = ref.read(currentUserProvider).valueOrNull?.role ?? 'PATIENT';
-                    final route = role == 'CAREGIVER'
-                        ? '/caregiver'
-                        : role == 'RESPONDER'
-                            ? '/responder'
-                            : '/home';
-                    context.go(route);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryNavy,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
-                  child: const Text('Go to Dashboard', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
                 ),
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildReceiptRow(String label, String value, {bool isStatus = false}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-        const SizedBox(width: 16),
-        Flexible(
-          child: SelectableText(
-            value,
-            textAlign: TextAlign.end,
-            maxLines: 1,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: isStatus ? const Color(0xFF10B981) : const Color(0xFF0F172A),
-            ),
-          ),
-        ),
-      ],
+  Widget _buildReceiptRow(BuildContext context, String label, String value, {bool selectable = false}) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          const SizedBox(height: 2),
+          selectable
+              ? SelectableText(value, style: text.titleSmall)
+              : Text(value, style: text.titleSmall),
+        ],
+      ),
     );
   }
 }

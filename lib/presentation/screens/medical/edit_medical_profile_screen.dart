@@ -3,31 +3,34 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/medical_profile_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class EditMedicalProfileScreen extends ConsumerStatefulWidget {
   const EditMedicalProfileScreen({super.key});
 
   @override
-  ConsumerState<EditMedicalProfileScreen> createState() =>
-      _EditMedicalProfileScreenState();
+  ConsumerState<EditMedicalProfileScreen> createState() => _EditMedicalProfileScreenState();
 }
 
-class _EditMedicalProfileScreenState
-    extends ConsumerState<EditMedicalProfileScreen> {
+class _EditMedicalProfileScreenState extends ConsumerState<EditMedicalProfileScreen> {
   final _formKey = GlobalKey<FormState>();
+
+  // Input controllers for the chip / list editors (pending, not-yet-added text).
   final _allergiesController = TextEditingController();
   final _diseasesController = TextEditingController();
   final _medicationsController = TextEditingController();
   final _additionalNotesController = TextEditingController();
+
+  final List<String> _allergies = [];
+  final List<String> _diseases = [];
+  final List<String> _medications = [];
+
   String _selectedBloodGroup = 'O+';
   String _selectedDisabilityType = 'None';
   bool _isLoading = false;
   bool _initialized = false;
 
-  static const List<String> _bloodGroups = [
-    'O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Unknown'
-  ];
+  static const List<String> _bloodGroups = ['O+', 'O-', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'Unknown'];
 
   static const List<String> _disabilityTypes = [
     'None',
@@ -49,7 +52,33 @@ class _EditMedicalProfileScreenState
     super.dispose();
   }
 
+  /// Moves any typed-but-not-added text into the matching list so nothing
+  /// the user typed is lost on save.
+  void _commitPending() {
+    _addFrom(_allergiesController, _allergies);
+    _addFrom(_diseasesController, _diseases);
+    _addFrom(_medicationsController, _medications);
+  }
+
+  void _addFrom(TextEditingController controller, List<String> target) {
+    final items = _parseList(controller.text);
+    if (items.isEmpty) return;
+    setState(() {
+      for (final item in items) {
+        if (!target.any((t) => t.toLowerCase() == item.toLowerCase())) {
+          target.add(item);
+        }
+      }
+      controller.clear();
+    });
+  }
+
+  void _removeFrom(List<String> target, String item) {
+    setState(() => target.remove(item));
+  }
+
   Future<void> _save() async {
+    _commitPending();
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
@@ -60,24 +89,17 @@ class _EditMedicalProfileScreenState
       final params = UpdateMedicalProfileParams(
         userId: userId,
         bloodType: _selectedBloodGroup,
-        disabilityType:
-            _selectedDisabilityType == 'None' ? null : _selectedDisabilityType,
-        allergies: _parseList(_allergiesController.text),
-        chronicDiseases: _parseList(_diseasesController.text),
-        medications: _parseList(_medicationsController.text),
+        disabilityType: _selectedDisabilityType == 'None' ? null : _selectedDisabilityType,
+        allergies: List<String>.from(_allergies),
+        chronicDiseases: List<String>.from(_diseases),
+        medications: List<String>.from(_medications),
         additionalNotes: _additionalNotesController.text.trim(),
       );
 
       await ref.read(updateMedicalProfileProvider(params).future);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Medical profile updated!'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Medical profile updated', tone: MfTone.success);
         context.pop();
       }
     } catch (e) {
@@ -85,27 +107,14 @@ class _EditMedicalProfileScreenState
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: const Row(
-              children: [
-                Icon(Icons.error_outline_rounded, color: AppColors.error, size: 28),
-                SizedBox(width: 10),
-                Text('Save Failed'),
-              ],
-            ),
+            icon: Icon(Icons.error_outline_rounded, color: MfColors.sos(ctx), size: 28),
+            title: const Text('Save failed'),
             content: const Text(
               'Unable to save your medical profile. Please check your internet connection and try again.',
             ),
             actions: [
-              ElevatedButton(
+              FilledButton(
                 onPressed: () => Navigator.pop(ctx),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.error,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                ),
                 child: const Text('OK'),
               ),
             ],
@@ -118,18 +127,18 @@ class _EditMedicalProfileScreenState
   }
 
   List<String> _parseList(String input) {
-    return input
-        .split(',')
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
+    return input.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+  }
+
+  /// Same limit the backend-facing comma separated text had before.
+  String? _maxLength(List<String> items, TextEditingController pending, int max) {
+    final all = [...items, ..._parseList(pending.text)];
+    if (all.join(', ').length > max) return 'Maximum $max characters';
+    return null;
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     // Pre-fill form with existing profile data
     if (!_initialized) {
       final userId = ref.watch(currentUserIdProvider).valueOrNull;
@@ -138,452 +147,293 @@ class _EditMedicalProfileScreenState
         existing.whenData((profile) {
           if (profile != null && !_initialized) {
             _initialized = true;
-            _selectedBloodGroup =
-                profile.bloodType.isNotEmpty ? profile.bloodType : 'O+';
+            _selectedBloodGroup = profile.bloodType.isNotEmpty ? profile.bloodType : 'O+';
             _selectedDisabilityType = profile.disabilityType ?? 'None';
-            _allergiesController.text = profile.allergies.join(', ');
-            _diseasesController.text = profile.chronicDiseases.join(', ');
-            _medicationsController.text =
-                profile.medications.map((m) => m.name).join(', ');
+            _allergies
+              ..clear()
+              ..addAll(profile.allergies);
+            _diseases
+              ..clear()
+              ..addAll(profile.chronicDiseases);
+            _medications
+              ..clear()
+              ..addAll(profile.medications.map((m) => m.name));
             _additionalNotesController.text = profile.additionalNotes ?? '';
           }
         });
       }
     }
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Medical Profile',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            Text(
-              'Keep your health information up to date',
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurface.withOpacity(0.45),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        titleSpacing: 0,
+    final bloodGroups = [
+      ..._bloodGroups,
+      if (!_bloodGroups.contains(_selectedBloodGroup)) _selectedBloodGroup,
+    ];
+    final disabilityTypes = [
+      ..._disabilityTypes,
+      if (!_disabilityTypes.contains(_selectedDisabilityType)) _selectedDisabilityType,
+    ];
+
+    return MfScaffold(
+      title: 'Edit medical profile',
+      subtitle: 'Keep your health information up to date',
+      bottomBar: MfPrimaryButton(
+        label: 'Save medical profile',
+        icon: Icons.save_outlined,
+        loading: _isLoading,
+        onPressed: _save,
       ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: [
-            // ── Privacy notice ───────────────────────────────────────────
-            Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.primary.withOpacity(0.15)),
+        // Column (not a lazy ListView) so every field's validator runs on save.
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const MfInfoBanner(
+                icon: Icons.shield_outlined,
+                tone: MfTone.primary,
+                title: 'Private and encrypted',
+                message:
+                    'This data is encrypted and only shared with your assigned responder during an active emergency.',
               ),
-              child: Row(
-                children: [
-                  Icon(Icons.shield_outlined,
-                      size: 16, color: AppColors.primary),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'This data is encrypted and only shared with your assigned responder during an active emergency.',
-                      style: TextStyle(
-                          fontSize: 11.5,
-                          color: AppColors.primary,
-                          height: 1.4),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+              const SizedBox(height: MfSpace.lg),
 
-            // ── Blood Group ──────────────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.bloodtype_rounded,
-              color: const Color(0xFFD32F2F),
-              title: 'Blood Group',
-              subtitle: 'Required for emergency transfusion decisions',
-              child: DropdownButtonFormField<String>(
-                value: _selectedBloodGroup,
-                decoration: InputDecoration(
-                  labelText: 'Select blood group',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFFD32F2F), width: 1.5),
-                  ),
+              // ── Critical information ─────────────────────────────────────
+              const MfSectionTitle(
+                'Blood group',
+                subtitle: 'Required for emergency transfusion decisions',
+              ),
+              const SizedBox(height: MfSpace.xs),
+              Semantics(
+                label: 'Blood group',
+                container: true,
+                child: Wrap(
+                  spacing: MfSpace.xs,
+                  runSpacing: MfSpace.xs,
+                  children: [
+                    for (final g in bloodGroups)
+                      ChoiceChip(
+                        label: Text(g),
+                        selected: _selectedBloodGroup == g,
+                        materialTapTargetSize: MaterialTapTargetSize.padded,
+                        onSelected: (_) => setState(() => _selectedBloodGroup = g),
+                      ),
+                  ],
                 ),
-                items: _bloodGroups
-                    .map((g) =>
-                        DropdownMenuItem(value: g, child: Text(g)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null) setState(() => _selectedBloodGroup = v);
-                },
               ),
-            ),
+              const SizedBox(height: MfSpace.lg),
 
-            // ── Accessibility Need ───────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.accessibility_new_rounded,
-              color: const Color(0xFF7B1FA2),
-              title: 'Accessibility Need',
-              subtitle: 'Helps responders prepare the right support approach',
-              child: DropdownButtonFormField<String>(
-                value: _selectedDisabilityType,
-                decoration: InputDecoration(
-                  labelText: 'Select disability / accessibility type',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFF7B1FA2), width: 1.5),
-                  ),
-                ),
-                items: _disabilityTypes
-                    .map((d) =>
-                        DropdownMenuItem(value: d, child: Text(d)))
-                    .toList(),
-                onChanged: (v) {
-                  if (v != null)
-                    setState(() => _selectedDisabilityType = v);
-                },
+              const MfSectionTitle(
+                'Allergies',
+                subtitle: 'Critical: affects which medications can be given',
               ),
-            ),
-
-            // ── Allergies ────────────────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.warning_amber_rounded,
-              color: const Color(0xFFE65100),
-              title: 'Allergies',
-              subtitle: 'Critical — affects which medications can be given',
-              child: TextFormField(
+              const SizedBox(height: MfSpace.xs),
+              _ChipListEditor(
                 controller: _allergiesController,
-                maxLines: 3,
-                maxLength: 300,
-                decoration: InputDecoration(
-                  labelText: 'Known allergies',
-                  hintText: 'e.g. Penicillin, Peanuts, Latex',
-                  helperText: 'Separate multiple entries with commas',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFFE65100), width: 1.5),
-                  ),
-                ),
-                validator: (v) {
-                  if (v != null && v.trim().length > 300)
-                    return 'Maximum 300 characters';
-                  return null;
-                },
+                items: _allergies,
+                label: 'Add an allergy',
+                hint: 'e.g. Penicillin, Peanuts, Latex',
+                addTooltip: 'Add allergy',
+                itemNoun: 'allergy',
+                tone: MfTone.danger,
+                onAdd: () => _addFrom(_allergiesController, _allergies),
+                onRemove: (item) => _removeFrom(_allergies, item),
+                validator: (_) => _maxLength(_allergies, _allergiesController, 300),
               ),
-            ),
+              const SizedBox(height: MfSpace.lg),
 
-            // ── Chronic Diseases ─────────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.monitor_heart_rounded,
-              color: const Color(0xFFC62828),
-              title: 'Chronic Diseases',
-              subtitle: 'Pre-existing conditions that affect treatment',
-              child: TextFormField(
+              // ── Conditions & medications ─────────────────────────────────
+              const MfSectionTitle(
+                'Chronic conditions',
+                subtitle: 'Pre-existing conditions that affect treatment',
+              ),
+              const SizedBox(height: MfSpace.xs),
+              _ChipListEditor(
                 controller: _diseasesController,
-                maxLines: 3,
-                maxLength: 300,
-                decoration: InputDecoration(
-                  labelText: 'Chronic conditions',
-                  hintText:
-                      'e.g. Diabetes Type 2, Hypertension, Asthma',
-                  helperText: 'Separate multiple entries with commas',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFFC62828), width: 1.5),
-                  ),
-                ),
-                validator: (v) {
-                  if (v != null && v.trim().length > 300)
-                    return 'Maximum 300 characters';
-                  return null;
-                },
+                items: _diseases,
+                label: 'Add a condition',
+                hint: 'e.g. Diabetes Type 2, Hypertension, Asthma',
+                addTooltip: 'Add condition',
+                itemNoun: 'condition',
+                tone: MfTone.warning,
+                onAdd: () => _addFrom(_diseasesController, _diseases),
+                onRemove: (item) => _removeFrom(_diseases, item),
+                validator: (_) => _maxLength(_diseases, _diseasesController, 300),
               ),
-            ),
+              const SizedBox(height: MfSpace.lg),
 
-            // ── Current Medications ──────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.medication_rounded,
-              color: const Color(0xFF0277BD),
-              title: 'Current Medications',
-              subtitle: 'Include name and dosage — prevents dangerous drug interactions',
-              child: TextFormField(
+              const MfSectionTitle(
+                'Current medications',
+                subtitle: 'Include name and dosage to prevent dangerous drug interactions',
+              ),
+              const SizedBox(height: MfSpace.xs),
+              _ChipListEditor(
                 controller: _medicationsController,
-                maxLines: 3,
-                maxLength: 500,
-                decoration: InputDecoration(
-                  labelText: 'Current medications',
-                  hintText: 'e.g. Metformin 500mg, Lisinopril 10mg',
-                  helperText: 'Separate multiple medications with commas',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFF0277BD), width: 1.5),
-                  ),
+                items: _medications,
+                label: 'Add a medication',
+                hint: 'e.g. Metformin 500mg',
+                addTooltip: 'Add medication',
+                itemNoun: 'medication',
+                asList: true,
+                onAdd: () => _addFrom(_medicationsController, _medications),
+                onRemove: (item) => _removeFrom(_medications, item),
+                validator: (_) => _maxLength(_medications, _medicationsController, 500),
+              ),
+              const SizedBox(height: MfSpace.lg),
+
+              // ── Accessibility ────────────────────────────────────────────
+              const MfSectionTitle(
+                'Accessibility need',
+                subtitle: 'Helps responders prepare the right support approach',
+              ),
+              const SizedBox(height: MfSpace.xs),
+              DropdownButtonFormField<String>(
+                key: ValueKey('disability-$_initialized'),
+                initialValue: _selectedDisabilityType,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Disability / accessibility type',
+                  prefixIcon: Icon(Icons.accessibility_new_rounded),
                 ),
-                validator: (v) {
-                  if (v != null && v.trim().length > 500)
-                    return 'Maximum 500 characters';
-                  return null;
+                items: disabilityTypes.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedDisabilityType = v);
                 },
               ),
-            ),
+              const SizedBox(height: MfSpace.lg),
 
-            // ── Additional Notes ─────────────────────────────────────────
-            _buildSectionCard(
-              theme: theme,
-              isDark: isDark,
-              icon: Icons.description_rounded,
-              color: const Color(0xFF00695C),
-              title: 'Additional Notes',
-              subtitle: 'Any other information first responders should know',
-              child: TextFormField(
+              // ── Notes ────────────────────────────────────────────────────
+              const MfSectionTitle(
+                'Additional notes',
+                subtitle: 'Any other information first responders should know',
+              ),
+              const SizedBox(height: MfSpace.xs),
+              TextFormField(
                 controller: _additionalNotesController,
                 maxLines: 4,
                 maxLength: 500,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Additional medical information',
-                  hintText:
-                      'e.g. DNR order, previous surgeries, implants, blood pressure notes...',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(
-                        color:
-                            theme.colorScheme.outline.withOpacity(0.3)),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: const BorderSide(
-                        color: Color(0xFF00695C), width: 1.5),
-                  ),
+                  hintText: 'e.g. DNR order, previous surgeries, implants, blood pressure notes',
+                  alignLabelWithHint: true,
                 ),
                 validator: (v) {
-                  if (v != null && v.trim().length > 500)
+                  if (v != null && v.trim().length > 500) {
                     return 'Maximum 500 characters';
+                  }
                   return null;
                 },
               ),
-            ),
-
-            const SizedBox(height: 8),
-
-            // ── Save Button ──────────────────────────────────────────────
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _save,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  disabledBackgroundColor:
-                      AppColors.primary.withOpacity(0.4),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2.5, color: Colors.white),
-                      )
-                    : const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.save_rounded,
-                              size: 20, color: Colors.white),
-                          SizedBox(width: 10),
-                          Text(
-                            'Save Medical Profile',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.3,
-                            ),
-                          ),
-                        ],
-                      ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  // ── Section card builder ───────────────────────────────────────────────────
-  Widget _buildSectionCard({
-    required ThemeData theme,
-    required bool isDark,
-    required IconData icon,
-    required Color color,
-    required String title,
-    required String subtitle,
-    required Widget child,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: isDark
-            ? Colors.white.withOpacity(0.05)
-            : theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDark
-              ? Colors.white.withOpacity(0.08)
-              : theme.colorScheme.outline.withOpacity(0.12),
+/// Text input + add button with removable chips (or rows when [asList]).
+class _ChipListEditor extends StatelessWidget {
+  final TextEditingController controller;
+  final List<String> items;
+  final String label;
+  final String hint;
+  final String addTooltip;
+  final String itemNoun;
+  final MfTone tone;
+  final bool asList;
+  final VoidCallback onAdd;
+  final ValueChanged<String> onRemove;
+  final FormFieldValidator<String> validator;
+
+  const _ChipListEditor({
+    required this.controller,
+    required this.items,
+    required this.label,
+    required this.hint,
+    required this.addTooltip,
+    required this.itemNoun,
+    required this.onAdd,
+    required this.onRemove,
+    required this.validator,
+    this.tone = MfTone.primary,
+    this.asList = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final t = MfColors.tone(context, tone);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextFormField(
+          controller: controller,
+          textCapitalization: TextCapitalization.sentences,
+          textInputAction: TextInputAction.done,
+          onFieldSubmitted: (_) => onAdd(),
+          validator: validator,
+          decoration: InputDecoration(
+            labelText: label,
+            hintText: hint,
+            helperText: 'Tap add, or separate several entries with commas',
+            suffixIcon: MfIconButton(
+              icon: Icons.add_circle_outline_rounded,
+              tooltip: addTooltip,
+              color: cs.primary,
+              onPressed: onAdd,
+            ),
+          ),
         ),
-        boxShadow: isDark
-            ? []
-            : [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
-                  blurRadius: 10,
-                  offset: const Offset(0, 2),
-                )
-              ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Card header strip
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.06),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(20)),
-              border: Border(
-                bottom: BorderSide(color: color.withOpacity(0.12)),
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 17),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: color,
-                          letterSpacing: 0.1,
+        const SizedBox(height: MfSpace.xs),
+        if (items.isEmpty)
+          Text('None added', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant))
+        else if (asList)
+          MfListGroup(
+            children: [
+              for (final item in items)
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: MfSize.minTouch),
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: MfSpace.md, right: MfSpace.xxs),
+                    child: Row(
+                      children: [
+                        Icon(Icons.medication_outlined, size: 20, color: cs.onSurfaceVariant),
+                        const SizedBox(width: MfSpace.sm),
+                        Expanded(child: Text(item, style: text.bodyLarge)),
+                        MfIconButton(
+                          icon: Icons.close_rounded,
+                          tooltip: 'Remove $itemNoun $item',
+                          onPressed: () => onRemove(item),
                         ),
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: theme.colorScheme.onSurface.withOpacity(0.5),
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
-              ],
-            ),
+            ],
+          )
+        else
+          Wrap(
+            spacing: MfSpace.xs,
+            runSpacing: 0,
+            children: [
+              for (final item in items)
+                InputChip(
+                  label: Text(item),
+                  labelStyle: text.labelLarge?.copyWith(color: t.foreground),
+                  backgroundColor: Color.alphaBlend(t.container, cs.surface),
+                  side: BorderSide(color: t.border),
+                  deleteIconColor: t.foreground,
+                  deleteButtonTooltipMessage: 'Remove $itemNoun $item',
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                  onDeleted: () => onRemove(item),
+                ),
+            ],
           ),
-          // Input field
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: child,
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

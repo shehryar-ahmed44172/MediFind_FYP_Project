@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/caregiver_providers.dart';
-import '../../theme/app_theme.dart';
-
-import '../../widgets/common/app_header.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class LinkPatientScreen extends ConsumerStatefulWidget {
   const LinkPatientScreen({super.key});
@@ -14,24 +12,28 @@ class LinkPatientScreen extends ConsumerStatefulWidget {
 }
 
 class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   String _selectedRelationship = 'Father';
-  
+
   final List<String> _relationshipOptions = [
     'Father', 'Mother', 'Son', 'Daughter', 'Spouse', 'Sibling', 'Friend', 'Other'
   ];
 
   bool _isLoading = false;
 
+  static final _emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  String? _validateEmail(String? value) {
+    final email = (value ?? '').trim();
+    if (email.isEmpty) return 'Enter the patient\'s email address.';
+    if (!_emailPattern.hasMatch(email)) return 'Please enter a valid email address.';
+    return null;
+  }
+
   Future<void> _sendInvitation() async {
     final email = _emailController.text.trim();
-    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a valid email address.'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+    if (!(_formKey.currentState?.validate() ?? _emailPattern.hasMatch(email))) {
       return;
     }
     FocusScope.of(context).unfocus();
@@ -45,25 +47,13 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
       }).future);
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation sent successfully!'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Invitation sent successfully', tone: MfTone.success);
         context.pop();
       }
     } catch (e) {
       if (mounted) {
         final message = e.toString().replaceAll('Exception:', '').trim();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, message, tone: MfTone.danger);
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -78,74 +68,87 @@ class _LinkPatientScreenState extends ConsumerState<LinkPatientScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: const AppHeader(greetingOverride: 'Link Patient', canPop: true, showLogout: false, showProfile: false),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(Icons.person_add_alt_1, size: 80, color: AppColors.primary),
-            const SizedBox(height: 24),
-            const Text(
-              'Invite Patient',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Enter the patient\'s registered email address to send them a connection request.',
-              style: TextStyle(color: Color(0xFF616161)),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _isLoading ? null : _sendInvitation(),
-              decoration: InputDecoration(
-                labelText: 'Patient Email',
-                prefixIcon: const Icon(Icons.email_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return MfScaffold(
+      title: 'Link patient',
+      fallbackRoute: '/caregiver/my-patients',
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.lg, MfSpace.gutter, MfSpace.lg),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 560),
+              child: Form(
+                key: _formKey,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Semantics(
+                      header: true,
+                      child: Text('Invite a patient', style: text.titleLarge),
+                    ),
+                    const SizedBox(height: MfSpace.xs),
+                    Text(
+                      'Enter the patient\'s registered email address to send them a connection request.',
+                      style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: MfSpace.lg),
+                    TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      autocorrect: false,
+                      autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.done,
+                      validator: _validateEmail,
+                      onFieldSubmitted: (_) => _isLoading ? null : _sendInvitation(),
+                      decoration: const InputDecoration(
+                        labelText: 'Patient email',
+                        prefixIcon: Icon(Icons.email_outlined),
+                      ),
+                    ),
+                    const SizedBox(height: MfSpace.md),
+                    DropdownButtonFormField<String>(
+                      initialValue: _selectedRelationship,
+                      isExpanded: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Relationship to patient',
+                        prefixIcon: Icon(Icons.family_restroom_rounded),
+                      ),
+                      items: _relationshipOptions.map((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                      onChanged: (newValue) {
+                        setState(() {
+                          _selectedRelationship = newValue!;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: MfSpace.md),
+                    const MfInfoBanner(
+                      icon: Icons.info_outline_rounded,
+                      title: 'The patient must accept',
+                      message: 'You can monitor the patient once they accept your request.',
+                    ),
+                    const SizedBox(height: MfSpace.lg),
+                    MfPrimaryButton(
+                      label: 'Send invitation',
+                      icon: Icons.send_rounded,
+                      loading: _isLoading,
+                      onPressed: _isLoading ? null : _sendInvitation,
+                    ),
+                  ],
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _selectedRelationship,
-              decoration: InputDecoration(
-                labelText: 'Relationship to Patient',
-                prefixIcon: const Icon(Icons.family_restroom),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-              ),
-              items: _relationshipOptions.map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (newValue) {
-                setState(() {
-                  _selectedRelationship = newValue!;
-                });
-              },
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _isLoading ? null : _sendInvitation,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size.fromHeight(52),
-              ),
-              child: _isLoading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                    )
-                  : const Text('Send Invitation', style: TextStyle(fontSize: 16)),
-            ),
-          ],
+          ),
         ),
       ),
     );

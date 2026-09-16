@@ -36,15 +36,26 @@ class AppConstants {
   static const String _prodWsUrl     = 'wss://api.medifind.com/';
   static const String _prodSocketUrl = 'https://api.medifind.com';
 
-  static String get baseUrl   => isDevelopment
-      ? (_useNgrok ? _ngrokBaseUrl   : _lanBaseUrl)
-      : _prodBaseUrl;
-  static String get wsUrl     => isDevelopment
-      ? (_useNgrok ? _ngrokWsUrl     : _lanWsUrl)
-      : _prodWsUrl;
-  static String get socketUrl => isDevelopment
-      ? (_useNgrok ? _ngrokSocketUrl : _lanSocketUrl)
-      : _prodSocketUrl;
+  // ── Optional build-time override ──────────────────────────────────────────
+  // flutter run --dart-define=MEDIFIND_API_HOST=http://10.0.2.2:3000
+  // (Android emulator → backend on this PC). Empty = use the settings above.
+  static const String _apiHostOverride = String.fromEnvironment('MEDIFIND_API_HOST');
+
+  static String get baseUrl   => _apiHostOverride.isNotEmpty
+      ? '$_apiHostOverride/api/'
+      : isDevelopment
+          ? (_useNgrok ? _ngrokBaseUrl   : _lanBaseUrl)
+          : _prodBaseUrl;
+  static String get wsUrl     => _apiHostOverride.isNotEmpty
+      ? _apiHostOverride.replaceFirst('http', 'ws')
+      : isDevelopment
+          ? (_useNgrok ? _ngrokWsUrl     : _lanWsUrl)
+          : _prodWsUrl;
+  static String get socketUrl => _apiHostOverride.isNotEmpty
+      ? _apiHostOverride
+      : isDevelopment
+          ? (_useNgrok ? _ngrokSocketUrl : _lanSocketUrl)
+          : _prodSocketUrl;
 
   static const String apiVersion = 'v1';
   static const int apiTimeout = 60000; // Increased to 60 seconds for local dev

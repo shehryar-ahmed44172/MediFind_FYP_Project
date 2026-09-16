@@ -5,40 +5,10 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
-import '../../theme/app_theme.dart';
-import '../../../core/constants/app_constants.dart';
+import '../../widgets/design_system/design_system.dart';
+import '../../../domain/entities/user.dart';
 import '../../../services/location/responder_location_tracker.dart';
 import '../../../config/router.dart';
-
-// ─── Role Theme ───────────────────────────────────────────────────────────────
-class _RoleTheme {
-  final String label;
-  final IconData icon;
-  final Color colorA;
-  final Color colorB;
-  const _RoleTheme(this.label, this.icon, this.colorA, this.colorB);
-}
-
-const _kRoleThemes = {
-  'PATIENT': _RoleTheme(
-    'Patient',
-    Icons.favorite_rounded,
-    Color(0xFF0E9AA7),
-    Color(0xFF0A6B75),
-  ),
-  'RESPONDER': _RoleTheme(
-    'Emergency Responder',
-    Icons.emergency_rounded,
-    Color(0xFF1B3A6B),
-    Color(0xFF2563EB),
-  ),
-  'CAREGIVER': _RoleTheme(
-    'Caregiver',
-    Icons.supervisor_account_rounded,
-    Color(0xFF5B21B6),
-    Color(0xFF7C3AED),
-  ),
-};
 
 const _kResponderTypeLabels = {
   'PARAMEDIC': 'Paramedic',
@@ -48,7 +18,44 @@ const _kResponderTypeLabels = {
   'VOLUNTEER': 'Volunteer',
 };
 
+String _roleLabel(String role) {
+  switch (role) {
+    case 'RESPONDER':
+      return 'Emergency responder';
+    case 'CAREGIVER':
+      return 'Caregiver';
+    default:
+      return 'Patient';
+  }
+}
+
+IconData _roleIcon(String role) {
+  switch (role) {
+    case 'RESPONDER':
+      return Icons.emergency_outlined;
+    case 'CAREGIVER':
+      return Icons.supervisor_account_outlined;
+    default:
+      return Icons.favorite_outline_rounded;
+  }
+}
+
+String _planLabel(String? plan) {
+  switch (plan) {
+    case 'EXECUTIVE':
+      return 'Executive plan';
+    case 'PROFESSIONAL':
+      return 'Professional plan';
+    default:
+      return 'Standard plan';
+  }
+}
+
+bool _isDeafUser(User user) => user.patientType?.toUpperCase() == 'DEAF';
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
+/// Own profile (tab root for every role, no header) or a patient's profile
+/// viewed by a caregiver (pushed, [userId] set).
 class UserProfileScreen extends ConsumerStatefulWidget {
   final String? userId;
   const UserProfileScreen({super.key, this.userId});
@@ -61,20 +68,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _isUploading = false;
   bool _isDeleting = false;
 
-  String _resolveImageUrl(String? path) {
-    if (path == null || path.isEmpty) return '';
-    if (path.startsWith('http')) return path;
-    final root = AppConstants.socketUrl.endsWith('/')
-        ? AppConstants.socketUrl.substring(0, AppConstants.socketUrl.length - 1)
-        : AppConstants.socketUrl;
-    return '$root${path.startsWith('/') ? path : '/$path'}';
-  }
-
   Future<void> _pickAndUploadImage() async {
-    final source = await showModalBottomSheet<ImageSource>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const _ImagePickerSheet(),
+    final source = await showMfBottomSheet<ImageSource>(
+      context,
+      title: 'Change profile photo',
+      builder: (ctx) => MfListGroup(
+        children: [
+          MfIconTile(
+            icon: Icons.photo_library_outlined,
+            label: 'Choose from gallery',
+            onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+          ),
+          MfIconTile(
+            icon: Icons.photo_camera_outlined,
+            label: 'Take a photo',
+            onTap: () => Navigator.pop(ctx, ImageSource.camera),
+          ),
+        ],
+      ),
     );
     if (source == null || !mounted) return;
 
@@ -86,19 +97,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     try {
       await ref.read(uploadProfileImageProvider(File(file.path)).future);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile picture updated!'),
-            backgroundColor: AppColors.secondaryTeal,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Profile photo updated', tone: MfTone.success);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed: $e')),
-        );
+        showMfSnackBar(context, 'Upload failed: $e', tone: MfTone.danger);
       }
     } finally {
       if (mounted) setState(() => _isUploading = false);
@@ -106,27 +109,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 
   Future<void> _confirmLogout() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign Out'),
-        content: const Text('Are you sure you want to sign out of MediFind?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Sign Out'),
-          ),
-        ],
-      ),
+    final ok = await showMfConfirmDialog(
+      context,
+      title: 'Sign out',
+      message: 'Are you sure you want to sign out of MediFind?',
+      confirmLabel: 'Sign out',
+      destructive: true,
+      icon: Icons.logout_rounded,
     );
 
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
 
     try {
       // 1. Clear tokens from Hive + API client + socket.
@@ -155,96 +147,103 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       context.go('/login');
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign out failed: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Sign out failed: $e', tone: MfTone.danger);
       }
     }
   }
 
-  Future<void> _confirmDeleteAccount(dynamic user) async {
-    final proceed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: const [
-            Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 26),
-            SizedBox(width: 8),
-            Text('Delete Account', style: TextStyle(color: AppColors.error)),
+  Future<void> _confirmDeleteAccount(User user) async {
+    final proceed = await showMfConfirmDialog(
+      context,
+      title: 'Delete account',
+      icon: Icons.warning_amber_rounded,
+      destructive: true,
+      confirmLabel: 'Continue',
+      content: Builder(builder: (ctx) {
+        final text = Theme.of(ctx).textTheme;
+        const items = [
+          'Medical profile and reports',
+          'Emergency history',
+          'Caregiver links',
+          'All personal data',
+        ];
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'This will permanently delete your account and all associated data, including:',
+              style: text.bodyMedium,
+            ),
+            const SizedBox(height: MfSpace.sm),
+            for (final item in items)
+              Padding(
+                padding: const EdgeInsets.only(bottom: MfSpace.xxs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.remove_rounded, size: 18, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                    const SizedBox(width: MfSpace.xs),
+                    Expanded(child: Text(item, style: text.bodyMedium)),
+                  ],
+                ),
+              ),
+            const SizedBox(height: MfSpace.sm),
+            Text(
+              'This action cannot be undone.',
+              style: text.bodyMedium?.copyWith(
+                color: Theme.of(ctx).colorScheme.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
-        ),
-        content: const Text(
-          'This will permanently delete your account and all associated data including:\n\n'
-          '• Medical profile & reports\n'
-          '• Emergency history\n'
-          '• Caregiver links\n'
-          '• All personal data\n\n'
-          'This action cannot be undone.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Continue'),
-          ),
-        ],
-      ),
+        );
+      }),
     );
 
-    if (proceed != true || !mounted) return;
+    if (!proceed || !mounted) return;
 
     final emailController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (ctx, setState) {
-          final matches = emailController.text.trim() == (user.email ?? '');
+        builder: (ctx, setDialogState) {
+          final cs = Theme.of(ctx).colorScheme;
+          final matches = emailController.text.trim() == user.email;
           return AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20)),
-            title: const Text('Confirm Deletion'),
+            icon: Icon(Icons.delete_forever_outlined, color: cs.error, size: 28),
+            title: const Text('Confirm deletion'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                    'Type your email address to confirm permanent deletion:'),
-                const SizedBox(height: 12),
+                const Text('Type your email address to confirm permanent deletion.'),
+                const SizedBox(height: MfSpace.sm),
                 TextField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
+                  autocorrect: false,
                   decoration: InputDecoration(
-                    hintText: user.email ?? 'your@email.com',
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 12),
+                    labelText: 'Email address',
+                    hintText: user.email.isEmpty ? 'your@email.com' : user.email,
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => setDialogState(() {}),
                 ),
               ],
             ),
+            actionsPadding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.md),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel'),
               ),
-              TextButton(
-                style: TextButton.styleFrom(
-                  foregroundColor:
-                      matches ? AppColors.error : AppColors.error.withOpacity(0.4),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: cs.error,
+                  foregroundColor: cs.onError,
                 ),
                 onPressed: matches ? () => Navigator.pop(ctx, true) : null,
-                child: const Text('Delete My Account'),
+                child: const Text('Delete my account'),
               ),
             ],
           );
@@ -275,28 +274,27 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       if (!mounted) return;
 
       // ── Clear overlay BEFORE navigating ───────────────────────────────
-      // _isDeleting keeps a 55 % black overlay on screen. If we navigate
-      // while it's still true the overlay persists during the page-transition
-      // animation, producing a fully-black flash. Resetting it here makes the
-      // current screen fully transparent again before GoRouter starts the fade.
+      // The overlay would otherwise persist during the page transition and
+      // produce a dark flash.
       setState(() => _isDeleting = false);
 
       // ── Bypass GoRouter's redirect for this navigation ─────────────────
       AppRouter.skipNextRedirect();
       context.go('/login');
     } catch (e) {
-      // Always reset the overlay, even if the widget is still mounted.
-      // Without this guard the dark overlay would stick forever.
+      // Always reset the overlay so it never sticks.
       if (mounted) {
         setState(() => _isDeleting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete account: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Failed to delete account: $e', tone: MfTone.danger);
       }
+    }
+  }
+
+  void _retry() {
+    if (widget.userId != null) {
+      ref.invalidate(userProfileProvider(widget.userId!));
+    } else {
+      ref.invalidate(currentUserProvider);
     }
   }
 
@@ -308,1387 +306,546 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final settings = ref.watch(accessibilityProvider);
     final isOwn = widget.userId == null;
 
+    final body = userAsync.when(
+      loading: () => const MfLoading(label: 'Loading profile'),
+      error: (e, _) => MfErrorState(
+        title: 'Could not load profile',
+        message: '$e',
+        onRetry: _retry,
+      ),
+      data: (user) {
+        if (user == null) {
+          return MfEmptyState(
+            icon: Icons.person_off_outlined,
+            title: 'Profile not found',
+            message: 'This profile is not available right now.',
+            actionLabel: 'Try again',
+            actionIcon: Icons.refresh_rounded,
+            onAction: _retry,
+          );
+        }
+        return isOwn
+            ? _buildOwnProfile(context, user, settings.textOnlyMode)
+            : _buildViewedProfile(context, user);
+      },
+    );
+
+    final page = isOwn
+        ? Scaffold(body: body)
+        : MfScaffold(
+            title: 'Patient Profile',
+            fallbackRoute: '/caregiver/my-patients',
+            body: body,
+          );
+
     return Stack(
       children: [
-        Scaffold(
-      appBar: !isOwn
-          ? AppBar(
-              title: const Text(
-                'Patient Profile',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-              ),
-              centerTitle: true,
-              elevation: 0,
-              leading: IconButton(
-                icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                onPressed: () => context.pop(),
-              ),
-            )
-          : null,
-      body: userAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Text('Error loading profile: $e',
-                textAlign: TextAlign.center),
-          ),
-        ),
-        data: (user) {
-          if (user == null) {
-            return const Center(child: Text('Profile not found.'));
-          }
-          final rt = _kRoleThemes[user.role] ?? _kRoleThemes['PATIENT']!;
-
-          return SingleChildScrollView(
-            physics: const BouncingScrollPhysics(),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Gradient identity card ──────────────────────────────
-                _ProfileCard(
-                  user: user,
-                  rt: rt,
-                  isOwnProfile: isOwn,
-                  isUploading: _isUploading,
-                  resolveUrl: _resolveImageUrl,
-                  onCameraTap: _pickAndUploadImage,
-                ),
-
-                // ── Body content ────────────────────────────────────────
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Only show accessibility banner on own profile —
-                      // caregiver's textOnlyMode should not bleed into a patient's profile view
-                      if (isOwn && settings.textOnlyMode) ...[
-                        _AccessibilityBanner(),
-                        const SizedBox(height: 16),
-                      ],
-
-                      // Role-specific sections
-                      if (user.role == 'RESPONDER') ...[
-                        _ResponderStatsRow(user: user),
-                        const SizedBox(height: 16),
-                        _ResponderCredentials(user: user, rt: rt),
-                      ] else if (user.role == 'CAREGIVER') ...[
-                        _CaregiverSection(user: user, rt: rt),
-                      ] else ...[
-                        _PatientSection(user: user, rt: rt, isOwnProfile: isOwn),
-                      ],
-
-                      const SizedBox(height: 20),
-
-                      _AccountInfoCard(
-                        user: user,
-                        // Text is scaled app-wide via MediaQuery.textScaler.
-                        fontMultiplier: 1.0,
-                      ),
-
-                      if (isOwn) ...[
-                        const SizedBox(height: 24),
-                        _EditProfileButton(rt: rt),
-                        const SizedBox(height: 12),
-                        _SignOutButton(onTap: _confirmLogout),
-                        const SizedBox(height: 8),
-                        _DeleteAccountButton(
-                            onTap: _isDeleting ? null : () => _confirmDeleteAccount(user)),
-                        const SizedBox(height: 8),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    ),
+        page,
         // ── Full-screen deletion overlay ───────────────────────────────────
         if (_isDeleting)
-          Container(
-            color: Colors.black.withOpacity(0.55),
-            child: const Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(color: Colors.white),
-                  SizedBox(height: 20),
-                  Text(
-                    'Deleting account…',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-}
-
-// ─── Profile Identity Card ────────────────────────────────────────────────────
-// A contained gradient card — no full-screen banner, no conflict with AppHeader.
-class _ProfileCard extends StatelessWidget {
-  final dynamic user;
-  final _RoleTheme rt;
-  final bool isOwnProfile;
-  final bool isUploading;
-  final String Function(String?) resolveUrl;
-  final VoidCallback onCameraTap;
-
-  const _ProfileCard({
-    required this.user,
-    required this.rt,
-    required this.isOwnProfile,
-    required this.isUploading,
-    required this.resolveUrl,
-    required this.onCameraTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [rt.colorA, rt.colorB],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: rt.colorA.withOpacity(0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          // ── Avatar ────────────────────────────────────────────────
-          Stack(
-            children: [
-              Container(
-                width: 84,
-                height: 84,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                      color: Colors.white.withOpacity(0.85), width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: ClipOval(
-                  child: isUploading
-                      ? Container(
-                          color: rt.colorA.withOpacity(0.5),
-                          child: const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2.5,
-                            ),
-                          ),
-                        )
-                      : _Avatar(
-                          imageUrl: resolveUrl(user.profileImageUrl),
-                          name: user.fullName ?? '',
-                          rt: rt,
-                        ),
-                ),
-              ),
-              if (isOwnProfile)
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: GestureDetector(
-                    onTap: onCameraTap,
-                    child: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.15),
-                            blurRadius: 4,
-                          ),
-                        ],
-                      ),
-                      child: Icon(Icons.camera_alt_rounded,
-                          size: 13, color: rt.colorA),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 16),
-
-          // ── Name + role ────────────────────────────────────────────
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  user.fullName ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.1,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 10),
-                // Role badge
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border:
-                        Border.all(color: Colors.white.withOpacity(0.35)),
-                  ),
-                  child: Row(
+          Positioned.fill(
+            child: Semantics(
+              liveRegion: true,
+              label: 'Deleting account',
+              child: ColoredBox(
+                color: Colors.black.withValues(alpha: 0.55),
+                child: Center(
+                  child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(rt.icon, color: Colors.white, size: 12),
-                      const SizedBox(width: 5),
-                      Text(
-                        rt.label,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.2,
+                      const CircularProgressIndicator(color: Colors.white),
+                      const SizedBox(height: MfSpace.md),
+                      Material(
+                        type: MaterialType.transparency,
+                        child: Text(
+                          'Deleting account…',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(color: Colors.white),
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                // Subscription plan badge
-                _SubscriptionBadge(plan: user.subscriptionPlan ?? 'FREE'),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SubscriptionBadge extends StatelessWidget {
-  final String plan;
-  const _SubscriptionBadge({required this.plan});
-
-  @override
-  Widget build(BuildContext context) {
-    final isPro = plan == 'PROFESSIONAL';
-    final isExec = plan == 'EXECUTIVE';
-
-    if (!isPro && !isExec) return const SizedBox.shrink();
-
-    final IconData icon = isExec ? Icons.workspace_premium_rounded : Icons.star_rounded;
-    final String label = isExec ? 'Executive' : 'Professional';
-    final Color bg = isExec ? const Color(0xFFFFD700) : const Color(0xFF38BDF8);
-    final Color textColor = isExec ? const Color(0xFF7C5200) : const Color(0xFF0C3D5E);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [
-          BoxShadow(color: bg.withOpacity(0.5), blurRadius: 6, offset: const Offset(0, 2)),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 11, color: textColor),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: textColor,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Avatar extends StatelessWidget {
-  final String imageUrl;
-  final String name;
-  final _RoleTheme rt;
-  const _Avatar(
-      {required this.imageUrl, required this.name, required this.rt});
-
-  @override
-  Widget build(BuildContext context) {
-    if (imageUrl.isNotEmpty) {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.cover,
-        errorBuilder: (_, __, ___) => _initials(),
-      );
-    }
-    return _initials();
-  }
-
-  Widget _initials() => Container(
-        color: rt.colorA.withOpacity(0.35),
-        child: Center(
-          child: Text(
-            name.isNotEmpty ? name[0].toUpperCase() : '?',
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 38,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      );
-}
-
-// ─── Accessibility Banner ─────────────────────────────────────────────────────
-class _AccessibilityBanner extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.visibility_rounded,
-              color: AppColors.warning, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Visual Accessibility Active',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.warning,
-                        fontSize: 13)),
-                Text('High-contrast & icon-only interface enabled',
-                    style: TextStyle(
-                        color: AppColors.warning.withOpacity(0.75), fontSize: 12)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Patient Section ──────────────────────────────────────────────────────────
-class _PatientSection extends StatelessWidget {
-  final dynamic user;
-  final _RoleTheme rt;
-  final bool isOwnProfile;
-  const _PatientSection({required this.user, required this.rt, this.isOwnProfile = true});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDeaf = user.patientType == 'DEAF';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Health Status'),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _StatusBadge(
-                icon: isDeaf
-                    ? Icons.hearing_disabled_rounded
-                    : Icons.hearing_rounded,
-                label: isDeaf ? 'Deaf & Mute' : 'Standard Mode',
-                color: isDeaf ? AppColors.secondaryTeal : AppColors.success,
               ),
             ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: isOwnProfile
-                  ? _StatusBadge(
-                      icon: Icons.sos_rounded,
-                      label: 'SOS Ready',
-                      color: const Color(0xFFEF4444),
-                    )
-                  : _StatusBadge(
-                      icon: Icons.shield_rounded,
-                      label: 'Monitored',
-                      color: AppColors.primary,
-                    ),
-            ),
-          ],
+          ),
+      ],
+    );
+  }
+
+  // ── Own profile (account hub) ───────────────────────────────────────────────
+  Widget _buildOwnProfile(BuildContext context, User user, bool textOnlyMode) {
+    final isPatient = user.role != 'RESPONDER' && user.role != 'CAREGIVER';
+    final isDeaf = _isDeafUser(user);
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+      children: [
+        _IdentityCard(
+          user: user,
+          isOwnProfile: true,
+          isUploading: _isUploading,
+          onChangePhoto: _pickAndUploadImage,
         ),
-        if (isDeaf) ...[
-          const SizedBox(height: 12),
-          _InfoBanner(
-            icon: Icons.sign_language_rounded,
-            title: 'Deaf & Mute Patient',
-            subtitle: isOwnProfile
-                ? 'Silent SOS  •  Icon-only UI  •  Haptic + Flash alerts'
-                : 'Communicate via text chat  •  Cannot receive voice calls  •  Uses visual alerts',
-            color: AppColors.secondaryTeal,
+
+        if (isPatient && (isDeaf || textOnlyMode)) ...[
+          const SizedBox(height: MfSpace.md),
+          MfInfoBanner(
+            icon: Icons.hearing_disabled_rounded,
+            title: 'Deaf mode ON',
+            message: 'Silent SOS, text-first chat, flashing screen and vibration alerts. '
+                'Tap to review accessibility settings.',
+            tone: MfTone.primary,
+            onTap: () => context.push('/accessibility-settings'),
+          ),
+        ] else if (textOnlyMode) ...[
+          const SizedBox(height: MfSpace.md),
+          MfInfoBanner(
+            icon: Icons.visibility_outlined,
+            title: 'Text-only mode ON',
+            message: 'Visual alerts and text-first interface are enabled. Tap to review.',
+            tone: MfTone.primary,
+            onTap: () => context.push('/accessibility-settings'),
           ),
         ],
-        const SizedBox(height: 20),
 
-        // ── Own profile: patient self-management links ──────────────────────
-        if (isOwnProfile) ...[
-          _SectionLabel('Quick Access'),
-          const SizedBox(height: 10),
-          _QuickAccessCard(links: [
-            _QLinkData(
-              Icons.medical_information_rounded,
-              'Medical Profile',
-              'View your full health record',
-              '/home/medical-profile',
-              AppColors.error,
+        if (user.role == 'RESPONDER')
+          ..._responderSections(context, user)
+        else if (user.role == 'CAREGIVER')
+          ..._caregiverSections(context, user)
+        else
+          ..._patientSections(context, user),
+
+        const SizedBox(height: MfSpace.lg),
+        _AccountInfoSection(user: user),
+
+        const SizedBox(height: MfSpace.lg),
+        MfSecondaryButton(
+          label: 'Sign out',
+          icon: Icons.logout_rounded,
+          tone: MfTone.danger,
+          large: true,
+          onPressed: _confirmLogout,
+        ),
+        const SizedBox(height: MfSpace.xs),
+        Center(
+          child: MfTextButton(
+            label: 'Delete account',
+            icon: Icons.delete_forever_outlined,
+            tone: MfTone.danger,
+            onPressed: _isDeleting ? null : () => _confirmDeleteAccount(user),
+          ),
+        ),
+      ],
+    );
+  }
+
+  List<Widget> _patientSections(BuildContext context, User user) {
+    final plan = _planLabel(user.subscriptionPlan);
+    return [
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Health & safety'),
+      MfListGroup(children: [
+        MfIconTile(
+          icon: Icons.medical_information_outlined,
+          label: 'Medical ID',
+          subtitle: 'Your health record, blood type and allergies',
+          onTap: () => context.go('/medical-id'),
+        ),
+        MfIconTile(
+          icon: Icons.contacts_outlined,
+          label: 'Emergency contacts',
+          subtitle: 'People to contact in an emergency',
+          onTap: () => context.push('/home/emergency-contacts'),
+        ),
+        MfIconTile(
+          icon: Icons.people_outline_rounded,
+          label: 'My caregivers',
+          subtitle: 'Invite and manage caregivers',
+          onTap: () => context.push('/home/caregivers'),
+        ),
+        MfIconTile(
+          icon: Icons.content_paste_rounded,
+          label: 'Medical reports',
+          subtitle: 'Upload and view report images',
+          onTap: () => context.push('/home/medical-reports'),
+        ),
+      ]),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Communication & accessibility'),
+      MfListGroup(children: [
+        MfIconTile(
+          icon: Icons.settings_accessibility_rounded,
+          label: 'Accessibility settings',
+          subtitle: 'Text size, contrast and interface mode',
+          onTap: () => context.push('/accessibility-settings'),
+        ),
+        if (_isDeafUser(user))
+          MfIconTile(
+            icon: Icons.quickreply_outlined,
+            label: 'Quick messages',
+            subtitle: 'Pre-written phrases for silent communication',
+            onTap: () => context.push('/predefined-messages'),
+          ),
+        MfIconTile(
+          icon: Icons.hearing_disabled_outlined,
+          label: 'About deaf & hearing modes',
+          subtitle: 'How MediFind adapts to you',
+          onTap: () => context.push('/home/patient-type-info'),
+        ),
+      ]),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Account'),
+      MfListGroup(children: [
+        _editProfileTile(context),
+        _subscriptionTile(context, plan),
+        _settingsTile(context),
+      ]),
+    ];
+  }
+
+  List<Widget> _caregiverSections(BuildContext context, User user) {
+    return [
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle(
+        'Patients',
+        subtitle: 'Monitoring linked patients with real-time SOS alerts',
+      ),
+      MfListGroup(children: [
+        MfIconTile(
+          icon: Icons.people_outline_rounded,
+          label: 'My patients',
+          subtitle: 'View and manage all linked patients',
+          onTap: () => context.push('/caregiver/my-patients'),
+        ),
+        MfIconTile(
+          icon: Icons.person_add_alt_outlined,
+          label: 'Link new patient',
+          subtitle: 'Connect to a new patient account',
+          onTap: () => context.push('/caregiver/my-patients/link-patient'),
+        ),
+        MfIconTile(
+          icon: Icons.map_outlined,
+          label: 'Live map',
+          subtitle: 'See patients on the live location map',
+          onTap: () => context.go('/caregiver/maps'),
+        ),
+        MfIconTile(
+          icon: Icons.history_rounded,
+          label: 'Emergency history',
+          subtitle: 'Past emergencies and reports',
+          onTap: () => context.push('/caregiver/history'),
+        ),
+        MfIconTile(
+          icon: Icons.chat_bubble_outline_rounded,
+          label: 'Messages',
+          subtitle: 'Conversations with patients and responders',
+          onTap: () => context.go('/caregiver/chats'),
+        ),
+      ]),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Account'),
+      MfListGroup(children: [
+        _editProfileTile(context),
+        _subscriptionTile(context, _planLabel(user.subscriptionPlan)),
+        _accessibilityTile(context),
+        _settingsTile(context),
+      ]),
+    ];
+  }
+
+  List<Widget> _responderSections(BuildContext context, User user) {
+    return [
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Performance'),
+      _ResponderStatsRow(user: user),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Professional credentials'),
+      _ResponderCredentials(user: user),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Work'),
+      MfListGroup(children: [
+        MfIconTile(
+          icon: Icons.history_rounded,
+          label: 'Response history',
+          subtitle: 'View past emergency responses',
+          onTap: () => context.go('/responder/history'),
+        ),
+        MfIconTile(
+          icon: Icons.tune_rounded,
+          label: 'Responder settings',
+          subtitle: 'Availability and notifications',
+          tone: MfTone.neutral,
+          onTap: () => context.push('/settings'),
+        ),
+      ]),
+      const SizedBox(height: MfSpace.lg),
+      const MfSectionTitle('Account'),
+      MfListGroup(children: [
+        _editProfileTile(context),
+        _accessibilityTile(context),
+        _subscriptionTile(context, _planLabel(user.subscriptionPlan)),
+      ]),
+    ];
+  }
+
+  Widget _editProfileTile(BuildContext context) => MfIconTile(
+        icon: Icons.edit_outlined,
+        label: 'Edit profile',
+        subtitle: 'Name, phone and personal details',
+        onTap: () => context.push('/edit-profile'),
+      );
+
+  Widget _subscriptionTile(BuildContext context, String plan) => MfIconTile(
+        icon: Icons.card_membership_outlined,
+        label: 'Subscription',
+        subtitle: 'Current: $plan',
+        onTap: () => context.push('/subscription-plans'),
+      );
+
+  Widget _accessibilityTile(BuildContext context) => MfIconTile(
+        icon: Icons.settings_accessibility_rounded,
+        label: 'Accessibility',
+        subtitle: 'Text size, contrast and interface mode',
+        onTap: () => context.push('/accessibility-settings'),
+      );
+
+  Widget _settingsTile(BuildContext context) => MfIconTile(
+        icon: Icons.settings_outlined,
+        label: 'Settings',
+        subtitle: 'Notifications, theme and app preferences',
+        tone: MfTone.neutral,
+        onTap: () => context.push('/settings'),
+      );
+
+  // ── Profile viewed by a caregiver ───────────────────────────────────────────
+  Widget _buildViewedProfile(BuildContext context, User user) {
+    final isDeaf = _isDeafUser(user);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+      children: [
+        _IdentityCard(user: user, isOwnProfile: false, isUploading: false),
+        if (user.role == 'RESPONDER') ...[
+          const SizedBox(height: MfSpace.lg),
+          const MfSectionTitle('Performance'),
+          _ResponderStatsRow(user: user),
+          const SizedBox(height: MfSpace.lg),
+          const MfSectionTitle('Professional credentials'),
+          _ResponderCredentials(user: user),
+        ] else if (user.role != 'CAREGIVER') ...[
+          if (isDeaf) ...[
+            const SizedBox(height: MfSpace.md),
+            const MfInfoBanner(
+              icon: Icons.sign_language_outlined,
+              title: 'Communicate by text — cannot receive voice calls',
+              message: 'This patient is deaf and uses visual alerts. Use text chat instead of calling.',
+              tone: MfTone.primary,
             ),
-            _QLinkData(
-              Icons.contacts_rounded,
-              'Emergency Contacts',
-              'Manage people to contact in emergencies',
-              '/home/emergency-contacts',
-              AppColors.warning,
+          ],
+          const SizedBox(height: MfSpace.lg),
+          const MfSectionTitle('Caregiver actions'),
+          MfListGroup(children: [
+            MfIconTile(
+              icon: Icons.chat_bubble_outline_rounded,
+              label: 'Message patient',
+              subtitle: 'Open conversation in Messages',
+              onTap: () => context.go('/caregiver/chats'),
             ),
-            _QLinkData(
-              Icons.settings_accessibility_rounded,
-              'Accessibility',
-              'Font size, contrast & interface mode',
-              '/accessibility-settings',
-              AppColors.secondaryTeal,
+            MfIconTile(
+              icon: Icons.people_outline_rounded,
+              label: 'View in My patients',
+              subtitle: 'See full monitoring dashboard',
+              onTap: () => context.push('/caregiver/my-patients'),
+            ),
+            MfIconTile(
+              icon: Icons.map_outlined,
+              label: 'Live map',
+              subtitle: 'View patient on the map',
+              onTap: () => context.go('/caregiver/maps'),
             ),
           ]),
-        ]
-
-        // ── Caregiver viewing a patient: relevant caregiver actions ─────────
-        else ...[
-          _SectionLabel('Caregiver Actions'),
-          const SizedBox(height: 10),
-          _CaregiverActionsCard(user: user),
         ],
+        const SizedBox(height: MfSpace.lg),
+        _AccountInfoSection(user: user),
       ],
     );
   }
 }
 
-// ─── Caregiver Actions Card (shown when a caregiver views a patient) ──────────
-class _CaregiverActionsCard extends StatelessWidget {
-  final dynamic user;
-  const _CaregiverActionsCard({required this.user});
+// ─── Identity card ────────────────────────────────────────────────────────────
+class _IdentityCard extends StatelessWidget {
+  final User user;
+  final bool isOwnProfile;
+  final bool isUploading;
+  final VoidCallback? onChangePhoto;
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Material(
-          color: Colors.transparent,
-          child: Column(
-            children: [
-              _CaregiverActionTile(
-                icon: Icons.chat_bubble_rounded,
-                color: AppColors.warning,
-                label: 'Message Patient',
-                subtitle: 'Open conversation in Messages',
-                onTap: () => context.go('/caregiver/chats'),
-                isLast: false,
-              ),
-              _CaregiverActionTile(
-                icon: Icons.people_rounded,
-                color: AppColors.primary,
-                label: 'View in My Patients',
-                subtitle: 'See full monitoring dashboard',
-                onTap: () => context.go('/caregiver/my-patients'),
-                isLast: false,
-              ),
-              _CaregiverActionTile(
-                icon: Icons.map_rounded,
-                color: AppColors.primaryLight,
-                label: 'Live Location Map',
-                subtitle: 'View patient on the map',
-                onTap: () => context.go('/caregiver/maps'),
-                isLast: true,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CaregiverActionTile extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String label;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool isLast;
-
-  const _CaregiverActionTile({
-    required this.icon,
-    required this.color,
-    required this.label,
-    required this.subtitle,
-    required this.onTap,
-    required this.isLast,
+  const _IdentityCard({
+    required this.user,
+    required this.isOwnProfile,
+    required this.isUploading,
+    this.onChangePhoto,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(9),
-                  decoration: BoxDecoration(
-                    color: color.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(icon, color: color, size: 20),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          color: Colors.grey.shade500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Icon(Icons.chevron_right_rounded,
-                    color: Colors.grey.shade400, size: 22),
-              ],
-            ),
-          ),
-        ),
-        if (!isLast)
-          Divider(height: 1, indent: 16, endIndent: 16,
-              color: Colors.grey.withOpacity(0.12)),
-      ],
-    );
-  }
-}
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isPatient = user.role != 'RESPONDER' && user.role != 'CAREGIVER';
+    final isDeaf = _isDeafUser(user);
+    const avatarSize = 72.0;
 
-// ─── Responder Stats Row ──────────────────────────────────────────────────────
-class _ResponderStatsRow extends StatelessWidget {
-  final dynamic user;
-  const _ResponderStatsRow({required this.user});
+    final plan = user.subscriptionPlan;
+    final planTone = plan == 'EXECUTIVE' || plan == 'PROFESSIONAL' ? MfTone.primary : MfTone.neutral;
+    final planIcon = plan == 'EXECUTIVE'
+        ? Icons.workspace_premium_outlined
+        : (plan == 'PROFESSIONAL' ? Icons.star_outline_rounded : Icons.card_membership_outlined);
 
-  @override
-  Widget build(BuildContext context) {
-    final isVerified = user.verificationStatus == 'VERIFIED';
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Performance'),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: _MiniStatCard(
-                icon: Icons.star_rounded,
-                label: 'Rating',
-                value: (user.rating ?? 5.0).toStringAsFixed(1),
-                color: const Color(0xFFF59E0B),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MiniStatCard(
-                icon: Icons.check_circle_rounded,
-                label: 'Completed',
-                value: '${user.totalResponsesHandled ?? 0}',
-                color: const Color(0xFF10B981),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _MiniStatCard(
-                icon: isVerified
-                    ? Icons.verified_rounded
-                    : Icons.pending_rounded,
-                label: 'Status',
-                value: isVerified ? 'Verified' : 'Pending',
-                color: isVerified
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF59E0B),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Responder Credentials ────────────────────────────────────────────────────
-class _ResponderCredentials extends StatelessWidget {
-  final dynamic user;
-  final _RoleTheme rt;
-  const _ResponderCredentials({required this.user, required this.rt});
-
-  @override
-  Widget build(BuildContext context) {
-    final isVerified = user.verificationStatus == 'VERIFIED';
-    final responderTypeLabel = _kResponderTypeLabels[user.responderType] ??
-        (user.responderType?.toString().replaceAll('_', ' ') ?? '—');
-    final vehicleLabel =
-        user.vehicleType?.toString().replaceAll('_', ' ') ?? '—';
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        _SectionLabel('Professional Credentials'),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: AppShadows.neumorphicOut,
-          ),
-          child: Column(
-            children: [
-              _CredRow(
-                icon: Icons.badge_rounded,
-                label: 'License Number',
-                value: user.licenseNumber ?? '—',
-                color: rt.colorA,
-                isFirst: true,
-              ),
-              _CredRow(
-                icon: Icons.business_rounded,
-                label: 'Organization',
-                value: user.organization ?? '—',
-                color: rt.colorA,
-              ),
-              _CredRow(
-                icon: Icons.medical_services_rounded,
-                label: 'Responder Type',
-                value: responderTypeLabel,
-                color: rt.colorA,
-              ),
-              _CredRow(
-                icon: Icons.airport_shuttle_rounded,
-                label: 'Vehicle Type',
-                value: vehicleLabel,
-                color: rt.colorA,
-              ),
-              _CredRow(
-                icon: isVerified
-                    ? Icons.verified_rounded
-                    : Icons.pending_rounded,
-                label: 'Verification',
-                value: isVerified ? 'Verified ✓' : 'Pending Review',
-                color: isVerified
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF59E0B),
-                valueColor: isVerified
-                    ? const Color(0xFF10B981)
-                    : const Color(0xFFF59E0B),
-                isLast: true,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        _SectionLabel('Quick Access'),
-        const SizedBox(height: 10),
-        _QuickAccessCard(links: [
-          _QLinkData(Icons.history_rounded, 'Response History',
-              'View past emergency responses', '/responder/history', rt.colorA),
-          _QLinkData(Icons.tune_rounded, 'Responder Settings',
-              'Availability and notifications', '/settings',
-              Colors.grey.shade700),
-        ]),
-      ],
-    );
-  }
-}
-
-// ─── Caregiver Section ────────────────────────────────────────────────────────
-class _CaregiverSection extends StatelessWidget {
-  final dynamic user;
-  final _RoleTheme rt;
-  const _CaregiverSection({required this.user, required this.rt});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Monitoring Overview'),
-        const SizedBox(height: 10),
-        _InfoBanner(
-          icon: Icons.monitor_heart_rounded,
-          title: 'Active Caregiver',
-          subtitle:
-              'Monitoring linked patients with real-time SOS alerts',
-          color: rt.colorA,
-        ),
-        const SizedBox(height: 20),
-        _SectionLabel('Quick Access'),
-        const SizedBox(height: 10),
-        _QuickAccessCard(links: [
-          _QLinkData(Icons.people_rounded, 'My Patients',
-              'View and manage all linked patients', '/caregiver/my-patients', rt.colorA,
-              usePush: false),
-          _QLinkData(Icons.person_add_rounded, 'Link New Patient',
-              'Connect to a new patient account', '/caregiver/my-patients/link-patient',
-              const Color(0xFF10B981),
-              usePush: true),
-          _QLinkData(Icons.map_rounded, 'Live Map',
-              'See patients on the live location map', '/caregiver/maps',
-              AppColors.warning,
-              usePush: false),
-          _QLinkData(Icons.history_rounded, 'Activity History',
-              'View past emergencies and reports', '/caregiver/history',
-              Colors.grey.shade700,
-              usePush: true),
-        ]),
-      ],
-    );
-  }
-}
-
-// ─── Account Info Card ────────────────────────────────────────────────────────
-class _AccountInfoCard extends StatelessWidget {
-  final dynamic user;
-  final double fontMultiplier;
-  const _AccountInfoCard(
-      {required this.user, required this.fontMultiplier});
-
-  @override
-  Widget build(BuildContext context) {
-    final m = fontMultiplier;
-    final rows = <_InfoRowData>[
-      _InfoRowData(Icons.person_outline_rounded, 'Full Name',
-          user.fullName ?? '—'),
-      _InfoRowData(
-          Icons.email_outlined, 'Email Address', user.email ?? '—'),
-      _InfoRowData(Icons.phone_outlined, 'Phone Number',
-          user.phoneNumber ?? '—'),
-      if (user.cnic != null)
-        _InfoRowData(Icons.badge_outlined, 'CNIC / ID', user.cnic!),
-    ];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _SectionLabel('Account Information'),
-        const SizedBox(height: 10),
-        Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).cardColor,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: AppShadows.neumorphicOut,
-          ),
-          child: Column(
-            children: rows.asMap().entries.map((e) {
-              final i = e.key;
-              final row = e.value;
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 18, vertical: 14),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(9),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.08),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(row.icon,
-                              color: Colors.grey.shade500,
-                              size: 18 * m),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                row.label,
-                                style: TextStyle(
-                                  fontSize: 11 * m,
-                                  color: Colors.grey.shade500,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                row.value,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14.5 * m,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (i < rows.length - 1)
-                    Divider(
-                        height: 0,
-                        indent: 56,
-                        color: Colors.grey.shade100),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─── Edit Profile Button ──────────────────────────────────────────────────────
-class _EditProfileButton extends StatelessWidget {
-  final _RoleTheme rt;
-  const _EditProfileButton({required this.rt});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: ElevatedButton.icon(
-        onPressed: () => context.push('/edit-profile'),
-        icon: const Icon(Icons.edit_rounded, size: 19),
-        label: const Text('Edit Profile',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: rt.colorA,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Sign Out Button ──────────────────────────────────────────────────────────
-class _SignOutButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const _SignOutButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 54,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.logout_rounded, size: 19, color: AppColors.error),
-        label: const Text('Sign Out',
-            style: TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: AppColors.error)),
-        style: OutlinedButton.styleFrom(
-          side: const BorderSide(color: AppColors.error, width: 1.5),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16)),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Delete Account Button ────────────────────────────────────────────────────
-class _DeleteAccountButton extends StatelessWidget {
-  final VoidCallback? onTap;
-  const _DeleteAccountButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: TextButton.icon(
-        onPressed: onTap,
-        icon: const Icon(Icons.delete_forever_rounded,
-            color: AppColors.error, size: 18),
-        label: const Text(
-          'Delete My Account',
-          style: TextStyle(
-            color: AppColors.error,
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        ),
-        style: TextButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-            side: BorderSide(color: AppColors.error.withOpacity(0.3), width: 1),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Shared Widgets ───────────────────────────────────────────────────────────
-
-/// Section label with a coloured left accent bar.
-class _SectionLabel extends StatelessWidget {
-  final String text;
-  const _SectionLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 16,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 0.3,
-            color: Theme.of(context).colorScheme.onSurface,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Compact horizontal status badge used for patient health status.
-class _StatusBadge extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  const _StatusBadge(
-      {required this.icon, required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.22)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(7),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 16),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: color,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Mini stat card for responders.
-class _MiniStatCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  const _MiniStatCard({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
+    return MfCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 18),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-              color: color,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10.5,
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoBanner extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  const _InfoBanner(
-      {required this.icon,
-      required this.title,
-      required this.subtitle,
-      required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color.withOpacity(0.22)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: color,
-                        fontSize: 14)),
-                const SizedBox(height: 3),
-                Text(subtitle,
-                    style: TextStyle(
-                        color: color.withOpacity(0.8), fontSize: 12.5)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QLinkData {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final String route;
-  final Color color;
-  final bool usePush;
-  const _QLinkData(
-      this.icon, this.label, this.subtitle, this.route, this.color,
-      {this.usePush = true});
-}
-
-class _QuickAccessCard extends StatelessWidget {
-  final List<_QLinkData> links;
-  const _QuickAccessCard({required this.links});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: Material(
-          color: Colors.transparent,
-          child: Column(
-            children: links.asMap().entries.map((e) {
-              final i = e.key;
-              final link = e.value;
-              return Column(
-                children: [
-                  InkWell(
-                    onTap: () => link.usePush ? context.push(link.route) : context.go(link.route),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 13),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(9),
-                            decoration: BoxDecoration(
-                              color: link.color.withOpacity(0.10),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(link.icon,
-                                color: link.color, size: 20),
-                          ),
-                          const SizedBox(width: 14),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  link.label,
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 14,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  link.subtitle,
-                                  style: TextStyle(
-                                    fontSize: 11.5,
-                                    color: Colors.grey.shade500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Icon(Icons.chevron_right_rounded,
-                              color: Colors.grey.shade400, size: 22),
-                        ],
-                      ),
-                    ),
-                  ),
-                  if (i < links.length - 1)
-                    Divider(
-                        height: 0,
-                        indent: 56,
-                        color: Colors.grey.shade100),
-                ],
-              );
-            }).toList(),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _CredRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-  final Color? valueColor;
-  final bool isFirst;
-  final bool isLast;
-  const _CredRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-    this.valueColor,
-    this.isFirst = false,
-    this.isLast = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          child: Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.10),
-                  borderRadius: BorderRadius.circular(10),
+              SizedBox(
+                width: avatarSize,
+                height: avatarSize,
+                child: Stack(
+                  children: [
+                    MfAvatar(imageUrl: user.profileImageUrl, name: user.fullName, size: avatarSize),
+                    if (isUploading)
+                      Positioned.fill(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: cs.surface.withValues(alpha: 0.7),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 28,
+                              height: 28,
+                              child: CircularProgressIndicator(strokeWidth: 2.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
-                child: Icon(icon, color: color, size: 18),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: MfSpace.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Colors.grey.shade500,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
+                      user.fullName.isEmpty ? 'Unnamed user' : user.fullName,
+                      style: text.titleLarge,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14.5,
-                        color: valueColor,
+                    if (user.email.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        user.email,
+                        style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
+                    ],
+                    const SizedBox(height: MfSpace.xs),
+                    Wrap(
+                      spacing: MfSpace.xs,
+                      runSpacing: MfSpace.xs,
+                      children: [
+                        MfStatusChip(
+                          label: _roleLabel(user.role),
+                          icon: _roleIcon(user.role),
+                          tone: MfTone.primary,
+                        ),
+                        MfStatusChip(
+                          label: _planLabel(plan),
+                          icon: planIcon,
+                          tone: planTone,
+                        ),
+                        if (isPatient)
+                          MfStatusChip(
+                            label: isDeaf ? 'Deaf mode' : 'Standard mode',
+                            icon: isDeaf ? Icons.hearing_disabled_rounded : Icons.hearing_rounded,
+                            tone: MfTone.info,
+                          ),
+                        if (isPatient)
+                          isOwnProfile
+                              ? const MfStatusChip(
+                                  label: 'SOS ready',
+                                  icon: Icons.check_circle_outline_rounded,
+                                  tone: MfTone.success,
+                                )
+                              : const MfStatusChip(
+                                  label: 'Monitored',
+                                  icon: Icons.shield_outlined,
+                                  tone: MfTone.primary,
+                                ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-        if (!isLast)
-          Divider(height: 0, indent: 56, color: Colors.grey.shade100),
-      ],
+          if (isOwnProfile && onChangePhoto != null) ...[
+            const SizedBox(height: MfSpace.md),
+            MfSecondaryButton(
+              label: isUploading ? 'Uploading photo' : 'Change photo',
+              icon: Icons.photo_camera_outlined,
+              loading: isUploading,
+              onPressed: onChangePhoto,
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
 
-class _InfoRowData {
-  final IconData icon;
-  final String label;
-  final String value;
-  const _InfoRowData(this.icon, this.label, this.value);
-}
-
-// ─── Image Source Bottom Sheet ────────────────────────────────────────────────
-class _ImagePickerSheet extends StatelessWidget {
-  const _ImagePickerSheet();
+// ─── Responder stats ──────────────────────────────────────────────────────────
+class _ResponderStatsRow extends StatelessWidget {
+  final User user;
+  const _ResponderStatsRow({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
-      decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+    final isVerified = user.verificationStatus == 'VERIFIED';
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 38,
-            height: 4,
-            decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2)),
+          Expanded(
+            child: MfStatTile(
+              icon: Icons.star_outline_rounded,
+              label: 'Rating',
+              value: (user.rating ?? 5.0).toStringAsFixed(1),
+              tone: MfTone.warning,
+            ),
           ),
-          const SizedBox(height: 20),
-          const Text('Update Profile Picture',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _PickerOption(
-                  Icons.photo_library_outlined, 'Gallery', ImageSource.gallery),
-              _PickerOption(
-                  Icons.camera_alt_outlined, 'Camera', ImageSource.camera),
-            ],
+          const SizedBox(width: MfSpace.xs),
+          Expanded(
+            child: MfStatTile(
+              icon: Icons.check_circle_outline_rounded,
+              label: 'Completed',
+              value: '${user.totalResponsesHandled ?? 0}',
+              tone: MfTone.success,
+            ),
+          ),
+          const SizedBox(width: MfSpace.xs),
+          Expanded(
+            child: MfStatTile(
+              icon: isVerified ? Icons.verified_outlined : Icons.pending_outlined,
+              label: 'Status',
+              value: isVerified ? 'Verified' : 'Pending',
+              tone: isVerified ? MfTone.success : MfTone.warning,
+            ),
           ),
         ],
       ),
@@ -1696,34 +853,89 @@ class _ImagePickerSheet extends StatelessWidget {
   }
 }
 
-class _PickerOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final ImageSource source;
-  const _PickerOption(this.icon, this.label, this.source);
+// ─── Responder credentials ────────────────────────────────────────────────────
+class _ResponderCredentials extends StatelessWidget {
+  final User user;
+  const _ResponderCredentials({required this.user});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => Navigator.pop(context, source),
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Column(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.10),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: AppColors.primary, size: 30),
-            ),
-            const SizedBox(height: 10),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          ],
+    final isVerified = user.verificationStatus == 'VERIFIED';
+    final responderTypeLabel = _kResponderTypeLabels[user.responderType] ??
+        (user.responderType?.replaceAll('_', ' ') ?? '—');
+    final vehicleLabel = user.vehicleType?.replaceAll('_', ' ') ?? '—';
+
+    return MfListGroup(children: [
+      MfKeyValueRow(
+        icon: Icons.badge_outlined,
+        label: 'License number',
+        value: user.licenseNumber ?? '—',
+      ),
+      MfKeyValueRow(
+        icon: Icons.business_outlined,
+        label: 'Organization',
+        value: user.organization ?? '—',
+      ),
+      MfKeyValueRow(
+        icon: Icons.medical_services_outlined,
+        label: 'Responder type',
+        value: responderTypeLabel,
+      ),
+      MfKeyValueRow(
+        icon: Icons.two_wheeler_rounded,
+        label: 'Vehicle type',
+        value: vehicleLabel,
+      ),
+      MfKeyValueRow(
+        icon: isVerified ? Icons.verified_outlined : Icons.pending_outlined,
+        label: 'Verification',
+        value: isVerified ? 'Verified' : 'Pending review',
+        trailing: MfStatusChip(
+          label: isVerified ? 'Verified' : 'Pending',
+          icon: isVerified ? Icons.check_rounded : Icons.schedule_rounded,
+          tone: isVerified ? MfTone.success : MfTone.warning,
         ),
       ),
+    ]);
+  }
+}
+
+// ─── Account information ──────────────────────────────────────────────────────
+class _AccountInfoSection extends StatelessWidget {
+  final User user;
+  const _AccountInfoSection({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    String orDash(String? v) => (v == null || v.isEmpty) ? '—' : v;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const MfSectionTitle('Account information'),
+        MfListGroup(children: [
+          MfKeyValueRow(
+            icon: Icons.person_outline_rounded,
+            label: 'Full name',
+            value: orDash(user.fullName),
+          ),
+          MfKeyValueRow(
+            icon: Icons.email_outlined,
+            label: 'Email address',
+            value: orDash(user.email),
+          ),
+          MfKeyValueRow(
+            icon: Icons.phone_outlined,
+            label: 'Phone number',
+            value: orDash(user.phoneNumber),
+          ),
+          if (user.cnic != null)
+            MfKeyValueRow(
+              icon: Icons.badge_outlined,
+              label: 'CNIC / ID',
+              value: user.cnic!,
+            ),
+        ]),
+      ],
     );
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/connectivity_provider.dart';
+import '../theme/app_theme.dart';
+import 'design_system/design_system.dart';
 
 /// App-wide NON-blocking offline banner.
 ///
@@ -38,47 +40,7 @@ class ConnectivityOverlay extends ConsumerWidget {
     // reset open screens such as an in-progress SOS.
     return Column(
       children: [
-        if (isConnected)
-          const SizedBox.shrink()
-        else
-        Material(
-          color: const Color(0xFFD32F2F), // app SOS red
-          child: Padding(
-            padding: EdgeInsets.only(top: mediaQuery.padding.top),
-            child: Semantics(
-              liveRegion: true,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
-                child: Row(
-                  children: [
-                    const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'No internet. For emergencies call 1122.',
-                        style: TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _launch(context, Uri(scheme: 'tel', path: emergencyNumber)),
-                      icon: const Icon(Icons.phone_rounded, size: 18, color: Colors.white),
-                      label: const Text('Call', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _launch(context, Uri(scheme: 'sms', path: emergencyNumber)),
-                      icon: const Icon(Icons.sms_rounded, size: 18, color: Colors.white),
-                      label: const Text('SMS', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-                      style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        if (isConnected) const SizedBox.shrink() else _OfflineBanner(topInset: mediaQuery.padding.top),
         Expanded(
           // When offline the banner consumes the status-bar inset.
           child: MediaQuery.removePadding(
@@ -88,6 +50,74 @@ class ConnectivityOverlay extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Restrained offline banner: neutral charcoal surface, white text, call /
+/// SMS fallback actions. Static (no animation).
+class _OfflineBanner extends StatelessWidget {
+  final double topInset;
+  const _OfflineBanner({required this.topInset});
+
+  @override
+  Widget build(BuildContext context) {
+    // The overlay sits above the Navigator, so Theme may be the app theme but
+    // no Scaffold exists — only use theme data, never Scaffold lookups.
+    final theme = Theme.of(context);
+    const fg = Colors.white;
+    final text = theme.textTheme;
+    final actionStyle = TextButton.styleFrom(
+      foregroundColor: fg,
+      minimumSize: const Size(MfSize.minTouch, MfSize.minTouch),
+      padding: const EdgeInsets.symmetric(horizontal: MfSpace.xs),
+      textStyle: text.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+
+    return Material(
+      color: MfColors.isHighContrast(context) ? Colors.black : AppColors.charcoal,
+      child: Padding(
+        padding: EdgeInsets.only(top: topInset),
+        child: Semantics(
+          liveRegion: true,
+          container: true,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.xxs, MfSpace.xs, MfSpace.xxs),
+            child: Row(
+              children: [
+                const Icon(Icons.wifi_off_rounded, color: fg, size: 20),
+                const SizedBox(width: MfSpace.xs),
+                Expanded(
+                  child: Text(
+                    'No internet. For emergencies call 1122.',
+                    style: text.bodySmall?.copyWith(color: fg, fontWeight: FontWeight.w500),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: () => ConnectivityOverlay._launch(
+                    context,
+                    Uri(scheme: 'tel', path: ConnectivityOverlay.emergencyNumber),
+                  ),
+                  icon: const Icon(Icons.phone_outlined, size: 18),
+                  label: const Text('Call'),
+                  style: actionStyle,
+                ),
+                TextButton.icon(
+                  onPressed: () => ConnectivityOverlay._launch(
+                    context,
+                    Uri(scheme: 'sms', path: ConnectivityOverlay.emergencyNumber),
+                  ),
+                  icon: const Icon(Icons.sms_outlined, size: 18),
+                  label: const Text('SMS'),
+                  style: actionStyle,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

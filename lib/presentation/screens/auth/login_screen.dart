@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
-import '../../../core/utils/responsive.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -18,7 +17,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
-  
+
   bool _obscurePassword = true;
   bool _isLoading = false;
 
@@ -45,7 +44,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (!mounted) return;
       final role = await ref.read(currentUserRoleProvider.future);
       if (mounted) _navigateByRole(role);
-
     } catch (e) {
       if (!mounted) return;
       final raw = e.toString().replaceAll('Exception:', '').trim();
@@ -55,47 +53,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           raw.toLowerCase().contains('temporarily locked')) {
         _showLockedModal(raw);
 
-      // ── Email not verified ───────────────────────────────────────────────
+        // ── Email not verified ───────────────────────────────────────────────
       } else if (raw.toLowerCase().contains('verify your email') ||
-                 raw.toLowerCase().contains('email') && raw.toLowerCase().contains('verif')) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Please verify your email before logging in.'),
-            backgroundColor: AppColors.warning,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+          raw.toLowerCase().contains('email') && raw.toLowerCase().contains('verif')) {
+        showMfSnackBar(
+          context,
+          'Please verify your email before logging in.',
+          tone: MfTone.warning,
         );
-        context.go('/verify-email',
-            extra: {'email': _emailController.text.trim()});
+        context.go('/verify-email', extra: {'email': _emailController.text.trim()});
 
-      // ── Warning: 1–2 attempts remaining ─────────────────────────────────
+        // ── Warning: 1–2 attempts remaining ─────────────────────────────────
       } else if (raw.toLowerCase().contains('warning') &&
-                 raw.toLowerCase().contains('attempt')) {
+          raw.toLowerCase().contains('attempt')) {
         _showAttemptsWarningBar(raw);
 
-      // ── Generic invalid credentials ──────────────────────────────────────
+        // ── Generic invalid credentials ──────────────────────────────────────
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    raw.contains('credentials')
-                        ? 'Incorrect email or password. Please try again.'
-                        : raw,
-                    style: const TextStyle(color: Colors.white),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        showMfSnackBar(
+          context,
+          raw.contains('credentials')
+              ? 'Incorrect email or password. Please try again.'
+              : raw,
+          tone: MfTone.danger,
         );
       }
     } finally {
@@ -106,158 +86,71 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   // ── Lockout modal ──────────────────────────────────────────────────────────
   void _showLockedModal(String errorMessage) {
     // Extract "X minutes" from the backend message
-    final minuteMatch =
-        RegExp(r'(\d+)\s*minute').firstMatch(errorMessage);
+    final minuteMatch = RegExp(r'(\d+)\s*minute').firstMatch(errorMessage);
     final minutesRemaining =
         minuteMatch != null ? int.tryParse(minuteMatch.group(1) ?? '') : null;
 
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        contentPadding: EdgeInsets.zero,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // ── Red header band ────────────────────────────────────────
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              decoration: const BoxDecoration(
-                color: Color(0xFFFFEBEB),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.lock_person_rounded,
-                      size: 48,
-                      color: AppColors.error,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'Account Temporarily Locked',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.error,
-                    ),
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        final text = Theme.of(ctx).textTheme;
+        return AlertDialog(
+          icon: Icon(Icons.lock_person_rounded, size: 32, color: cs.error),
+          title: const Text('Account temporarily locked', textAlign: TextAlign.center),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Your account has been locked due to 5 consecutive failed login attempts.',
+                  textAlign: TextAlign.center,
+                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+                if (minutesRemaining != null) ...[
+                  const SizedBox(height: MfSpace.md),
+                  MfInfoBanner(
+                    icon: Icons.timer_outlined,
+                    tone: MfTone.warning,
+                    title:
+                        'Try again in $minutesRemaining minute${minutesRemaining == 1 ? '' : 's'}',
                   ),
                 ],
-              ),
+                const SizedBox(height: MfSpace.md),
+                Text(
+                  'If you forgot your password, you can reset it now without waiting.',
+                  textAlign: TextAlign.center,
+                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ],
             ),
-
-            // ── Body ──────────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
-              child: Column(
-                children: [
-                  Text(
-                    'Your account has been locked due to 5 consecutive failed login attempts.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  if (minutesRemaining != null)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 12, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: AppColors.warning.withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.timer_outlined, color: AppColors.warning, size: 20),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Try again in $minutesRemaining minute${minutesRemaining == 1 ? '' : 's'}',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.warning,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 12),
-                  Text(
-                    'If you forgot your password, you can reset it now without waiting.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade500,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Actions ───────────────────────────────────────────────
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: Column(
-                children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(ctx);
-                        context.go('/forgot-password');
-                      },
-                      icon: const Icon(Icons.lock_reset_rounded),
-                      label: const Text('Reset My Password'),
-                      style: OutlinedButton.styleFrom(
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12)),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'I Understand',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.md),
+          actions: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                MfSecondaryButton(
+                  label: 'Reset my password',
+                  icon: Icons.lock_reset_rounded,
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    context.go('/forgot-password');
+                  },
+                ),
+                const SizedBox(height: MfSpace.xs),
+                MfPrimaryButton(
+                  label: 'I understand',
+                  height: MfSize.minTouch,
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
             ),
           ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -269,35 +162,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final isLastAttempt = remaining == 1;
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        duration: const Duration(seconds: 5),
-        backgroundColor: isLastAttempt ? AppColors.error : AppColors.warning,
-        behavior: SnackBarBehavior.floating,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        content: Row(
-          children: [
-            Icon(
-              isLastAttempt
-                  ? Icons.warning_rounded
-                  : Icons.info_outline_rounded,
-              color: Colors.white,
-              size: 20,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                isLastAttempt
-                    ? '⚠️ Last attempt! Your account will be locked for 30 minutes if you fail again.'
-                    : 'Incorrect password. $remaining attempts remaining before lockout.',
-                style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w500),
-              ),
-            ),
-          ],
-        ),
-      ),
+    showMfSnackBar(
+      context,
+      isLastAttempt
+          ? 'Last attempt. Your account will be locked for 30 minutes if you fail again.'
+          : 'Incorrect password. $remaining attempts remaining before lockout.',
+      tone: isLastAttempt ? MfTone.danger : MfTone.warning,
+      duration: const Duration(seconds: 5),
     );
   }
 
@@ -311,144 +182,131 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         context.go('/caregiver');
         break;
       default:
-        context.go('/home'); 
+        context.go('/home');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 2.hp),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(height: 6.hp),
-
-                // header
-                Semantics(
-                  header: true,
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: MfSpace.gutter, vertical: MfSpace.lg),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 480),
+              child: Form(
+                key: _formKey,
+                child: AutofillGroup(
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Image.asset(
-                        'assets/logos/Medifind_New_Logo-removebg-preview.png',
-                        height: 18.hp,
-                        fit: BoxFit.contain,
+                      // ── Logo ─────────────────────────────────────────────
+                      Center(
+                        child: Image.asset(
+                          'assets/logos/medifind_logo_full.png',
+                          height: 132,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'MediFind',
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 5.hp),
-
-                // email field
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email_outlined),
-                  ),
-                  validator: (value) => StringUtils.validateEmail(value),
-                ),
-                SizedBox(height: 2.hp),
-
-                // pass field
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock_outlined),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  validator: (value) {
-                    if (value.isNullOrEmpty) return 'Password is required';
-                    return null;
-                  },
-                ),
-                SizedBox(height: 1.hp),
-
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () => context.go('/forgot-password'),
-                    child: Text('Forgot Password?', style: TextStyle(fontSize: 1.6.hp)),
-                  ),
-                ),
-                SizedBox(height: 2.hp),
-
-                // login btn with neumorphic effect
-                Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryLight.withOpacity(0.4),
-                        blurRadius: 12,
-                        offset: const Offset(4, 4),
+                      const SizedBox(height: MfSpace.lg),
+                      Semantics(
+                        header: true,
+                        child: Text('Welcome back', style: text.headlineSmall),
                       ),
-                      const BoxShadow(
-                        color: Colors.white,
-                        blurRadius: 10,
-                        offset: Offset(-4, -4),
+                      const SizedBox(height: MfSpace.xxs),
+                      Text(
+                        'Log in to continue to MediFind.',
+                        style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                    ],
-                  ),
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _login,
-                    style: ElevatedButton.styleFrom(
-                      padding: EdgeInsets.symmetric(vertical: 2.hp),
-                      backgroundColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
+                      const SizedBox(height: MfSpace.lg),
+
+                      const MfSectionTitle('Account details'),
+                      const SizedBox(height: MfSpace.xs),
+
+                      // ── Email ────────────────────────────────────────────
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        textInputAction: TextInputAction.next,
+                        autofillHints: const [AutofillHints.email],
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                          errorMaxLines: 2,
+                        ),
+                        validator: (value) => StringUtils.validateEmail(value),
                       ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : Text(
-                            'Login',
-                            style: TextStyle(
-                              fontSize: 1.8.hp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
+                      const SizedBox(height: MfSpace.md),
+
+                      // ── Password ─────────────────────────────────────────
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: _obscurePassword,
+                        textInputAction: TextInputAction.done,
+                        autofillHints: const [AutofillHints.password],
+                        autovalidateMode: AutovalidateMode.onUserInteraction,
+                        onFieldSubmitted: (_) {
+                          if (!_isLoading) _login();
+                        },
+                        decoration: InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: const Icon(Icons.lock_outline_rounded),
+                          suffixIcon: IconButton(
+                            tooltip: _obscurePassword ? 'Show password' : 'Hide password',
+                            icon: Icon(_obscurePassword
+                                ? Icons.visibility_outlined
+                                : Icons.visibility_off_outlined),
+                            onPressed: () =>
+                                setState(() => _obscurePassword = !_obscurePassword),
                           ),
+                        ),
+                        validator: (value) {
+                          if (value.isNullOrEmpty) return 'Password is required';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: MfSpace.xxs),
+
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: MfTextButton(
+                          label: 'Forgot password?',
+                          onPressed: () => context.go('/forgot-password'),
+                        ),
+                      ),
+                      const SizedBox(height: MfSpace.md),
+
+                      MfPrimaryButton(
+                        label: _isLoading ? 'Logging in' : 'Log in',
+                        loading: _isLoading,
+                        onPressed: _login,
+                      ),
+                      const SizedBox(height: MfSpace.lg),
+
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          Text(
+                            "Don't have an account?",
+                            style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          MfTextButton(
+                            label: 'Register',
+                            onPressed: () => context.go('/select-role'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(height: 3.hp),
-
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text("Don't have an account? ", style: TextStyle(fontSize: 1.6.hp)),
-                    TextButton(
-                      onPressed: () => context.go('/select-role'),
-                      child: Text('Register', style: TextStyle(fontSize: 1.6.hp, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-
-              ],
+              ),
             ),
           ),
         ),

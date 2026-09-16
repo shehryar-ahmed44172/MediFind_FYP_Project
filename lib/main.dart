@@ -4,17 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing Hive for efficient local database storage
 import 'package:hive_flutter/hive_flutter.dart';
-// Importing Firebase core and options
-import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart';
 
 // Importing custom routing, configuration, and theme files for the project
 import 'config/router.dart';
 import 'core/config/app_config.dart';
 import 'presentation/theme/app_theme.dart';
 import 'presentation/providers/accessibility_provider.dart';
-// Importing push notification service
-import 'services/notification/push_notification_service.dart';
+// Self-hosted push notifications
+import 'services/notification/medifind_push_service.dart';
+import 'core/dev/demo_session_loader.dart';
+import 'services/notification/battery_optimization_prompt.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'core/constants/app_constants.dart';
 import 'presentation/providers/auth_provider.dart';
@@ -36,13 +35,11 @@ void main() async {
   Stripe.publishableKey = AppConstants.stripePublishableKey;
   await Stripe.instance.applySettings();
 
-  // Initialize Firebase First
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
-
   // Initialize Hive for local storage (Database setup)
   await Hive.initFlutter();
+
+  // Debug/profile builds only: optional pre-seeded session for emulator walkthroughs
+  await DemoSessionLoader.loadIfPresent();
 
   // Running the app wrapped in ProviderScope for Riverpod state management
   runApp(
@@ -60,68 +57,54 @@ class MediFindApp extends ConsumerStatefulWidget {
   ConsumerState<MediFindApp> createState() => _MediFindAppState();
 }
 
-class _MediFindAppState extends ConsumerState<MediFindApp> {
+class _MediFindAppState extends ConsumerState<MediFindApp> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Initialize AppRouter with provider container for redirects
     AppRouter.setContainer(ProviderScope.containerOf(context, listen: false));
-    // Initialize Push Notifications and FCM Handlers after app mounts
+    // Initialize self-hosted push notifications after app mounts
     _setupPushNotifications();
   }
 
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Foreground: the app handles pushes and fetches missed ones on resume.
+    // Background: the Android alert service shows them instead.
+    MedifindPushService.onAppLifecycleChanged(state);
+  }
+
   void _setupPushNotifications() async {
+    final container = ProviderScope.containerOf(context, listen: false);
     await Future.microtask(() async {
-      // 2. Initialize Push Notification Service (Plan v5: Passed localDataSource)
       final localDataSource = await ref.read(localDataSourceProvider.future);
 
-      // Wire token-refresh callback BEFORE initialize() so the listener is set
-      // when Firebase fires it during the initialize() call itself.
-      PushNotificationService.setTokenRefreshCallback((newToken) async {
-        try {
-          await ref.read(updateFcmTokenProvider(newToken).future);
-        } catch (e) {
-          debugPrint('❌ Token refresh sync failed: $e');
-        }
-      });
+      // Push client: socket `push` events, local notifications, tap routing
+      // (including launch from a terminated state).
+      await MedifindPushService.initialize(AppRouter.navigatorKey, localDataSource, container);
 
-      if (context.mounted) {
-        await PushNotificationService.initialize(AppRouter.navigatorKey, localDataSource);
-      }
-
-      // 3. Activate Socket Notification Persistence Handler (Plan v5)
+      // Activate Socket Notification Persistence Handler (Plan v5)
       ref.read(socketNotificationHandlerProvider);
-      
-      // Fetch the FCM token
-      final token = await PushNotificationService.getToken();
-      if (token != null) {
-        debugPrint('\n======================================================');
-        debugPrint('🚀 FCM DEVICE TOKEN (for backend testing):');
-        debugPrint(token);
-        debugPrint('======================================================\n');
-      }
     });
 
-    // Listen for auth state changes to sync token and connect socket (Plan v4.1)
+    if (!mounted) return;
+
+    // Listen for auth state changes to connect socket + push delivery (Plan v4.1)
     ref.listenManual(authStateProvider, (previous, next) async {
       final isLoggedIn = next.value ?? false;
       if (isLoggedIn) {
-        // 1. Sync FCM Token
-        final token = await PushNotificationService.getToken();
-        if (token != null) {
-          try {
-            await ref.read(updateFcmTokenProvider(token).future);
-            debugPrint('✅ FCM Token synced successfully after login');
-          } catch (e) {
-            debugPrint('❌ Failed to sync FCM Token: $e');
-          }
-        }
-
-        // 2. Connect Socket.io for In-App Notifications
+        // 1. Connect Socket.io for In-App Notifications
         final user = await ref.read(currentUserProvider.future);
         final authRepo = await ref.read(authRepositoryProvider.future);
         final jwtToken = await authRepo.getAuthToken();
-        
+
         if (user != null && jwtToken != null) {
           final socketService = SocketService.instance;
           // updateAuthToken reconnects an existing socket if the token changed
@@ -129,11 +112,21 @@ class _MediFindAppState extends ConsumerState<MediFindApp> {
           socketService.updateAuthToken(jwtToken);
           socketService.connect(user.id);
           ref.read(accessibilityProvider.notifier).loadForUser(user.id, user.patientType);
+
+          // 2. Push delivery: fetch missed pushes, start the Android
+          //    background alert service, then ask once to allow background use.
+          await MedifindPushService.onLoggedIn(user);
+          await BatteryOptimizationPrompt.maybeShow(AppRouter.navigatorKey);
         }
       } else {
         // Disconnect if logged out
         SocketService.instance.disconnect();
         ref.read(accessibilityProvider.notifier).loadForUser(null, null);
+        // Only a settled "logged out" state stops background alerts (not the
+        // initial loading state on app start).
+        if (!next.isLoading && !next.hasError) {
+          await MedifindPushService.onLoggedOut();
+        }
       }
     }, fireImmediately: true);
   }

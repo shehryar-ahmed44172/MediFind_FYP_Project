@@ -574,27 +574,14 @@ class MediFindApiClient {
     return User.fromJson(flat);
   }
 
-  Future<void> updateFcmToken(String fcmToken) async {
-    try {
-      final response = await _dio.put(
-        'auth/fcm-token',
-        data: {'fcmToken': fcmToken},
-      );
-      if (response.statusCode != 200) {
-        throw NetworkException(message: 'Failed to update FCM token');
-      }
-    } on DioException catch (e) {
-      throw _handleDioException(e);
-    }
-  }
-
   // EMERGENCY ENDPOINTS
   Future<CreateEmergencyResult> createEmergency(
     String emergencyType,
     double latitude,
     double longitude,
-    String? additionalInfo,
-  ) async {
+    String? additionalInfo, {
+    bool isMocked = false,
+  }) async {
     try {
       final response = await _dio.post(
         'emergencies',
@@ -603,6 +590,7 @@ class MediFindApiClient {
           'latitude': latitude,
           'longitude': longitude,
           'additionalInfo': additionalInfo,
+          'isMocked': isMocked,
           'priority': 'NORMAL', // Default, backend can override
         },
       );
@@ -811,9 +799,18 @@ class MediFindApiClient {
     }
   }
 
-  Future<void> resolveEmergency(String emergencyId) async {
+  /// [outcome]: TREATED | TRANSPORTED | FALSE_ALARM | PATIENT_NOT_FOUND.
+  /// Both fields are optional (older backends default the outcome to TREATED).
+  Future<void> resolveEmergency(String emergencyId, {String? outcome, String? note}) async {
     try {
-      final response = await _dio.post('responders/emergencies/$emergencyId/resolve');
+      final body = <String, dynamic>{
+        if (outcome != null) 'outcome': outcome,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      };
+      final response = await _dio.post(
+        'responders/emergencies/$emergencyId/resolve',
+        data: body.isEmpty ? null : body,
+      );
       if (response.statusCode != 200) {
         throw NetworkException(message: 'Failed to resolve emergency');
       }
@@ -1213,6 +1210,28 @@ class MediFindApiClient {
       throw _handleDioException(e);
     } catch (e) {
       throw NetworkException(message: 'Failed to parse notifications: $e');
+    }
+  }
+
+  /// Self-hosted push: messages not yet acknowledged by this device
+  /// (fallback for pushes missed while the socket was down).
+  Future<List<dynamic>> getPendingPush() async {
+    try {
+      final response = await _dio.get('notifications/pending');
+      final data = response.data is Map ? response.data['data'] : null;
+      return data is List ? data : const [];
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
+  /// Self-hosted push: acknowledge delivered messages over HTTP.
+  Future<void> ackPush(List<String> ids) async {
+    if (ids.isEmpty) return;
+    try {
+      await _dio.post('notifications/ack', data: {'ids': ids});
+    } on DioException catch (e) {
+      throw _handleDioException(e);
     }
   }
 

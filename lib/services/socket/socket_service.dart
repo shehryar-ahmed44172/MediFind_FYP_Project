@@ -11,6 +11,8 @@ enum SocketEvent {
   responderArrived,
   newMessage,
   notification,
+  /// Self-hosted push message (`push` event) - see MedifindPushService.
+  push,
   unknown
 }
 
@@ -134,6 +136,11 @@ class SocketService {
       _messageController.add(SocketMessage(SocketEvent.notification, data));
     });
 
+    // Self-hosted push delivery (store-and-forward, must be acknowledged).
+    socket.on('push', (data) {
+      _messageController.add(SocketMessage(SocketEvent.push, data));
+    });
+
     socket.on('NEW_EMERGENCY', (data) {
       _messageController.add(SocketMessage(SocketEvent.newEmergency, _unpack(data)));
     });
@@ -254,6 +261,21 @@ class SocketService {
       'status': status,
       'timestamp': DateTime.now().toIso8601String(),
     });
+  }
+
+  /// Acknowledge push messages so the server stops re-sending them.
+  /// Returns false when the socket is not connected (use the HTTP fallback).
+  bool ackPush(List<String> ids) {
+    if (ids.isEmpty) return true;
+    final socket = _socket;
+    if (!_isConnected || socket == null) return false;
+    socket.emit('push:ack', {'ids': ids});
+    return true;
+  }
+
+  /// Ask the server to replay undelivered push messages.
+  void requestPushSync() {
+    if (_isConnected) _socket?.emit('push:sync');
   }
 
   void _clearRooms() {

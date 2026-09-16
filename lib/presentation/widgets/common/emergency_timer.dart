@@ -1,6 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../design_system/design_system.dart';
 
+/// Countdown until an emergency request expires (m:ss).
+///
+/// Uses the theme's text style with tabular figures; the last 10 seconds are
+/// shown in the SOS color. Pass [style] to override.
 class EmergencyTimer extends StatefulWidget {
   final String expiresAt;
   final String? serverTime;
@@ -35,39 +40,33 @@ class _EmergencyTimerState extends State<EmergencyTimer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.expiresAt != widget.expiresAt) {
       _calculateInitialTime();
+      _startTimer();
     }
   }
 
   void _calculateInitialTime() {
-    final expiry = DateTime.parse(widget.expiresAt);
-    final now = widget.serverTime != null 
-        ? DateTime.parse(widget.serverTime!) 
-        : DateTime.now();
-    
-    // We calculate the diff based on server time to stay synchronized
-    final diff = expiry.difference(now).inSeconds;
-    
-    // If we use local time, we might need to adjust if serverTime is provided
-    if (widget.serverTime != null) {
-      // Calculate local offset if needed, but for simplicity we'll just use the diff
-      // and apply it to current local time.
-      _secondsRemaining = diff;
-    } else {
-      _secondsRemaining = diff;
+    final expiry = DateTime.tryParse(widget.expiresAt);
+    if (expiry == null) {
+      _secondsRemaining = 0;
+      return;
     }
-
+    // Server time (when provided) keeps the countdown in sync with the backend.
+    final now = (widget.serverTime != null ? DateTime.tryParse(widget.serverTime!) : null) ?? DateTime.now();
+    _secondsRemaining = expiry.difference(now).inSeconds;
     if (_secondsRemaining < 0) _secondsRemaining = 0;
   }
 
   void _startTimer() {
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       if (_secondsRemaining > 0) {
-        setState(() {
-          _secondsRemaining--;
-        });
+        setState(() => _secondsRemaining--);
       } else {
-        _timer?.cancel();
+        timer.cancel();
         widget.onExpired?.call();
       }
     });
@@ -81,18 +80,22 @@ class _EmergencyTimerState extends State<EmergencyTimer> {
 
   @override
   Widget build(BuildContext context) {
-    final minutes = (_secondsRemaining / 60).floor();
+    final minutes = _secondsRemaining ~/ 60;
     final seconds = _secondsRemaining % 60;
-    
-    final color = _secondsRemaining < 10 ? Colors.red : Colors.orange;
+    final cs = Theme.of(context).colorScheme;
+    final urgent = _secondsRemaining < 10;
+    final base = Theme.of(context).textTheme.titleLarge?.copyWith(
+          color: urgent ? MfColors.sos(context) : cs.onSurface,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        );
 
-    return Text(
-      '${minutes.toString().padLeft(1, '0')}:${seconds.toString().padLeft(2, '0')}',
-      style: widget.style ?? TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-        color: color,
-        fontFamily: 'monospace',
+    return Semantics(
+      liveRegion: urgent,
+      label: 'Expires in $minutes minute${minutes == 1 ? '' : 's'} $seconds second${seconds == 1 ? '' : 's'}',
+      excludeSemantics: true,
+      child: Text(
+        '$minutes:${seconds.toString().padLeft(2, '0')}',
+        style: widget.style ?? base,
       ),
     );
   }

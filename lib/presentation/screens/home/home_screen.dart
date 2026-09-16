@@ -1,14 +1,61 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/medical_profile_provider.dart';
-import '../../theme/app_theme.dart';
-import 'package:medifind_mobile_application/core/utils/responsive.dart';
+import '../../../core/utils/emergency_status.dart';
+import '../../../services/location/location_service.dart';
 import '../../providers/accessibility_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/connectivity_provider.dart';
+import '../../providers/medical_profile_provider.dart';
+import '../../widgets/design_system/design_system.dart';
+import '../patient/predefined_messages_screen.dart';
 
+/// GPS readiness for the Home status strip (service on + permission granted).
+final _gpsReadyProvider = FutureProvider.autoDispose<bool>((ref) async {
+  try {
+    final enabled = await Geolocator.isLocationServiceEnabled();
+    if (!enabled) return false;
+    final permission = await Geolocator.checkPermission();
+    return permission == LocationPermission.always || permission == LocationPermission.whileInUse;
+  } catch (_) {
+    return false;
+  }
+});
+
+/// The patient's open (non-terminal) emergency, if any.
+/// Uses GET emergencies/history (allowed for PATIENT) so the status is fresh.
+final _openEmergencyProvider = FutureProvider.autoDispose<_OpenEmergency?>((ref) async {
+  final user = await ref.watch(currentUserProvider.future);
+  if (user == null || user.role != 'PATIENT') return null;
+  final client = ref.read(apiClientProvider);
+  final response = await client.dio.get('emergencies/history', queryParameters: {'limit': 5});
+  final raw = response.data is Map ? response.data['data'] : null;
+  if (raw is! List) return null;
+  final open = raw
+      .whereType<Map>()
+      .map((m) => _OpenEmergency(
+            id: (m['id'] ?? '').toString(),
+            status: (m['status'] ?? '').toString(),
+            type: (m['emergencyType'] ?? 'OTHER').toString(),
+            createdAt: DateTime.tryParse((m['createdAt'] ?? '').toString()),
+          ))
+      .where((e) => e.id.isNotEmpty && !EmergencyStatus.isTerminal(e.status))
+      .toList()
+    ..sort((a, b) => (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+  return open.isEmpty ? null : open.first;
+});
+
+class _OpenEmergency {
+  final String id;
+  final String status;
+  final String type;
+  final DateTime? createdAt;
+  const _OpenEmergency({required this.id, required this.status, required this.type, this.createdAt});
+}
+
+/// Patient Home (SOS tab).
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -16,13 +63,41 @@ class HomeScreen extends ConsumerStatefulWidget {
   ConsumerState<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends ConsumerState<HomeScreen> {
+class _HomeScreenState extends ConsumerState<HomeScreen> with WidgetsBindingObserver {
+  GoRouter? _router;
+  bool _wasOnHome = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final router = GoRouter.maybeOf(context);
+    if (router != null && !identical(router, _router)) {
+      _router?.routerDelegate.removeListener(_onRouteChanged);
+      _router = router;
+      router.routerDelegate.addListener(_onRouteChanged);
+    }
+  }
+
+  /// Home stays alive in the tab stack — refresh the active-SOS banner and GPS
+  /// status whenever the user comes back to it (e.g. after an emergency ends).
+  void _onRouteChanged() {
+    final router = _router;
+    if (router == null || !mounted) return;
+    // `last` includes pushed (imperative) routes, unlike `uri`.
+    final config = router.routerDelegate.currentConfiguration;
+    final onHome = config.isNotEmpty && config.last.matchedLocation == '/home';
+    if (onHome && !_wasOnHome) {
+      ref.invalidate(_openEmergencyProvider);
+      ref.invalidate(_gpsReadyProvider);
+    }
+    _wasOnHome = onHome;
+  }
 
   @override
   void initState() {
     super.initState();
-    // FIX: Run accessibility init once after first frame, NOT inside build().
-    // Calling setState-triggering code inside build() causes infinite rebuild loops (blinking).
+    WidgetsBinding.instance.addObserver(this);
+    // Run accessibility init once after first frame, NOT inside build().
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final user = ref.read(currentUserProvider).valueOrNull;
       if (user != null) {
@@ -32,669 +107,584 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final settings = ref.watch(accessibilityProvider);
-    final isDeafMode = settings.textOnlyMode;
-    final userAsync = ref.watch(currentUserProvider);
-
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: Stack(
-        children: [
-          SafeArea(
-            child: Column(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(horizontal: 6.wp, vertical: 2.hp),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildProfessionalHeader(userAsync, theme, isDark),
-                        const SizedBox(height: 24),
-                        _buildDigitalMedicalID(theme, isDark),
-                        const SizedBox(height: 40),
-                        _buildAdvancedSOSCenter(theme, isDeafMode, isDark),
-                        const SizedBox(height: 48),
-                        _buildGlassServiceGrid(theme, isDark),
-                        const SizedBox(height: 32),
-                        _buildPremiumUpgradeCard(theme, userAsync.valueOrNull),
-                        const SizedBox(height: 32),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
+  void dispose() {
+    _router?.routerDelegate.removeListener(_onRouteChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
-  Widget _buildProfessionalHeader(AsyncValue<dynamic> userAsync, ThemeData theme, bool isDark) {
-    final textColor = isDark ? Colors.white : theme.colorScheme.onSurface;
-    return userAsync.when(
-      data: (user) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('MediFind Hub',
-            style: TextStyle(
-              color: AppColors.primaryLight.withOpacity(0.85),
-              fontWeight: FontWeight.w900,
-              fontSize: 12,
-              letterSpacing: 2,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            user?.fullName.split(' ')[0] ?? 'User',
-            style: TextStyle(
-              color: textColor,
-              fontWeight: FontWeight.w900,
-              fontSize: 32,
-              letterSpacing: -1,
-            ),
-          ),
-        ],
-      ),
-      loading: () => const SizedBox(height: 60),
-      error: (_, __) => const SizedBox.shrink(),
-    );
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Returning from system settings (GPS toggle) → re-check readiness.
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(_gpsReadyProvider);
+      ref.invalidate(_openEmergencyProvider);
+    }
   }
 
-  Widget _buildDigitalMedicalID(ThemeData theme, bool isDark) {
-    final userIdAsync = ref.watch(currentUserIdProvider);
-    final glassColor1 = isDark ? Colors.white.withOpacity(0.1)  : theme.colorScheme.primary.withOpacity(0.07);
-    final glassColor2 = isDark ? Colors.white.withOpacity(0.03) : theme.colorScheme.primary.withOpacity(0.02);
-    final borderColor = isDark ? Colors.white.withOpacity(0.1)  : theme.colorScheme.outline.withOpacity(0.2);
-    final labelColor  = isDark ? Colors.white70                  : theme.colorScheme.onSurface.withOpacity(0.6);
-    final iconColor   = isDark ? Colors.white.withOpacity(0.3)   : theme.colorScheme.onSurface.withOpacity(0.3);
-
-    return userIdAsync.when(
-      data: (userId) {
-        if (userId == null) return const SizedBox.shrink();
-        final profileAsync = ref.watch(getMedicalProfileProvider(userId));
-
-        return profileAsync.when(
-          data: (profile) {
-            final currentUser = ref.read(currentUserProvider).valueOrNull;
-            final isVerified = currentUser?.isEmailVerified == true;
-            return GestureDetector(
-              onTap: () => _showMedicalIDOptions(profile, theme, isDark),
-              child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [glassColor1, glassColor2],
-                    ),
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: borderColor, width: 1),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(10),
-                            decoration: BoxDecoration(
-                              color: AppColors.error.withOpacity(0.12),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.health_and_safety_rounded, color: AppColors.error, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              'DIGITAL MEDICAL ID',
-                              style: TextStyle(color: labelColor, fontWeight: FontWeight.w900, fontSize: 11, letterSpacing: 1.5),
-                            ),
-                          ),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.qr_code_2_rounded, color: iconColor, size: 20),
-                              const SizedBox(width: 4),
-                              Text('TAP', style: TextStyle(color: iconColor, fontSize: 8, fontWeight: FontWeight.w900, letterSpacing: 1)),
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          _buildIDStat('BLOOD', profile?.bloodType ?? '--', AppColors.error, labelColor),
-                          _buildIDStat('ALLERGIES', (profile?.allergies.isNotEmpty == true) ? 'ACTIVE' : 'NONE', AppColors.warning, labelColor),
-                          _buildIDStat('STATUS', isVerified ? 'VERIFIED' : 'PENDING', isVerified ? AppColors.success : AppColors.warning, labelColor),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-            ); // GestureDetector
-          },
-          loading: () => const SizedBox(height: 100),
-          error: (e, _) => const SizedBox.shrink(),
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-
-  /// Shows an action sheet letting the patient choose between editing their
-  /// medical profile or displaying the emergency QR code.
-  void _showMedicalIDOptions(dynamic profile, ThemeData theme, bool isDark) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // drag handle
-            Container(
-              width: 36, height: 4,
-              margin: const EdgeInsets.only(bottom: 20),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Text(
-              'Medical ID',
-              style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'What would you like to do?',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.5),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Edit Medical Profile
-            _OptionTile(
-              icon: Icons.edit_note_rounded,
-              color: AppColors.primary,
-              title: 'Edit Medical Profile',
-              subtitle: 'Update blood type, allergies, conditions and more',
-              onTap: () {
-                Navigator.pop(context);
-                context.push('/home/medical-profile');
-              },
-            ),
-            const SizedBox(height: 12),
-            // Show Emergency QR
-            _OptionTile(
-              icon: Icons.qr_code_2_rounded,
-              color: Colors.deepPurple,
-              title: 'Show Emergency QR',
-              subtitle: 'Display your medical ID for first responders to scan',
-              onTap: () {
-                Navigator.pop(context);
-                _showMedicalQRSheet(profile, theme, isDark);
-              },
-            ),
-            const SizedBox(height: 16),
-            // Privacy note
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.lock_outline_rounded, size: 14, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Your QR is private. Only you can generate it. '
-                      'Responders access your data only during an active emergency — all accesses are logged.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.primary.withOpacity(0.75),
-                        height: 1.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Shows a QR code bottom-sheet so first responders (or bystanders) can
-  /// scan the patient's critical medical info without needing the app.
-  void _showMedicalQRSheet(dynamic profile, ThemeData theme, bool isDark) {
+  Future<void> _refresh() async {
     final user = ref.read(currentUserProvider).valueOrNull;
-    final name  = user?.fullName ?? 'Unknown';
-    final blood = profile?.bloodType ?? 'Unknown';
-    final allergies = (profile?.allergies as List?)?.isNotEmpty == true
-        ? (profile!.allergies as List).join(', ')
-        : 'None';
-    final conditions = (profile?.chronicDiseases as List?)?.isNotEmpty == true
-        ? (profile!.chronicDiseases as List).join(', ')
-        : 'None';
-    final isDeaf = profile?.patientType?.toString().toUpperCase() == 'DEAF';
+    ref.invalidate(_gpsReadyProvider);
+    ref.invalidate(_openEmergencyProvider);
+    if (user != null) ref.invalidate(getMedicalProfileProvider(user.id));
+    await ref.read(_openEmergencyProvider.future).catchError((_) => null);
+  }
 
-    final qrData = 'MEDIFIND MEDICAL ID\n'
-        'Name: $name\n'
-        'Blood Type: $blood\n'
-        'Allergies: $allergies\n'
-        'Conditions: $conditions\n'
-        'DEAF/MUTE: ${isDeaf ? "YES" : "NO"}';
+  @override
+  Widget build(BuildContext context) {
+    final settings = ref.watch(accessibilityProvider);
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isDeaf = (user?.patientType ?? '').toUpperCase() == 'DEAF' || settings.textOnlyMode;
+    final openEmergency = ref.watch(_openEmergencyProvider).valueOrNull;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => Container(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // drag handle
-            Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withOpacity(0.2) : Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Icon(Icons.qr_code_2_rounded, color: AppColors.primary, size: 26),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Emergency Medical ID',
-                          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900)),
-                      Text('Tap to show — anyone can scan',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurface.withOpacity(0.5))),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            // QR Code
-            Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: AppShadows.cardShadow,
-              ),
-              child: QrImageView(
-                data: qrData,
-                version: QrVersions.auto,
-                size: 210,
-                backgroundColor: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            // DEAF badge
-            if (isDeaf)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.warning.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.warning.withOpacity(0.35)),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.hearing_disabled, color: AppColors.warning, size: 16),
-                    const SizedBox(width: 8),
-                    Text('DEAF / MUTE status included in QR',
-                        style: TextStyle(color: AppColors.warning, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ],
-                ),
-              ),
-            if (!isDeaf) const SizedBox(height: 4),
-            const SizedBox(height: 8),
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.sm, MfSpace.md, MfSpace.xl),
+        children: [
+          if (openEmergency != null) ...[
+            _ActiveEmergencyBanner(emergency: openEmergency),
+            const SizedBox(height: MfSpace.md),
           ],
-        ),
+          _StatusStrip(isDeaf: isDeaf, voiceOn: settings.voiceGuidanceEnabled),
+          const SizedBox(height: MfSpace.lg),
+          Center(
+            child: _SosButton(
+              isDeaf: isDeaf,
+              onTap: () {
+                HapticFeedback.heavyImpact();
+                context.push('/home/emergency');
+              },
+            ),
+          ),
+          const SizedBox(height: MfSpace.sm),
+          Text(
+            'Press and hold for 2 seconds, choose the emergency type, then you have 60 seconds to cancel before help is alerted. Use Send SOS now if you need help immediately.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+          ),
+          const SizedBox(height: MfSpace.lg),
+          if (isDeaf) ...[
+            const _DeafTools(),
+            const SizedBox(height: MfSpace.lg),
+          ] else ...[
+            MfInfoBanner(
+              icon: settings.voiceGuidanceEnabled ? Icons.record_voice_over_outlined : Icons.voice_over_off_outlined,
+              tone: MfTone.info,
+              title: settings.voiceGuidanceEnabled ? 'Voice guidance is on' : 'Voice guidance is off',
+              message: settings.voiceGuidanceEnabled
+                  ? 'MediFind will speak emergency updates, like when a responder is on the way.'
+                  : 'Turn it on to hear spoken emergency updates.',
+              actionLabel: 'Change in accessibility settings',
+              onAction: () => context.push('/accessibility-settings'),
+            ),
+            const SizedBox(height: MfSpace.lg),
+          ],
+          const MfSectionTitle('Quick actions'),
+          const _QuickActions(),
+          const SizedBox(height: MfSpace.lg),
+          const MfSectionTitle('Medical ID'),
+          const _MedicalIdSummary(),
+          const SizedBox(height: MfSpace.lg),
+          MfListGroup(
+            children: [
+              MfIconTile(
+                icon: isDeaf ? Icons.hearing_disabled_rounded : Icons.hearing_rounded,
+                label: 'Deaf and hearing modes',
+                subtitle: 'How MediFind adapts alerts and communication',
+                onTap: () => context.push('/home/patient-type-info'),
+              ),
+              if ((user?.subscriptionPlan ?? 'FREE') == 'FREE')
+                MfIconTile(
+                  icon: Icons.workspace_premium_outlined,
+                  label: 'Upgrade your plan',
+                  subtitle: 'More caregivers, reports and priority features',
+                  onTap: () => context.push('/subscription-plans'),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }
+}
 
-  Widget _buildIDStat(String label, String value, Color color, Color labelColor) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+// ── Active emergency banner ────────────────────────────────────────────────
+class _ActiveEmergencyBanner extends StatelessWidget {
+  final _OpenEmergency emergency;
+  const _ActiveEmergencyBanner({required this.emergency});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final t = MfColors.tone(context, MfTone.danger);
+    return MfCard(
+      tone: MfTone.danger,
+      onTap: () => context.push('/emergency/${emergency.id}/tracking'),
+      semanticLabel: 'Emergency in progress: ${EmergencyStatus.label(emergency.status)}. Resume tracking.',
+      child: Row(
+        children: [
+          Icon(Icons.emergency_share_outlined, color: t.foreground, size: 28),
+          const SizedBox(width: MfSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Emergency in progress', style: text.titleMedium?.copyWith(color: t.foreground)),
+                Text(
+                  '${EmergencyTypes.label(emergency.type)} · ${EmergencyStatus.label(emergency.status)}',
+                  style: text.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: MfSpace.xs),
+          Text('Resume', style: text.labelLarge?.copyWith(color: t.foreground)),
+          Icon(Icons.chevron_right_rounded, color: t.foreground),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Status strip: connectivity · GPS · deaf mode ───────────────────────────
+class _StatusStrip extends ConsumerWidget {
+  final bool isDeaf;
+  final bool voiceOn;
+  const _StatusStrip({required this.isDeaf, required this.voiceOn});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final online = ref.watch(isConnectedProvider);
+    final gps = ref.watch(_gpsReadyProvider);
+
+    return Wrap(
+      spacing: MfSpace.xs,
+      runSpacing: MfSpace.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        Text(label, style: TextStyle(color: labelColor, fontWeight: FontWeight.w900, fontSize: 9, letterSpacing: 1)),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(color: color, fontWeight: FontWeight.w900, fontSize: 18),
+        MfStatusChip(
+          label: online ? 'Online' : 'Offline',
+          icon: online ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+          tone: online ? MfTone.success : MfTone.warning,
         ),
+        gps.when(
+          data: (ready) => MfStatusChip(
+            label: ready ? 'Location ready' : 'Location off',
+            icon: ready ? Icons.my_location_rounded : Icons.location_disabled_rounded,
+            tone: ready ? MfTone.success : MfTone.warning,
+            tooltip: ready ? null : 'Location off. Open location settings',
+            onTap: ready
+                ? null
+                : () async {
+                    final enabled = await LocationService().isLocationServiceEnabled();
+                    if (!enabled) {
+                      await LocationService().openLocationSettings();
+                    } else {
+                      final p = await LocationService().requestLocationPermission();
+                      if (p == LocationPermission.deniedForever) {
+                        await LocationService().openAppSettings();
+                      }
+                    }
+                    ref.invalidate(_gpsReadyProvider);
+                  },
+          ),
+          loading: () => const MfStatusChip(label: 'Checking location', icon: Icons.location_searching_rounded),
+          error: (_, __) => const MfStatusChip(
+            label: 'Location unknown',
+            icon: Icons.location_disabled_rounded,
+            tone: MfTone.warning,
+          ),
+        ),
+        if (isDeaf)
+          MfStatusChip(
+            label: 'Deaf mode ON',
+            icon: Icons.hearing_disabled_rounded,
+            tone: MfTone.primary,
+            solid: true,
+            tooltip: 'Deaf mode on. Open accessibility settings',
+            onTap: () => context.push('/accessibility-settings'),
+          ),
       ],
     );
   }
-
-  Widget _buildAdvancedSOSCenter(ThemeData theme, bool isDeaf, bool isDark) {
-    return _SOSButton(
-      isDeaf: isDeaf,
-      onTap: () => context.push('/home/emergency'),
-    );
-  }
-
-  Widget _buildGlassServiceGrid(ThemeData theme, bool isDark) {
-    final services = [
-      {'title': 'Medical Records',  'icon': Icons.folder_copy_rounded,       'color': AppColors.primaryLight,  'route': '/home/medical-reports',    'push': true},
-      {'title': 'Caregivers',       'icon': Icons.people_alt_rounded,        'color': AppColors.warning,       'route': '/home/caregivers',          'push': true},
-      {'title': 'Messages',         'icon': Icons.chat_bubble_rounded,       'color': AppColors.secondaryTeal, 'route': '/chats',                    'push': false},
-      {'title': 'SOS Contacts',     'icon': Icons.contact_emergency_rounded, 'color': AppColors.success,       'route': '/home/emergency-contacts',  'push': true},
-    ];
-
-    final tileBg     = isDark ? Colors.white.withOpacity(0.05) : theme.colorScheme.surfaceContainer;
-    final tileBorder = isDark ? Colors.white.withOpacity(0.08) : theme.colorScheme.outline.withOpacity(0.15);
-    final textColor  = isDark ? Colors.white                    : theme.colorScheme.onSurface;
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.4,
-      ),
-      itemCount: services.length,
-      itemBuilder: (context, index) {
-        final service = services[index];
-        final color = service['color'] as Color;
-        return Container(
-          decoration: BoxDecoration(
-            color: tileBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: tileBorder),
-          ),
-          child: Material(
-            color: Colors.transparent,
-            borderRadius: BorderRadius.circular(24),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(24),
-              onTap: () {
-                final route = service['route'] as String?;
-                final usePush = service['push'] as bool? ?? false;
-                if (route != null) {
-                  usePush ? context.push(route) : context.go(route);
-                }
-              },
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(service['icon'] as IconData, color: color, size: 28),
-                  const SizedBox(height: 10),
-                  Text(
-                    service['title'] as String,
-                    style: TextStyle(color: textColor, fontWeight: FontWeight.bold, fontSize: 13),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPremiumUpgradeCard(ThemeData theme, dynamic user) {
-    if (user?.subscriptionPlan != 'FREE') return const SizedBox.shrink();
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(24),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(24),
-        onTap: () => context.push('/subscription-plans'),
-        child: Container(
-          padding: const EdgeInsets.all(2),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            gradient: LinearGradient(
-              colors: AppColors.medifindGradient,
-            ),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface,
-              borderRadius: BorderRadius.circular(23),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.auto_awesome_rounded, color: theme.colorScheme.primary),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    'Upgrade to Premium',
-                    style: TextStyle(color: theme.colorScheme.onSurface, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                Icon(Icons.arrow_forward_ios_rounded, color: theme.colorScheme.onSurface.withOpacity(0.3), size: 14),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-
 }
 
-// ── Option tile used inside the Medical ID action sheet ──────────────────────
-class _OptionTile extends StatelessWidget {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  const _OptionTile({
-    required this.icon,
-    required this.color,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Material(
-      color: color.withOpacity(0.07),
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w800, color: color)),
-                    const SizedBox(height: 2),
-                    Text(subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurface.withOpacity(0.55))),
-                  ],
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 13, color: color.withOpacity(0.6)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Modern full-width SOS button with breathing glow animation ───────────────
-class _SOSButton extends StatefulWidget {
+// ── SOS button ──────────────────────────────────────────────────────────────
+class _SosButton extends StatefulWidget {
   final bool isDeaf;
   final VoidCallback onTap;
-
-  const _SOSButton({required this.isDeaf, required this.onTap});
+  const _SosButton({required this.isDeaf, required this.onTap});
 
   @override
-  State<_SOSButton> createState() => _SOSButtonState();
+  State<_SosButton> createState() => _SosButtonState();
 }
 
-class _SOSButtonState extends State<_SOSButton> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _anim;
+class _SosButtonState extends State<_SosButton> with TickerProviderStateMixin {
+  late final AnimationController _pulse =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
+
+  /// Press-and-hold guard against pocket taps and accidental touches.
+  late final AnimationController _hold = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 2000),
+  )..addStatusListener(_onHoldStatus);
+
+  void _onHoldStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      HapticFeedback.heavyImpact();
+      _hold.value = 0;
+      widget.onTap();
+    }
+  }
+
+  void _startHold() {
+    HapticFeedback.selectionClick();
+    _hold.forward();
+  }
+
+  void _releaseHold() {
+    if (_hold.isCompleted || _hold.value == 0) return;
+    final heldBriefly = _hold.value < 0.25;
+    _hold.reverse();
+    if (heldBriefly && mounted) {
+      showMfSnackBar(context, 'Press and hold the SOS button for 2 seconds to start.', tone: MfTone.info);
+    }
+  }
 
   @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat(reverse: true);
-    _anim = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MfMotion.reduced(context)) {
+      _pulse.stop();
+      _pulse.value = 0;
+    } else if (!_pulse.isAnimating) {
+      _pulse.repeat();
+    }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _hold.dispose();
+    _pulse.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _anim,
-      builder: (context, _) {
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFD32F2F).withOpacity(0.25 + _anim.value * 0.25),
-                blurRadius: 24 + _anim.value * 16,
-                spreadRadius: 2 + _anim.value * 4,
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(28),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.onTap,
-                splashColor: Colors.white.withOpacity(0.15),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 36),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFFD32F2F), Color(0xFF8B0000)],
-                    ),
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final sos = MfColors.sos(context);
+    const size = MfSize.sosButton;
+    const ring = 20.0;
+
+    return Semantics(
+      button: true,
+      label: widget.isDeaf
+          ? 'SOS, medical emergency. No voice needed.'
+          : 'SOS, medical emergency',
+      hint: 'Double tap and hold to start SOS',
+      onLongPress: widget.onTap,
+      excludeSemantics: true,
+      child: SizedBox(
+        width: size + ring * 2,
+        height: size + ring * 2,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Subtle expanding ring (disabled with reduced motion).
+            AnimatedBuilder(
+              animation: _pulse,
+              builder: (context, _) {
+                final v = _pulse.value;
+                return Container(
+                  width: size + ring * 2 * v,
+                  height: size + ring * 2 * v,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: sos.withValues(alpha: 0.35 * (1 - v)), width: 2),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Glass-effect icon ring
-                      Container(
-                        padding: const EdgeInsets.all(20),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withOpacity(0.15),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.35),
-                            width: 1.5,
-                          ),
-                        ),
-                        child: const Icon(
-                          Icons.emergency_rounded,
-                          color: Colors.white,
-                          size: 52,
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-                      const Text(
-                        'SOS',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w900,
-                          fontSize: 44,
-                          letterSpacing: 10,
-                          height: 1,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      // Pill badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.2),
-                          ),
-                        ),
-                        child: Text(
-                          widget.isDeaf ? 'TAP TO TRIGGER EMERGENCY' : 'EMERGENCY ALERT',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11,
-                            letterSpacing: 2,
-                          ),
-                        ),
-                      ),
-                    ],
+                );
+              },
+            ),
+            // Hold progress ring
+            IgnorePointer(
+              child: SizedBox.square(
+                dimension: size + 14,
+                child: AnimatedBuilder(
+                  animation: _hold,
+                  builder: (context, _) => CircularProgressIndicator(
+                    value: _hold.value,
+                    strokeWidth: 6,
+                    color: sos,
+                    backgroundColor: Colors.transparent,
+                    strokeCap: StrokeCap.round,
                   ),
                 ),
               ),
             ),
+            Material(
+              color: sos,
+              shape: CircleBorder(side: BorderSide(color: sos.withValues(alpha: 0.2), width: 6, strokeAlign: 1)),
+              elevation: 2,
+              shadowColor: sos.withValues(alpha: 0.4),
+              clipBehavior: Clip.antiAlias,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (_) => _startHold(),
+                onTapUp: (_) => _releaseHold(),
+                onTapCancel: _releaseHold,
+                child: SizedBox(
+                  width: size,
+                  height: size,
+                  child: Padding(
+                    padding: const EdgeInsets.all(MfSpace.lg),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.emergency_rounded, color: cs.onError, size: 44),
+                          const SizedBox(height: MfSpace.xxs),
+                          Text('SOS', style: text.displaySmall?.copyWith(color: cs.onError, fontWeight: FontWeight.w700, height: 1)),
+                          const SizedBox(height: MfSpace.xxs),
+                          Text('Hold for 2 seconds', style: text.titleSmall?.copyWith(color: cs.onError)),
+                          if (widget.isDeaf)
+                            Text(
+                              'No voice needed',
+                              style: text.bodySmall?.copyWith(color: cs.onError.withValues(alpha: 0.9)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Deaf tools: show card · quick phrases · alert explainer ────────────────
+class _DeafTools extends ConsumerWidget {
+  const _DeafTools();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final phrases = ref.watch(predefinedMessagesProvider);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        MfPrimaryButton(
+          label: 'Show to people nearby',
+          icon: Icons.co_present_outlined,
+          semanticLabel: 'Show to people nearby. Opens a full-screen card saying you are deaf.',
+          onPressed: () => context.push('/home/show-card'),
+        ),
+        const SizedBox(height: MfSpace.lg),
+        MfSectionTitle(
+          'Quick phrases',
+          subtitle: 'Tap a phrase to show it in large text',
+          actionLabel: 'Edit',
+          onAction: () => context.push('/predefined-messages'),
+        ),
+        if (phrases.isEmpty)
+          Text('No quick phrases yet. Tap Edit to add some.',
+              style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+        else
+          SizedBox(
+            height: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: phrases.length,
+              separatorBuilder: (_, __) => const SizedBox(width: MfSpace.xs),
+              itemBuilder: (context, i) => Center(
+                child: ActionChip(
+                  avatar: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
+                  label: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 260),
+                    child: Text(phrases[i], maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ),
+                  tooltip: 'Show "${phrases[i]}" in large text',
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                  onPressed: () => context.push('/home/show-card', extra: phrases[i]),
+                ),
+              ),
+            ),
           ),
+        const SizedBox(height: MfSpace.md),
+        const MfInfoBanner(
+          icon: Icons.vibration_rounded,
+          tone: MfTone.primary,
+          title: 'Alerts without sound',
+          message: 'Emergency updates arrive as a flashing full-screen message and vibration. '
+              'Chat with your responder by text.',
+        ),
+      ],
+    );
+  }
+}
+
+// ── Quick actions (2-column, icon + label) ─────────────────────────────────
+class _QuickActions extends StatelessWidget {
+  const _QuickActions();
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      MfIconTile(
+        vertical: true,
+        icon: Icons.medical_information_outlined,
+        label: 'Medical ID',
+        onTap: () => context.go('/medical-id'),
+      ),
+      MfIconTile(
+        vertical: true,
+        icon: Icons.contact_phone_outlined,
+        label: 'Emergency contacts',
+        onTap: () => context.push('/home/emergency-contacts'),
+      ),
+      MfIconTile(
+        vertical: true,
+        icon: Icons.groups_outlined,
+        label: 'Caregivers',
+        onTap: () => context.push('/home/caregivers'),
+      ),
+      MfIconTile(
+        vertical: true,
+        icon: Icons.chat_bubble_outline_rounded,
+        label: 'Messages',
+        onTap: () => context.go('/chats'),
+      ),
+    ];
+
+    return Column(
+      children: [
+        for (var row = 0; row < items.length; row += 2) ...[
+          if (row > 0) const SizedBox(height: MfSpace.sm),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: items[row]),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(child: row + 1 < items.length ? items[row + 1] : const SizedBox()),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Medical ID summary ─────────────────────────────────────────────────────
+class _MedicalIdSummary extends ConsumerWidget {
+  const _MedicalIdSummary();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    if (user == null) return const MfSkeleton(height: 96, radius: MfRadius.md);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    return ref.watch(getMedicalProfileProvider(user.id)).when(
+          loading: () => const MfSkeleton(height: 96, radius: MfRadius.md),
+          error: (_, __) => MfCard(
+            child: MfErrorState(
+              compact: true,
+              message: 'Could not load your medical ID.',
+              onRetry: () => ref.invalidate(getMedicalProfileProvider(user.id)),
+            ),
+          ),
+          data: (profile) {
+            if (profile == null) {
+              return MfCard(
+                onTap: () => context.push('/home/medical-profile'),
+                child: const _SummaryRow(
+                  icon: Icons.add_circle_outline_rounded,
+                  title: 'Add your medical information',
+                  subtitle: 'Blood group and allergies help responders treat you safely.',
+                ),
+              );
+            }
+            final allergies = profile.allergies.where((a) => a.trim().isNotEmpty).toList();
+            return MfCard(
+              onTap: () => context.go('/medical-id'),
+              semanticLabel: 'Medical ID. Blood group ${profile.bloodType.isEmpty ? 'not set' : profile.bloodType}. '
+                  'Allergies: ${allergies.isEmpty ? 'none recorded' : allergies.join(', ')}. Open Medical ID.',
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Blood group', style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                      Text(
+                        profile.bloodType.trim().isEmpty ? '--' : profile.bloodType,
+                        style: text.headlineSmall?.copyWith(color: cs.error),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: MfSpace.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Allergies', style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+                        const SizedBox(height: MfSpace.xxs),
+                        Text(
+                          allergies.isEmpty ? 'None recorded' : allergies.join(', '),
+                          style: text.titleSmall,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+                ],
+              ),
+            );
+          },
         );
-      },
+  }
+}
+
+class _SummaryRow extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _SummaryRow({required this.icon, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(icon, color: MfColors.tone(context, MfTone.primary).foreground),
+        const SizedBox(width: MfSpace.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: text.titleSmall),
+              Text(subtitle, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            ],
+          ),
+        ),
+        Icon(Icons.chevron_right_rounded, color: cs.onSurfaceVariant),
+      ],
     );
   }
 }

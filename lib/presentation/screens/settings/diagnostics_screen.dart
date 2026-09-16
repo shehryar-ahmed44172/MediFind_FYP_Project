@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter/services.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/emergency_provider.dart';
 import '../../../services/socket/socket_service.dart';
-import '../../../services/notification/push_notification_service.dart';
-import '../../theme/app_theme.dart';
-import '../../widgets/common/app_header.dart';
+import '../../../services/notification/medifind_push_service.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class DiagnosticsScreen extends ConsumerStatefulWidget {
   const DiagnosticsScreen({super.key});
@@ -16,19 +14,19 @@ class DiagnosticsScreen extends ConsumerStatefulWidget {
 }
 
 class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
-  String? _fcmToken;
+  String? _pushStatus;
   bool _isPinging = false;
 
   @override
   void initState() {
     super.initState();
-    _loadFcmToken();
+    _loadPushStatus();
   }
 
-  Future<void> _loadFcmToken() async {
-    final token = await PushNotificationService.getToken();
+  Future<void> _loadPushStatus() async {
+    final status = await MedifindPushService.statusSummary();
     if (mounted) {
-      setState(() => _fcmToken = token);
+      setState(() => _pushStatus = status);
     }
   }
 
@@ -40,9 +38,7 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
       // For now, we'll just check if connected
       if (!socket.isConnected) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Socket not connected!')),
-          );
+          showMfSnackBar(context, 'Socket not connected', tone: MfTone.danger);
         }
       } else {
         // Send a diagnostic ping
@@ -54,267 +50,227 @@ class _DiagnosticsScreenState extends ConsumerState<DiagnosticsScreen> {
     }
   }
 
+  Future<void> _clearLocalCache() async {
+    final localDs = await ref.read(localDataSourceProvider.future);
+    await localDs.clearAllEmergencies();
+    if (mounted) {
+      showMfSnackBar(context, 'Local emergency cache cleared. Dashboard reset.', tone: MfTone.success);
+    }
+  }
+
+  Future<void> _cleanAllEmergencies() async {
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Clean all emergencies?',
+      message: 'Cancels every locally cached emergency on the backend and clears the local cache.',
+      confirmLabel: 'Clean all',
+      destructive: true,
+      icon: Icons.cleaning_services_outlined,
+    );
+    if (!confirmed) return;
+    final localDs = await ref.read(localDataSourceProvider.future);
+    final emergencies = await localDs.getAllEmergencies();
+    int count = 0;
+    for (var e in emergencies) {
+      try {
+        final repo = await ref.read(emergencyRepositoryProvider.future);
+        await repo.cancelEmergency(e['id']);
+        count++;
+      } catch (_) {}
+    }
+    await localDs.clearAllEmergencies();
+    if (mounted) {
+      showMfSnackBar(context, 'Cleaned $count emergencies from backend and local cache.');
+    }
+  }
+
+  Future<void> _setFakeLocation() async {
+    await ref.read(pushFakeLocationProvider(0.045).future);
+    if (mounted) {
+      showMfSnackBar(context, 'Fake location set about 5 km away');
+    }
+  }
+
+  Future<void> _syncPending() async {
+    try {
+      await MedifindPushService.syncPending();
+      await _loadPushStatus();
+      if (mounted) {
+        showMfSnackBar(context, 'Missed alerts fetched', tone: MfTone.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        showMfSnackBar(context, 'Sync failed: $e', tone: MfTone.danger);
+      }
+    }
+  }
+
+  MfStatusChip _chip(bool ok, String okLabel, String badLabel) => MfStatusChip(
+        label: ok ? okLabel : badLabel,
+        tone: ok ? MfTone.success : MfTone.danger,
+        icon: ok ? Icons.check_circle_outline_rounded : Icons.error_outline_rounded,
+      );
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final userAsync = ref.watch(currentUserProvider);
     final isSocketConnected = ref.watch(socketStreamProvider.select((s) => s.valueOrNull?.event == SocketEvent.connectionStatus && s.valueOrNull?.data['status'] == 'connected' || SocketService.instance.isConnected));
+    final simulationMode = ref.watch(simulationModeProvider);
 
-    return Scaffold(
-      backgroundColor: theme.colorScheme.surface,
-      body: Column(
+    return MfScaffold(
+      title: 'Diagnostics',
+      subtitle: 'System status and testing tools',
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
         children: [
-          const AppHeader(
-            greetingOverride: 'Diagnostics',
-            showProfile: false,
-            canPop: true,
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.all(20),
+          // ── User identity ────────────────────────────────────────────
+          const MfSectionTitle('User identity'),
+          userAsync.when(
+            data: (user) => MfListGroup(
               children: [
-                _buildSection(
-                  'User Identity',
-                  userAsync.when(
-                    data: (user) => Column(
-                      children: [
-                        _buildInfoRow('User ID', user?.id ?? 'Unknown'),
-                        _buildInfoRow('Name', user?.fullName ?? 'Unknown'),
-                        _buildInfoRow('Role', user?.role ?? 'Unknown'),
-                        _buildInfoRow('Active Status', user?.isActive == true ? 'ACTIVE' : 'INACTIVE', color: user?.isActive == true ? AppColors.success : AppColors.error),
-                      ],
-                    ),
-                    loading: () => const CircularProgressIndicator(),
-                    error: (e, _) => Text('Error loading user: $e'),
-                  ),
+                MfKeyValueRow(icon: Icons.fingerprint_rounded, label: 'User ID', value: user?.id ?? 'Unknown'),
+                MfKeyValueRow(icon: Icons.person_outline_rounded, label: 'Name', value: user?.fullName ?? 'Unknown'),
+                MfKeyValueRow(icon: Icons.badge_outlined, label: 'Role', value: user?.role ?? 'Unknown'),
+                MfKeyValueRow(
+                  icon: Icons.verified_user_outlined,
+                  label: 'Account status',
+                  value: user?.isActive == true ? 'Active' : 'Inactive',
+                  trailing: _chip(user?.isActive == true, 'Active', 'Inactive'),
                 ),
-                
-                const SizedBox(height: 12),
-                
-                // Reset/Clean Dashboard Button (Plan v8)
-                Column(
-                  children: [
-                    OutlinedButton.icon(
-                      onPressed: () async {
-                        final localDs = await ref.read(localDataSourceProvider.future);
-                        await localDs.clearAllEmergencies();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Local emergency cache cleared! Dashboard reset.')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.delete_sweep_rounded, color: AppColors.warning),
-                      label: const Text('Clear Local Cache', style: TextStyle(color: AppColors.warning)),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: AppColors.warning),
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    ElevatedButton.icon(
-                      onPressed: () async {
-                        final localDs = await ref.read(localDataSourceProvider.future);
-                        final emergencies = await localDs.getAllEmergencies();
-                        int count = 0;
-                        for (var e in emergencies) {
-                          try {
-                            final repo = await ref.read(emergencyRepositoryProvider.future);
-                            await repo.cancelEmergency(e['id']);
-                            count++;
-                          } catch (_) {}
-                        }
-                        await localDs.clearAllEmergencies();
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Cleaned $count emergencies from backend & local cache.')),
-                          );
-                        }
-                      },
-                      icon: const Icon(Icons.cleaning_services_rounded),
-                      label: const Text('Clean All My Emergencies (Backend + Local)'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.error,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                const SizedBox(height: 24),
-                
-                _buildSection(
-                  'Connection Status',
-                  Column(
-                    children: [
-                      _buildInfoRow(
-                        'Socket.io', 
-                        isSocketConnected ? 'CONNECTED' : 'DISCONNECTED',
-                        color: isSocketConnected ? AppColors.success : AppColors.error,
-                      ),
-                      const Divider(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              ],
+            ),
+            loading: () => MfSkeleton.list(count: 1, itemHeight: 200),
+            error: (e, _) => MfCard(
+              child: MfErrorState(
+                compact: true,
+                title: 'Could not load user',
+                message: '$e',
+                onRetry: () => ref.invalidate(currentUserProvider),
+              ),
+            ),
+          ),
+          const SizedBox(height: MfSpace.sm),
+
+          // Reset/Clean Dashboard Buttons (Plan v8)
+          MfSecondaryButton(
+            label: 'Clear local cache',
+            icon: Icons.delete_sweep_outlined,
+            tone: MfTone.warning,
+            onPressed: _clearLocalCache,
+          ),
+          const SizedBox(height: MfSpace.xs),
+          MfSecondaryButton(
+            label: 'Clean all my emergencies (backend + local)',
+            icon: Icons.cleaning_services_outlined,
+            tone: MfTone.danger,
+            onPressed: _cleanAllEmergencies,
+          ),
+
+          const SizedBox(height: MfSpace.lg),
+
+          // ── Connection status ────────────────────────────────────────
+          const MfSectionTitle('Connection status'),
+          MfListGroup(
+            children: [
+              MfKeyValueRow(
+                icon: Icons.hub_outlined,
+                label: 'Socket.io',
+                value: isSocketConnected ? 'Real-time channel open' : 'Real-time channel closed',
+                trailing: _chip(isSocketConnected, 'Connected', 'Disconnected'),
+              ),
+              Semantics(
+                toggled: simulationMode,
+                label: 'Simulation mode',
+                hint: 'Fake movement for testing',
+                excludeSemantics: true,
+                onTap: () => ref.read(simulationModeProvider.notifier).state = !simulationMode,
+                child: InkWell(
+                  onTap: () => ref.read(simulationModeProvider.notifier).state = !simulationMode,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(minHeight: 56),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.xs),
+                      child: Row(
                         children: [
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Simulation Mode', style: TextStyle(fontWeight: FontWeight.bold)),
-                              Text('Fake movement for testing', style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
-                            ],
+                          Icon(Icons.route_outlined, size: 20, color: cs.onSurfaceVariant),
+                          const SizedBox(width: MfSpace.sm),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Simulation mode', style: text.titleSmall),
+                                Text('Fake movement for testing', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                              ],
+                            ),
                           ),
                           Switch(
-                            value: ref.watch(simulationModeProvider),
+                            value: simulationMode,
                             onChanged: (val) => ref.read(simulationModeProvider.notifier).state = val,
-                            activeThumbColor: AppColors.primary,
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
-                      ElevatedButton.icon(
-                        onPressed: _isPinging ? null : _checkSocketRooms,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Refresh Socket Status'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      OutlinedButton.icon(
-                        onPressed: () async {
-                          await ref.read(pushFakeLocationProvider(0.045).future);
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Fake location set ~5km away')),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.location_on_outlined),
-                        label: const Text('Set Fake Location (5km away)'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-                
-                const SizedBox(height: 24),
-                
-                _buildSection(
-                  'Push Notifications (FCM)',
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildInfoRow('Token Status', _fcmToken != null ? 'READY' : 'MISSING', color: _fcmToken != null ? AppColors.success : AppColors.error),
-                      if (_fcmToken != null) ...[
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            _fcmToken!,
-                            style: const TextStyle(fontSize: 10, fontFamily: 'monospace'),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            OutlinedButton.icon(
-                              onPressed: () {
-                                Clipboard.setData(ClipboardData(text: _fcmToken!));
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(content: Text('FCM Token copied to clipboard')),
-                                );
-                              },
-                              icon: const Icon(Icons.copy_rounded, size: 18),
-                              label: const Text('Copy Token'),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton.icon(
-                              onPressed: () async {
-                                if (_fcmToken != null) {
-                                  try {
-                                    await ref.read(updateFcmTokenProvider(_fcmToken!).future);
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('✅ Token synced to backend successfully!')),
-                                      );
-                                    }
-                                  } catch (e) {
-                                    if (mounted) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(content: Text('❌ Sync failed: $e')),
-                                      );
-                                    }
-                                  }
-                                }
-                              },
-                              icon: const Icon(Icons.sync_rounded),
-                              label: const Text('Sync to Backend'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.success,
-                                foregroundColor: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(MfSpace.md),
+                child: Column(
+                  children: [
+                    MfPrimaryButton(
+                      label: 'Refresh socket status',
+                      icon: Icons.refresh_rounded,
+                      loading: _isPinging,
+                      height: MfSize.minTouch,
+                      onPressed: _isPinging ? null : _checkSocketRooms,
+                    ),
+                    const SizedBox(height: MfSpace.xs),
+                    MfSecondaryButton(
+                      label: 'Set fake location (5 km away)',
+                      icon: Icons.location_on_outlined,
+                      onPressed: _setFakeLocation,
+                    ),
+                  ],
                 ),
-
-                const SizedBox(height: 40),
-                
-                Text(
-                  'Troubleshooting Tips:',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const Text('• Ensure you are on the same Wi-Fi as the server (192.168.100.5).\n• Toggle "Online" status twice to force-sync location.\n• Check server logs for [Geospatial Search] entries.', style: TextStyle(fontSize: 13, color: Colors.grey)),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSection(String title, Widget content) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: AppShadows.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 16),
-          content,
-        ],
-      ),
-    );
-  }
+          const SizedBox(height: MfSpace.lg),
 
-  Widget _buildInfoRow(String label, String value, {Color? color}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(color: Colors.grey, fontSize: 13)),
-          Text(
-            value, 
-            style: TextStyle(
-              fontWeight: FontWeight.bold, 
-              fontSize: 13,
-              color: color,
-            )
+          // ── Push notifications ───────────────────────────────────────
+          const MfSectionTitle('Push notifications'),
+          MfListGroup(
+            children: [
+              MfKeyValueRow(
+                icon: Icons.notifications_active_outlined,
+                label: 'Delivery',
+                value: _pushStatus ?? 'Checking...',
+                trailing: _chip(SocketService.instance.isConnected, 'Online', 'Offline'),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(MfSpace.md),
+                child: MfPrimaryButton(
+                  label: 'Fetch missed alerts',
+                  icon: Icons.sync_rounded,
+                  height: MfSize.minTouch,
+                  onPressed: _syncPending,
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: MfSpace.lg),
+
+          const MfInfoBanner(
+            icon: Icons.tips_and_updates_outlined,
+            tone: MfTone.neutral,
+            title: 'Troubleshooting tips',
+            message: '- Ensure you are on the same Wi-Fi as the server (192.168.100.5).\n'
+                '- Toggle "Online" status twice to force-sync location.\n'
+                '- Check server logs for [Geospatial Search] entries.',
           ),
         ],
       ),

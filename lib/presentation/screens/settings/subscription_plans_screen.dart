@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class SubscriptionPlansScreen extends ConsumerStatefulWidget {
   const SubscriptionPlansScreen({super.key});
@@ -26,125 +26,67 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
   @override
   Widget build(BuildContext context) {
     final userAsync = ref.watch(currentUserProvider);
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverAppBar(
-            expandedHeight: 240,
-            pinned: true,
-            stretch: true,
-            backgroundColor: AppColors.primaryNavy,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white),
-              onPressed: () => context.pop(),
-            ),
-            flexibleSpace: FlexibleSpaceBar(
-              stretchModes: const [
-                StretchMode.zoomBackground,
-                StretchMode.blurBackground,
-              ],
-              centerTitle: true,
-              title: const Text(
-                'MediFind Premium',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                  fontSize: 20,
-                  letterSpacing: -0.5,
-                ),
+    return MfScaffold(
+      title: 'Subscription plans',
+      body: userAsync.when(
+        data: (user) {
+          final role = (user?.role ?? 'PATIENT').toUpperCase();
+          final currentPlan = user?.subscriptionPlan ?? 'FREE';
+          final plans = _plansForRole(role);
+          final headline = role == 'CAREGIVER'
+              ? 'Care more, worry less'
+              : role == 'RESPONDER'
+                  ? 'Advance your response career'
+                  : 'Choose the plan that fits your care';
+          final subtitle = role == 'CAREGIVER'
+              ? 'Monitor more patients, get faster alerts, and access complete medical histories.'
+              : role == 'RESPONDER'
+                  ? 'Get priority dispatch, advanced case tools, and full analytics to grow your impact.'
+                  : 'Unlock advanced medical tracking, unlimited caregivers, and priority emergency dispatch.';
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+            children: [
+              Text(headline, style: text.headlineSmall),
+              const SizedBox(height: MfSpace.xs),
+              Text(subtitle, style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+              const SizedBox(height: MfSpace.lg),
+              _buildPlanCard(context, 'FREE', 'Standard', '0', currentPlan == 'FREE', plans['FREE']!),
+              const SizedBox(height: MfSpace.md),
+              _buildPlanCard(context, 'PROFESSIONAL', 'Professional', '499',
+                  currentPlan == 'PROFESSIONAL', plans['PROFESSIONAL']!),
+              const SizedBox(height: MfSpace.md),
+              _buildPlanCard(context, 'EXECUTIVE', 'Executive', '2,499',
+                  currentPlan == 'EXECUTIVE', plans['EXECUTIVE']!),
+              const SizedBox(height: MfSpace.md),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+                  const SizedBox(width: MfSpace.xxs),
+                  Flexible(
+                    child: Text(
+                      'Payments are processed securely by Stripe',
+                      style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
               ),
-              background: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Color(0xFF0C637E),
-                      Color(0xFF2496A7),
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.auto_awesome_rounded,
-                    size: 100,
-                    color: Colors.white.withOpacity(0.15),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          SliverToBoxAdapter(
-            child: userAsync.when(
-              data: (user) {
-                final role = (user?.role ?? 'PATIENT').toUpperCase();
-                final headline = role == 'CAREGIVER'
-                    ? 'Care More, Worry Less'
-                    : role == 'RESPONDER'
-                        ? 'Advance Your Response Career'
-                        : 'Elevate Your Experience';
-                final subtitle = role == 'CAREGIVER'
-                    ? 'Monitor more patients, get faster alerts, and access complete medical histories.'
-                    : role == 'RESPONDER'
-                        ? 'Get priority dispatch, advanced case tools, and full analytics to grow your impact.'
-                        : 'Unlock advanced medical tracking, unlimited caregivers, and priority emergency dispatch.';
-                return Container(
-                  padding: const EdgeInsets.fromLTRB(24, 32, 24, 8),
-                  child: Column(
-                    children: [
-                      Text(
-                        headline,
-                        style: theme.textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primaryNavy,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        subtitle,
-                        style: const TextStyle(fontSize: 15, color: Colors.grey, height: 1.5),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 32),
-                    ],
-                  ),
-                );
-              },
-              loading: () => const SizedBox(height: 120),
-              error: (_, __) => const SizedBox(height: 120),
-            ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: userAsync.when(
-              data: (user) {
-                final currentPlan = user?.subscriptionPlan ?? 'FREE';
-                final role = (user?.role ?? 'PATIENT').toUpperCase();
-                final plans = _plansForRole(role);
-                return SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildPlanCard(context, 'FREE', 'Standard', '0', currentPlan == 'FREE',
-                        plans['FREE']!, const Color(0xFF94A3B8)),
-                    const SizedBox(height: 20),
-                    _buildPlanCard(context, 'PROFESSIONAL', 'Professional', '499',
-                        currentPlan == 'PROFESSIONAL', plans['PROFESSIONAL']!, const Color(0xFF2496A7)),
-                    const SizedBox(height: 20),
-                    _buildPlanCard(context, 'EXECUTIVE', 'Executive', '2,499',
-                        currentPlan == 'EXECUTIVE', plans['EXECUTIVE']!, const Color(0xFF0C637E)),
-                    const SizedBox(height: 40),
-                  ]),
-                );
-              },
-              loading: () => const SliverToBoxAdapter(child: Center(child: CircularProgressIndicator())),
-              error: (e, _) => SliverToBoxAdapter(child: Center(child: Text('Error: $e'))),
-            ),
-          ),
-        ],
+            ],
+          );
+        },
+        loading: () => Padding(
+          padding: const EdgeInsets.all(MfSpace.gutter),
+          child: MfSkeleton.list(count: 3, itemHeight: 220),
+        ),
+        error: (e, _) => MfErrorState(
+          title: 'Could not load your plan',
+          message: '$e',
+          onRetry: () => ref.invalidate(currentUserProvider),
+        ),
       ),
     );
   }
@@ -156,159 +98,75 @@ class _SubscriptionPlansScreenState extends ConsumerState<SubscriptionPlansScree
     String price,
     bool isCurrent,
     List<String> features,
-    Color accentColor,
   ) {
     final isLoading = _loadingPlan == planId;
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final primary = MfColors.tone(context, MfTone.primary);
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: [
-          BoxShadow(
-            color: accentColor.withOpacity(0.08),
-            blurRadius: 24,
-            offset: const Offset(0, 8),
-          ),
-        ],
-        border: Border.all(
-          color: isCurrent ? accentColor : Colors.grey.shade100,
-          width: isCurrent ? 2 : 1,
-        ),
-      ),
+    return MfCard(
+      tone: isCurrent ? MfTone.primary : null,
+      padding: const EdgeInsets.all(MfSpace.md),
+      semanticLabel: isCurrent ? '$title plan, current plan' : '$title plan',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: accentColor.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(30),
-                topRight: Radius.circular(30),
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Column(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title.toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w900,
-                        color: accentColor,
-                        letterSpacing: 1.2,
+                    Text(title, style: text.titleMedium),
+                    const SizedBox(height: MfSpace.xxs),
+                    Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(text: 'PKR ', style: text.titleSmall?.copyWith(color: cs.onSurfaceVariant)),
+                          TextSpan(text: price, style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
+                          TextSpan(text: ' /month', style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                        ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.baseline,
-                      textBaseline: TextBaseline.alphabetic,
-                      children: [
-                        const Text(
-                          'PKR ',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black54),
-                        ),
-                        Text(
-                          price,
-                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
-                        ),
-                        const Text(
-                          '/mo',
-                          style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-                if (isCurrent)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: accentColor,
-                      borderRadius: BorderRadius.circular(30),
-                      boxShadow: [
-                        BoxShadow(color: accentColor.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
-                      ],
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 14),
-                        SizedBox(width: 6),
-                        Text(
-                          'ACTIVE',
-                          style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              children: [
-                ...features.map((f) => Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: accentColor.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(Icons.check_rounded, color: accentColor, size: 14),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Text(
-                          f,
-                          style: const TextStyle(
-                            fontSize: 14, 
-                            color: Color(0xFF334155),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                )),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton(
-                    onPressed: isCurrent || isLoading ? null : () => _handleUpgrade(planId),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: accentColor,
-                      foregroundColor: Colors.white,
-                      disabledBackgroundColor: Colors.grey.shade100,
-                      disabledForegroundColor: Colors.grey.shade400,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    child: isLoading 
-                        ? const SizedBox(
-                            height: 24, 
-                            width: 24, 
-                            child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white)
-                          )
-                        : Text(
-                            isCurrent ? 'Current Plan' : 'Select $title',
-                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
-                          ),
-                  ),
+              ),
+              if (isCurrent)
+                const MfStatusChip(
+                  label: 'Current plan',
+                  tone: MfTone.primary,
+                  icon: Icons.check_circle_outline_rounded,
                 ),
-              ],
-            ),
+            ],
           ),
+          const SizedBox(height: MfSpace.sm),
+          const Divider(height: 1),
+          const SizedBox(height: MfSpace.sm),
+          ...features.map((f) => Padding(
+                padding: const EdgeInsets.only(bottom: MfSpace.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.check_rounded, color: primary.foreground, size: 20),
+                    const SizedBox(width: MfSpace.xs),
+                    Expanded(child: Text(f, style: text.bodyMedium)),
+                  ],
+                ),
+              )),
+          const SizedBox(height: MfSpace.sm),
+          isCurrent
+              ? const MfSecondaryButton(
+                  label: 'Current plan',
+                  icon: Icons.check_rounded,
+                  large: true,
+                  onPressed: null,
+                )
+              : MfPrimaryButton(
+                  label: 'Select $title',
+                  loading: isLoading,
+                  onPressed: isLoading ? null : () => _handleUpgrade(planId),
+                ),
         ],
       ),
     );

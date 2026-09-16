@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import '../../data/repositories/emergency_repository_impl.dart';
 import '../../domain/repositories/emergency_repository.dart';
-import '../../services/notification/push_notification_service.dart';
+import '../../services/notification/medifind_push_service.dart';
 import 'auth_provider.dart';
 import 'accessibility_provider.dart';
 import '../../services/socket/socket_service.dart';
@@ -41,6 +41,7 @@ final createEmergencyProvider = FutureProvider.autoDispose.family<CreateEmergenc
     params.latitude,
     params.longitude,
     params.additionalInfo,
+    isMocked: params.isMocked,
   );
 });
 
@@ -219,11 +220,15 @@ class CreateEmergencyParams {
   final double longitude;
   final String? additionalInfo;
 
+  /// Device reported a mock GPS provider for this fix (server refuses these in production).
+  final bool isMocked;
+
   CreateEmergencyParams({
     required this.emergencyType,
     required this.latitude,
     required this.longitude,
     this.additionalInfo,
+    this.isMocked = false,
   });
 }
 
@@ -299,10 +304,10 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
               ref.invalidate(responderAlertsProvider);
-              PushNotificationService.showEmergencyAlert(payload);
+              MedifindPushService.showEmergencyAlert(payload);
             } catch (e) {
               debugPrint('Socket: could not pre-fetch emergency $emergencyId: $e');
-              PushNotificationService.showEmergencyAlert(payload);
+              MedifindPushService.showEmergencyAlert(payload);
             }
           }
         }
@@ -338,11 +343,11 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
               await repo.getEmergency(emergencyId.toString());
               ref.invalidate(getActiveEmergenciesProvider);
               ref.invalidate(responderAlertsProvider);
-              PushNotificationService.showEmergencyAlert(payload);
+              MedifindPushService.showEmergencyAlert(payload);
             } catch (e) {
               debugPrint('Socket: could not pre-fetch emergency $emergencyId: $e');
               // Still alert the responder — caching must never block the alert.
-              PushNotificationService.showEmergencyAlert(payload);
+              MedifindPushService.showEmergencyAlert(payload);
             }
           }
         }
@@ -366,7 +371,7 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
             }
           }
 
-          PushNotificationService.dismissCurrentEmergencyModal();
+          MedifindPushService.dismissCurrentEmergencyModal();
           ref.invalidate(getActiveEmergenciesProvider);
           ref.invalidate(watchActiveEmergenciesProvider);
           ref.invalidate(responderAlertsProvider);
@@ -377,7 +382,7 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
         // notifications, which carry a status) opens the caregiver dialog.
         else if (eventType == 'PATIENT_EMERGENCY' && user.role == 'CAREGIVER' && payload['status'] == null) {
           debugPrint('🚨 Caregiver SOS Notification Received!');
-          PushNotificationService.showEmergencyAlert({
+          MedifindPushService.showEmergencyAlert({
             ...payload,
             'isCaregiverAlert': true,
           });
@@ -435,8 +440,9 @@ final socketNotificationHandlerProvider = Provider<void>((ref) {
                     'FINDING ANOTHER RESPONDER: ${data['message']}';
               }
             } else if (user.role == 'PATIENT') {
-              // Voice feedback for normal patients
-              if (newStatus == 'ASSIGNED' || newStatus == 'RESPONDER_ASSIGNED') {
+              // Voice feedback for normal patients — only when Voice Guidance is on.
+              final voiceOn = ref.read(accessibilityProvider).voiceGuidanceEnabled;
+              if (voiceOn && (newStatus == 'ASSIGNED' || newStatus == 'RESPONDER_ASSIGNED')) {
                 VoiceAlertService().speakMessage("Help is on the way. ${data['responderName'] ?? 'A responder'} has accepted your request.");
               }
             }

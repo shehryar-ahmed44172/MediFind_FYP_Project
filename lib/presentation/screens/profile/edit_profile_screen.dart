@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 import '../../../domain/entities/user.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -17,7 +17,7 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
-  
+
   // Standard Fields
   late TextEditingController _nameController;
   late TextEditingController _phoneController;
@@ -25,13 +25,13 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   late TextEditingController _cnicController;
   late TextEditingController _dobController;
   DateTime? _selectedDob;
-  
+
   // Responder Fields
   late TextEditingController _organizationController;
   late TextEditingController _licenseController;
   late TextEditingController _responderTypeController;
   late TextEditingController _vehicleTypeController;
-  
+
   final _phoneFormatter = MaskTextInputFormatter(
     mask: '+92-###-#######',
     filter: {"#": RegExp(r'[0-9]')},
@@ -46,18 +46,18 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void initState() {
     super.initState();
     final user = ref.read(currentUserProvider).value;
-    
+
     _nameController = TextEditingController(text: user?.fullName ?? '');
     _phoneController = TextEditingController(text: user?.phoneNumber ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _cnicController = TextEditingController(text: user?.cnic ?? 'N/A');
     _selectedDob = user?.dateOfBirth;
     _dobController = TextEditingController(
-      text: _selectedDob != null 
-        ? "${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}" 
-        : ''
+      text: _selectedDob != null
+          ? "${_selectedDob!.day}/${_selectedDob!.month}/${_selectedDob!.year}"
+          : '',
     );
-    
+
     _organizationController = TextEditingController(text: user?.organization ?? '');
     _licenseController = TextEditingController(text: user?.licenseNumber ?? '');
     _responderTypeController = TextEditingController(text: user?.responderType ?? '');
@@ -78,9 +78,28 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     super.dispose();
   }
 
+  void _toggleEditing() {
+    setState(() {
+      if (_isEditing) {
+        // Reset fields if canceling
+        _isEditing = false;
+        _selectedImage = null;
+        // Re-init controllers
+        final u = ref.read(currentUserProvider).value;
+        _nameController.text = u?.fullName ?? '';
+        _phoneController.text = u?.phoneNumber ?? '';
+        _organizationController.text = u?.organization ?? '';
+        _responderTypeController.text = u?.responderType ?? '';
+        _vehicleTypeController.text = u?.vehicleType ?? '';
+      } else {
+        _isEditing = true;
+      }
+    });
+  }
+
   Future<void> _selectDate() async {
     if (!_isEditing) return;
-    
+
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedDob ?? DateTime.now().subtract(const Duration(days: 365 * 18)),
@@ -97,10 +116,10 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   Future<void> _pickImage() async {
     if (!_isEditing) return;
-    
+
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 70);
-    
+
     if (pickedFile != null) {
       setState(() => _selectedImage = File(pickedFile.path));
     }
@@ -132,15 +151,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
 
       await ref.read(updateProfileProvider(updateData).future);
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Profile updated successfully!'),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Profile updated successfully', tone: MfTone.success);
         setState(() {
           _isEditing = false;
           _isLoading = false;
@@ -148,13 +161,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to update: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Failed to update: $e', tone: MfTone.danger);
         setState(() => _isLoading = false);
       }
     }
@@ -162,223 +169,175 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final user = ref.watch(currentUserProvider).value;
     final bool isResponder = user?.role == 'RESPONDER';
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Personal Details'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(_isEditing ? Icons.close_rounded : Icons.edit_note_rounded),
-            onPressed: () => setState(() {
-              if (_isEditing) {
-                // Reset fields if canceling
-                _isEditing = false;
-                _selectedImage = null;
-                // Re-init controllers
-                final u = ref.read(currentUserProvider).value;
-                _nameController.text = u?.fullName ?? '';
-                _phoneController.text = u?.phoneNumber ?? '';
-                _organizationController.text = u?.organization ?? '';
-                _responderTypeController.text = u?.responderType ?? '';
-                _vehicleTypeController.text = u?.vehicleType ?? '';
-              } else {
-                _isEditing = true;
-              }
-            }),
-            tooltip: _isEditing ? 'Cancel' : 'Edit Profile',
-          ),
-        ],
-      ),
-      body: _isLoading 
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                children: [
-                  // Profile Picture Section
-                  _buildProfileImage(user),
-                  const SizedBox(height: 32),
-
-                  // Basic Info Section
-                  _buildSectionHeader('Account Information'),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    label: 'Full Name',
-                    controller: _nameController,
-                    icon: Icons.person_outline,
-                    readOnly: !_isEditing,
-                    validator: (val) => val == null || val.isEmpty ? 'Name is required' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    label: 'Phone Number',
-                    controller: _phoneController,
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    readOnly: !_isEditing,
-                    inputFormatters: [_phoneFormatter],
-                    validator: (val) => val == null || val.isEmpty ? 'Phone is required' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    label: 'Email Address',
-                    controller: _emailController,
-                    icon: Icons.email_outlined,
-                    readOnly: true, // Always immutable
-                    subtitle: 'Email cannot be changed',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    label: 'CNIC / Identity Number',
-                    controller: _cnicController,
-                    icon: Icons.badge_outlined,
-                    readOnly: true, // Always immutable
-                    subtitle: 'Identity verified during registration',
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    label: 'Date of Birth',
-                    controller: _dobController,
-                    icon: Icons.calendar_today_rounded,
-                    readOnly: true,
-                    onTap: _isEditing ? _selectDate : null,
-                  ),
-                  
-                  // Responder Professional Section
-                  if (isResponder) ...[
-                    const SizedBox(height: 32),
-                    _buildSectionHeader('Professional Profile'),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      label: 'Organization',
-                      controller: _organizationController,
-                      icon: Icons.business_rounded,
-                      readOnly: !_isEditing,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      label: 'License Number',
-                      controller: _licenseController,
-                      icon: Icons.verified_user_outlined,
-                      readOnly: true, // Immutable
-                      subtitle: 'Government issued license',
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      label: 'Responder Type',
-                      controller: _responderTypeController,
-                      icon: Icons.medical_information_outlined,
-                      readOnly: !_isEditing,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildTextField(
-                      label: 'Vehicle Type',
-                      controller: _vehicleTypeController,
-                      icon: Icons.emergency_rounded,
-                      readOnly: !_isEditing,
-                    ),
-                  ],
-
-                  const SizedBox(height: 48),
-
-                  if (_isEditing)
-                    SizedBox(
-                      width: double.infinity,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: AppShadows.sosMassiveGlow,
-                        ),
-                        child: ElevatedButton(
-                          onPressed: _handleUpdate,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 18),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
-                          ),
-                          child: const Text('Save Changes', 
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1)),
-                        ),
-                      ),
-                    ),
-                  const SizedBox(height: 40),
-                ],
-              ),
+    return MfScaffold(
+      title: 'Personal details',
+      subtitle: _isEditing ? 'Editing' : null,
+      actions: [
+        MfIconButton(
+          icon: _isEditing ? Icons.close_rounded : Icons.edit_outlined,
+          tooltip: _isEditing ? 'Cancel editing' : 'Edit profile',
+          onPressed: _isLoading ? null : _toggleEditing,
+        ),
+      ],
+      bottomBar: _isEditing
+          ? MfPrimaryButton(
+              label: 'Save changes',
+              icon: Icons.check_rounded,
+              loading: _isLoading,
+              onPressed: _handleUpdate,
+            )
+          : MfSecondaryButton(
+              label: 'Edit details',
+              icon: Icons.edit_outlined,
+              large: true,
+              onPressed: _toggleEditing,
             ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildProfileImage(user),
+              const SizedBox(height: MfSpace.lg),
+
+              // Basic Info Section
+              const MfSectionTitle('Account information'),
+              const SizedBox(height: MfSpace.xs),
+              _buildTextField(
+                label: 'Full name',
+                controller: _nameController,
+                icon: Icons.person_outline_rounded,
+                readOnly: !_isEditing,
+                textInputAction: TextInputAction.next,
+                validator: (val) => val == null || val.isEmpty ? 'Name is required' : null,
+              ),
+              const SizedBox(height: MfSpace.md),
+              _buildTextField(
+                label: 'Phone number',
+                controller: _phoneController,
+                icon: Icons.phone_outlined,
+                keyboardType: TextInputType.phone,
+                readOnly: !_isEditing,
+                inputFormatters: [_phoneFormatter],
+                validator: (val) => val == null || val.isEmpty ? 'Phone is required' : null,
+              ),
+              const SizedBox(height: MfSpace.md),
+              _buildTextField(
+                label: 'Email address',
+                controller: _emailController,
+                icon: Icons.email_outlined,
+                readOnly: true, // Always immutable
+                locked: true,
+                helper: 'Email cannot be changed',
+              ),
+              const SizedBox(height: MfSpace.md),
+              _buildTextField(
+                label: 'CNIC / identity number',
+                controller: _cnicController,
+                icon: Icons.badge_outlined,
+                readOnly: true, // Always immutable
+                locked: true,
+                helper: 'Identity verified during registration',
+              ),
+              const SizedBox(height: MfSpace.md),
+              _buildTextField(
+                label: 'Date of birth',
+                controller: _dobController,
+                icon: Icons.calendar_today_outlined,
+                readOnly: true,
+                helper: _isEditing ? 'Tap to choose a date' : null,
+                onTap: _isEditing ? _selectDate : null,
+              ),
+
+              // Responder Professional Section
+              if (isResponder) ...[
+                const SizedBox(height: MfSpace.lg),
+                const MfSectionTitle('Professional profile'),
+                const SizedBox(height: MfSpace.xs),
+                _buildTextField(
+                  label: 'Organization',
+                  controller: _organizationController,
+                  icon: Icons.business_outlined,
+                  readOnly: !_isEditing,
+                ),
+                const SizedBox(height: MfSpace.md),
+                _buildTextField(
+                  label: 'License number',
+                  controller: _licenseController,
+                  icon: Icons.verified_user_outlined,
+                  readOnly: true, // Immutable
+                  locked: true,
+                  helper: 'Government issued license',
+                ),
+                const SizedBox(height: MfSpace.md),
+                _buildTextField(
+                  label: 'Responder type',
+                  controller: _responderTypeController,
+                  icon: Icons.medical_information_outlined,
+                  readOnly: !_isEditing,
+                ),
+                const SizedBox(height: MfSpace.md),
+                _buildTextField(
+                  label: 'Vehicle type',
+                  controller: _vehicleTypeController,
+                  icon: Icons.two_wheeler_rounded,
+                  readOnly: !_isEditing,
+                ),
+              ],
+            ],
           ),
+        ),
+      ),
     );
   }
 
   Widget _buildProfileImage(User? user) {
-    return Center(
-      child: Stack(
-        alignment: Alignment.bottomRight,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.primary.withOpacity(0.2), width: 2),
-            ),
-            child: CircleAvatar(
-              radius: 60,
-              backgroundColor: Colors.grey.shade200,
-              backgroundImage: _selectedImage != null 
-                ? FileImage(_selectedImage!) as ImageProvider
-                : (user?.profileImageUrl != null ? NetworkImage(user!.profileImageUrl!) : null),
-              child: (_selectedImage == null && user?.profileImageUrl == null)
-                ? const Icon(Icons.person, size: 60, color: Colors.grey)
-                : null,
-            ),
+    const size = 104.0;
+    return Column(
+      children: [
+        SizedBox(
+          width: size,
+          height: size,
+          child: _selectedImage != null
+              ? Semantics(
+                  image: true,
+                  label: 'Selected profile photo',
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                    ),
+                    child: ClipOval(
+                      child: Image.file(_selectedImage!, width: size, height: size, fit: BoxFit.cover),
+                    ),
+                  ),
+                )
+              : MfAvatar(imageUrl: user?.profileImageUrl, name: user?.fullName, size: size),
+        ),
+        if (_isEditing) ...[
+          const SizedBox(height: MfSpace.sm),
+          MfSecondaryButton(
+            label: _selectedImage == null ? 'Change photo' : 'Choose another photo',
+            icon: Icons.photo_camera_outlined,
+            expanded: false,
+            onPressed: _isLoading ? null : _pickImage,
           ),
-          if (_isEditing)
-            GestureDetector(
-              onTap: _pickImage,
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                  boxShadow: AppShadows.neumorphicOut,
-                ),
-                child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 20),
+          if (_selectedImage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: MfSpace.xxs),
+              child: Text(
+                'New photo will be uploaded when you save',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
               ),
             ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildSectionHeader(String title) {
-    return Row(
-      children: [
-        Container(
-          width: 4,
-          height: 18,
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-            color: AppColors.primary,
-            letterSpacing: 1.2,
-          ),
-        ),
       ],
     );
   }
@@ -388,51 +347,41 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     required TextEditingController controller,
     required IconData icon,
     bool readOnly = false,
+    bool locked = false,
     TextInputType keyboardType = TextInputType.text,
-    String? subtitle,
+    TextInputAction? textInputAction,
+    String? helper,
     VoidCallback? onTap,
     List<TextInputFormatter>? inputFormatters,
     String? Function(String?)? validator,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-        ),
-        Container(
-          decoration: BoxDecoration(
-            color: readOnly ? Colors.grey.shade50 : Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: readOnly ? [] : AppShadows.neumorphicIn,
-            border: Border.all(color: readOnly ? Colors.grey.shade200 : Colors.transparent),
+    final cs = Theme.of(context).colorScheme;
+    final muted = readOnly && onTap == null;
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      textInputAction: textInputAction,
+      validator: validator,
+      readOnly: readOnly,
+      onTap: onTap,
+      inputFormatters: inputFormatters,
+      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+            color: muted ? cs.onSurfaceVariant : cs.onSurface,
           ),
-          child: TextFormField(
-            controller: controller,
-            keyboardType: keyboardType,
-            validator: validator,
-            readOnly: readOnly,
-            onTap: onTap,
-            inputFormatters: inputFormatters,
-            style: TextStyle(
-              color: readOnly ? Colors.grey.shade600 : Colors.black87,
-              fontWeight: readOnly ? FontWeight.w500 : FontWeight.bold,
-              fontSize: 15,
-            ),
-            decoration: InputDecoration(
-              prefixIcon: Icon(icon, color: readOnly ? Colors.grey.shade400 : AppColors.primary, size: 20),
-              border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            ),
-          ),
-        ),
-        if (subtitle != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 4, top: 6),
-            child: Text(subtitle, style: TextStyle(fontSize: 10, color: Colors.grey.shade400, fontStyle: FontStyle.italic)),
-          ),
-      ],
+      decoration: InputDecoration(
+        labelText: label,
+        helperText: helper,
+        helperMaxLines: 2,
+        prefixIcon: Icon(icon, color: muted ? cs.onSurfaceVariant : cs.primary),
+        suffixIcon: locked
+            ? Tooltip(
+                message: 'Cannot be changed',
+                child: Icon(Icons.lock_outline_rounded, size: 20, color: cs.onSurfaceVariant),
+              )
+            : null,
+        filled: muted ? true : null,
+        fillColor: muted ? cs.surfaceContainerHighest.withValues(alpha: 0.5) : null,
+      ),
     );
   }
 }

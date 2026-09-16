@@ -1,35 +1,36 @@
 import 'package:flutter/material.dart';
-import '../../../theme/app_theme.dart';
+import '../../../widgets/design_system/design_system.dart';
 
+/// Full-width offline notice shown at the top of a dashboard.
 class ConnectivityBanner extends StatelessWidget {
   const ConnectivityBanner({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
-      decoration: BoxDecoration(
-        color: AppColors.error,
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.error.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: const Row(
-        children: [
-          Icon(Icons.signal_wifi_off, color: Colors.white, size: 16),
-          SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'No internet connection — SOS will fall back to SMS/Call.',
-              style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+    final t = MfColors.tone(context, MfTone.warning);
+    final cs = Theme.of(context).colorScheme;
+    return Semantics(
+      liveRegion: true,
+      container: true,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.xs),
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(t.container, cs.surface),
+          border: Border(bottom: BorderSide(color: t.border)),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.wifi_off_rounded, color: t.foreground, size: 20),
+            const SizedBox(width: MfSpace.xs),
+            Expanded(
+              child: Text(
+                'No internet connection. SOS will fall back to SMS or a phone call.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurface, fontWeight: FontWeight.w500),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

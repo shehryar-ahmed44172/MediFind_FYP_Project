@@ -176,12 +176,6 @@ final logoutProvider = FutureProvider.autoDispose<void>((ref) async {
   ref.invalidate(responderLocationTrackerProvider);
 });
 
-// Update FCM Token provider
-final updateFcmTokenProvider = FutureProvider.family<void, String>((ref, token) async {
-  final authRepo = await ref.watch(authRepositoryProvider.future);
-  await authRepo.updateFcmToken(token);
-});
-
 // Current user ID provider (for convenience across screens)
 final currentUserIdProvider = FutureProvider<String?>((ref) async {
   final localDs = await ref.watch(localDataSourceProvider.future);

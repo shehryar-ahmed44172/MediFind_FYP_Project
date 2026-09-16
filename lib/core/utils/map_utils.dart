@@ -109,75 +109,90 @@ class MapUtils {
   // Red pulsing pin with "SOS" label. Looks nothing like the default cyan pin.
   static Future<BitmapDescriptor> getPatientMarker() async {
     if (_cachedPatientMarker != null) return _cachedPatientMarker!;
-    const double w = 80.0;
-    const double h = 96.0; // taller than wide — pin shape
+    const double w = 104.0;
+    const double h = 124.0;
     const double cx = w / 2;
-    const double pinR = 32.0;
-    const double pinCy = pinR + 4;
+    const double headR = 34.0; // pin head radius
+    const double cy = headR + 14;
+    const navy = Color(0xFF0C637E);
+    const deep = Color(0xFF04364E);
+    const sos = Color(0xFFDC2626);
 
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w, h));
 
-    // ── 1. Drop shadow ───────────────────────────────────────────────────────
-    final shadowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.30)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
-    canvas.drawCircle(Offset(cx, pinCy + 4), pinR - 2, shadowPaint);
+    // Soft SOS halo so the patient stands out without looking like an alert icon
+    canvas.drawCircle(
+      const Offset(cx, cy),
+      headR + 10,
+      Paint()..color = sos.withValues(alpha: 0.16),
+    );
 
-    // ── 2. Glow ──────────────────────────────────────────────────────────────
-    final glowPaint = Paint()
-      ..color = Colors.red.withOpacity(0.20)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    canvas.drawCircle(Offset(cx, pinCy), pinR + 4, glowPaint);
+    // Shadow
+    canvas.drawCircle(
+      const Offset(cx, cy + 3),
+      headR,
+      Paint()
+        ..color = Colors.black.withValues(alpha: 0.22)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
+    );
 
-    // ── 3. Outer ring ────────────────────────────────────────────────────────
-    final outerPaint = Paint()
-      ..color = Colors.red.shade300
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(cx, pinCy), pinR, outerPaint);
+    // Pin body (teardrop): white fill, navy outline
+    final pin = Path()
+      ..addOval(Rect.fromCircle(center: const Offset(cx, cy), radius: headR))
+      ..moveTo(cx - 14, cy + headR - 6)
+      ..quadraticBezierTo(cx, h - 2, cx, h - 2)
+      ..quadraticBezierTo(cx, h - 2, cx + 14, cy + headR - 6)
+      ..close();
+    canvas.drawPath(pin, Paint()..color = Colors.white);
+    canvas.drawPath(
+      pin,
+      Paint()
+        ..color = navy
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4,
+    );
 
-    // ── 4. Main red circle ───────────────────────────────────────────────────
-    final mainPaint = Paint()
-      ..color = Colors.red.shade600
-      ..style = PaintingStyle.fill;
-    canvas.drawCircle(Offset(cx, pinCy), pinR - 4, mainPaint);
+    // Person glyph
+    final person = Paint()..color = deep;
+    canvas.drawCircle(const Offset(cx, cy - 9), 10, person);
+    final shoulders = Path()
+      ..moveTo(cx - 18, cy + 20)
+      ..quadraticBezierTo(cx - 18, cy + 3, cx, cy + 3)
+      ..quadraticBezierTo(cx + 18, cy + 3, cx + 18, cy + 20)
+      ..close();
+    canvas.drawPath(shoulders, person);
 
-    // ── 5. "SOS" text ────────────────────────────────────────────────────────
-    final textPainter = TextPainter(
+    // "SOS" badge, top-right
+    const badge = Rect.fromLTWH(w - 44, 2, 42, 22);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(badge, const Radius.circular(11)),
+      Paint()..color = sos,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(badge, const Radius.circular(11)),
+      Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2,
+    );
+    final label = TextPainter(
       text: const TextSpan(
         text: 'SOS',
-        style: TextStyle(
-          color: Colors.white,
-          fontSize: 16,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-        ),
+        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 0.5),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
+    label.paint(canvas, Offset(badge.center.dx - label.width / 2, badge.center.dy - label.height / 2));
 
-    textPainter.paint(
-      canvas,
-      Offset(cx - textPainter.width / 2, pinCy - textPainter.height / 2),
-    );
-
-    // ── 6. Pin tail ──────────────────────────────────────────────────────────
-    final tailPaint = Paint()
-      ..color = Colors.red.shade700
-      ..style = PaintingStyle.fill;
-
-    final tailPath = Path()
-      ..moveTo(cx - 8, pinCy + pinR - 8)
-      ..lineTo(cx + 8, pinCy + pinR - 8)
-      ..lineTo(cx, h - 4)
-      ..close();
-    canvas.drawPath(tailPath, tailPaint);
-
-    // ── Render ───────────────────────────────────────────────────────────────
     final picture = recorder.endRecording();
     final image = await picture.toImage(w.toInt(), h.toInt());
     final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-    _cachedPatientMarker = BitmapDescriptor.fromBytes(byteData!.buffer.asUint8List());
+    _cachedPatientMarker = BitmapDescriptor.bytes(
+      byteData!.buffer.asUint8List(),
+      width: 52,
+      height: 62,
+    );
     return _cachedPatientMarker!;
   }
 

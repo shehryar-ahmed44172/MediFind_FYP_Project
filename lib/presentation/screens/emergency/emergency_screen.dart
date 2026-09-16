@@ -9,7 +9,7 @@ import '../../../core/utils/exceptions.dart';
 import '../../providers/connectivity_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({super.key});
@@ -24,18 +24,19 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   final _symptomsController = TextEditingController();
   bool _isFetchingLocation = false;
   bool _isClassifying = false;
+  bool _showTextClassifier = false;
   final FocusNode _otherFocusNode = FocusNode();
 
   // Values match the backend's specialist routing (SPECIALIST_MAP) + FALL/OTHER.
   static const List<Map<String, dynamic>> _emergencyTypes = [
-    {'value': EmergencyTypes.cardiac, 'label': 'Cardiac / Chest Pain', 'icon': Icons.favorite_rounded},
-    {'value': EmergencyTypes.breathing, 'label': 'Breathing', 'icon': Icons.air_rounded},
-    {'value': EmergencyTypes.stroke, 'label': 'Stroke', 'icon': Icons.psychology_outlined},
-    {'value': EmergencyTypes.trauma, 'label': 'Injury / Trauma', 'icon': Icons.personal_injury_outlined},
-    {'value': EmergencyTypes.fall, 'label': 'Fall', 'icon': Icons.accessibility_new_outlined},
-    {'value': EmergencyTypes.seizure, 'label': 'Seizure', 'icon': Icons.bolt_rounded},
-    {'value': EmergencyTypes.diabetic, 'label': 'Diabetic', 'icon': Icons.bloodtype_outlined},
-    {'value': EmergencyTypes.other, 'label': 'Other', 'icon': Icons.emergency_outlined},
+    {'value': EmergencyTypes.cardiac, 'icon': Icons.favorite_outline_rounded},
+    {'value': EmergencyTypes.stroke, 'icon': Icons.psychology_outlined},
+    {'value': EmergencyTypes.breathing, 'icon': Icons.air_rounded},
+    {'value': EmergencyTypes.trauma, 'icon': Icons.personal_injury_outlined},
+    {'value': EmergencyTypes.fall, 'icon': Icons.accessibility_new_rounded},
+    {'value': EmergencyTypes.seizure, 'icon': Icons.bolt_rounded},
+    {'value': EmergencyTypes.diabetic, 'icon': Icons.bloodtype_outlined},
+    {'value': EmergencyTypes.other, 'icon': Icons.medical_services_outlined},
   ];
 
   @override
@@ -66,25 +67,16 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           }
         });
         HapticFeedback.mediumImpact();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(children: [
-              const Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 16),
-              const SizedBox(width: 8),
-              Expanded(child: Text('AI suggested: ${_emergencyTypes.firstWhere((e) => e['value'] == mapped, orElse: () => {'label': mapped})['label']}')),
-            ]),
-            backgroundColor: AppColors.primary,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            duration: const Duration(seconds: 3),
-          ),
+        showMfSnackBar(
+          context,
+          'AI suggested: ${EmergencyTypes.label(mapped)}',
+          tone: MfTone.success,
+          duration: const Duration(seconds: 3),
         );
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('AI classification unavailable — please select manually.'), behavior: SnackBarBehavior.floating),
-        );
+        showMfSnackBar(context, 'AI classification unavailable. Please select the type manually.', tone: MfTone.warning);
       }
     } finally {
       if (mounted) setState(() => _isClassifying = false);
@@ -126,6 +118,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           'emergencyType': _selectedEmergencyType,
           'latitude': position.latitude,
           'longitude': position.longitude,
+          'isMocked': position.isMocked,
           'additionalInfo': _additionalInfoController.text.trim().isNotEmpty
               ? _additionalInfoController.text.trim()
               : null,
@@ -144,20 +137,21 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     }
   }
 
+  ButtonStyle _dangerFilled(BuildContext ctx) {
+    final cs = Theme.of(ctx).colorScheme;
+    return FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError);
+  }
+
   void _showOfflineFallbackDialog() {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.signal_wifi_off, color: AppColors.error),
-            const SizedBox(width: 8),
-            const Text('No Internet Connection'),
-          ],
-        ),
+        icon: Icon(Icons.wifi_off_rounded, color: Theme.of(ctx).colorScheme.error, size: 28),
+        title: const Text('No internet connection'),
         content: const Text(
           'You are offline. To get emergency help, you can call or SMS the emergency number.',
         ),
+        actionsOverflowButtonSpacing: MfSpace.xs,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -171,10 +165,10 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
               _launchEmergencyUri('sms:1122');
             },
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            icon: const Icon(Icons.phone, color: Colors.white),
-            label: const Text('Call 1122', style: TextStyle(color: Colors.white)),
+          FilledButton.icon(
+            style: _dangerFilled(ctx),
+            icon: const Icon(Icons.phone_rounded),
+            label: const Text('Call 1122'),
             onPressed: () {
               Navigator.pop(ctx);
               _launchEmergencyUri('tel:1122');
@@ -191,9 +185,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
       if (!ok) throw Exception('launch failed');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open the dialer. Please dial 1122 manually.')),
-        );
+        showMfSnackBar(context, 'Could not open the dialer. Please dial 1122 manually.', tone: MfTone.danger);
       }
     }
   }
@@ -204,18 +196,15 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.location_off_rounded, color: AppColors.error),
-            const SizedBox(width: 8),
-            const Expanded(child: Text('Location unavailable')),
-          ],
+        icon: Icon(Icons.location_off_outlined, color: Theme.of(ctx).colorScheme.error, size: 28),
+        title: const Text('Location unavailable'),
+        content: SingleChildScrollView(
+          child: Text(
+            '${e.message}\n\nAn SOS can only be sent with your real location. '
+            'If this is urgent, call 1122 now.',
+          ),
         ),
-        content: Text(
-          '${e.message}\n\nAn SOS can only be sent with your real location. '
-          'If this is urgent, call 1122 now.',
-        ),
-        actionsOverflowButtonSpacing: 8,
+        actionsOverflowButtonSpacing: MfSpace.xs,
         actions: [
           TextButton(
             onPressed: () async {
@@ -235,9 +224,9 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
             },
             child: const Text('Try again'),
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            icon: const Icon(Icons.phone),
+          FilledButton.icon(
+            style: _dangerFilled(ctx),
+            icon: const Icon(Icons.phone_rounded),
             label: const Text('Call 1122'),
             onPressed: () {
               Navigator.pop(ctx);
@@ -253,28 +242,24 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.location_off, color: AppColors.warning),
-            const SizedBox(width: 8),
-            const Text('GPS Disabled'),
-          ],
-        ),
+        icon: Icon(Icons.location_off_outlined, color: MfColors.tone(ctx, MfTone.warning).foreground, size: 28),
+        title: const Text('GPS is turned off'),
         content: const Text(
           'Location services are off. Turn on GPS so responders can find you, '
           'or call 1122 if this is urgent.',
         ),
+        actionsOverflowButtonSpacing: MfSpace.xs,
         actions: [
           TextButton(
             onPressed: () async {
               Navigator.pop(ctx);
               await LocationService().openLocationSettings();
             },
-            child: const Text('Open Settings'),
+            child: const Text('Open settings'),
           ),
-          ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            icon: const Icon(Icons.phone),
+          FilledButton.icon(
+            style: _dangerFilled(ctx),
+            icon: const Icon(Icons.phone_rounded),
             label: const Text('Call 1122'),
             onPressed: () {
               Navigator.pop(ctx);
@@ -286,13 +271,21 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     );
   }
 
+  void _selectType(String value) {
+    HapticFeedback.lightImpact();
+    setState(() => _selectedEmergencyType = value);
+    if (value == EmergencyTypes.other) _otherFocusNode.requestFocus();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
     final isConnected = ref.watch(isConnectedProvider);
     final user = ref.watch(currentUserProvider).valueOrNull;
     final settings = ref.watch(accessibilityProvider);
     final isDeafPatient = (user?.patientType?.toUpperCase() == 'DEAF') || settings.textOnlyMode;
+    final isOther = _selectedEmergencyType == EmergencyTypes.other;
 
     return PopScope(
       canPop: false,
@@ -300,385 +293,232 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
         if (didPop) return;
         context.go('/home');
       },
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new_rounded, color: theme.colorScheme.onSurface),
-            tooltip: 'Back',
-            onPressed: () => context.go('/home'),
-          ),
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Emergency Alert',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                  color: theme.colorScheme.onSurface,
-                ),
-              ),
-              Text(
-                'Select type and confirm',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: theme.colorScheme.onSurface.withOpacity(0.45),
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          titleSpacing: 0,
+      child: MfScaffold(
+        title: 'Emergency alert',
+        subtitle: 'Choose what is happening',
+        onBack: () => context.go('/home'),
+        bottomBar: MfPrimaryButton(
+          label: _isFetchingLocation ? 'Detecting location…' : 'Send SOS',
+          icon: Icons.sos_rounded,
+          tone: MfTone.danger,
+          loading: _isFetchingLocation,
+          semanticLabel: _isFetchingLocation ? 'Detecting your location' : 'Send SOS emergency alert',
+          onPressed: _isFetchingLocation ? null : _triggerSOS,
         ),
-        body: SafeArea(
-          child: Column(
-            children: [
-              // ── Offline banner ─────────────────────────────────────────
-              if (!isConnected)
-                Container(
-                  margin: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.warning.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.signal_wifi_off, color: AppColors.warning, size: 18),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Offline — the alert button will offer Call / SMS 1122.',
-                          style: TextStyle(fontSize: 12, color: AppColors.warning, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // ── Scrollable content ──────────────────────────────────────
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // ── Deaf patient: AI symptom classifier ────────────────
-                      if (isDeafPatient) ...[
-                        Container(
-                          padding: const EdgeInsets.all(14),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.07),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.primary.withOpacity(0.25)),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 16),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'AI Symptom Classifier',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.primary,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 8),
-                              TextFormField(
-                                controller: _symptomsController,
-                                maxLines: 2,
-                                style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurface),
-                                decoration: InputDecoration(
-                                  hintText: 'Type what you feel (e.g. chest pain, difficulty breathing)...',
-                                  hintStyle: TextStyle(fontSize: 12, color: theme.colorScheme.onSurface.withOpacity(0.4)),
-                                  filled: true,
-                                  fillColor: theme.colorScheme.surface,
-                                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton.icon(
-                                  onPressed: _isClassifying ? null : _classifySymptoms,
-                                  icon: _isClassifying
-                                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                      : const Icon(Icons.auto_awesome_rounded, size: 16),
-                                  label: Text(_isClassifying ? 'Classifying...' : 'AI Suggest Emergency Type'),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: AppColors.primary,
-                                    foregroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(vertical: 10),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                    textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // Section label
-                      Text(
-                        'What is happening?',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: theme.colorScheme.onSurface.withOpacity(0.55),
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Emergency type grid
-                      GridView.count(
-                        crossAxisCount: 3,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisSpacing: 12,
-                        mainAxisSpacing: 12,
-                        childAspectRatio: 0.9,
-                        children: _emergencyTypes.map((type) {
-                          final isSelected = _selectedEmergencyType == type['value'];
-                          return Semantics(
-                            button: true,
-                            selected: isSelected,
-                            label: type['label'] as String,
-                            child: GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              setState(() => _selectedEmergencyType = type['value'] as String);
-                              if (type['value'] == EmergencyTypes.other) _otherFocusNode.requestFocus();
-                            },
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(18),
-                                color: isSelected
-                                    ? const Color(0xFFD32F2F)
-                                    : theme.colorScheme.surfaceContainer,
-                                border: Border.all(
-                                  color: isSelected
-                                      ? const Color(0xFFD32F2F)
-                                      : theme.colorScheme.outline.withOpacity(0.15),
-                                  width: isSelected ? 2 : 1,
-                                ),
-                                boxShadow: isSelected
-                                    ? [
-                                        BoxShadow(
-                                          color: const Color(0xFFD32F2F).withOpacity(0.30),
-                                          blurRadius: 12,
-                                          offset: const Offset(0, 6),
-                                        )
-                                      ]
-                                    : [],
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: isSelected
-                                          ? Colors.white.withOpacity(0.2)
-                                          : const Color(0xFFD32F2F).withOpacity(0.09),
-                                    ),
-                                    child: Icon(
-                                      type['icon'] as IconData,
-                                      color: isSelected ? Colors.white : const Color(0xFFD32F2F),
-                                      size: 24,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                                    child: Text(
-                                      type['label'] as String,
-                                      textAlign: TextAlign.center,
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.bold,
-                                        color: isSelected ? Colors.white : theme.colorScheme.onSurface,
-                                        height: 1.3,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          );
-                        }).toList(),
-                      ),
-
-                      const SizedBox(height: 24),
-                      Text(
-                        'Additional details',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
-                          color: theme.colorScheme.onSurface.withOpacity(0.55),
-                          letterSpacing: 0.8,
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Notes field
-                      TextFormField(
-                        controller: _additionalInfoController,
-                        focusNode: _otherFocusNode,
-                        maxLines: _selectedEmergencyType == EmergencyTypes.other ? 4 : 3,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: theme.colorScheme.onSurface,
-                        ),
-                        decoration: InputDecoration(
-                          labelText: _selectedEmergencyType == EmergencyTypes.other
-                              ? 'Describe your emergency *'
-                              : 'Additional details (optional)',
-                          hintText: _selectedEmergencyType == EmergencyTypes.other
-                              ? 'e.g. unconscious, severe bleeding...'
-                              : 'e.g. exact floor, symptoms, landmarks...',
-                          alignLabelWithHint: true,
-                          filled: true,
-                          fillColor: _selectedEmergencyType == EmergencyTypes.other
-                              ? const Color(0xFFD32F2F).withOpacity(0.04)
-                              : theme.colorScheme.surfaceContainer,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: theme.colorScheme.outline.withOpacity(0.2),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide(
-                              color: _selectedEmergencyType == EmergencyTypes.other
-                                  ? const Color(0xFFD32F2F)
-                                  : theme.colorScheme.outline.withOpacity(0.2),
-                              width: _selectedEmergencyType == EmergencyTypes.other ? 2 : 1,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFD32F2F),
-                              width: 2,
-                            ),
-                          ),
-                          labelStyle: TextStyle(
-                            color: _selectedEmergencyType == EmergencyTypes.other
-                                ? const Color(0xFFD32F2F)
-                                : theme.colorScheme.onSurface.withOpacity(0.55),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                          ),
-                          hintStyle: TextStyle(
-                            color: theme.colorScheme.onSurface.withOpacity(0.35),
-                            fontSize: 13,
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                    ],
-                  ),
-                ),
+        body: ListView(
+          padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.lg),
+          children: [
+            if (!isConnected) ...[
+              const MfInfoBanner(
+                icon: Icons.wifi_off_rounded,
+                tone: MfTone.warning,
+                title: 'You are offline',
+                message: 'Send SOS will offer to call or SMS 1122 instead.',
               ),
-
-              // ── Sticky bottom action bar ────────────────────────────────
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                decoration: BoxDecoration(
-                  color: theme.scaffoldBackgroundColor,
-                  border: Border(
-                    top: BorderSide(
-                      color: theme.colorScheme.outline.withOpacity(0.12),
-                    ),
-                  ),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: ElevatedButton(
-                      onPressed: _isFetchingLocation ? null : _triggerSOS,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFD32F2F),
-                        disabledBackgroundColor: const Color(0xFFD32F2F).withOpacity(0.3),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: _isFetchingLocation
-                          ? const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2.5,
-                                  ),
-                                ),
-                                SizedBox(width: 12),
-                                Text(
-                                  'Detecting Location…',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 0.3,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.emergency_rounded, size: 22, color: Colors.white),
-                                SizedBox(width: 10),
-                                Text(
-                                  'SEND EMERGENCY ALERT',
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w900,
-                                    letterSpacing: 1.0,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
-                  ),
-                ),
-              ),
+              const SizedBox(height: MfSpace.md),
             ],
+
+            const MfSectionTitle('What is happening?', subtitle: 'Tap the closest match'),
+            const SizedBox(height: MfSpace.xs),
+            _buildTypeGrid(),
+
+            // Deaf / text-only patients: AI symptom classifier as a secondary option.
+            if (isDeafPatient) ...[
+              const SizedBox(height: MfSpace.md),
+              _buildTextClassifierCard(context),
+            ],
+
+            const SizedBox(height: MfSpace.lg),
+            const MfSectionTitle('Additional details'),
+            const SizedBox(height: MfSpace.xs),
+            TextFormField(
+              controller: _additionalInfoController,
+              focusNode: _otherFocusNode,
+              maxLines: isOther ? 4 : 3,
+              minLines: 2,
+              style: text.bodyLarge,
+              decoration: InputDecoration(
+                labelText: isOther ? 'Describe your emergency *' : 'Additional details (optional)',
+                hintText: isOther
+                    ? 'e.g. unconscious, severe bleeding'
+                    : 'e.g. exact floor, symptoms, landmarks',
+                alignLabelWithHint: true,
+                enabledBorder: isOther
+                    ? OutlineInputBorder(
+                        borderRadius: MfRadius.mdAll,
+                        borderSide: BorderSide(color: cs.error, width: 1.5),
+                      )
+                    : null,
+                labelStyle: isOther ? text.bodyLarge?.copyWith(color: cs.error) : null,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypeGrid() {
+    final rows = <Widget>[];
+    for (var i = 0; i < _emergencyTypes.length; i += 2) {
+      final left = _emergencyTypes[i];
+      final right = i + 1 < _emergencyTypes.length ? _emergencyTypes[i + 1] : null;
+      rows.add(
+        Padding(
+          padding: EdgeInsets.only(bottom: i + 2 < _emergencyTypes.length ? MfSpace.sm : 0),
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: _tileFor(left)),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(child: right == null ? const SizedBox.shrink() : _tileFor(right)),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Column(children: rows);
+  }
+
+  Widget _tileFor(Map<String, dynamic> type) {
+    final value = type['value'] as String;
+    return _EmergencyTypeTile(
+      icon: type['icon'] as IconData,
+      label: EmergencyTypes.label(value),
+      selected: _selectedEmergencyType == value,
+      onTap: () => _selectType(value),
+    );
+  }
+
+  Widget _buildTextClassifierCard(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    return MfCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          MfIconTile(
+            icon: Icons.keyboard_outlined,
+            label: 'Describe in text',
+            subtitle: 'Type your symptoms and AI suggests the emergency type',
+            showChevron: false,
+            trailing: Icon(
+              _showTextClassifier ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+              color: cs.onSurfaceVariant,
+            ),
+            onTap: () => setState(() => _showTextClassifier = !_showTextClassifier),
+          ),
+          if (_showTextClassifier)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextFormField(
+                    controller: _symptomsController,
+                    maxLines: 3,
+                    minLines: 2,
+                    style: text.bodyLarge,
+                    decoration: const InputDecoration(
+                      labelText: 'What do you feel?',
+                      hintText: 'e.g. chest pain, difficulty breathing',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: MfSpace.sm),
+                  MfSecondaryButton(
+                    label: _isClassifying ? 'Classifying…' : 'Suggest emergency type',
+                    icon: Icons.auto_awesome_outlined,
+                    loading: _isClassifying,
+                    onPressed: _isClassifying ? null : _classifySymptoms,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Selectable pictogram tile: icon + always-visible label, min 96dp tall.
+class _EmergencyTypeTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _EmergencyTypeTile({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final danger = MfColors.tone(context, MfTone.danger);
+    final hc = MfColors.isHighContrast(context);
+
+    final shape = RoundedRectangleBorder(
+      borderRadius: MfRadius.mdAll,
+      side: BorderSide(
+        color: selected ? danger.solid : cs.outlineVariant,
+        width: selected ? 2 : (hc ? 2 : 1),
+      ),
+    );
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: label,
+      excludeSemantics: true,
+      child: Material(
+        color: selected ? Color.alphaBlend(danger.container, cs.surface) : cs.surface,
+        shape: shape,
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          customBorder: shape,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 96),
+            child: Padding(
+              padding: const EdgeInsets.all(MfSpace.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: selected ? danger.solid : danger.container,
+                          borderRadius: MfRadius.smAll,
+                        ),
+                        child: Icon(icon, size: 24, color: selected ? danger.onSolid : danger.foreground),
+                      ),
+                      const Spacer(),
+                      if (selected) Icon(Icons.check_circle_rounded, color: danger.solid, size: 22),
+                    ],
+                  ),
+                  const SizedBox(height: MfSpace.sm),
+                  Text(
+                    label,
+                    style: text.titleSmall?.copyWith(
+                      color: cs.onSurface,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

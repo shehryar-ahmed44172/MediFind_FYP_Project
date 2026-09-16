@@ -1,105 +1,47 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../widgets/common/app_header.dart';
-import '../../widgets/navigation/app_drawer.dart';
+import '../../widgets/navigation/mf_role_shell.dart';
 
-class ResponderShell extends ConsumerStatefulWidget {
+/// Responder dashboard: Requests (Home) · History · Profile.
+class ResponderShell extends ConsumerWidget {
   final StatefulNavigationShell navigationShell;
   final GoRouterState state;
   const ResponderShell({super.key, required this.navigationShell, required this.state});
 
   @override
-  ConsumerState<ResponderShell> createState() => _ResponderShellState();
-}
-
-class _ResponderShellState extends ConsumerState<ResponderShell> {
-  Future<bool?> _showExitDialog() {
-    final theme = Theme.of(context);
-    return showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Row(
-          children: [
-            Icon(Icons.exit_to_app_rounded, color: theme.colorScheme.tertiary),
-            const SizedBox(width: 10),
-            const Expanded(child: Text('Exit MediFind?')),
-          ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    return MfRoleShell(
+      navigationShell: navigationShell,
+      tabs: [
+        const MfShellTab(
+          icon: Icons.notifications_active_outlined,
+          selectedIcon: Icons.notifications_active_rounded,
+          label: 'Requests',
+          title: 'MediFind',
+          subtitle: 'Responder · Requests',
+          showBrand: true,
         ),
-        content: const Text(
-          'Are you sure you want to exit? Your session will remain active and you can return anytime.',
+        const MfShellTab(
+          icon: Icons.history_rounded,
+          selectedIcon: Icons.history_rounded,
+          label: 'History',
+          title: 'Response history',
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Stay'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: theme.colorScheme.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Exit', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final currentIndex = widget.navigationShell.currentIndex;
-
-    String? title;
-    switch (currentIndex) {
-      case 0: title = 'Dashboard'; break;
-      case 1: title = 'History'; break;
-      case 2: title = 'Profile'; break;
-      default: title = null;
-    }
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (currentIndex != 0) {
-          widget.navigationShell.goBranch(0, initialLocation: true);
-          return;
-        }
-        final shouldExit = await _showExitDialog();
-        if (shouldExit == true && mounted) {
-          SystemNavigator.pop();
-        }
-      },
-      child: Scaffold(
-        backgroundColor: theme.colorScheme.surface,
-        endDrawer: const AppDrawer(),
-        body: Column(
-          children: [
-            AppHeader(
-              greetingOverride: title,
-              showLogout: false,
-              showProfile: currentIndex != 2,
-              canPop: currentIndex != 0 || widget.state.uri.pathSegments.length > 1,
-            ),
-            Expanded(
-              child: widget.navigationShell,
+        MfShellTab(
+          icon: Icons.person_outline_rounded,
+          selectedIcon: Icons.person_rounded,
+          label: 'Profile',
+          title: 'Profile',
+          actions: [
+            IconButton(
+              tooltip: 'Settings',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: () => context.push('/settings'),
             ),
           ],
         ),
-        bottomNavigationBar: BottomNavigationBar(
-          currentIndex: currentIndex,
-          onTap: (index) => widget.navigationShell.goBranch(index),
-          type: BottomNavigationBarType.fixed,
-          showUnselectedLabels: true,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.dashboard_rounded), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.history_rounded), label: 'History'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
-          ],
-        ),
-      ),
+      ],
     );
   }
 }

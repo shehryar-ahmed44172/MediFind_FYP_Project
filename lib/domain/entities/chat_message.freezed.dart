@@ -310,10 +310,14 @@ mixin _$ChatRoom {
   String get id => throw _privateConstructorUsedError;
   String get patientId => throw _privateConstructorUsedError;
   String? get caregiverId => throw _privateConstructorUsedError;
+  String? get responderId => throw _privateConstructorUsedError;
+  String? get emergencyId => throw _privateConstructorUsedError;
+  String? get roomType => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
   Map<String, dynamic>? get patient => throw _privateConstructorUsedError;
   Map<String, dynamic>? get caregiver => throw _privateConstructorUsedError;
+  Map<String, dynamic>? get responder => throw _privateConstructorUsedError;
   List<ChatMessage>? get messages => throw _privateConstructorUsedError;
 
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -331,10 +335,14 @@ abstract class $ChatRoomCopyWith<$Res> {
       {String id,
       String patientId,
       String? caregiverId,
+      String? responderId,
+      String? emergencyId,
+      String? roomType,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
       Map<String, dynamic>? caregiver,
+      Map<String, dynamic>? responder,
       List<ChatMessage>? messages});
 }
 
@@ -354,10 +362,14 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
     Object? id = null,
     Object? patientId = null,
     Object? caregiverId = freezed,
+    Object? responderId = freezed,
+    Object? emergencyId = freezed,
+    Object? roomType = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
     Object? caregiver = freezed,
+    Object? responder = freezed,
     Object? messages = freezed,
   }) {
     return _then(_value.copyWith(
@@ -371,7 +383,20 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
               as String,
       caregiverId: freezed == caregiverId
           ? _value.caregiverId
-          : caregiverId as String?,
+          : caregiverId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderId: freezed == responderId
+          ? _value.responderId
+          : responderId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      emergencyId: freezed == emergencyId
+          ? _value.emergencyId
+          : emergencyId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      roomType: freezed == roomType
+          ? _value.roomType
+          : roomType // ignore: cast_nullable_to_non_nullable
+              as String?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -387,6 +412,10 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
       caregiver: freezed == caregiver
           ? _value.caregiver
           : caregiver // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
+      responder: freezed == responder
+          ? _value.responder
+          : responder // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
       messages: freezed == messages
           ? _value.messages
@@ -408,10 +437,14 @@ abstract class _$$ChatRoomImplCopyWith<$Res>
       {String id,
       String patientId,
       String? caregiverId,
+      String? responderId,
+      String? emergencyId,
+      String? roomType,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
       Map<String, dynamic>? caregiver,
+      Map<String, dynamic>? responder,
       List<ChatMessage>? messages});
 }
 
@@ -429,10 +462,14 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
     Object? id = null,
     Object? patientId = null,
     Object? caregiverId = freezed,
+    Object? responderId = freezed,
+    Object? emergencyId = freezed,
+    Object? roomType = freezed,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
     Object? caregiver = freezed,
+    Object? responder = freezed,
     Object? messages = freezed,
   }) {
     return _then(_$ChatRoomImpl(
@@ -446,7 +483,20 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
               as String,
       caregiverId: freezed == caregiverId
           ? _value.caregiverId
-          : caregiverId as String?,
+          : caregiverId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      responderId: freezed == responderId
+          ? _value.responderId
+          : responderId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      emergencyId: freezed == emergencyId
+          ? _value.emergencyId
+          : emergencyId // ignore: cast_nullable_to_non_nullable
+              as String?,
+      roomType: freezed == roomType
+          ? _value.roomType
+          : roomType // ignore: cast_nullable_to_non_nullable
+              as String?,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -463,6 +513,10 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
           ? _value._caregiver
           : caregiver // ignore: cast_nullable_to_non_nullable
               as Map<String, dynamic>?,
+      responder: freezed == responder
+          ? _value._responder
+          : responder // ignore: cast_nullable_to_non_nullable
+              as Map<String, dynamic>?,
       messages: freezed == messages
           ? _value._messages
           : messages // ignore: cast_nullable_to_non_nullable
@@ -478,13 +532,18 @@ class _$ChatRoomImpl implements _ChatRoom {
       {required this.id,
       required this.patientId,
       this.caregiverId,
+      this.responderId,
+      this.emergencyId,
+      this.roomType,
       required this.createdAt,
       required this.updatedAt,
       final Map<String, dynamic>? patient,
       final Map<String, dynamic>? caregiver,
+      final Map<String, dynamic>? responder,
       final List<ChatMessage>? messages})
       : _patient = patient,
         _caregiver = caregiver,
+        _responder = responder,
         _messages = messages;
 
   factory _$ChatRoomImpl.fromJson(Map<String, dynamic> json) =>
@@ -496,6 +555,12 @@ class _$ChatRoomImpl implements _ChatRoom {
   final String patientId;
   @override
   final String? caregiverId;
+  @override
+  final String? responderId;
+  @override
+  final String? emergencyId;
+  @override
+  final String? roomType;
   @override
   final DateTime createdAt;
   @override
@@ -520,6 +585,16 @@ class _$ChatRoomImpl implements _ChatRoom {
     return EqualUnmodifiableMapView(value);
   }
 
+  final Map<String, dynamic>? _responder;
+  @override
+  Map<String, dynamic>? get responder {
+    final value = _responder;
+    if (value == null) return null;
+    if (_responder is EqualUnmodifiableMapView) return _responder;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableMapView(value);
+  }
+
   final List<ChatMessage>? _messages;
   @override
   List<ChatMessage>? get messages {
@@ -532,7 +607,7 @@ class _$ChatRoomImpl implements _ChatRoom {
 
   @override
   String toString() {
-    return 'ChatRoom(id: $id, patientId: $patientId, caregiverId: $caregiverId, createdAt: $createdAt, updatedAt: $updatedAt, patient: $patient, caregiver: $caregiver, messages: $messages)';
+    return 'ChatRoom(id: $id, patientId: $patientId, caregiverId: $caregiverId, responderId: $responderId, emergencyId: $emergencyId, roomType: $roomType, createdAt: $createdAt, updatedAt: $updatedAt, patient: $patient, caregiver: $caregiver, responder: $responder, messages: $messages)';
   }
 
   @override
@@ -545,6 +620,12 @@ class _$ChatRoomImpl implements _ChatRoom {
                 other.patientId == patientId) &&
             (identical(other.caregiverId, caregiverId) ||
                 other.caregiverId == caregiverId) &&
+            (identical(other.responderId, responderId) ||
+                other.responderId == responderId) &&
+            (identical(other.emergencyId, emergencyId) ||
+                other.emergencyId == emergencyId) &&
+            (identical(other.roomType, roomType) ||
+                other.roomType == roomType) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -552,6 +633,8 @@ class _$ChatRoomImpl implements _ChatRoom {
             const DeepCollectionEquality().equals(other._patient, _patient) &&
             const DeepCollectionEquality()
                 .equals(other._caregiver, _caregiver) &&
+            const DeepCollectionEquality()
+                .equals(other._responder, _responder) &&
             const DeepCollectionEquality().equals(other._messages, _messages));
   }
 
@@ -562,10 +645,14 @@ class _$ChatRoomImpl implements _ChatRoom {
       id,
       patientId,
       caregiverId,
+      responderId,
+      emergencyId,
+      roomType,
       createdAt,
       updatedAt,
       const DeepCollectionEquality().hash(_patient),
       const DeepCollectionEquality().hash(_caregiver),
+      const DeepCollectionEquality().hash(_responder),
       const DeepCollectionEquality().hash(_messages));
 
   @JsonKey(ignore: true)
@@ -587,10 +674,14 @@ abstract class _ChatRoom implements ChatRoom {
       {required final String id,
       required final String patientId,
       final String? caregiverId,
+      final String? responderId,
+      final String? emergencyId,
+      final String? roomType,
       required final DateTime createdAt,
       required final DateTime updatedAt,
       final Map<String, dynamic>? patient,
       final Map<String, dynamic>? caregiver,
+      final Map<String, dynamic>? responder,
       final List<ChatMessage>? messages}) = _$ChatRoomImpl;
 
   factory _ChatRoom.fromJson(Map<String, dynamic> json) =
@@ -603,6 +694,12 @@ abstract class _ChatRoom implements ChatRoom {
   @override
   String? get caregiverId;
   @override
+  String? get responderId;
+  @override
+  String? get emergencyId;
+  @override
+  String? get roomType;
+  @override
   DateTime get createdAt;
   @override
   DateTime get updatedAt;
@@ -610,6 +707,8 @@ abstract class _ChatRoom implements ChatRoom {
   Map<String, dynamic>? get patient;
   @override
   Map<String, dynamic>? get caregiver;
+  @override
+  Map<String, dynamic>? get responder;
   @override
   List<ChatMessage>? get messages;
   @override

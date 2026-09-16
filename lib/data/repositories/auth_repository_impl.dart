@@ -103,11 +103,6 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<void> updateFcmToken(String token) async {
-    await apiClient.updateFcmToken(token);
-  }
-
-  @override
   Future<User?> getUser(String userId) async {
     final profile = await apiClient.getUserProfile(userId);
     if (profile == null) return null;

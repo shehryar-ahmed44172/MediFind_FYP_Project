@@ -240,6 +240,8 @@ class AnimatedMascotMarker {
   double _bearing = 0;
   bool _flash = false;
   DateTime? _moveStart;
+  DateTime? _lastUpdateAt;
+  Duration _currentMoveDuration = const Duration(milliseconds: 1000);
   Timer? _moveTimer;
   Timer? _flashTimer;
   bool _disposed = false;
@@ -281,7 +283,14 @@ class AnimatedMascotMarker {
     _bearing = bearingBetween(current, target);
     _from = current;
     _to = target;
-    _moveStart = DateTime.now();
+    // Live location arrives every few seconds: glide over the whole gap so the
+    // bike keeps moving continuously instead of jumping and then waiting.
+    final now = DateTime.now();
+    final gap = _lastUpdateAt == null ? moveDuration : now.difference(_lastUpdateAt!);
+    _lastUpdateAt = now;
+    final ms = gap.inMilliseconds.clamp(moveDuration.inMilliseconds, 6000);
+    _currentMoveDuration = Duration(milliseconds: ms);
+    _moveStart = now;
     _moveTimer?.cancel();
     _moveTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
       final start = _moveStart;
@@ -292,8 +301,8 @@ class AnimatedMascotMarker {
         return;
       }
       final elapsed = DateTime.now().difference(start).inMilliseconds;
-      final raw = (elapsed / moveDuration.inMilliseconds).clamp(0.0, 1.0);
-      final eased = Curves.easeInOut.transform(raw);
+      final raw = (elapsed / _currentMoveDuration.inMilliseconds).clamp(0.0, 1.0);
+      final eased = raw; // linear: constant speed between GPS fixes
       _current = LatLng(
         from.latitude + (to.latitude - from.latitude) * eased,
         from.longitude + (to.longitude - from.longitude) * eased,

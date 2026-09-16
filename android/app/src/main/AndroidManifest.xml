@@ -1,4 +1,5 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Internet & Network -->
     <uses-permission android:name="android.permission.INTERNET" />
@@ -16,6 +17,12 @@
     <!-- Foreground service for live tracking -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Self-hosted push: background alert service keeps a socket
+         open and shows emergency alerts as local notifications -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_REMOTE_MESSAGING" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <!-- Vibration for SOS alert feedback -->
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -64,6 +71,14 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+
+        <!-- MediFind background alert service (flutter_background_service).
+             Android 14+ requires the foreground service type to be declared. -->
+        <service
+            android:name="id.flutter.flutter_background_service.BackgroundService"
+            android:foregroundServiceType="remoteMessaging"
+            android:exported="false"
+            tools:replace="android:exported" />
 
         <!-- Google Maps API Key (REPLACE THIS WITH A REAL KEY FOR MAPS TO WORK) -->
         <meta-data

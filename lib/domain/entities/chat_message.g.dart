@@ -45,10 +45,14 @@ _$ChatRoomImpl _$$ChatRoomImplFromJson(Map<String, dynamic> json) =>
       id: json['id'] as String,
       patientId: json['patientId'] as String,
       caregiverId: json['caregiverId'] as String?,
+      responderId: json['responderId'] as String?,
+      emergencyId: json['emergencyId'] as String?,
+      roomType: json['roomType'] as String?,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),
       patient: json['patient'] as Map<String, dynamic>?,
       caregiver: json['caregiver'] as Map<String, dynamic>?,
+      responder: json['responder'] as Map<String, dynamic>?,
       messages: (json['messages'] as List<dynamic>?)
           ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
           .toList(),
@@ -59,9 +63,13 @@ Map<String, dynamic> _$$ChatRoomImplToJson(_$ChatRoomImpl instance) =>
       'id': instance.id,
       'patientId': instance.patientId,
       'caregiverId': instance.caregiverId,
+      'responderId': instance.responderId,
+      'emergencyId': instance.emergencyId,
+      'roomType': instance.roomType,
       'createdAt': instance.createdAt.toIso8601String(),
       'updatedAt': instance.updatedAt.toIso8601String(),
       'patient': instance.patient,
       'caregiver': instance.caregiver,
+      'responder': instance.responder,
       'messages': instance.messages,
     };

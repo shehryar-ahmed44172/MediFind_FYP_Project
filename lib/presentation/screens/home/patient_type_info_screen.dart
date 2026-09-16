@@ -1,222 +1,179 @@
 import 'package:flutter/material.dart';
-import '../../theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../providers/auth_provider.dart';
+import '../../widgets/design_system/design_system.dart';
 
-class PatientTypeInfoScreen extends StatelessWidget {
-  /// Pass a patientType to highlight one category, or null to show all.
+/// Explains how MediFind adapts to deaf and hearing patients.
+class PatientTypeInfoScreen extends ConsumerWidget {
+  /// Pass a patientType to highlight one category, or null to use the
+  /// signed-in patient's type (both are always shown).
   final String? patientType;
   const PatientTypeInfoScreen({super.key, this.patientType});
 
+  static const _deafFeatures = [
+    (Icons.flash_on_outlined, 'Visual alerts', 'Every alert flashes the screen. Nothing depends on sound.'),
+    (Icons.vibration_rounded, 'Strong vibration', 'Distinct vibration patterns confirm SOS, assignment and arrival.'),
+    (Icons.quickreply_outlined, 'Quick phrases', 'Send pre-written messages to responders with one tap.'),
+    (Icons.mic_off_outlined, 'Text-only interface', 'Microphone and voice controls are hidden; chat always shows Send.'),
+    (Icons.hearing_disabled_outlined, 'Responders are told', 'Your responder sees "Deaf: text only" before accepting.'),
+    (Icons.badge_outlined, 'Show to people nearby', 'A full-screen card explains you are deaf and need help.'),
+    (Icons.timer_outlined, 'Visual countdown', 'The SOS countdown is shown in large numbers instead of beeps.'),
+  ];
+
+  static const _hearingFeatures = [
+    (Icons.sos_outlined, 'One-tap SOS', 'Request an emergency responder in seconds.'),
+    (Icons.medical_information_outlined, 'Medical profile', 'Blood group, allergies and medications shared with your responder.'),
+    (Icons.record_voice_over_outlined, 'Voice guidance', 'Optional spoken prompts and voice messages in chat.'),
+    (Icons.people_outline_rounded, 'Caregivers', 'Linked caregivers are notified and can follow your emergency.'),
+    (Icons.map_outlined, 'Live tracking', 'Follow the responder on the map with an estimated arrival time.'),
+  ];
+
   @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('How MediFind Helps You'),
-        centerTitle: true,
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final type = (patientType ?? user?.patientType)?.toUpperCase();
+    final isPatient = (user?.role ?? 'PATIENT').toUpperCase() == 'PATIENT';
+
+    final deafCard = _ModeCard(
+      icon: Icons.hearing_disabled_rounded,
+      title: 'Deaf mode',
+      subtitle: 'For Deaf and hard of hearing patients. Text-first, visual and vibration alerts.',
+      isCurrent: type == 'DEAF',
+      features: _deafFeatures,
+    );
+    final hearingCard = _ModeCard(
+      icon: Icons.hearing_rounded,
+      title: 'Hearing mode',
+      subtitle: 'Standard alerts with sound, voice guidance and all features.',
+      isCurrent: type == 'NORMAL',
+      features: _hearingFeatures,
+    );
+
+    return MfScaffold(
+      title: 'Deaf & hearing modes',
+      subtitle: 'How MediFind adapts to you',
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
         children: [
           Text(
-            'MediFind is designed for everyone, with special support built for patients with disabilities.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium
-                ?.copyWith(color: Colors.grey.shade600, height: 1.5),
+            'MediFind is built deaf-first. Every emergency step works without sound, '
+            'and hearing patients get the same features with optional voice support.',
+            style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
           ),
-          const SizedBox(height: 24),
-
-          _PatientTypeCard(
-            type: 'NORMAL',
-            isActive: patientType == null || patientType == 'NORMAL',
-            icon: Icons.person_rounded,
-            color: const Color(0xFF1976D2),
-            title: 'Standard Patient',
-            subtitle: 'Full access to all features',
-            features: const [
-              'One-tap SOS emergency button',
-              'Digital medical profile with blood type, allergies & medications',
-              'Upload & store medical report images securely',
-              'Assign and notify caregivers instantly',
-              'Real-time responder tracking on map',
-              'Select emergency category (Cardiac, Injury, etc.)',
-            ],
+          const SizedBox(height: MfSpace.lg),
+          // Current mode first.
+          if (type == 'NORMAL') ...[hearingCard, const SizedBox(height: MfSpace.md), deafCard]
+          else ...[deafCard, const SizedBox(height: MfSpace.md), hearingCard],
+          const SizedBox(height: MfSpace.lg),
+          const MfInfoBanner(
+            icon: Icons.info_outline_rounded,
+            tone: MfTone.primary,
+            title: 'Changing your mode',
+            message: 'Your mode is set during registration and can be updated in your medical profile. '
+                'Text-only mode in Accessibility settings hides voice controls at any time.',
           ),
-          const SizedBox(height: 16),
-
-          _PatientTypeCard(
-            type: 'DEAF',
-            isActive: patientType == null || patientType == 'DEAF',
-            icon: Icons.hearing_disabled_rounded,
-            color: const Color(0xFF00897B),
-            title: 'Deaf / Hearing Impaired',
-            subtitle: 'Text-first, vibration-powered emergency flow',
-            features: const [
-              '🔔 All alerts are fully visual — no audio required',
-              '📳 Strong vibration feedback confirms SOS activation',
-              '💬 Predefined emergency text messages sent to responders',
-              '🔡 Text-only interface mode hides audio-dependent UI',
-              '🎨 High-contrast mode for maximum visual clarity',
-              '📍 Location & medical profile auto-attached to every SOS',
-              '👁 Visual countdown with color changes instead of beeps',
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          const SizedBox(height: 24),
-
-          // Reminder info box
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primary.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.primary.shade200),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          if (isPatient) ...[
+            const SizedBox(height: MfSpace.md),
+            MfListGroup(
               children: [
-                const Icon(Icons.info_outline, color: AppColors.primary, size: 20),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Your patient type is set during registration and can be updated in your medical profile at any time.',
-                    style: theme.textTheme.bodySmall
-                        ?.copyWith(color: AppColors.primary.shade800, height: 1.5),
-                  ),
+                MfIconTile(
+                  icon: Icons.edit_note_rounded,
+                  label: 'Edit medical profile',
+                  subtitle: 'Update your hearing mode',
+                  onTap: () => context.push('/home/medical-profile/edit'),
+                ),
+                MfIconTile(
+                  icon: Icons.settings_accessibility_rounded,
+                  label: 'Accessibility settings',
+                  subtitle: 'Text-only mode, vibration, contrast and text size',
+                  onTap: () => context.push('/accessibility-settings'),
                 ),
               ],
             ),
-          ),
+          ],
         ],
       ),
     );
   }
 }
 
-// ---------------------------------------------------------------------------
-// Patient Type Card
-// ---------------------------------------------------------------------------
-class _PatientTypeCard extends StatelessWidget {
-  final String type;
-  final bool isActive;
+class _ModeCard extends StatelessWidget {
   final IconData icon;
-  final Color color;
   final String title;
   final String subtitle;
-  final List<String> features;
+  final bool isCurrent;
+  final List<(IconData, String, String)> features;
 
-  const _PatientTypeCard({
-    required this.type,
-    required this.isActive,
+  const _ModeCard({
     required this.icon,
-    required this.color,
     required this.title,
     required this.subtitle,
+    required this.isCurrent,
     required this.features,
   });
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedOpacity(
-      opacity: isActive ? 1.0 : 0.35,
-      duration: const Duration(milliseconds: 300),
-      child: Container(
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.07),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: isActive ? color : color.withValues(alpha: 0.3),
-            width: isActive ? 2 : 1,
-          ),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
-                  )
-                ]
-              : [],
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header row
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.15),
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(icon, color: color, size: 28),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: color,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: color.withValues(alpha: 0.7),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (isActive)
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text(
-                      'YOUR TYPE',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold),
-                    ),
-                  ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Features list
-            ...features.map(
-              (feature) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final t = MfColors.tone(context, MfTone.primary);
+    return MfCard(
+      tone: isCurrent ? MfTone.primary : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(color: t.container, borderRadius: MfRadius.smAll),
+                child: Icon(icon, color: t.foreground),
+              ),
+              const SizedBox(width: MfSpace.sm),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.check_circle_rounded,
-                        color: color, size: 16),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        feature,
-                        style: const TextStyle(fontSize: 13, height: 1.4),
-                      ),
-                    ),
+                    Semantics(header: true, child: Text(title, style: text.titleMedium)),
+                    Text(subtitle, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
+              if (isCurrent) ...[
+                const SizedBox(width: MfSpace.xs),
+                const MfStatusChip(label: 'Your mode', icon: Icons.check_rounded, tone: MfTone.primary, solid: true),
+              ],
+            ],
+          ),
+          const SizedBox(height: MfSpace.sm),
+          const Divider(height: 1),
+          const SizedBox(height: MfSpace.xs),
+          for (final f in features)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: MfSpace.xxs),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(f.$1, size: 20, color: t.foreground),
+                  const SizedBox(width: MfSpace.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(f.$2, style: text.titleSmall),
+                        Text(f.$3, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ],
-        ),
+        ],
       ),
     );
   }

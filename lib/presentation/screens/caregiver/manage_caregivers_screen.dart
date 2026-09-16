@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/caregiver_providers.dart';
-import '../../../domain/entities/caregiver_connection.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chat_provider.dart';
-import 'package:go_router/go_router.dart';
+import '../../widgets/design_system/design_system.dart';
+import '../../../domain/entities/caregiver_connection.dart';
 
+/// Patient side: caregivers linked to (or invited by) the current patient.
+/// Pushed at `/home/caregivers`.
 class ManageCaregiversScreen extends ConsumerStatefulWidget {
   const ManageCaregiversScreen({super.key});
 
@@ -19,6 +21,8 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
   final _emailController = TextEditingController();
   final _relationshipController = TextEditingController();
   bool _isInviting = false;
+  String? _inviteError;
+  StateSetter? _setSheetState;
 
   @override
   void dispose() {
@@ -27,150 +31,133 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
     super.dispose();
   }
 
+  /// Rebuilds both the screen and the open invite sheet (if any).
+  void _update(VoidCallback fn) {
+    if (!mounted) return;
+    setState(fn);
+    _setSheetState?.call(() {});
+  }
+
   Future<void> _handleInvite() async {
     final email = _emailController.text.trim();
     final relationship = _relationshipController.text.trim();
 
     if (email.isEmpty || relationship.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please fill in all fields')),
-      );
+      _update(() => _inviteError = 'Please fill in all fields');
       return;
     }
     if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address')),
-      );
+      _update(() => _inviteError = 'Please enter a valid email address');
       return;
     }
 
-    setState(() => _isInviting = true);
+    _update(() {
+      _isInviting = true;
+      _inviteError = null;
+    });
     try {
       // Patient inviting a caregiver -> the email belongs to the CAREGIVER.
       await ref.read(sendInvitationProvider({
         'caregiverEmail': email,
         'relationship': relationship,
       }).future);
-      
+
       if (mounted) {
         Navigator.pop(context);
         _emailController.clear();
         _relationshipController.clear();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invitation sent successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
+        showMfSnackBar(context, 'Invitation sent successfully', tone: MfTone.success);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
-        );
+        _update(() => _inviteError = 'Error: ${e.toString()}');
+        showMfSnackBar(context, 'Error: ${e.toString()}', tone: MfTone.danger);
       }
     } finally {
-      if (mounted) setState(() => _isInviting = false);
+      _update(() => _isInviting = false);
     }
   }
 
-  void _showAddCaregiverSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+  Future<void> _showAddCaregiverSheet() async {
+    _inviteError = null;
+    await showMfBottomSheet<void>(
+      context,
+      title: 'Invite caregiver',
+      subtitle: 'Enter the email of the person you want to add as your caregiver. '
+          'They will be notified instantly in an emergency.',
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) {
-          final theme = Theme.of(context);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-                24, 24, 24, MediaQuery.of(ctx).viewInsets.bottom + 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Text('Invite Caregiver',
-                        style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold)),
-                    const Spacer(),
-                    IconButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      icon: const Icon(Icons.close),
-                      tooltip: 'Close',
-                    ),
-                  ],
+          _setSheetState = setModalState;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: MfSpace.xs),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Email address',
+                  hintText: 'e.g. name@example.com',
+                  prefixIcon: Icon(Icons.email_outlined),
                 ),
-                const SizedBox(height: 8),
-                Text('Enter the email of the person you want to add as your caregiver.',
-                    style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: 'Email Address',
-                    hintText: 'e.g. name@example.com',
-                    prefixIcon: const Icon(Icons.email_outlined),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+              ),
+              const SizedBox(height: MfSpace.md),
+              TextField(
+                controller: _relationshipController,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _isInviting ? null : _handleInvite(),
+                decoration: const InputDecoration(
+                  labelText: 'Relationship',
+                  hintText: 'e.g. Son, Daughter, Spouse',
+                  prefixIcon: Icon(Icons.people_outline_rounded),
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _relationshipController,
-                  decoration: InputDecoration(
-                    labelText: 'Relationship',
-                    hintText: 'e.g. Son, Daughter, Spouse',
-                    prefixIcon: const Icon(Icons.people_outline),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: _isInviting ? null : _handleInvite,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
-                  child: _isInviting 
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Send Invitation', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+              if (_inviteError != null) ...[
+                const SizedBox(height: MfSpace.sm),
+                MfInfoBanner(
+                  icon: Icons.error_outline_rounded,
+                  title: _inviteError!,
+                  tone: MfTone.danger,
                 ),
               ],
-            ),
+              const SizedBox(height: MfSpace.lg),
+              MfPrimaryButton(
+                label: 'Send invitation',
+                icon: Icons.send_outlined,
+                loading: _isInviting,
+                onPressed: _handleInvite,
+              ),
+              const SizedBox(height: MfSpace.xs),
+              MfTextButton(
+                label: 'Cancel',
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ],
           );
         },
       ),
     );
+    _setSheetState = null;
   }
 
   Future<void> _handleRemove(CaregiverConnection connection) async {
     final isPending = connection.status.toUpperCase() == 'PENDING';
     final name = connection.caregiverName ?? connection.caregiverEmail ?? 'this caregiver';
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(isPending ? 'Cancel Invitation' : 'Remove Caregiver'),
-        content: Text(isPending
-            ? 'Cancel the pending invitation for $name?'
-            : 'Are you sure you want to remove $name? They will no longer be notified about your emergencies.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: Text(isPending ? 'Cancel Invite' : 'Remove',
-                style: const TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: isPending ? 'Cancel invitation' : 'Remove caregiver',
+      message: isPending
+          ? 'Cancel the pending invitation for $name?'
+          : 'Are you sure you want to remove $name? They will no longer be notified about your emergencies.',
+      cancelLabel: 'Keep',
+      confirmLabel: isPending ? 'Cancel invite' : 'Remove',
+      destructive: true,
+      icon: Icons.person_remove_outlined,
     );
-    if (confirmed != true) return;
+    if (!confirmed) return;
 
     try {
       // DELETE /api/caregivers/:caregiverId (PATIENT only) expects the
@@ -179,14 +166,10 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
       ref.invalidate(allCaregiverLinksProvider);
       ref.invalidate(caregiverLinksProvider);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(isPending ? 'Invitation cancelled' : 'Caregiver removed')),
-      );
+      showMfSnackBar(context, isPending ? 'Invitation cancelled' : 'Caregiver removed');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
-      );
+      showMfSnackBar(context, 'Error: ${e.toString()}', tone: MfTone.danger);
     }
   }
 
@@ -199,18 +182,15 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
       ref.invalidate(allCaregiverLinksProvider);
       ref.invalidate(caregiverLinksProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(accept ? 'Invitation accepted' : 'Invitation rejected'),
-            backgroundColor: accept ? AppColors.success : AppColors.error,
-          ),
+        showMfSnackBar(
+          context,
+          accept ? 'Invitation accepted' : 'Invitation rejected',
+          tone: accept ? MfTone.success : MfTone.neutral,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}'), backgroundColor: AppColors.error),
-        );
+        showMfSnackBar(context, 'Error: ${e.toString()}', tone: MfTone.danger);
       }
     }
   }
@@ -218,56 +198,62 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
   @override
   Widget build(BuildContext context) {
     final linksAsync = ref.watch(allCaregiverLinksProvider);
+    final hasLinks = linksAsync.valueOrNull?.isNotEmpty ?? false;
 
-    return Scaffold(
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddCaregiverSheet,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Add Caregiver', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
+    return MfScaffold(
+      title: 'My caregivers',
+      subtitle: 'People notified in an emergency',
+      actions: [
+        MfIconButton(
+          icon: Icons.person_add_alt_outlined,
+          tooltip: 'Invite caregiver',
+          onPressed: _showAddCaregiverSheet,
+        ),
+      ],
+      bottomBar: hasLinks
+          ? MfPrimaryButton(
+              label: 'Invite caregiver',
+              icon: Icons.person_add_alt_outlined,
+              onPressed: _showAddCaregiverSheet,
+            )
+          : null,
       body: linksAsync.when(
         data: (links) {
           if (links.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(24),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.07),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.group_add_outlined, size: 80, color: AppColors.primary.withOpacity(0.4)),
-                  ),
-                  const SizedBox(height: 24),
-                  const Text('No Caregivers Yet',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 40),
-                    child: Text(
-                      'Add family members or friends to be notified instantly in case of an emergency.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey.shade600, fontSize: 14),
+            return RefreshIndicator(
+              onRefresh: () => ref.refresh(allCaregiverLinksProvider.future),
+              child: LayoutBuilder(
+                builder: (context, constraints) => SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                    child: MfEmptyState(
+                      icon: Icons.group_add_outlined,
+                      title: 'No caregivers yet',
+                      message: 'Add family members or friends to be notified instantly in case of an emergency.',
+                      actionLabel: 'Invite caregiver',
+                      actionIcon: Icons.person_add_alt_outlined,
+                      onAction: _showAddCaregiverSheet,
                     ),
                   ),
-                ],
+                ),
               ),
             );
           }
 
+          final currentUserId = ref.read(currentUserProvider).valueOrNull?.id ?? '';
           return RefreshIndicator(
             onRefresh: () => ref.refresh(allCaregiverLinksProvider.future),
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            child: ListView.separated(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.lg),
               itemCount: links.length,
+              separatorBuilder: (_, __) => const SizedBox(height: MfSpace.sm),
               itemBuilder: (ctx, i) {
                 final link = links[i];
                 return _CaregiverCard(
                   link: link,
-                  currentUserId: ref.read(currentUserProvider).valueOrNull?.id ?? '',
+                  currentUserId: currentUserId,
                   onDelete: () => _handleRemove(link),
                   onAccept: () => _handleInvitationResponse(link, true),
                   onReject: () => _handleInvitationResponse(link, false),
@@ -276,31 +262,14 @@ class _ManageCaregiversScreenState extends ConsumerState<ManageCaregiversScreen>
             ),
           );
         },
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
-                const SizedBox(height: 16),
-                const Text(
-                  'Unable to load caregivers',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                ),
-                const SizedBox(height: 8),
-                Text(e.toString(), textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => ref.invalidate(allCaregiverLinksProvider),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Retry'),
-                  style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
-                ),
-              ],
-            ),
-          ),
+        loading: () => Padding(
+          padding: const EdgeInsets.all(MfSpace.gutter),
+          child: MfSkeleton.list(count: 3, itemHeight: 120),
+        ),
+        error: (e, _) => MfErrorState(
+          title: 'Unable to load caregivers',
+          message: e.toString(),
+          onRetry: () => ref.invalidate(allCaregiverLinksProvider),
         ),
       ),
     );
@@ -324,144 +293,119 @@ class _CaregiverCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color statusColor;
-    String statusText;
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final status = link.status.toUpperCase();
+    final isPending = status == 'PENDING';
+    final isIncoming = isPending && link.requesterId != currentUserId;
 
-    switch (link.status.toUpperCase()) {
+    MfTone tone;
+    String statusText;
+    IconData statusIcon;
+    switch (status) {
       case 'ACCEPTED':
-        statusColor = AppColors.success;
-        statusText = 'Connected';
+        tone = MfTone.success;
+        statusText = 'Active';
+        statusIcon = Icons.check_circle_outline_rounded;
         break;
       case 'PENDING':
-        statusColor = AppColors.warning;
-        statusText = 'Pending Approval';
+        tone = MfTone.warning;
+        statusText = 'Pending';
+        statusIcon = Icons.schedule_rounded;
         break;
       case 'REJECTED':
-        statusColor = AppColors.error;
+        tone = MfTone.danger;
         statusText = 'Rejected';
+        statusIcon = Icons.block_rounded;
         break;
       default:
-        statusColor = Colors.grey;
+        tone = MfTone.neutral;
         statusText = link.status;
+        statusIcon = Icons.info_outline_rounded;
     }
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+    return MfCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: statusColor.withOpacity(0.1),
-                    child: Text(
-                      (link.caregiverName?.isNotEmpty == true ? link.caregiverName! : '?')[0].toUpperCase(),
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor,
+              MfAvatar(name: link.caregiverName, size: 48),
+              const SizedBox(width: MfSpace.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      link.caregiverName ?? 'Unknown caregiver',
+                      style: text.titleMedium,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (link.relationship.isNotEmpty)
+                      Text(
+                        link.relationship,
+                        style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: MfSpace.xxs),
+                    Row(
                       children: [
-                        Text(
-                          link.caregiverName ?? 'Unknown Caregiver',
-                          style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          link.relationship,
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: statusColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      statusText,
-                      style: TextStyle(
-                        color: statusColor,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 12),
-                child: Divider(height: 1),
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: Row(
-                      children: [
-                        Icon(Icons.email_outlined, size: 14, color: Colors.grey.shade400),
-                        const SizedBox(width: 6),
+                        Icon(Icons.email_outlined, size: 16, color: cs.onSurfaceVariant),
+                        const SizedBox(width: MfSpace.xxs),
                         Expanded(
                           child: Text(
                             link.caregiverEmail ?? 'No email',
-                            style: TextStyle(
-                              color: Colors.grey.shade500, 
-                              fontSize: 12,
-                            ),
+                            style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 4),
-                  if (link.status.toUpperCase() == 'PENDING' && link.requesterId != currentUserId) ...[
-                    TextButton(
+                  ],
+                ),
+              ),
+              const SizedBox(width: MfSpace.xs),
+              MfStatusChip(label: statusText, tone: tone, icon: statusIcon),
+            ],
+          ),
+          if (isIncoming) ...[
+            const SizedBox(height: MfSpace.xs),
+            Text(
+              'Wants to be your caregiver',
+              style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+          const SizedBox(height: MfSpace.sm),
+          const Divider(height: 1),
+          const SizedBox(height: MfSpace.xs),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: MfSpace.xs,
+            runSpacing: MfSpace.xs,
+            children: isIncoming
+                ? [
+                    MfTextButton(
+                      label: 'Reject',
+                      icon: Icons.close_rounded,
+                      tone: MfTone.danger,
                       onPressed: onReject,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(48, 48),
-                      ),
-                      child: const Text('Reject', style: TextStyle(color: AppColors.error, fontSize: 13)),
                     ),
-                    const SizedBox(width: 4),
-                    ElevatedButton(
+                    MfPrimaryButton(
+                      label: 'Accept',
+                      icon: Icons.check_rounded,
+                      tone: MfTone.success,
+                      expanded: false,
+                      height: MfSize.minTouch,
                       onPressed: onAccept,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.success,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        minimumSize: const Size(48, 48),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      ),
-                      child: const Text('Accept', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
                     ),
-                  ] else ...[
-                    if (link.status.toUpperCase() == 'ACCEPTED')
+                  ]
+                : [
+                    if (status == 'ACCEPTED')
                       Consumer(
-                        builder: (context, ref, child) => TextButton.icon(
+                        builder: (context, ref, child) => MfTextButton(
+                          label: 'Chat',
+                          icon: Icons.chat_bubble_outline_rounded,
                           onPressed: () async {
                             try {
                               final room = await ref.read(getChatRoomForUserProvider(link.caregiverId).future);
@@ -470,39 +414,21 @@ class _CaregiverCard extends StatelessWidget {
                               }
                             } catch (e) {
                               if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(content: Text('Could not open chat: $e'), backgroundColor: AppColors.error),
-                                );
+                                showMfSnackBar(context, 'Could not open chat: $e', tone: MfTone.danger);
                               }
                             }
                           },
-                          icon: const Icon(Icons.chat_bubble_outline_rounded, size: 16, color: AppColors.primary),
-                          label: const Text('Chat', style: TextStyle(color: AppColors.primary, fontSize: 13)),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: const Size(48, 48),
-                          ),
                         ),
                       ),
-                    const SizedBox(width: 4),
-                    TextButton.icon(
+                    MfTextButton(
+                      label: isPending ? 'Cancel invite' : 'Remove',
+                      icon: Icons.person_remove_outlined,
+                      tone: MfTone.danger,
                       onPressed: onDelete,
-                      icon: const Icon(Icons.person_remove_outlined, size: 16, color: AppColors.error),
-                      label: Text(
-                        link.status.toUpperCase() == 'PENDING' ? 'Cancel' : 'Remove',
-                        style: const TextStyle(color: AppColors.error, fontSize: 13),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: const Size(48, 48),
-                      ),
                     ),
                   ],
-                ],
-              ),
-            ],
           ),
-        ),
+        ],
       ),
     );
   }

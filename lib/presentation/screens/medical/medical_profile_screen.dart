@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../domain/entities/medical_profile.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/accessibility_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
+
+const _editRoute = '/home/medical-profile/edit';
 
 class MedicalProfileScreen extends ConsumerWidget {
   const MedicalProfileScreen({super.key});
@@ -12,399 +14,363 @@ class MedicalProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUserId = ref.watch(currentUserIdProvider);
-    final settings = ref.watch(accessibilityProvider);
-    // Text is scaled app-wide via MediaQuery.textScaler (see main.dart).
-    const m = 1.0;
-    
+
     return currentUserId.when(
-      data: (userId) => _buildProfileContent(context, ref, userId ?? '', settings, m),
-      loading: () => const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (e, _) => Scaffold(body: Center(child: Text('Error: $e'))),
+      data: (userId) => _buildProfileContent(context, ref, userId ?? ''),
+      loading: () => const MfScaffold(
+        title: 'Medical profile',
+        body: MfLoading(label: 'Loading your profile'),
+      ),
+      error: (e, _) => MfScaffold(
+        title: 'Medical profile',
+        body: MfErrorState(
+          message: 'We could not load your account. Please try again.',
+          onRetry: () => ref.invalidate(currentUserIdProvider),
+        ),
+      ),
     );
   }
 
-  Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId, AccessibilitySettings settings, double m) {
+  Widget _buildProfileContent(BuildContext context, WidgetRef ref, String userId) {
     final profileAsync = ref.watch(getMedicalProfileProvider(userId));
-    final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: theme.colorScheme.onSurface),
-          onPressed: () => context.pop(),
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final hasProfile = profileAsync.valueOrNull != null;
+
+    return MfScaffold(
+      title: 'Medical profile',
+      subtitle: 'Your health information',
+      actions: [
+        MfIconButton(
+          icon: Icons.edit_outlined,
+          tooltip: 'Edit medical profile',
+          onPressed: () => context.push(_editRoute),
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Medical Profile',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            Text(
-              'Your health information',
-              style: TextStyle(
-                fontSize: 11,
-                color: theme.colorScheme.onSurface.withOpacity(0.45),
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-        titleSpacing: 0,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.edit_rounded,
-                color: theme.colorScheme.primary, size: 20),
-            tooltip: 'Edit Profile',
-            onPressed: () => context.push('/home/medical-profile/edit'),
-          ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: profileAsync.when(
+      ],
+      bottomBar: hasProfile
+          ? MfPrimaryButton(
+              label: 'Edit medical profile',
+              icon: Icons.edit_outlined,
+              onPressed: () => context.push(_editRoute),
+            )
+          : null,
+      body: profileAsync.when(
         data: (profile) {
           if (profile == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.medical_information_outlined,
-                      size: 72, color: Colors.grey.shade300),
-                  const SizedBox(height: 16),
-                  Text('No medical profile found',
-                      style: TextStyle(color: Colors.grey.shade500, fontSize: 16)),
-                  const SizedBox(height: 8),
-                  Text('Tap the edit button above to create one',
-                      style: TextStyle(color: Colors.grey.shade400, fontSize: 13)),
-                  const SizedBox(height: 28),
-                  ElevatedButton.icon(
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create Medical Profile'),
-                    onPressed: () => context.push('/home/medical-profile/edit'),
-                  ),
-                ],
-              ),
+            return MfEmptyState(
+              icon: Icons.medical_information_outlined,
+              title: 'No medical profile yet',
+              message: 'Add your blood type, allergies and medications so responders can treat you safely.',
+              actionLabel: 'Create medical profile',
+              actionIcon: Icons.add_rounded,
+              onAction: () => context.push(_editRoute),
             );
           }
-          return ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              _SectionCard(
-                title: 'Blood Group',
-                icon: Icons.bloodtype_rounded,
-                iconColor: AppColors.error,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withOpacity(0.07),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppColors.error.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    profile.bloodType.isNotEmpty ? profile.bloodType : 'Not set',
-                    style: TextStyle(
-                      fontSize: 28 * m,
-                      fontWeight: FontWeight.bold,
-                      color: settings.highContrast ? Colors.black : AppColors.error,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              _SectionCard(
-                title: 'Disability Type',
-                icon: Icons.accessible_forward_rounded,
-                iconColor: Colors.purple,
-                child: Text(
-                  profile.disabilityType?.isNotEmpty == true
-                      ? profile.disabilityType!
-                      : 'None specified',
-                  style: const TextStyle(fontSize: 15),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              _ChipListSection(
-                title: 'Allergies',
-                icon: Icons.science_outlined,
-                iconColor: AppColors.warning,
-                items: profile.allergies,
-                color: AppColors.warning,
-              ),
-              const SizedBox(height: 16),
-
-              _ChipListSection(
-                title: 'Chronic Diseases',
-                icon: Icons.health_and_safety_outlined,
-                iconColor: Colors.pink,
-                items: profile.chronicDiseases,
-                color: Colors.pink,
-              ),
-              const SizedBox(height: 16),
-
-              _SectionCard(
-                title: 'Current Medications',
-                icon: Icons.medication_outlined,
-                iconColor: AppColors.primary,
-                child: profile.medications.isEmpty
-                    ? const Text('None', style: TextStyle(color: Colors.grey))
-                    : Column(
-                        children: profile.medications
-                            .map((m) => ListTile(
-                                  dense: true,
-                                  leading: const Icon(Icons.circle, size: 8),
-                                  title: Text(m.name),
-                                  contentPadding: EdgeInsets.zero,
-                                ))
-                            .toList(),
-                      ),
-              ),
-              const SizedBox(height: 16),
-
-              _SectionCard(
-                title: 'Emergency Contacts',
-                icon: Icons.contact_phone_outlined,
-                iconColor: AppColors.warning,
-                child: profile.emergencyContacts.isEmpty
-                    ? const Text('None', style: TextStyle(color: Colors.grey))
-                    : Column(
-                        children: profile.emergencyContacts
-                            .map((c) => ListTile(
-                                  dense: true,
-                                  leading: const Icon(Icons.person, size: 20, color: AppColors.warning),
-                                  title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text('${c.relationship} • ${c.phoneNumber}'),
-                                  contentPadding: EdgeInsets.zero,
-                                ))
-                            .toList(),
-                      ),
-              ),
-              const SizedBox(height: 24),
-
-              // Medical Reports CTA
-              OutlinedButton.icon(
-                onPressed: () => context.go('/home/medical-reports'),
-                icon: const Icon(Icons.description_outlined),
-                label: const Text('View Medical Reports'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                onPressed: () => context.push('/home/medical-profile/edit'),
-                icon: const Icon(Icons.edit_outlined),
-                label: const Text('Edit Medical Profile'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-            ],
-          );
+          final isDeaf =
+              profile.patientType.toUpperCase() == 'DEAF' || user?.patientType?.toUpperCase() == 'DEAF';
+          return _ProfileBody(profile: profile, isDeaf: isDeaf);
         },
-                loading: () => const Center(child: CircularProgressIndicator()),
-                error: (e, _) => _ErrorView(
-                  message: e.toString(),
-                  onRetry: () => ref.invalidate(getMedicalProfileProvider(userId)),
-                ),
-              ),
-            ),
+        loading: () => ListView(
+          padding: const EdgeInsets.all(MfSpace.gutter),
+          children: [
+            const MfSkeleton(height: 132, radius: MfRadius.md),
+            const SizedBox(height: MfSpace.sm),
+            MfSkeleton.list(count: 3, itemHeight: 88),
           ],
         ),
+        error: (e, _) => MfErrorState(
+          title: 'Could not load your medical profile',
+          message: e.toString().contains('timeout')
+              ? 'The server is taking too long to respond. Please check your internet connection.'
+              : 'We encountered an error while loading your profile. Please try again.',
+          onRetry: () => ref.invalidate(getMedicalProfileProvider(userId)),
+        ),
+      ),
     );
   }
 }
 
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
+class _ProfileBody extends StatelessWidget {
+  final MedicalProfile profile;
+  final bool isDeaf;
+  const _ProfileBody({required this.profile, required this.isDeaf});
 
-  const _ErrorView({
-    required this.message,
-    required this.onRetry,
-  });
+  String _formatDate(DateTime dt) {
+    final l = dt.toLocal();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${l.day}/${l.month}/${l.year}, ${two(l.hour)}:${two(l.minute)}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final danger = MfColors.tone(context, MfTone.danger);
 
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: theme.scaffoldBackgroundColor,
-          border: Border.all(color: Colors.white.withOpacity(0.5), width: 2),
-          borderRadius: BorderRadius.circular(32),
-          boxShadow: AppShadows.neumorphicOut,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.07),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.error.withOpacity(0.2),
-                    blurRadius: 20,
-                    spreadRadius: 5,
+    final disabilities = <String>[
+      if (profile.disabilityType?.isNotEmpty == true) profile.disabilityType!,
+      ...profile.disabilities.where((d) => d.isNotEmpty && d != profile.disabilityType),
+    ];
+    final notes = profile.additionalNotes?.trim() ?? '';
+    final history = profile.medicalHistory?.trim() ?? '';
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.lg),
+      children: [
+        // ── Critical information ─────────────────────────────────────────
+        const MfSectionTitle('Critical information'),
+        MfCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 64, minHeight: 56),
+                    padding: const EdgeInsets.symmetric(horizontal: MfSpace.sm, vertical: MfSpace.xs),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: danger.container,
+                      borderRadius: MfRadius.smAll,
+                      border: Border.all(color: danger.border),
+                    ),
+                    child: Text(
+                      profile.bloodType.isNotEmpty ? profile.bloodType : '--',
+                      style:
+                          text.headlineSmall?.copyWith(color: danger.foreground, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                  const SizedBox(width: MfSpace.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Blood group', style: text.titleSmall),
+                        Text(
+                          profile.bloodType.isNotEmpty
+                              ? 'Used for emergency transfusion decisions'
+                              : 'Not set. Edit your profile to add it.',
+                          style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.wifi_off_rounded,
-                size: 48,
-                color: AppColors.error,
+              const SizedBox(height: MfSpace.md),
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, size: 20, color: danger.foreground),
+                  const SizedBox(width: MfSpace.xs),
+                  Text('Allergies', style: text.titleSmall),
+                ],
               ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'Connection Issue',
-              style: theme.textTheme.headlineSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              message.contains('timeout') 
-                  ? 'The server is taking too long to respond. Please check your internet.' 
-                  : 'We encountered an error while loading your profile. Please try again.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
-              ),
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: onRetry,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 16),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+              const SizedBox(height: MfSpace.xs),
+              if (profile.allergies.isEmpty)
+                Text('No known allergies', style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+              else
+                Wrap(
+                  spacing: MfSpace.xs,
+                  runSpacing: MfSpace.xs,
+                  children: [
+                    for (final a in profile.allergies)
+                      MfStatusChip(label: a, tone: MfTone.danger, icon: Icons.error_outline_rounded),
+                  ],
                 ),
-                elevation: 8,
-                shadowColor: AppColors.primary.withOpacity(0.4),
-              ),
-              child: const Text(
-                'TRY AGAIN',
-                style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text(
-                'Go Back',
-                style: TextStyle(
-                  color: theme.colorScheme.onSurface.withOpacity(0.5),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
-      ),
-    );
-  }
-}
+        const SizedBox(height: MfSpace.lg),
 
-class _SectionCard extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color iconColor;
-  final Widget child;
-  const _SectionCard({
-    required this.title,
-    required this.icon,
-    required this.iconColor,
-    required this.child,
-  });
+        // ── Patient type / disabilities ──────────────────────────────────
+        const MfSectionTitle('Patient type and accessibility'),
+        if (isDeaf) ...[
+          const MfInfoBanner(
+            icon: Icons.hearing_disabled_outlined,
+            tone: MfTone.primary,
+            title: 'Deaf / hard of hearing patient',
+            message: 'Communicates by text, writing or signs.',
+          ),
+          const SizedBox(height: MfSpace.xs),
+        ],
+        MfCard(
+          padding: const EdgeInsets.symmetric(vertical: MfSpace.xxs),
+          child: Column(
+            children: [
+              MfKeyValueRow(
+                icon: Icons.person_outline_rounded,
+                label: 'Patient type',
+                value: isDeaf ? 'Deaf' : 'Normal',
+              ),
+              const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
+              MfKeyValueRow(
+                icon: Icons.accessible_forward_rounded,
+                label: 'Disability / accessibility need',
+                value: disabilities.isEmpty ? 'None specified' : disabilities.join(', '),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: MfSpace.lg),
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).scaffoldBackgroundColor,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: AppShadows.neumorphicOut,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        // ── Chronic conditions ───────────────────────────────────────────
+        const MfSectionTitle('Chronic conditions'),
+        MfCard(
+          child: SizedBox(
+            width: double.infinity,
+            child: profile.chronicDiseases.isEmpty
+                ? Text('None recorded', style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
+                : Wrap(
+                    spacing: MfSpace.xs,
+                    runSpacing: MfSpace.xs,
+                    children: [
+                      for (final c in profile.chronicDiseases)
+                        MfStatusChip(label: c, tone: MfTone.warning, icon: Icons.monitor_heart_outlined),
+                    ],
+                  ),
+          ),
+        ),
+        const SizedBox(height: MfSpace.lg),
+
+        // ── Medications ──────────────────────────────────────────────────
+        const MfSectionTitle('Current medications'),
+        if (profile.medications.isEmpty)
+          MfCard(
+            child: SizedBox(
+              width: double.infinity,
+              child: Text('None recorded', style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            ),
+          )
+        else
+          MfListGroup(
+            children: [
+              for (final m in profile.medications) _MedicationRow(medication: m),
+            ],
+          ),
+        const SizedBox(height: MfSpace.lg),
+
+        // ── Emergency contacts summary ───────────────────────────────────
+        MfSectionTitle(
+          'Emergency contacts',
+          actionLabel: 'Manage',
+          onAction: () => context.push('/home/emergency-contacts'),
+        ),
+        if (profile.emergencyContacts.isEmpty)
+          MfCard(
+            child: SizedBox(
+              width: double.infinity,
+              child: Text('No emergency contacts added',
+                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            ),
+          )
+        else
+          MfListGroup(
+            children: [
+              for (final c in profile.emergencyContacts)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
+                  child: Row(
+                    children: [
+                      MfAvatar(name: c.name, size: 40),
+                      const SizedBox(width: MfSpace.sm),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(c.name, style: text.titleSmall),
+                            Text(
+                              '${c.relationship} · ${c.phoneNumber}',
+                              style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        const SizedBox(height: MfSpace.lg),
+
+        // ── Notes ────────────────────────────────────────────────────────
+        if (notes.isNotEmpty || history.isNotEmpty) ...[
+          const MfSectionTitle('Notes'),
+          MfCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(icon, color: iconColor, size: 20),
-                const SizedBox(width: 8),
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                if (notes.isNotEmpty) ...[
+                  Text('Additional notes', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: MfSpace.xxs),
+                  Text(notes, style: text.bodyMedium),
+                ],
+                if (notes.isNotEmpty && history.isNotEmpty) const SizedBox(height: MfSpace.sm),
+                if (history.isNotEmpty) ...[
+                  Text('Medical history', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: MfSpace.xxs),
+                  Text(history, style: text.bodyMedium),
+                ],
               ],
             ),
-            const SizedBox(height: 12),
-            child,
+          ),
+          const SizedBox(height: MfSpace.lg),
+        ],
+
+        // ── Related ──────────────────────────────────────────────────────
+        const MfSectionTitle('Records'),
+        MfListGroup(
+          children: [
+            MfIconTile(
+              icon: Icons.description_outlined,
+              label: 'Medical reports',
+              subtitle: 'View and upload lab results, scans and prescriptions',
+              onTap: () => context.push('/home/medical-reports'),
+            ),
           ],
         ),
-      ),
+
+        if (profile.lastUpdated != null) ...[
+          const SizedBox(height: MfSpace.md),
+          Text(
+            'Last updated ${_formatDate(profile.lastUpdated!)}',
+            textAlign: TextAlign.center,
+            style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
+      ],
     );
   }
 }
 
-class _ChipListSection extends StatelessWidget {
-  final String title;
-  final IconData icon;
-  final Color iconColor;
-  final List<String> items;
-  final Color color;
-  const _ChipListSection({
-    required this.title,
-    required this.icon,
-    required this.iconColor,
-    required this.items,
-    required this.color,
-  });
+class _MedicationRow extends StatelessWidget {
+  final Medication medication;
+  const _MedicationRow({required this.medication});
 
   @override
   Widget build(BuildContext context) {
-    return _SectionCard(
-      title: title,
-      icon: icon,
-      iconColor: iconColor,
-      child: items.isEmpty
-          ? const Text('None', style: TextStyle(color: Colors.grey))
-          : Wrap(
-              spacing: 8,
-              runSpacing: 4,
-              children: items
-                  .map((item) => Chip(
-                        label: Text(item),
-                        backgroundColor: color.withOpacity(0.1),
-                        labelStyle: TextStyle(color: color.withOpacity(0.8)),
-                        side: BorderSide(color: color.withOpacity(0.3)),
-                      ))
-                  .toList(),
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final details = [
+      if (medication.dosage.isNotEmpty) medication.dosage,
+      if (medication.frequency.isNotEmpty) medication.frequency,
+    ].join(' · ');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
+      child: Row(
+        children: [
+          Icon(Icons.medication_outlined, size: 20, color: cs.primary),
+          const SizedBox(width: MfSpace.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(medication.name, style: text.titleSmall),
+                if (details.isNotEmpty)
+                  Text(details, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              ],
             ),
+          ),
+        ],
+      ),
     );
   }
 }

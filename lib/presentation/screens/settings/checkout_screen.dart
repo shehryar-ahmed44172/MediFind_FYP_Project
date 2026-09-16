@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
-import '../../theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../widgets/design_system/design_system.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
   final String planId;
@@ -31,214 +31,138 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   Widget build(BuildContext context) {
     final plan = _getPlanDetails();
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final priceLabel = 'PKR ${plan['price'].toStringAsFixed(0)}';
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Checkout', style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.surface,
-        foregroundColor: AppColors.onSurface,
-        elevation: 0,
-        centerTitle: true,
+    return MfScaffold(
+      title: 'Checkout',
+      // Sticky Pay button
+      bottomBar: MfPrimaryButton(
+        label: _isProcessing ? 'Processing payment' : 'Pay $priceLabel',
+        icon: Icons.lock_outline_rounded,
+        loading: _isProcessing,
+        onPressed: _isProcessing ? null : _handlePayment,
       ),
-      body: Stack(
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.md, MfSpace.gutter, MfSpace.xl),
         children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
+          // Order Summary Card
+          const MfSectionTitle('Order summary'),
+          MfCard(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Order Summary Card
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 20, offset: const Offset(0, 4))
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Selected Plan', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.primaryTeal.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              plan['name'],
-                              style: TextStyle(color: AppColors.primaryTeal, fontSize: 12, fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Monthly Fee', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                          Text('PKR ${plan['price'].toStringAsFixed(0)}', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const Divider(height: 32),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text('Total Amount', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
-                          Text(
-                            'PKR ${plan['price'].toStringAsFixed(0)}',
-                            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.primaryNavy),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 32),
-                const Text('Select Payment Method', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-
-                _buildPaymentTile('CARD', 'Credit / Debit Card (Stripe)', Icons.credit_card_rounded, const Color(0xFF6366F1)),
-                // Wallet gateways are not integrated yet — shown but disabled so
-                // no plan can be upgraded without a verified payment.
-                _buildPaymentTile('JAZZCASH', 'JazzCash Wallet', Icons.account_balance_wallet_rounded, const Color(0xFFF59E0B), enabled: false),
-                _buildPaymentTile('EASYPAISA', 'EasyPaisa Wallet', Icons.payments_rounded, const Color(0xFF10B981), enabled: false),
-
-                const SizedBox(height: 40),
-
-                // Stripe sandbox notice for CARD
-                if (_selectedMethod == 'CARD') ...[
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEEF2FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Selected plan', style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.info_outline_rounded, size: 18, color: Color(0xFF6366F1)),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Sandbox mode — use test card 4242 4242 4242 4242, any future date, any CVC.',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF4338CA), height: 1.4),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                ],
-
-                // Security note
-                Center(
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.lock_outline_rounded, size: 14, color: Colors.grey.shade400),
-                          const SizedBox(width: 4),
-                          Text('Secure 256-bit SSL Encryption', style: TextStyle(color: Colors.grey.shade400, fontSize: 12)),
-                        ],
-                      ),
-                    ],
-                  ),
+                    MfStatusChip(label: plan['name'], tone: MfTone.primary),
+                  ],
                 ),
-                const SizedBox(height: 100),
+                const SizedBox(height: MfSpace.sm),
+                Row(
+                  children: [
+                    Expanded(child: Text('Monthly fee', style: text.bodyLarge)),
+                    Text(priceLabel, style: text.titleSmall),
+                  ],
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: MfSpace.sm),
+                  child: Divider(height: 1),
+                ),
+                Row(
+                  children: [
+                    Expanded(child: Text('Total', style: text.titleMedium)),
+                    Text(priceLabel, style: text.titleLarge?.copyWith(color: MfColors.tone(context, MfTone.primary).foreground)),
+                  ],
+                ),
               ],
             ),
           ),
 
-          // Sticky Pay button
-          Positioned(
-            bottom: 0, left: 0, right: 0,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 20, offset: const Offset(0, -5))],
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: _isProcessing ? null : _handlePayment,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryNavy,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    elevation: 0,
-                  ),
-                  child: _isProcessing
-                      ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 3, color: Colors.white))
-                      : Text('Pay PKR ${plan['price'].toStringAsFixed(0)}', style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-                ),
-              ),
+          const SizedBox(height: MfSpace.lg),
+          const MfSectionTitle('Payment method'),
+
+          MfListGroup(
+            children: [
+              _buildPaymentTile('CARD', 'Credit / debit card (Stripe)', Icons.credit_card_rounded),
+              // Wallet gateways are not integrated yet — shown but disabled so
+              // no plan can be upgraded without a verified payment.
+              _buildPaymentTile('JAZZCASH', 'JazzCash wallet', Icons.account_balance_wallet_outlined, enabled: false),
+              _buildPaymentTile('EASYPAISA', 'EasyPaisa wallet', Icons.payments_outlined, enabled: false),
+            ],
+          ),
+
+          const SizedBox(height: MfSpace.lg),
+
+          // Stripe sandbox notice for CARD
+          if (_selectedMethod == 'CARD') ...[
+            const MfInfoBanner(
+              icon: Icons.info_outline_rounded,
+              title: 'Sandbox mode',
+              message: 'Use test card 4242 4242 4242 4242, any future date, any CVC.',
             ),
+            const SizedBox(height: MfSpace.sm),
+          ],
+
+          // Security note
+          MfInfoBanner(
+            icon: Icons.verified_user_outlined,
+            tone: MfTone.neutral,
+            title: 'Secure payment',
+            message: 'Card details are entered in Stripe\'s secure payment sheet and protected by 256-bit SSL encryption. '
+                'MediFind never stores your card number.',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentTile(String id, String title, IconData icon, Color color, {bool enabled = true}) {
+  Widget _buildPaymentTile(String id, String title, IconData icon, {bool enabled = true}) {
     final isSelected = enabled && _selectedMethod == id;
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final primary = MfColors.tone(context, MfTone.primary);
     return Semantics(
       button: true,
       enabled: enabled,
       selected: isSelected,
       label: enabled ? title : '$title, coming soon',
       excludeSemantics: true,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.55,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Material(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            child: InkWell(
-              onTap: enabled ? () => setState(() => _selectedMethod = id) : null,
-              borderRadius: BorderRadius.circular(20),
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: isSelected ? color : Colors.transparent, width: 2),
+      child: InkWell(
+        onTap: enabled ? () => setState(() => _selectedMethod = id) : null,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 56),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.xs),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: enabled ? primary.container : cs.surfaceContainer,
+                    borderRadius: MfRadius.smAll,
+                  ),
+                  child: Icon(icon, color: enabled ? primary.foreground : cs.onSurfaceVariant, size: 22),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                      child: Icon(icon, color: color, size: 24),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-                    if (!enabled)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          'Coming soon',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.grey.shade800),
-                        ),
-                      )
-                    else if (isSelected)
-                      Icon(Icons.check_circle_rounded, color: color),
-                  ],
+                const SizedBox(width: MfSpace.sm),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: text.titleSmall?.copyWith(color: enabled ? null : cs.onSurfaceVariant),
+                  ),
                 ),
-              ),
+                if (!enabled)
+                  const MfStatusChip(label: 'Coming soon', tone: MfTone.neutral)
+                else
+                  Icon(
+                    isSelected ? Icons.radio_button_checked_rounded : Icons.radio_button_unchecked_rounded,
+                    color: isSelected ? primary.foreground : cs.onSurfaceVariant,
+                  ),
+              ],
             ),
           ),
         ),
@@ -257,27 +181,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       if (mounted) {
         final cancelled = e.error.code == FailureCode.Canceled;
         final reason = e.error.localizedMessage ?? e.error.message ?? 'Unknown error';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(cancelled
-                ? 'Payment cancelled. You have not been charged.'
-                : 'Payment failed: $reason'),
-            backgroundColor: cancelled ? Colors.grey.shade800 : AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
+        showMfSnackBar(
+          context,
+          cancelled
+              ? 'Payment cancelled. You have not been charged.'
+              : 'Payment failed: $reason',
+          tone: cancelled ? MfTone.neutral : MfTone.danger,
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Payment failed: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        showMfSnackBar(context, 'Payment failed: $e', tone: MfTone.danger);
       }
     } finally {
       if (mounted) setState(() => _isProcessing = false);

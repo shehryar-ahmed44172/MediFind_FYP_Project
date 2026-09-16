@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../providers/accessibility_provider.dart';
 
 class AppColors {
-  // Primary colors — Updated to match logo (#0C637E, #2496A7, #2891C2)
+  // Primary colors — brand palette from the logo (#0C637E, #2496A7, #2891C2)
   static const MaterialColor primary = MaterialColor(
     0xFF0C637E,
     <int, Color>{
@@ -18,12 +18,13 @@ class AppColors {
       900: Color(0xFF04364E),
     },
   );
-  static const Color primaryLight = Color(0xFF2891C2);   // Sky Blue from logo
-  static const Color primaryDark = Color(0xFF04364E);    // Deepest logo area
-  static const Color secondaryTeal = Color(0xFF2496A7);   // Mid Teal from logo
+  static const Color primaryLight = Color(0xFF2891C2); // Sky Blue
+  static const Color primaryDark = Color(0xFF04364E); // Deep
+  static const Color secondaryTeal = Color(0xFF2496A7); // Mid Teal
+  static const Color primaryPale = Color(0xFFE2F0F3); // Pale
   static const Color onPrimary = Colors.white;
 
-  // Secondary/Neutral colors — Charcoal
+  // Neutral — Charcoal / slate
   static const MaterialColor secondary = MaterialColor(
     0xFF3D4F5F,
     <int, Color>{
@@ -39,506 +40,514 @@ class AppColors {
       900: Color(0xFF1B2632),
     },
   );
+  static const Color charcoal = Color(0xFF3D4F5F);
 
-  // Status and Accent colors (Emerald/Amber/Red Palette)
-  static const Color accent = Color(0xFFFF6B6B);
-  static const Color success = Color(0xFF10B981); // Emerald 500
-  static const Color warning = Color(0xFFF59E0B); // Amber 500
-  static const Color error = Color(0xFFEF4444);   // Red 500
+  // Status colors
+  static const Color success = Color(0xFF10B981);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color error = Color(0xFFEF4444);
 
-  // Modern Palette
-  static const Color background = Color(0xFFF8FAFC); // Very light blue-gray
+  /// THE SOS / destructive token. Every SOS red in the app resolves to this
+  /// (or to `Theme.of(context).colorScheme.error`, which is this color, with a
+  /// darker shade of the same red in high-contrast mode).
+  static const Color sos = error;
+
+  /// Kept for backwards compatibility — maps to the SOS token (no extra hue).
+  static const Color accent = error;
+
+  // Surfaces
+  static const Color background = Color(0xFFF8FAFC); // slate 50
   static const Color surface = Color(0xFFFFFFFF);
-  static const Color glassSurface = Color(0xCCFFFFFF); // For glassmorphism
-  
-  static const Color onBackground = Color(0xFF0F172A); // Slate 900
-  static const Color onSurface = Color(0xFF1E293B);    // Slate 800
-  
+  static const Color glassSurface = Color(0xF2FFFFFF);
+  static const Color border = Color(0xFFE2E8F0); // slate 200
+  static const Color borderStrong = Color(0xFFCBD5E1); // slate 300
+
+  static const Color onBackground = Color(0xFF0F172A); // slate 900
+  static const Color onSurface = Color(0xFF1E293B); // slate 800
+  static const Color onSurfaceVariant = Color(0xFF64748B); // slate 500
+
   static const Color primaryBlue = Color(0xFF2891C2);
   static const Color primaryTeal = Color(0xFF2496A7);
   static const Color primaryNavy = Color(0xFF0C637E);
 
-  // Dark Mode specific
+  // Dark mode
   static const Color darkBackground = Color(0xFF0F172A);
   static const Color darkSurface = Color(0xFF1E293B);
+  static const Color darkSurfaceHigh = Color(0xFF273449);
+  static const Color darkBorder = Color(0xFF334155);
   static const Color darkOnSurface = Color(0xFFF1F5F9);
+  static const Color darkOnSurfaceVariant = Color(0xFF94A3B8);
 
-  // High Contrast overrides
+  // High contrast overrides
   static const Color hcBackground = Colors.white;
   static const Color hcSurface = Colors.white;
   static const Color hcOnSurface = Colors.black;
-  static const Color hcPrimary = Colors.black;
+  // High contrast keeps the brand: deepest navy-teal is ~12:1 on white
+  static const Color hcPrimary = AppColors.primaryDark;
   static const Color hcOnPrimary = Colors.white;
-  static const Color hcAccent = Color(0xFFD32F2F);
 
-  // MediFind Logo Gradient updated to new colors
+  /// High-contrast shade of the SOS token (same hue, WCAG AA on white).
+  static const Color hcAccent = Color(0xFFDC2626); // darker SOS red for AA contrast with white text
+
+  /// Brand gradient — reserved for the logo/splash only.
   static const List<Color> medifindGradient = [
-    Color(0xFF0C637E),  // dark navy teal
-    Color(0xFF2496A7),  // mid teal
-    Color(0xFF2891C2),  // sky blue
+    Color(0xFF0C637E),
+    Color(0xFF2496A7),
+    Color(0xFF2891C2),
   ];
 }
+
+/// Flat elevation. Cards use 1px borders; shadows are kept subtle.
 class AppShadows {
-  // Modern Elevation (Soft Shadows)
-  static List<BoxShadow> get softShadow {
-    return [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.05),
-        offset: const Offset(0, 4),
-        blurRadius: 12,
-        spreadRadius: 0,
-      ),
-    ];
-  }
+  static List<BoxShadow> get softShadow => [
+        BoxShadow(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.04),
+          offset: const Offset(0, 1),
+          blurRadius: 2,
+        ),
+      ];
 
-  // Modern Card Shadow
-  static List<BoxShadow> get cardShadow {
-    return [
-      BoxShadow(
-        color: const Color(0xFF0C637E).withOpacity(0.08),
-        offset: const Offset(0, 8),
-        blurRadius: 24,
-        spreadRadius: -4,
-      ),
-    ];
-  }
+  static List<BoxShadow> get cardShadow => [
+        BoxShadow(
+          color: const Color(0xFF0F172A).withValues(alpha: 0.06),
+          offset: const Offset(0, 2),
+          blurRadius: 6,
+        ),
+      ];
 
-  // ALIASES for compatibility during transition
-  static List<BoxShadow> get neumorphicOut => cardShadow;
+  // ALIASES for compatibility
+  static List<BoxShadow> get neumorphicOut => softShadow;
   static List<BoxShadow> get neumorphicIn => softShadow;
+  static List<BoxShadow> get glassShadow => cardShadow;
 
-  // Glassmorphism effect shadow
-  static List<BoxShadow> get glassShadow {
-    return [
-      BoxShadow(
-        color: Colors.black.withOpacity(0.03),
-        offset: const Offset(0, 8),
-        blurRadius: 32,
-        spreadRadius: 0,
-      ),
-    ];
-  }
-
-  // SOS specific massive shadow
-  static List<BoxShadow> get sosMassiveGlow {
-    return [
-      BoxShadow(
-        color: AppColors.error.withOpacity(0.3),
-        blurRadius: 40,
-        spreadRadius: 8,
-      ),
-      BoxShadow(
-        color: AppColors.error.withOpacity(0.15),
-        blurRadius: 20,
-        spreadRadius: 2,
-      ),
-    ];
-  }
+  /// Formerly a large glow; now a restrained shadow.
+  static List<BoxShadow> get sosMassiveGlow => [
+        BoxShadow(
+          color: AppColors.sos.withValues(alpha: 0.18),
+          offset: const Offset(0, 4),
+          blurRadius: 12,
+        ),
+      ];
 }
 
 class AppTextStyles {
-  // Same styles as before, just mapped correctly
-  // Display styles
-  static const TextStyle displayLarge = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 57,
-    fontWeight: FontWeight.bold,
-    letterSpacing: -0.25,
-  );
+  static const String family = 'Montserrat';
 
-  static const TextStyle displayMedium = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 45,
-    fontWeight: FontWeight.bold,
-  );
+  static const TextStyle displayLarge = TextStyle(fontFamily: family, fontSize: 57, fontWeight: FontWeight.w600, letterSpacing: -0.25, height: 1.12);
+  static const TextStyle displayMedium = TextStyle(fontFamily: family, fontSize: 45, fontWeight: FontWeight.w600, height: 1.16);
+  static const TextStyle displaySmall = TextStyle(fontFamily: family, fontSize: 36, fontWeight: FontWeight.w600, height: 1.2);
 
-  static const TextStyle displaySmall = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 36,
-    fontWeight: FontWeight.bold,
-  );
+  static const TextStyle headlineLarge = TextStyle(fontFamily: family, fontSize: 30, fontWeight: FontWeight.w600, height: 1.25);
+  static const TextStyle headlineMedium = TextStyle(fontFamily: family, fontSize: 26, fontWeight: FontWeight.w600, height: 1.28);
+  static const TextStyle headlineSmall = TextStyle(fontFamily: family, fontSize: 22, fontWeight: FontWeight.w600, height: 1.3);
 
-  // Headline styles
-  static const TextStyle headlineLarge = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 32,
-    fontWeight: FontWeight.bold,
-  );
+  static const TextStyle titleLarge = TextStyle(fontFamily: family, fontSize: 18, fontWeight: FontWeight.w600, height: 1.35);
+  static const TextStyle titleMedium = TextStyle(fontFamily: family, fontSize: 16, fontWeight: FontWeight.w600, height: 1.4);
+  static const TextStyle titleSmall = TextStyle(fontFamily: family, fontSize: 14, fontWeight: FontWeight.w600, height: 1.4);
 
-  static const TextStyle headlineMedium = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 28,
-    fontWeight: FontWeight.bold,
-  );
+  static const TextStyle bodyLarge = TextStyle(fontFamily: family, fontSize: 16, fontWeight: FontWeight.w400, height: 1.5);
+  static const TextStyle bodyMedium = TextStyle(fontFamily: family, fontSize: 14, fontWeight: FontWeight.w400, height: 1.45);
+  static const TextStyle bodySmall = TextStyle(fontFamily: family, fontSize: 12, fontWeight: FontWeight.w400, height: 1.4);
 
-  static const TextStyle headlineSmall = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 24,
-    fontWeight: FontWeight.bold,
-  );
-
-  // Title styles
-  static const TextStyle titleLarge = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 22,
-    fontWeight: FontWeight.w600,
-  );
-
-  static const TextStyle titleMedium = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 16,
-    fontWeight: FontWeight.w600,
-  );
-
-  static const TextStyle titleSmall = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 14,
-    fontWeight: FontWeight.w600,
-  );
-
-  // Body styles
-  static const TextStyle bodyLarge = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 16,
-    fontWeight: FontWeight.w400,
-  );
-
-  static const TextStyle bodyMedium = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 14,
-    fontWeight: FontWeight.w400,
-  );
-
-  static const TextStyle bodySmall = TextStyle(
-    fontFamily: 'Montserrat',
-    fontSize: 12,
-    fontWeight: FontWeight.w400,
-  );
+  static const TextStyle labelLarge = TextStyle(fontFamily: family, fontSize: 14, fontWeight: FontWeight.w600, height: 1.3);
+  static const TextStyle labelMedium = TextStyle(fontFamily: family, fontSize: 12, fontWeight: FontWeight.w600, height: 1.3);
+  static const TextStyle labelSmall = TextStyle(fontFamily: family, fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.4, height: 1.3);
 }
 
 class AppTheme {
+  static const double _radius = 12;
+
   static ThemeData buildTheme(AccessibilitySettings settings) {
     final hc = settings.highContrast;
-    final bg     = hc ? AppColors.hcBackground : AppColors.background;
-    final surf   = hc ? AppColors.hcSurface    : AppColors.surface;
-    final onSurf = hc ? AppColors.hcOnSurface  : AppColors.onSurface;
-    final prim   = hc ? AppColors.hcPrimary    : AppColors.primary;
+    final bg = hc ? AppColors.hcBackground : AppColors.background;
+    final surf = hc ? AppColors.hcSurface : AppColors.surface;
+    final onSurf = hc ? AppColors.hcOnSurface : AppColors.onSurface;
+    final onSurfVar = hc ? Colors.black : AppColors.onSurfaceVariant;
+    final prim = hc ? AppColors.hcPrimary : AppColors.primary;
+    final sos = hc ? AppColors.hcAccent : AppColors.sos;
+    final border = hc ? AppColors.primaryDark : AppColors.border;
+    final borderStrong = hc ? AppColors.primaryDark : AppColors.borderStrong;
+
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: Brightness.light,
+    ).copyWith(
+      primary: prim,
+      onPrimary: hc ? AppColors.hcOnPrimary : Colors.white,
+      primaryContainer: hc ? Colors.white : AppColors.primaryPale,
+      onPrimaryContainer: hc ? AppColors.primaryDark : AppColors.primaryDark,
+      secondary: hc ? AppColors.primaryDark : AppColors.secondaryTeal,
+      onSecondary: Colors.white,
+      tertiary: hc ? AppColors.primaryDark : AppColors.primaryLight,
+      surface: surf,
+      onSurface: onSurf,
+      onSurfaceVariant: onSurfVar,
+      surfaceContainerLowest: Colors.white,
+      surfaceContainerLow: hc ? Colors.white : const Color(0xFFF8FAFC),
+      surfaceContainer: hc ? Colors.white : const Color(0xFFF1F5F9),
+      surfaceContainerHigh: hc ? Colors.white : const Color(0xFFEEF2F6),
+      surfaceContainerHighest: hc ? Colors.white : const Color(0xFFE2E8F0),
+      outline: borderStrong,
+      outlineVariant: border,
+      error: sos,
+      onError: Colors.white,
+      errorContainer: sos.withValues(alpha: 0.10),
+      onErrorContainer: hc ? Colors.black : const Color(0xFF991B1B),
+      surfaceTint: Colors.transparent,
+    );
+
+    return _build(
+      settings: settings,
+      scheme: scheme,
+      scaffold: bg,
+      borderWidth: hc ? 2 : 1,
+    );
+  }
+
+  static ThemeData buildDarkTheme(AccessibilitySettings settings) {
+    final scheme = ColorScheme.fromSeed(
+      seedColor: AppColors.primary,
+      brightness: Brightness.dark,
+    ).copyWith(
+      primary: AppColors.primaryLight,
+      onPrimary: Colors.white,
+      primaryContainer: AppColors.primaryDark,
+      onPrimaryContainer: AppColors.primaryPale,
+      secondary: AppColors.secondaryTeal,
+      onSecondary: Colors.white,
+      tertiary: AppColors.primaryLight,
+      surface: AppColors.darkSurface,
+      onSurface: AppColors.darkOnSurface,
+      onSurfaceVariant: AppColors.darkOnSurfaceVariant,
+      surfaceContainerLowest: AppColors.darkBackground,
+      surfaceContainerLow: const Color(0xFF172033),
+      surfaceContainer: AppColors.darkSurface,
+      surfaceContainerHigh: AppColors.darkSurfaceHigh,
+      surfaceContainerHighest: AppColors.darkBorder,
+      outline: const Color(0xFF475569),
+      outlineVariant: AppColors.darkBorder,
+      error: AppColors.sos,
+      onError: Colors.white,
+      errorContainer: AppColors.sos.withValues(alpha: 0.2),
+      onErrorContainer: const Color(0xFFFECACA),
+      surfaceTint: Colors.transparent,
+    );
+    return _build(
+      settings: settings,
+      scheme: scheme,
+      scaffold: AppColors.darkBackground,
+      borderWidth: 1,
+    );
+  }
+
+  static ThemeData _build({
+    required AccessibilitySettings settings,
+    required ColorScheme scheme,
+    required Color scaffold,
+    required double borderWidth,
+  }) {
+    final isDark = scheme.brightness == Brightness.dark;
+    final hc = settings.highContrast && !isDark;
+    final textTheme = _buildTextTheme().apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    );
+    final buttonVertical = settings.largeButtons ? 20.0 : 14.0;
+    final borderSide = BorderSide(color: scheme.outlineVariant, width: borderWidth);
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius));
+    final buttonText = AppTextStyles.labelLarge.copyWith(fontSize: 15);
+    // Buttons use navy-teal (#0C637E): white text contrast 6.5:1.
+    final buttonBg = hc ? AppColors.primaryDark : (isDark ? AppColors.primaryLight : AppColors.primary);
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.light,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
-        brightness: Brightness.light,
-        primary:    prim,
-        onPrimary:  hc ? AppColors.hcOnPrimary : Colors.white,
-        secondary:  AppColors.secondaryTeal,
-        surface:    surf,
-        onSurface:  onSurf,
-        error:      hc ? AppColors.hcAccent : AppColors.error,
-      ),
-      scaffoldBackgroundColor: bg,
-      fontFamily: 'Montserrat',
-      textTheme: _buildTextTheme(settings),
+      brightness: scheme.brightness,
+      colorScheme: scheme,
+      scaffoldBackgroundColor: scaffold,
+      canvasColor: scaffold,
+      fontFamily: AppTextStyles.family,
+      textTheme: textTheme,
+      visualDensity: VisualDensity.standard,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
+      splashFactory: InkRipple.splashFactory,
 
-      // ── AppBar ─────────────────────────────────────────────────────
       appBarTheme: AppBarTheme(
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.onSurface,
+        backgroundColor: scheme.surface,
+        foregroundColor: scheme.onSurface,
         elevation: 0,
-        centerTitle: true,
+        scrolledUnderElevation: 0,
+        centerTitle: false,
         shadowColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        iconTheme: const IconThemeData(color: AppColors.onSurface),
-        titleTextStyle: TextStyle(
-          fontFamily: 'Montserrat',
-          fontSize: 18, // scaled app-wide via MediaQuery.textScaler
-          fontWeight: FontWeight.w700,
-          color: AppColors.onSurface,
-        ),
+        iconTheme: IconThemeData(color: scheme.onSurface),
+        titleTextStyle: AppTextStyles.titleLarge.copyWith(color: scheme.onSurface),
+        shape: Border(bottom: borderSide),
       ),
 
-      // ── Card ───────────────────────────────────────────────────────
       cardTheme: CardThemeData(
-        color: Colors.white,
+        color: scheme.surface,
         elevation: 0,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-
-      // ── Bottom Navigation ──────────────────────────────────────────
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.white,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: Color(0xFF94A3B8),
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        selectedLabelStyle: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w700, fontSize: 11),
-        unselectedLabelStyle: TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w500, fontSize: 11),
-      ),
-
-      // ── Divider ────────────────────────────────────────────────────
-      dividerTheme: DividerThemeData(
-        color: Colors.grey.shade200,
-        thickness: 1,
-        space: 0,
-      ),
-
-      // ── Icon ───────────────────────────────────────────────────────
-      iconTheme: const IconThemeData(color: AppColors.primary),
-
-      // ── Dialog ─────────────────────────────────────────────────────
-      dialogTheme: DialogThemeData(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-          color: AppColors.onSurface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(_radius),
+          side: borderSide,
         ),
       ),
 
-      // ── Chip ───────────────────────────────────────────────────────
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        height: 72,
+        indicatorColor: hc ? AppColors.primaryDark : scheme.primaryContainer,
+        indicatorShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            size: 24,
+            color: selected
+                ? (hc ? Colors.white : (isDark ? AppColors.primaryLight : AppColors.primary))
+                : scheme.onSurfaceVariant,
+          );
+        }),
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return AppTextStyles.labelMedium.copyWith(
+            color: selected ? scheme.onSurface : scheme.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          );
+        }),
+      ),
+
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: scheme.surface,
+        selectedItemColor: scheme.primary,
+        unselectedItemColor: scheme.onSurfaceVariant,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        selectedLabelStyle: AppTextStyles.labelMedium,
+        unselectedLabelStyle: AppTextStyles.labelMedium.copyWith(fontWeight: FontWeight.w500),
+      ),
+
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant, thickness: 1, space: 1),
+
+      iconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 24),
+
+      dialogTheme: DialogThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        titleTextStyle: AppTextStyles.titleLarge.copyWith(color: scheme.onSurface),
+        contentTextStyle: AppTextStyles.bodyMedium.copyWith(color: scheme.onSurfaceVariant),
+      ),
+
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: scheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        showDragHandle: false,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+      ),
+
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: isDark ? AppColors.darkSurfaceHigh : AppColors.onSurface,
+        contentTextStyle: AppTextStyles.bodyMedium.copyWith(color: Colors.white),
+        actionTextColor: AppColors.primaryPale,
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.background,
-        labelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w600, fontSize: 13),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        backgroundColor: scheme.surface,
+        selectedColor: scheme.primaryContainer,
+        side: borderSide,
+        labelStyle: AppTextStyles.labelLarge.copyWith(color: scheme.onSurface),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
 
-      // ── ListTile ───────────────────────────────────────────────────
-      listTileTheme: const ListTileThemeData(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      listTileTheme: ListTileThemeData(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        minVerticalPadding: 12,
+        iconColor: scheme.onSurfaceVariant,
+        textColor: scheme.onSurface,
+        titleTextStyle: AppTextStyles.titleSmall.copyWith(color: scheme.onSurface),
+        subtitleTextStyle: AppTextStyles.bodySmall.copyWith(color: scheme.onSurfaceVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
       ),
 
-      elevatedButtonTheme: _buildElevatedButtonTheme(settings, isDark: false),
-      inputDecorationTheme: _buildInputDecorationTheme(settings),
+      switchTheme: SwitchThemeData(
+        thumbColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? Colors.white : scheme.outline),
+        trackColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? buttonBg : scheme.surfaceContainerHighest),
+        trackOutlineColor: WidgetStateProperty.resolveWith((s) =>
+            s.contains(WidgetState.selected) ? Colors.transparent : scheme.outline),
+      ),
+
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: buttonBg,
+        linearTrackColor: scheme.surfaceContainerHighest,
+        circularTrackColor: Colors.transparent,
+      ),
+
+      tabBarTheme: TabBarThemeData(
+        labelColor: scheme.onSurface,
+        unselectedLabelColor: scheme.onSurfaceVariant,
+        indicatorColor: buttonBg,
+        dividerColor: scheme.outlineVariant,
+        labelStyle: AppTextStyles.labelLarge,
+        unselectedLabelStyle: AppTextStyles.labelLarge.copyWith(fontWeight: FontWeight.w500),
+      ),
+
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: buttonBg,
+        foregroundColor: Colors.white,
+        elevation: 1,
+        highlightElevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonBg,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: scheme.surfaceContainerHighest,
+          disabledForegroundColor: scheme.onSurfaceVariant,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          minimumSize: const Size(48, 48),
+          padding: EdgeInsets.symmetric(vertical: buttonVertical, horizontal: 20),
+          textStyle: buttonText,
+          shape: shape,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: buttonBg,
+          foregroundColor: Colors.white,
+          disabledBackgroundColor: scheme.surfaceContainerHighest,
+          disabledForegroundColor: scheme.onSurfaceVariant,
+          minimumSize: const Size(48, 48),
+          padding: EdgeInsets.symmetric(vertical: buttonVertical, horizontal: 20),
+          textStyle: buttonText,
+          shape: shape,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: hc ? AppColors.primaryDark : (isDark ? AppColors.primaryLight : AppColors.primary),
+          minimumSize: const Size(48, 48),
+          padding: EdgeInsets.symmetric(vertical: buttonVertical, horizontal: 20),
+          side: BorderSide(color: scheme.outline, width: borderWidth),
+          textStyle: buttonText,
+          shape: shape,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: hc ? AppColors.primaryDark : (isDark ? AppColors.primaryLight : AppColors.primary),
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          textStyle: buttonText,
+          shape: shape,
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(48, 48),
+          foregroundColor: scheme.onSurface,
+        ),
+      ),
+
+      inputDecorationTheme: _buildInputDecorationTheme(scheme, hc: hc, isDark: isDark),
 
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: ZoomPageTransitionsBuilder(allowEnterRouteSnapshotting: false),
+          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: ZoomPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
         },
       ),
     );
   }
 
-  static ThemeData buildDarkTheme(AccessibilitySettings settings) {
-    return ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
-        brightness: Brightness.dark,
-        primary: AppColors.primaryLight,
-        onPrimary: Colors.white,
-        secondary: AppColors.secondaryTeal,
-        surface: AppColors.darkSurface,
-        onSurface: AppColors.darkOnSurface,
-        error: AppColors.error,
-      ),
-      scaffoldBackgroundColor: AppColors.darkBackground,
-      fontFamily: 'Montserrat',
-      textTheme: _buildTextTheme(settings).apply(
-        bodyColor: AppColors.darkOnSurface,
-        displayColor: Colors.white,
-      ),
-      appBarTheme: const AppBarTheme(
-        backgroundColor: Color(0xFF1E293B),
-        foregroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        shadowColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        titleTextStyle: TextStyle(
-          fontFamily: 'Montserrat',
-          fontSize: 18,
-          fontWeight: FontWeight.w700,
-          color: Colors.white,
-        ),
-      ),
-      cardTheme: CardThemeData(
-        color: AppColors.darkSurface,
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      ),
-      bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: AppColors.darkSurface,
-        selectedItemColor: AppColors.primaryLight,
-        unselectedItemColor: Colors.white.withOpacity(0.4),
-        type: BottomNavigationBarType.fixed,
-        elevation: 0,
-        selectedLabelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w700, fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontFamily: 'Montserrat', fontWeight: FontWeight.w500, fontSize: 11),
-      ),
-      dividerTheme: DividerThemeData(
-        color: Colors.white.withOpacity(0.08),
-        thickness: 1,
-        space: 0,
-      ),
-      iconTheme: const IconThemeData(color: AppColors.primaryLight),
-      dialogTheme: DialogThemeData(
-        backgroundColor: AppColors.darkSurface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        titleTextStyle: const TextStyle(
-          fontFamily: 'Montserrat',
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-          color: Colors.white,
-        ),
-      ),
-      elevatedButtonTheme: _buildElevatedButtonTheme(settings, isDark: true),
-      inputDecorationTheme: _buildInputDecorationTheme(settings).copyWith(
-        fillColor: AppColors.darkSurface,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.1), width: 1.5),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: AppColors.primaryLight, width: 2),
-        ),
-      ),
+  static TextTheme _buildTextTheme() {
+    // Font scaling is applied app-wide via MediaQuery.textScaler in main.dart.
+    return Typography.blackMountainView.copyWith(
+      displayLarge: AppTextStyles.displayLarge,
+      displayMedium: AppTextStyles.displayMedium,
+      displaySmall: AppTextStyles.displaySmall,
+      headlineLarge: AppTextStyles.headlineLarge,
+      headlineMedium: AppTextStyles.headlineMedium,
+      headlineSmall: AppTextStyles.headlineSmall,
+      titleLarge: AppTextStyles.titleLarge,
+      titleMedium: AppTextStyles.titleMedium,
+      titleSmall: AppTextStyles.titleSmall,
+      bodyLarge: AppTextStyles.bodyLarge,
+      bodyMedium: AppTextStyles.bodyMedium,
+      bodySmall: AppTextStyles.bodySmall,
+      labelLarge: AppTextStyles.labelLarge,
+      labelMedium: AppTextStyles.labelMedium,
+      labelSmall: AppTextStyles.labelSmall,
     );
   }
 
-  static TextTheme _buildTextTheme(AccessibilitySettings settings) {
-    const baseTextTheme = Typography.blackMountainView;
-    // Font scaling is applied app-wide via MediaQuery.textScaler in main.dart;
-    // multiplying here as well would scale text twice.
-    const m = 1.0;
-
-    return baseTextTheme.copyWith(
-      displayLarge: AppTextStyles.displayLarge.copyWith(fontSize: 57 * m),
-      displayMedium: AppTextStyles.displayMedium.copyWith(fontSize: 45 * m),
-      displaySmall: AppTextStyles.displaySmall.copyWith(fontSize: 36 * m),
-      headlineLarge: AppTextStyles.headlineLarge.copyWith(fontSize: 32 * m),
-      headlineMedium: AppTextStyles.headlineMedium.copyWith(fontSize: 28 * m),
-      headlineSmall: AppTextStyles.headlineSmall.copyWith(fontSize: 24 * m),
-      titleLarge: AppTextStyles.titleLarge.copyWith(fontSize: 22 * m),
-      titleMedium: AppTextStyles.titleMedium.copyWith(fontSize: 16 * m),
-      titleSmall: AppTextStyles.titleSmall.copyWith(fontSize: 14 * m),
-      bodyLarge: AppTextStyles.bodyLarge.copyWith(fontSize: 16 * m),
-      bodyMedium: AppTextStyles.bodyMedium.copyWith(fontSize: 14 * m),
-      bodySmall: AppTextStyles.bodySmall.copyWith(fontSize: 12 * m),
-    );
-  }
-
-  // isDark = true  → renders on a dark scaffold (use sky blue for contrast)
-  // isDark = false → renders on a light scaffold (use sky blue; primary navy is too dark)
-  static ElevatedButtonThemeData _buildElevatedButtonTheme(
-    AccessibilitySettings settings, {
-    bool isDark = false,
+  static InputDecorationTheme _buildInputDecorationTheme(
+    ColorScheme scheme, {
+    required bool hc,
+    required bool isDark,
   }) {
-    final Color bgColor = settings.highContrast
-        ? Colors.black
-        : isDark
-            ? AppColors.primaryLight   // #2891C2 Sky Blue on dark background
-            : AppColors.primaryLight;  // #2891C2 Sky Blue on light background (primary navy is too dark)
-
-    return ElevatedButtonThemeData(
-      style: ElevatedButton.styleFrom(
-        backgroundColor: bgColor,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        shadowColor: Colors.transparent,
-        padding: EdgeInsets.symmetric(
-          vertical: settings.largeButtons ? 24 : 16,
-          horizontal: 24,
-        ),
-        textStyle: TextStyle(
-          fontSize: 16, // scaled app-wide via MediaQuery.textScaler
-          fontWeight: FontWeight.bold,
-          fontFamily: 'Montserrat',
-          letterSpacing: 0.3,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-      ),
-    );
-  }
-
-  static InputDecorationTheme _buildInputDecorationTheme(AccessibilitySettings settings) {
-    // Colors reused in multiple places
-    const normalBorderColor = Color(0xFFCFD8DC); // blue-grey 100 — soft, neutral
-    const errorBorderColor  = Color(0xFFEF9A9A); // red 200 — light pink, not alarming
-    const labelGrey         = Color(0xFF78909C); // blue-grey 400
-    const iconGrey          = Color(0xFF90A4AE); // blue-grey 300
+    final normal = BorderSide(color: hc ? AppColors.primaryDark : scheme.outline, width: hc ? 2 : 1);
+    final focusColor = hc ? AppColors.primaryDark : (isDark ? AppColors.primaryLight : AppColors.primary);
+    OutlineInputBorder b(BorderSide side) => OutlineInputBorder(
+          borderRadius: BorderRadius.circular(_radius),
+          borderSide: side,
+        );
 
     return InputDecorationTheme(
       filled: true,
-      fillColor: Colors.white,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-
-      // ── Normal border ──────────────────────────────────────────────────
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast
-            ? const BorderSide(color: Colors.black, width: 2)
-            : const BorderSide(color: normalBorderColor, width: 1.5),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: settings.highContrast
-            ? const BorderSide(color: Colors.black, width: 2)
-            : const BorderSide(color: normalBorderColor, width: 1.5),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: BorderSide(
-          color: settings.highContrast ? Colors.black : AppColors.primary,
-          width: 2,
-        ),
-      ),
-
-      // ── Error border — soft pink, NOT full red ─────────────────────────
-      // Only the border changes subtly; the label and icon do NOT turn red.
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: errorBorderColor, width: 1.5),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: errorBorderColor, width: 2),
-      ),
-
-      // ── Error message — small, clear, below the field only ─────────────
-      errorStyle: const TextStyle(
-        fontSize: 11.5,
-        fontWeight: FontWeight.w500,
-        color: Color(0xFFC62828), // deep red — readable but compact
-        height: 1.4,
-      ),
-
-      // ── Label — stays grey at ALL times, never turns red ───────────────
+      fillColor: scheme.surface,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      border: b(normal),
+      enabledBorder: b(normal),
+      disabledBorder: b(BorderSide(color: scheme.outlineVariant)),
+      focusedBorder: b(BorderSide(color: focusColor, width: 2)),
+      errorBorder: b(BorderSide(color: scheme.error, width: 1.5)),
+      focusedErrorBorder: b(BorderSide(color: scheme.error, width: 2)),
+      errorStyle: AppTextStyles.bodySmall.copyWith(color: scheme.error, fontWeight: FontWeight.w500),
+      errorMaxLines: 3,
+      hintStyle: AppTextStyles.bodyMedium.copyWith(color: scheme.onSurfaceVariant),
+      helperStyle: AppTextStyles.bodySmall.copyWith(color: scheme.onSurfaceVariant),
       labelStyle: WidgetStateTextStyle.resolveWith((states) {
         if (states.contains(WidgetState.focused)) {
-          return const TextStyle(fontSize: 14, color: AppColors.primary);
+          return AppTextStyles.bodyMedium.copyWith(color: focusColor);
         }
-        return const TextStyle(fontSize: 14, color: labelGrey);
+        return AppTextStyles.bodyMedium.copyWith(color: scheme.onSurfaceVariant);
       }),
       floatingLabelStyle: WidgetStateTextStyle.resolveWith((states) {
-        if (states.contains(WidgetState.focused)) {
-          return const TextStyle(color: AppColors.primary, fontWeight: FontWeight.w500);
+        if (states.contains(WidgetState.error)) {
+          return AppTextStyles.labelLarge.copyWith(color: scheme.error);
         }
-        // error state AND normal floating: both stay grey — no red label
-        return const TextStyle(color: labelGrey, fontWeight: FontWeight.w500);
+        if (states.contains(WidgetState.focused)) {
+          return AppTextStyles.labelLarge.copyWith(color: focusColor);
+        }
+        return AppTextStyles.labelLarge.copyWith(color: scheme.onSurfaceVariant);
       }),
-
-      // ── Icons — stay grey at ALL times, never turn red ─────────────────
       prefixIconColor: WidgetStateColor.resolveWith((states) {
-        if (states.contains(WidgetState.focused)) return AppColors.primary;
-        return iconGrey;
+        if (states.contains(WidgetState.focused)) return focusColor;
+        return scheme.onSurfaceVariant;
       }),
       suffixIconColor: WidgetStateColor.resolveWith((states) {
-        if (states.contains(WidgetState.focused)) return AppColors.primary;
-        return iconGrey;
+        if (states.contains(WidgetState.focused)) return focusColor;
+        return scheme.onSurfaceVariant;
       }),
     );
   }
 }
-

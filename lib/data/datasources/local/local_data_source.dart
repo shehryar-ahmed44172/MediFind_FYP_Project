@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../core/utils/exceptions.dart';
+import '../../../services/notification/push_core.dart';
 
 /// LocalDataSource stores all data as JSON strings in Hive boxes.
 /// This avoids the need for HiveAdapters on Freezed-generated classes.
@@ -40,6 +41,7 @@ class LocalDataSource {
   Future<void> saveAuthToken(String token) async {
     try {
       await _authBox.put(AppConstants.jwtTokenKey, token);
+      await _mirror(() => PushSessionStore.saveAccessToken(token));
     } catch (e) {
       throw DatabaseException(message: 'Failed to save auth token', originalException: e);
     }
@@ -48,6 +50,7 @@ class LocalDataSource {
   Future<void> saveRefreshToken(String token) async {
     try {
       await _authBox.put('refresh_token', token);
+      await _mirror(() => PushSessionStore.saveRefreshToken(token));
     } catch (e) {
       throw DatabaseException(message: 'Failed to save refresh token', originalException: e);
     }
@@ -73,6 +76,7 @@ class LocalDataSource {
     try {
       // Clear entire box to remove token, refresh_token, current_user_id, and current_user_role
       await _authBox.clear();
+      await _mirror(PushSessionStore.clear);
     } catch (e) {
       throw DatabaseException(message: 'Failed to clear tokens', originalException: e);
     }
@@ -80,6 +84,7 @@ class LocalDataSource {
 
   Future<void> saveCurrentUserId(String userId) async {
     await _authBox.put('current_user_id', userId);
+    await _mirror(() => PushSessionStore.saveUserId(userId));
   }
 
   Future<String?> getCurrentUserId() async {
@@ -88,10 +93,21 @@ class LocalDataSource {
 
   Future<void> saveCurrentUserRole(String role) async {
     await _authBox.put('current_user_role', role);
+    await _mirror(() => PushSessionStore.saveRole(role));
   }
 
   Future<String?> getCurrentUserRole() async {
     return _authBox.get('current_user_role');
+  }
+
+  /// The background push service (separate isolate) cannot share Hive, so the
+  /// session is mirrored to SharedPreferences. Mirroring must never break auth.
+  Future<void> _mirror(Future<void> Function() write) async {
+    try {
+      await write();
+    } catch (e) {
+      debugPrint('Push session mirror failed: $e');
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -262,6 +278,7 @@ class LocalDataSource {
         _caregiverBox.clear(),
         _generalBox.clear(),
       ]);
+      await _mirror(PushSessionStore.clear);
     } catch (e) {
       throw DatabaseException(message: 'Failed to clear all data', originalException: e);
     }

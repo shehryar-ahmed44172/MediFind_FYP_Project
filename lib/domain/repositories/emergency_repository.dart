@@ -9,8 +9,9 @@ abstract class EmergencyRepository {
     String emergencyType,
     double latitude,
     double longitude,
-    String? additionalInfo,
-  );
+    String? additionalInfo, {
+    bool isMocked = false,
+  });
   
   Future<Emergency> getEmergency(String emergencyId);
   
@@ -48,7 +49,8 @@ abstract class EmergencyRepository {
 
   Future<void> cancelEmergency(String emergencyId);
 
-  Future<void> resolveEmergency(String emergencyId);
+  /// Closes the emergency with an optional [outcome] and [note].
+  Future<void> resolveEmergency(String emergencyId, {String? outcome, String? note});
   
   Future<void> cancelAssignment(String emergencyId);
 

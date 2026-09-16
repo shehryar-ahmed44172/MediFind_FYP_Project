@@ -40,8 +40,8 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
   }
 
   @override
-  Future<void> resolveEmergency(String emergencyId) async {
-    await apiClient.resolveEmergency(emergencyId);
+  Future<void> resolveEmergency(String emergencyId, {String? outcome, String? note}) async {
+    await apiClient.resolveEmergency(emergencyId, outcome: outcome, note: note);
     final cached = await localDataSource.getEmergency(emergencyId);
     if (cached != null) {
       cached['status'] = 'RESOLVED';
@@ -197,13 +197,15 @@ class EmergencyRepositoryImpl implements EmergencyRepository {
     String emergencyType,
     double latitude,
     double longitude,
-    String? additionalInfo,
-  ) async {
+    String? additionalInfo, {
+    bool isMocked = false,
+  }) async {
     final result = await apiClient.createEmergency(
       emergencyType,
       latitude,
       longitude,
       additionalInfo,
+      isMocked: isMocked,
     );
     await localDataSource.saveEmergency(_emergencyToMap(result.emergency));
     return result;

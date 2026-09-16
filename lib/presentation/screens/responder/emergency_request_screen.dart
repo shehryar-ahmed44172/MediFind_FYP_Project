@@ -2,15 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/emergency_provider.dart';
-import '../../theme/app_theme.dart';
 import 'dart:async';
 import '../../../services/audio/voice_alert_service.dart';
 import '../../../services/location/location_service.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/chat_provider.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../../domain/entities/emergency.dart' as emergency_entity;
 import '../../../core/utils/emergency_status.dart';
+import '../../widgets/design_system/design_system.dart';
+import 'widgets/responder_widgets.dart';
 
 class EmergencyRequestScreen extends ConsumerStatefulWidget {
   final String requestId;
@@ -30,11 +32,16 @@ class _EmergencyRequestScreenState
   /// Distance from the responder, computed ONCE (not on every rebuild).
   Future<String>? _distanceFuture;
 
+  /// ETA derived from the same one-off distance calculation (display only).
+  String? _etaText;
+
   Future<String> _distanceTo(double lat, double lng) {
     return _distanceFuture ??= () async {
       try {
         final position = await LocationService().getCurrentLocation();
         final km = GeoUtils.haversineKm(position.latitude, position.longitude, lat, lng);
+        final eta = GeoUtils.etaMinutes(km);
+        _etaText = eta == 0 ? 'Arriving' : '~$eta min';
         return '${GeoUtils.formatDistance(km)} away';
       } catch (_) {
         return 'Distance unavailable';
@@ -44,7 +51,7 @@ class _EmergencyRequestScreenState
 
   Future<void> _accept() async {
     setState(() => _isAccepting = true);
-    
+
     try {
       final responderId = await ref.read(currentUserIdProvider.future) ?? '';
 
@@ -55,7 +62,7 @@ class _EmergencyRequestScreenState
         emergencyId: widget.requestId,
         responderId: responderId,
       )).future);
-      
+
       final voiceEnabled = ref.read(accessibilityProvider).voiceGuidanceEnabled;
 
       if (voiceEnabled) {
@@ -76,19 +83,13 @@ class _EmergencyRequestScreenState
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not accept: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Could not accept: $e', tone: MfTone.danger);
         ref.invalidate(getEmergencyProvider(widget.requestId));
         setState(() => _isAccepting = false);
       }
       return;
     }
-    
+
     // Navigate immediately to active emergency screen
     if (mounted) {
       context.go('/responder/active/${widget.requestId}');
@@ -96,22 +97,15 @@ class _EmergencyRequestScreenState
   }
 
   Future<void> _reject() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Decline this request?'),
-        content: const Text('It will be offered to other nearby responders.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Decline'),
-          ),
-        ],
-      ),
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Decline this request?',
+      message: 'It will be offered to other nearby responders.',
+      confirmLabel: 'Decline',
+      cancelLabel: 'Keep',
+      destructive: true,
     );
-    if (confirmed != true || !mounted) return;
+    if (!confirmed || !mounted) return;
 
     setState(() => _isRejecting = true);
     try {
@@ -129,56 +123,56 @@ class _EmergencyRequestScreenState
     }
   }
 
+  /// Opens the emergency chat with the patient (same room mechanism as the
+  /// active emergency screen). Used by the deaf-patient banner.
+  Future<void> _openEmergencyChat(String patientUserId) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const MfLoading(label: 'Opening chat'),
+    );
+    try {
+      final room = await ref.read(chatRepositoryProvider).createOrGetChatRoom(
+            patientUserId,
+            emergencyId: widget.requestId,
+          );
+      if (!mounted) return;
+      Navigator.pop(context);
+      context.push('/chat/${room.id}', extra: 'Patient');
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context);
+      showMfSnackBar(context, 'Could not open chat: $e', tone: MfTone.danger);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final emergencyAsync = ref.watch(getEmergencyProvider(widget.requestId));
-    final theme = Theme.of(context);
 
-    return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Emergency Request'),
-        centerTitle: true,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          tooltip: 'Back',
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/responder');
-            }
-          },
-        ),
-      ),
+    return MfScaffold(
+      title: 'Emergency request',
+      fallbackRoute: '/responder',
       body: emergencyAsync.when(
-        data: (emergency) => _buildContent(context, theme, emergency as emergency_entity.Emergency?),
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
-                const SizedBox(height: 12),
-                Text('Could not load this emergency.\n$e', textAlign: TextAlign.center),
-                const SizedBox(height: 16),
-                OutlinedButton.icon(
-                  onPressed: () => ref.invalidate(getEmergencyProvider(widget.requestId)),
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: const Text('Retry'),
-                ),
-              ],
-            ),
-          ),
+        data: (emergency) => _buildContent(context, emergency as emergency_entity.Emergency?),
+        loading: () => const MfLoading(label: 'Loading request'),
+        error: (e, _) => MfErrorState(
+          title: 'Could not load this emergency',
+          message: '$e',
+          onRetry: () => ref.invalidate(getEmergencyProvider(widget.requestId)),
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, ThemeData theme, emergency_entity.Emergency? emergency) {
-    if (emergency == null) return const Center(child: Text('Emergency not found'));
+  Widget _buildContent(BuildContext context, emergency_entity.Emergency? emergency) {
+    if (emergency == null) {
+      return const MfEmptyState(
+        icon: Icons.search_off_rounded,
+        title: 'Emergency not found',
+        message: 'This request may have been removed.',
+      );
+    }
 
     final distanceFuture = _distanceTo(emergency.latitude, emergency.longitude);
     final priority = emergency.priority.toUpperCase() == 'HIGH' ? 'HIGH' : 'NORMAL';
@@ -201,7 +195,7 @@ class _EmergencyRequestScreenState
         builder: (context, distanceSnapshot) {
           return _buildRequestDetails(
             context: context,
-            theme: theme,
+            emergency: emergency,
             emergencyType: emergency.emergencyType,
             patientName: patientName,
             distance: distanceSnapshot.data ?? 'Calculating...',
@@ -234,7 +228,7 @@ class _EmergencyRequestScreenState
           builder: (context, distanceSnapshot) {
             return _buildRequestDetails(
               context: context,
-              theme: theme,
+              emergency: emergency,
               emergencyType: emergency.emergencyType,
               patientName: patientName,
               distance: distanceSnapshot.data ?? 'Calculating...',
@@ -249,10 +243,10 @@ class _EmergencyRequestScreenState
           },
         );
       },
-      loading: () => const Center(child: CircularProgressIndicator()),
+      loading: () => const MfLoading(label: 'Loading medical profile'),
       error: (e, _) => _buildRequestDetails(
         context: context,
-        theme: theme,
+        emergency: emergency,
         emergencyType: emergency.emergencyType,
         patientName: 'Patient',
         distance: 'Unable to calculate',
@@ -278,9 +272,35 @@ class _EmergencyRequestScreenState
     return null;
   }
 
+  void _toggleVoiceAlert({
+    required String emergencyType,
+    required bool isDeaf,
+    required String patientName,
+    required String bloodGroup,
+    required String allergies,
+    required String conditions,
+    required String distance,
+  }) {
+    final isCurrentlyPlaying = _isPlayingVoice;
+    setState(() => _isPlayingVoice = !isCurrentlyPlaying);
+
+    if (isCurrentlyPlaying) {
+      VoiceAlertService().stop();
+    } else {
+      final message = "Emergency Alert: ${emergencyType.replaceAll('_', ' ')}. "
+          "${isDeaf ? 'Attention: This is a Deaf Patient. Use visual cues and text chat. ' : ''}"
+          "Patient: $patientName. "
+          "Blood Group: $bloodGroup. "
+          "Allergies: $allergies. "
+          "Conditions: $conditions. "
+          "Distance: $distance.";
+      VoiceAlertService().speakMessage(message);
+    }
+  }
+
   Widget _buildRequestDetails({
     required BuildContext context,
-    required ThemeData theme,
+    required emergency_entity.Emergency emergency,
     required String emergencyType,
     required String patientName,
     required String distance,
@@ -295,396 +315,267 @@ class _EmergencyRequestScreenState
   }) {
     final isClosed = EmergencyStatus.isTerminal(status);
     final isTaken = EmergencyStatus.isAssigned(status);
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Emergency Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: priority == 'HIGH'
-                    ? [const Color(0xFFb71c1c), const Color(0xFFd32f2f)]
-                    : [const Color(0xFFF57C00), const Color(0xFFFFB74D)],
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Column(
-              children: [
-                if (priority == 'HIGH')
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Text('HIGH PRIORITY ESCALATION',
-                        style: TextStyle(color: AppColors.error, fontWeight: FontWeight.bold, fontSize: 12)),
-                  ),
-                const Icon(Icons.emergency_rounded,
-                    color: Colors.white, size: 48),
-                const SizedBox(height: 8),
-                Text(
-                  EmergencyTypes.label(emergencyType),
-                  style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 4),
-                Text(distance,
-                    style: const TextStyle(
-                        color: Colors.white70, fontSize: 15)),
-              ],
-            ),
-          ),
-          if (isDeaf) ...[
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: AppColors.primaryNavy, // Logo-matched accessibility alert
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.hearing_disabled, color: Colors.white),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'ACCESSIBILITY ALERT: DEAF PATIENT',
-                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final isHigh = priority == 'HIGH';
 
-          // Voice Alert Button
-          OutlinedButton.icon(
-            onPressed: () {
-              final isCurrentlyPlaying = _isPlayingVoice;
-              setState(() => _isPlayingVoice = !isCurrentlyPlaying);
-              
-              if (isCurrentlyPlaying) {
-                 VoiceAlertService().stop();
-              } else {
-                 final message = "Emergency Alert: ${emergencyType.replaceAll('_', ' ')}. "
-                     "${isDeaf ? 'Attention: This is a Deaf Patient. Use visual cues and text chat. ' : ''}"
-                     "Patient: $patientName. "
-                     "Blood Group: $bloodGroup. "
-                     "Allergies: $allergies. "
-                     "Conditions: $conditions. "
-                     "Distance: $distance.";
-                 VoiceAlertService().speakMessage(message);
-              }
-            },
-            icon: Icon(_isPlayingVoice
-                ? Icons.stop_circle_outlined
-                : Icons.volume_up_outlined),
-            label: Text(_isPlayingVoice ? 'Stop Alert' : 'Play Voice Alert'),
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12)),
-            ),
-          ),
-          const SizedBox(height: 16),
+    final MfTone sourceTone;
+    final IconData sourceIcon;
+    final String sourceLabel;
+    switch (dataSource) {
+      case 'snapshot':
+        sourceTone = MfTone.info;
+        sourceIcon = Icons.save_outlined;
+        sourceLabel = 'Pre-captured at SOS time. Valid even if the patient phone is off.';
+        break;
+      case 'live':
+        sourceTone = MfTone.primary;
+        sourceIcon = Icons.cloud_done_outlined;
+        sourceLabel = 'Live from server';
+        break;
+      default:
+        sourceTone = MfTone.neutral;
+        sourceIcon = Icons.cloud_off_outlined;
+        sourceLabel = 'Data unavailable';
+    }
+    final sourceColors = MfColors.tone(context, sourceTone);
 
-          // ── Privacy / audit notice ────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.warning.withOpacity(0.3)),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.lock_outline_rounded, size: 15, color: AppColors.warning),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'HIPAA-Protected Medical Data',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.warning,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'This access is logged and limited to active emergency context only. '
-                        'Do not share or screenshot this information.',
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: AppColors.warning,
-                          height: 1.4,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          // ── Data source badge ─────────────────────────────────────────
-          Row(
+    Widget meta(IconData icon, String label, String value) => Expanded(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: dataSource == 'snapshot'
-                      ? AppColors.primaryBlue.withOpacity(0.1) // Logo-matched light blue
-                      : dataSource == 'live'
-                          ? AppColors.primaryTeal.withOpacity(0.1) // Logo-matched light teal
-                          : Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: dataSource == 'snapshot'
-                        ? AppColors.primaryBlue.withOpacity(0.4)
-                        : dataSource == 'live'
-                            ? AppColors.primaryTeal.withOpacity(0.4)
-                            : Colors.grey.shade300,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+              Icon(icon, size: 20, color: cs.onSurfaceVariant),
+              const SizedBox(width: MfSpace.xs),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      dataSource == 'snapshot'
-                          ? Icons.save_outlined
-                          : dataSource == 'live'
-                              ? Icons.cloud_done_outlined
-                              : Icons.cloud_off_outlined,
-                      size: 12,
-                      color: dataSource == 'snapshot'
-                          ? AppColors.primaryBlue // Logo-matched
-                          : dataSource == 'live'
-                              ? AppColors.primaryTeal // Logo-matched
-                              : Colors.grey.shade600,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(
-                      dataSource == 'snapshot'
-                          ? 'Pre-captured at SOS time — valid even if patient phone is off'
-                          : dataSource == 'live'
-                              ? 'Live from server'
-                              : 'Data unavailable',
-                      style: TextStyle(
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w700,
-                        color: dataSource == 'snapshot'
-                            ? AppColors.primaryBlue // Logo-matched
-                            : dataSource == 'live'
-                                ? AppColors.primaryTeal // Logo-matched
-                                : Colors.grey.shade600,
-                      ),
-                    ),
+                    Text(label, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    Text(value, style: text.titleSmall),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+        );
 
-          // ── Medical Profile Summary ───────────────────────────────────
-          Container(
-            decoration: BoxDecoration(
-              color: theme.scaffoldBackgroundColor,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: AppShadows.neumorphicOut,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
+    final scroll = ListView(
+      padding: const EdgeInsets.all(MfSpace.gutter),
+      children: [
+        // ── Emergency summary ──────────────────────────────────────────
+        MfCard(
+          tone: isHigh ? MfTone.danger : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isHigh) ...[
+                const Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: MfStatusChip(
+                    label: 'High priority escalation',
+                    icon: Icons.priority_high_rounded,
+                    tone: MfTone.danger,
+                    solid: true,
+                  ),
+                ),
+                const SizedBox(height: MfSpace.sm),
+              ],
+              Row(
+                children: [
+                  ResponderTypePictogram(type: emergencyType, size: 52, tone: MfTone.danger),
+                  const SizedBox(width: MfSpace.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(EmergencyTypes.label(emergencyType), style: text.titleLarge),
+                        const SizedBox(height: 2),
+                        Text('Emergency type', style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: MfSpace.sm),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: MfStatusChip.emergency(status),
+              ),
+              const Divider(height: MfSpace.lg),
+              Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
-                    children: [
-                      Icon(Icons.medical_information_outlined,
-                          color: AppColors.primary),
-                      SizedBox(width: 8),
-                      Text('Patient Medical Summary',
-                          style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 16)),
-                    ],
-                  ),
-                  const Divider(),
-                  _InfoRow(label: 'Patient', value: patientName),
-                  _InfoRow(label: 'Blood Group', value: bloodGroup),
-                  _InfoRow(label: 'Allergies', value: allergies),
-                  _InfoRow(label: 'Conditions', value: conditions),
-                  // Full pre-captured summary when available
-                  if (voiceSummary != null && voiceSummary.trim().isNotEmpty) ...[
-                    const Divider(),
-                    const Text(
-                      'Full Captured Summary',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.grey,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryBlue.withOpacity(0.1), // Logo-matched light blue
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
-                      ),
-                      child: Text(
-                        voiceSummary,
-                        style: TextStyle(
-                          fontSize: 12,
-                          height: 1.6,
-                          color: AppColors.primaryBlue.withOpacity(0.9),
-                        ),
-                      ),
-                    ),
-                  ],
+                  meta(Icons.near_me_outlined, 'Distance', distance),
+                  const SizedBox(width: MfSpace.xs),
+                  meta(Icons.schedule_rounded, 'ETA', _etaText ?? '—'),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          if (isClosed || isTaken) ...[
-            Container(
-              padding: const EdgeInsets.all(14),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300),
-              ),
-              child: Row(
+              const SizedBox(height: MfSpace.sm),
+              Row(
                 children: [
-                  Icon(isClosed ? Icons.block_rounded : Icons.assignment_turned_in_rounded, color: Colors.grey.shade700),
-                  const SizedBox(width: 10),
+                  Icon(Icons.location_on_outlined, size: 20, color: cs.onSurfaceVariant),
+                  const SizedBox(width: MfSpace.xs),
                   Expanded(
                     child: Text(
-                      isClosed
-                          ? 'This emergency is ${EmergencyStatus.label(status).toLowerCase()} and no longer needs a responder.'
-                          : 'This emergency has already been accepted.',
-                      style: TextStyle(color: Colors.grey.shade800, fontWeight: FontWeight.w600),
+                      '${emergency.latitude.toStringAsFixed(5)}, ${emergency.longitude.toStringAsFixed(5)}',
+                      style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                   ),
                 ],
-              ),
-            ),
-            const SizedBox(height: 12),
-            if (isTaken)
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () => context.go('/responder/active/${widget.requestId}'),
-                  icon: const Icon(Icons.navigation_rounded),
-                  label: const Text('Open if assigned to me'),
-                ),
-              ),
-          ] else
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: (_isAccepting || _isRejecting) ? null : _reject,
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    side: const BorderSide(color: AppColors.error),
-                    foregroundColor: AppColors.error,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isRejecting
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: AppColors.error),
-                        )
-                      : const Text('Reject', style: TextStyle(fontSize: 16)),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                flex: 2,
-                child: ElevatedButton(
-                  onPressed: (_isAccepting || _isRejecting) ? null : _accept,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue, // Logo-matched primary action
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: _isAccepting
-                      ? const Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white)),
-                            SizedBox(height: 8),
-                            Text('Preparing Navigation...',
-                                style: TextStyle(
-                                    color: Colors.white, fontSize: 12)),
-                          ],
-                        )
-                      : const Text('Accept Emergency',
-                          style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white)),
-                ),
               ),
             ],
           ),
+        ),
+
+        // ── Deaf patient ──────────────────────────────────────────────
+        if (isDeaf) ...[
+          const SizedBox(height: MfSpace.sm),
+          ResponderDeafCommsCard(
+            message: 'Do not call. Use visual cues and text chat.',
+            onOpenChat: () => _openEmergencyChat(emergency.userId),
+          ),
         ],
-      ),
+
+        // ── Voice alert (automated analysis) ─────────────────────────
+        const SizedBox(height: MfSpace.sm),
+        MfSecondaryButton(
+          large: true,
+          icon: _isPlayingVoice ? Icons.stop_circle_outlined : Icons.volume_up_outlined,
+          label: _isPlayingVoice ? 'Stop alert' : 'Play voice alert',
+          onPressed: () => _toggleVoiceAlert(
+            emergencyType: emergencyType,
+            isDeaf: isDeaf,
+            patientName: patientName,
+            bloodGroup: bloodGroup,
+            allergies: allergies,
+            conditions: conditions,
+            distance: distance,
+          ),
+        ),
+
+        // ── Medical profile summary ──────────────────────────────────
+        const SizedBox(height: MfSpace.lg),
+        const MfSectionTitle('Patient medical summary'),
+        MfCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.sm, MfSpace.md, 0),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(sourceIcon, size: 16, color: sourceColors.foreground),
+                    const SizedBox(width: MfSpace.xs),
+                    Expanded(
+                      child: Text(sourceLabel, style: text.labelMedium?.copyWith(color: sourceColors.foreground)),
+                    ),
+                  ],
+                ),
+              ),
+              MfKeyValueRow(icon: Icons.person_outline_rounded, label: 'Patient', value: patientName),
+              const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
+              MfKeyValueRow(icon: Icons.bloodtype_outlined, label: 'Blood group', value: bloodGroup),
+              const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
+              MfKeyValueRow(icon: Icons.warning_amber_rounded, label: 'Allergies', value: allergies),
+              const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
+              MfKeyValueRow(icon: Icons.medical_information_outlined, label: 'Conditions', value: conditions),
+              // Full pre-captured summary when available
+              if (voiceSummary != null && voiceSummary.trim().isNotEmpty) ...[
+                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.all(MfSpace.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text('Full captured summary', style: text.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                      const SizedBox(height: MfSpace.xs),
+                      Container(
+                        padding: const EdgeInsets.all(MfSpace.sm),
+                        decoration: BoxDecoration(
+                          color: cs.surfaceContainerLow,
+                          borderRadius: MfRadius.smAll,
+                          border: Border.all(color: cs.outlineVariant),
+                        ),
+                        child: Text(voiceSummary, style: text.bodyMedium),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+
+        // ── Privacy / audit notice ────────────────────────────────────
+        const SizedBox(height: MfSpace.sm),
+        const MfInfoBanner(
+          icon: Icons.lock_outline_rounded,
+          tone: MfTone.neutral,
+          title: 'Protected medical data (HIPAA)',
+          message: 'This access is logged and limited to active emergency context only. '
+              'Do not share or screenshot this information.',
+        ),
+
+        if (isClosed || isTaken) ...[
+          const SizedBox(height: MfSpace.sm),
+          MfInfoBanner(
+            icon: isClosed ? Icons.block_rounded : Icons.assignment_turned_in_outlined,
+            tone: MfTone.neutral,
+            title: isClosed ? 'No longer needs a responder' : 'Already accepted',
+            message: isClosed
+                ? 'This emergency is ${EmergencyStatus.label(status).toLowerCase()} and no longer needs a responder.'
+                : 'This emergency has already been accepted.',
+          ),
+        ],
+        const SizedBox(height: MfSpace.md),
+      ],
     );
-  }
-}
 
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    Widget? actions;
+    if (isClosed || isTaken) {
+      if (isTaken) {
+        actions = MfSecondaryButton(
+          large: true,
+          icon: Icons.navigation_outlined,
+          label: 'Open if assigned to me',
+          onPressed: () => context.go('/responder/active/${widget.requestId}'),
+        );
+      }
+    } else {
+      final busy = _isAccepting || _isRejecting;
+      actions = Row(
         children: [
-          SizedBox(
-            width: 100,
-            child: Text(label,
-                style: const TextStyle(
-                    color: Colors.grey, fontWeight: FontWeight.w500)),
-          ),
           Expanded(
-            child: Text(value,
-                style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: MfSecondaryButton(
+              large: true,
+              tone: MfTone.danger,
+              icon: Icons.close_rounded,
+              label: 'Reject',
+              loading: _isRejecting,
+              onPressed: busy ? null : _reject,
+            ),
+          ),
+          const SizedBox(width: MfSpace.sm),
+          Expanded(
+            flex: 2,
+            child: MfPrimaryButton(
+              icon: Icons.check_rounded,
+              label: _isAccepting ? 'Preparing navigation…' : 'Accept emergency',
+              loading: _isAccepting,
+              onPressed: busy ? null : _accept,
+            ),
           ),
         ],
-      ),
+      );
+    }
+
+    return Column(
+      children: [
+        Expanded(child: scroll),
+        if (actions != null) MfBottomActionBar(child: actions),
+      ],
     );
   }
 }

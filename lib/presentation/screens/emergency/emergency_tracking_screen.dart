@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -13,12 +12,14 @@ import '../../theme/app_theme.dart';
 import '../../services/haptic_feedback_service.dart';
 import '../../../services/socket/socket_service.dart';
 import '../../../domain/entities/emergency.dart';
+import '../../../domain/entities/user.dart';
 import '../../../services/audio/voice_alert_service.dart';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/utils/map_utils.dart';
-import '../../widgets/map_ambulance_overlay.dart';
+import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
+import '../../widgets/map/route_line.dart';
 import '../../../core/utils/emergency_status.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
@@ -50,10 +51,6 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   String _eta = 'Waiting for responder';
   int _selectedStars = 0;
   bool _ratingSubmitted = false;
-
-  /// Deaf "responder arrived" overlay dismissed by the patient. Dismissing
-  /// only hides the overlay — it never changes the emergency status.
-  bool _arrivedAlertDismissed = false;
   bool _leftForTerminal = false;
 
   StreamSubscription<SocketMessage>? _socketSub;
@@ -62,17 +59,23 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   List<Map<String, dynamic>>? _aiQuickReplies;
 
   /// Animated motorbike-ambulance marker for the assigned responder.
+  /// Road route from the responder to the patient (SRS FR6.2).
+  final RouteLine _route = RouteLine(color: AppColors.primary);
+
   AnimatedMascotMarker _responderMarker = AnimatedMascotMarker(
     markerId: const MarkerId('responder'),
     infoWindow: const InfoWindow(title: 'Responder'),
   );
+
+  /// Patient SOS pin (falls back to a default red marker until loaded).
+  BitmapDescriptor? _patientIcon;
 
   // ── Simulation overlay state ─────────────────────────────────────────────
   bool _simActive = false;
   LatLng? _patientLatLng;
   ScreenCoordinate? _responderScreenCoord;
   ScreenCoordinate? _patientScreenCoord;
-  double _currentBearing = 90; // default east (bike faces right)
+  double _currentBearing = 90; // default east
   LatLng? _prevResponderLatLng;
 
   @override
@@ -92,6 +95,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       }, fireImmediately: true);
     });
 
+    MapUtils.getPatientMarker().then((icon) {
+      if (mounted) setState(() => _patientIcon = icon);
+    }).catchError((Object e) {
+      debugPrint('Tracking: could not load patient marker: $e');
+    });
+
     _loadInitialState();
   }
 
@@ -101,6 +110,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     _simTimer = null;
     _socketSub?.cancel();
     _responderMarker.dispose();
+    _route.dispose();
     super.dispose();
   }
 
@@ -115,11 +125,11 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       String? responderId = data['assignedResponderId']?.toString();
       String? responderName = data['assignedResponderName']?.toString();
       final requests = data['emergencyRequests'];
-      if (responderId == null && requests is List) {
+      if (requests is List) {
         for (final r in requests.whereType<Map>()) {
           final st = r['status']?.toString().toUpperCase();
           if (st == 'ACCEPTED' || st == 'COMPLETED') {
-            responderId = r['responderId']?.toString();
+            responderId ??= r['responderId']?.toString();
             final responder = r['responder'];
             if (responder is Map && responder['user'] is Map) {
               responderName ??= (responder['user'] as Map)['fullName']?.toString();
@@ -135,6 +145,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         }
       }
 
+      final previousStatus = _currentStatus;
       setState(() {
         final serverStatus = EmergencyStatus.normalize(data['status']?.toString());
         if (!_statusLoaded && serverStatus.isNotEmpty) _currentStatus = serverStatus;
@@ -143,6 +154,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         _responderName ??= responderName;
         if (_responderId != null && _eta == 'Waiting for responder') _eta = 'Calculating…';
       });
+      if (_currentStatus == 'ARRIVED' && previousStatus != 'ARRIVED') {
+        _raiseArrivedVisualAlert();
+      }
       _handleTerminalStatus();
 
       if (responderId != null) {
@@ -206,12 +220,27 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       _eta = eta;
     });
     _responderMarker.moveTo(LatLng(lat, lng));
+    _route.update(LatLng(lat, lng), patient);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         _animateToResponder();
         if (_simActive) _updateOverlayPositions();
       }
     });
+  }
+
+  /// "Responder arrived" full-screen visual alert.
+  ///
+  /// The app-wide [DeafVisualAlertLayer] renders it. For DEAF-type patients
+  /// `emergency_provider` already sets the alert from the socket, so this only
+  /// covers NORMAL patients who turned on text-only mode.
+  void _raiseArrivedVisualAlert() {
+    final user = ref.read(currentUserProvider).valueOrNull;
+    final settings = ref.read(accessibilityProvider);
+    final isDeafType = user?.patientType?.toUpperCase() == 'DEAF';
+    if (isDeafType || !settings.textOnlyMode) return;
+    ref.read(visualEmergencyAlertProvider.notifier).state =
+        'RESPONDER ARRIVED: Look around for ${_responderName ?? 'help'}.';
   }
 
   void _onSocketMessage(SocketMessage message) {
@@ -257,17 +286,17 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           );
         });
         WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(data['message']?.toString() ?? 'Finding another responder for you…'),
-            behavior: SnackBarBehavior.floating,
-          ),
+        showMfSnackBar(
+          context,
+          data['message']?.toString() ?? 'Finding another responder for you…',
+          tone: MfTone.info,
         );
         return;
       }
 
-      if (newStatus != _currentStatus && !isDeafPatient) {
-        // Voice alerts for progress — deaf patients rely on visual/haptic cues
+      // Voice alerts for progress — only with Voice Guidance on; deaf patients
+      // rely on visual/haptic cues.
+      if (newStatus != _currentStatus && !isDeafPatient && settings.voiceGuidanceEnabled) {
         if (newStatus == 'ASSIGNED' || newStatus == 'EN_ROUTE') {
           VoiceAlertService().speakMessage('A responder has been assigned and is on the way.');
         } else if (newStatus == 'ARRIVED') {
@@ -286,12 +315,14 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         if (data['motorbikeNumber']       != null) _motorbikeNumber       = data['motorbikeNumber'].toString();
         if (data['vehicleType']           != null) _vehicleType           = data['vehicleType'].toString();
         if (data['organization']          != null) _organization          = data['organization'].toString();
-        if (newStatus == 'ARRIVED') _arrivedAlertDismissed = false;
         if (_responderId != null && _eta == 'Waiting for responder') _eta = 'Calculating…';
       });
 
-      if (newStatus == 'ARRIVED' && isDeafPatient && settings.vibrationFeedback) {
-        HapticFeedbackService.sosPattern();
+      if (newStatus == 'ARRIVED') {
+        _raiseArrivedVisualAlert();
+        if (isDeafPatient && settings.vibrationFeedback) {
+          HapticFeedbackService.sosPattern();
+        }
       }
       _handleTerminalStatus();
     } else if (message.event == SocketEvent.responderLocationUpdate) {
@@ -301,10 +332,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       _applyResponderPosition(lat, lng, data['estimatedArrivalMinutes'] ?? data['etaMinutes']);
     } else if (message.event == SocketEvent.responderArrived) {
       if (_currentStatus != 'ARRIVED') {
-        setState(() {
-          _currentStatus = 'ARRIVED';
-          _arrivedAlertDismissed = false;
-        });
+        setState(() => _currentStatus = 'ARRIVED');
+        _raiseArrivedVisualAlert();
       }
     }
   }
@@ -314,11 +343,10 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     if (!mounted || _leftForTerminal || !EmergencyStatus.isCancelled(_currentStatus)) return;
     _leftForTerminal = true;
     SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('This emergency was cancelled. If you still need help, call 1122.'),
-        behavior: SnackBarBehavior.floating,
-      ),
+    showMfSnackBar(
+      context,
+      'This emergency was cancelled. If you still need help, call 1122.',
+      tone: MfTone.warning,
     );
     context.go('/home');
   }
@@ -331,8 +359,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       Marker(
         markerId: const MarkerId('patient'),
         position: _patientLatLng!,
-        infoWindow: const InfoWindow(title: 'SOS Location'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        infoWindow: const InfoWindow(title: 'SOS location'),
+        icon: _patientIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
       ),
     };
   }
@@ -389,34 +417,30 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
 
     return Theme(
       data: theme,
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: emergencyAsync.when(
-          data: (emergency) => _buildModernBody(context, theme, emergency, settings, isDeafPatient),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline_rounded, size: 48, color: AppColors.error),
-                  const SizedBox(height: 12),
-                  Text('Could not load emergency status.\n$e', textAlign: TextAlign.center),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      ref.invalidate(getEmergencyProvider(widget.emergencyId));
-                      _loadInitialState();
-                    },
-                    icon: const Icon(Icons.refresh_rounded),
-                    label: const Text('Retry'),
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton(onPressed: () => context.go('/home'), child: const Text('Back to home')),
-                ],
-              ),
-            ),
+      child: emergencyAsync.when(
+        data: (emergency) => Scaffold(
+          body: _buildBody(context, emergency, user, isDeafPatient),
+        ),
+        loading: () => MfScaffold(
+          title: 'Live tracking',
+          onBack: () => context.go('/home'),
+          body: const MfLoading(label: 'Loading emergency status'),
+        ),
+        error: (e, _) => MfScaffold(
+          title: 'Live tracking',
+          onBack: () => context.go('/home'),
+          body: MfErrorState(
+            title: 'Could not load emergency status',
+            message: '$e',
+            onRetry: () {
+              ref.invalidate(getEmergencyProvider(widget.emergencyId));
+              _loadInitialState();
+            },
+          ),
+          bottomBar: MfSecondaryButton(
+            label: 'Back to home',
+            icon: Icons.home_outlined,
+            onPressed: () => context.go('/home'),
           ),
         ),
       ),
@@ -470,44 +494,20 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     });
   }
 
-  // ── AAC Communication Board ─────────────────────────────────────────────────
+  // ── Quick messages (AAC board) ──────────────────────────────────────────────
   // Eight universal emergency phrases with icons.
   // Tapping one sends it instantly to the assigned responder via emergency chat.
 
   static const List<Map<String, dynamic>> _emergencyPhrases = [
-    {'icon': Icons.emergency_rounded,        'text': 'I need immediate help!'},
-    {'icon': Icons.hearing_disabled_rounded, 'text': 'I am Deaf — use text chat.'},
-    {'icon': Icons.favorite_rounded,         'text': 'I have chest pain.'},
-    {'icon': Icons.air_rounded,              'text': 'I cannot breathe.'},
-    {'icon': Icons.bolt_rounded,             'text': 'I am having a seizure.'},
-    {'icon': Icons.local_hospital_rounded,   'text': 'Please call an ambulance.'},
-    {'icon': Icons.monitor_heart_rounded,    'text': 'I am diabetic — feeling faint.'},
-    {'icon': Icons.warning_amber_rounded,    'text': 'I have a drug allergy.'},
+    {'icon': Icons.emergency_outlined,        'text': 'I need immediate help!'},
+    {'icon': Icons.hearing_disabled_outlined, 'text': 'I am Deaf — use text chat.'},
+    {'icon': Icons.favorite_outline_rounded,  'text': 'I have chest pain.'},
+    {'icon': Icons.air_rounded,               'text': 'I cannot breathe.'},
+    {'icon': Icons.bolt_rounded,              'text': 'I am having a seizure.'},
+    {'icon': Icons.local_hospital_outlined,   'text': 'Please call an ambulance.'},
+    {'icon': Icons.monitor_heart_outlined,    'text': 'I am diabetic — feeling faint.'},
+    {'icon': Icons.warning_amber_rounded,     'text': 'I have a drug allergy.'},
   ];
-
-  Widget _buildQuickMessageButton(BuildContext context) {
-    return GestureDetector(
-      onTap: () => _showQuickMessageBoard(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: AppColors.medifindGradient),
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: [
-            BoxShadow(color: AppColors.primary.withOpacity(0.4), blurRadius: 12, offset: const Offset(0, 4)),
-          ],
-        ),
-        child: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.message_rounded, color: Colors.white, size: 18),
-            SizedBox(width: 8),
-            Text('Quick Message', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-          ],
-        ),
-      ),
-    );
-  }
 
   void _showQuickMessageBoard(BuildContext context) {
     // Load AI replies from backend on first open; use static phrases as fallback
@@ -520,109 +520,44 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       });
     }
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          final phrases = _aiQuickReplies ?? _emergencyPhrases;
-          final isAi = _aiQuickReplies != null;
+    final phrases = _aiQuickReplies ?? _emergencyPhrases;
+    final isAi = _aiQuickReplies != null;
 
-          return Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+    showMfBottomSheet<void>(
+      context,
+      title: 'Quick messages',
+      subtitle: isAi
+          ? 'Personalized for your emergency. Tap a message to send it.'
+          : 'Tap a message to send it to your responder.',
+      builder: (ctx) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isAi) ...[
+            const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: MfStatusChip(label: 'AI suggested', tone: MfTone.primary, icon: Icons.auto_awesome_outlined),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 36, height: 4,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Row(
-                  children: [
-                    const Icon(Icons.message_rounded, color: AppColors.primary, size: 20),
-                    const SizedBox(width: 10),
-                    const Expanded(
-                      child: Text('Quick Emergency Messages',
-                          style: TextStyle(color: AppColors.onSurface, fontWeight: FontWeight.bold, fontSize: 16)),
-                    ),
-                    if (isAi)
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.10),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                        ),
-                        child: const Text('AI', style: TextStyle(color: AppColors.primary, fontSize: 11, fontWeight: FontWeight.bold)),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  isAi
-                      ? 'Personalized for your emergency — tap to send'
-                      : 'Tap a phrase to send instantly to your responder',
-                  style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
-                ),
-                const SizedBox(height: 16),
-                GridView.count(
-                  crossAxisCount: 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 10,
-                  mainAxisSpacing: 10,
-                  childAspectRatio: 2.6,
-                  children: phrases.map((phrase) {
-                    final text = phrase['text'] as String;
-                    final iconData = isAi
-                        ? _iconFromName(phrase['icon'] as String? ?? '')
-                        : (phrase['icon'] as IconData);
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _sendQuickMessage(text);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.background,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.primary.withOpacity(0.12)),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(iconData, color: AppColors.primary, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                text,
-                                style: const TextStyle(color: AppColors.onSurface, fontSize: 11.5, fontWeight: FontWeight.w600),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ],
-            ),
-          );
-        },
+            const SizedBox(height: MfSpace.sm),
+          ],
+          MfListGroup(
+            children: phrases.map((phrase) {
+              final text = phrase['text'] as String;
+              final iconData = isAi
+                  ? _iconFromName(phrase['icon'] as String? ?? '')
+                  : (phrase['icon'] as IconData);
+              return MfIconTile(
+                icon: iconData,
+                label: text,
+                trailing: Icon(Icons.send_rounded, color: Theme.of(ctx).colorScheme.primary),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _sendQuickMessage(text);
+                },
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -630,22 +565,22 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   // Maps backend icon name strings (Material icon names) to Flutter IconData
   IconData _iconFromName(String name) {
     const map = <String, IconData>{
-      'emergency': Icons.emergency_rounded,
-      'hearing_disabled': Icons.hearing_disabled_rounded,
-      'favorite': Icons.favorite_rounded,
+      'emergency': Icons.emergency_outlined,
+      'hearing_disabled': Icons.hearing_disabled_outlined,
+      'favorite': Icons.favorite_outline_rounded,
       'air': Icons.air_rounded,
       'bolt': Icons.bolt_rounded,
-      'local_hospital': Icons.local_hospital_rounded,
-      'monitor_heart': Icons.monitor_heart_rounded,
+      'local_hospital': Icons.local_hospital_outlined,
+      'monitor_heart': Icons.monitor_heart_outlined,
       'warning_amber': Icons.warning_amber_rounded,
-      'medication': Icons.medication_rounded,
-      'bloodtype': Icons.bloodtype_rounded,
+      'medication': Icons.medication_outlined,
+      'bloodtype': Icons.bloodtype_outlined,
       'accessible': Icons.accessible_rounded,
-      'help': Icons.help_rounded,
-      'sick': Icons.sick_rounded,
+      'help': Icons.help_outline_rounded,
+      'sick': Icons.sick_outlined,
       'thermostat': Icons.thermostat_rounded,
     };
-    return map[name] ?? Icons.message_rounded;
+    return map[name] ?? Icons.chat_bubble_outline_rounded;
   }
 
   Future<void> _sendQuickMessage(String message) async {
@@ -655,599 +590,444 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       final sent = await ref.read(chatMessagesProvider(room.id).notifier).sendMessage(message);
       if (!sent) throw Exception('message was not delivered');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Sent: $message',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            backgroundColor: AppColors.success,
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 3),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
+        showMfSnackBar(context, 'Sent: $message', tone: MfTone.success, duration: const Duration(seconds: 3));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not send: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Could not send: $e', tone: MfTone.danger);
       }
     }
   }
 
-  Widget _buildModernBody(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings, bool isDeafPatient) {
-    return Stack(
-      children: [
-        // 1. Dark Map
-        Positioned.fill(
-          // Only the map rebuilds while the responder mascot animates.
-          child: ValueListenableBuilder<Marker?>(
-            valueListenable: _responderMarker.marker,
-            builder: (context, responderMarker, _) => GoogleMap(
-            mapType: MapType.normal,
-            initialCameraPosition: CameraPosition(
-              target: LatLng(emergency.latitude, emergency.longitude),
-              zoom: 15,
-            ),
-            markers: {
-              ..._patientMarkers(emergency),
-              if (responderMarker != null && !_simActive && EmergencyStatus.isAssigned(_currentStatus))
-                responderMarker,
-            },
-            myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
-            buildingsEnabled: false,
-            indoorViewEnabled: false,
-            tiltGesturesEnabled: false,
-            style: MapUtils.getDarkMapStyle(),
-            onMapCreated: (GoogleMapController controller) {
-              _mapController = controller;
-            },
-            onCameraIdle: () {
-              // After any camera animation finishes, recalculate overlay positions
-              // so the Flutter widgets stay pinned to the correct lat/lng.
-              if (mounted && _simActive) _updateOverlayPositions();
-            },
-          ),
-          ),
-        ),
+  // ── Layout ──────────────────────────────────────────────────────────────────
 
-        // ── Simulation overlays ──────────────────────────────────────────────
-        // These Flutter widgets replace the default Google Maps markers during
-        // simulation. IgnorePointer ensures they never block touch on the map.
-        if (_simActive && _patientScreenCoord != null)
-          Positioned(
-            left:  _patientScreenCoord!.x.toDouble() - 34,
-            top:   _patientScreenCoord!.y.toDouble() - 80,
-            child: IgnorePointer(
-              child: const PatientAvatarWidget(),
-            ),
-          ),
+  Widget _buildBody(BuildContext context, Emergency emergency, User? user, bool isDeafPatient) {
+    final cs = Theme.of(context).colorScheme;
+    final reducedMotion = MfMotion.reduced(context);
 
-        if (_simActive && _responderScreenCoord != null)
-          AnimatedPositioned(
-            duration: const Duration(milliseconds: 600),
-            curve: Curves.easeInOut,
-            left:  _responderScreenCoord!.x.toDouble() - 64,
-            top:   _responderScreenCoord!.y.toDouble() - 58,
-            child: IgnorePointer(
-              child: MotorbikeAmbulanceWidget(bearing: _currentBearing),
-            ),
-          ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final height = constraints.maxHeight;
+        final mapHeight = height * 0.55;
+        final sheetSize = ((height - mapHeight + MfRadius.lg) / height).clamp(0.3, 0.6);
 
-        // 2. Glassmorphism Top Bar
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 16,
-          left: 16,
-          right: 16,
-          child: Row(
-            children: [
-              Semantics(
-                button: true,
-                label: 'Back to home',
-                child: GestureDetector(
-                onTap: () => context.go('/home'),
-                child: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.88),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-                    boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.10), blurRadius: 12, offset: const Offset(0, 4))],
+        return Stack(
+          children: [
+            // 1. Map (top ~55%, extends under the sheet's rounded corner)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: mapHeight + MfRadius.lg,
+              // Only the map rebuilds while the responder mascot animates.
+              child: ListenableBuilder(
+                listenable: Listenable.merge([_responderMarker.marker, _route.polylines]),
+                builder: (context, _) {
+                  final responderMarker = _responderMarker.marker.value;
+                  return GoogleMap(
+                  mapType: MapType.normal,
+                  initialCameraPosition: CameraPosition(
+                    target: LatLng(emergency.latitude, emergency.longitude),
+                    zoom: 15,
                   ),
-                  child: const Icon(Icons.arrow_back_rounded, color: AppColors.onSurface, size: 28),
-                ),
-              ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(child: _buildGlassHeader(theme, settings)),
-            ],
-          ),
-        ),
-
-        // 3. Floating Action Buttons (right side — map controls)
-        Positioned(
-          right: 16,
-          bottom: 120,
-          child: Column(
-            children: [
-              _buildFloatingMapButton(Icons.my_location, () => _animateToResponder()),
-            ],
-          ),
-        ),
-
-        // 3b. AAC Quick Message Button (left side — deaf patients only)
-        if (isDeafPatient && !EmergencyStatus.isTerminal(_currentStatus))
-          Positioned(
-            left: 16,
-            bottom: 120,
-            child: _buildQuickMessageButton(context),
-          ),
-
-        // 4. Modern Draggable Bottom Sheet
-        _buildDraggableBottomSheet(context, theme, emergency, settings, isDeafPatient),
-
-        // Deaf Patient Mode Banner
-        if (isDeafPatient)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 80,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.90),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.hearing_disabled, color: Colors.white, size: 18),
-                  SizedBox(width: 12),
-                  Text(
-                    'DEAF MODE: VISUAL UPDATES ACTIVE',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11),
-                  ),
-                ],
+                  markers: {
+                    ..._patientMarkers(emergency),
+                    if (responderMarker != null && !_simActive && EmergencyStatus.isAssigned(_currentStatus))
+                      responderMarker,
+                  },
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  buildingsEnabled: false,
+                  indoorViewEnabled: false,
+                  tiltGesturesEnabled: false,
+                  style: MapUtils.getDarkMapStyle(),
+                  onMapCreated: (GoogleMapController controller) {
+                    _mapController = controller;
+                  },
+                  polylines: EmergencyStatus.isAssigned(_currentStatus) && !_simActive
+                      ? _route.polylines.value
+                      : const <Polyline>{},
+                  onCameraIdle: () {
+                    // After any camera animation finishes, recalculate overlay positions
+                    // so the Flutter widgets stay pinned to the correct lat/lng.
+                    if (mounted && _simActive) _updateOverlayPositions();
+                  },
+                );
+                },
               ),
             ),
-          ),
 
-        if (isDeafPatient && (_currentStatus == 'EN_ROUTE' || _currentStatus == 'ARRIVED'))
-          _buildDeafVisualPulse(theme),
-
-        if (_currentStatus == 'ARRIVED' && isDeafPatient && !_arrivedAlertDismissed)
-          _buildArrivedVisualAlert(theme),
-
-        // 5. Resolution / Completion Overlay (RESOLVED or legacy COMPLETED)
-        if (EmergencyStatus.isResolved(_currentStatus))
-          _buildResolutionOverlay(context, theme),
-      ],
-    );
-  }
-
-  Widget _buildGlassHeader(ThemeData theme, AccessibilitySettings settings) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(20),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.88),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.primary.withOpacity(0.15)),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withOpacity(0.10),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              )
-            ],
-          ),
-          child: Row(
-            children: [
-              _buildPulseIndicator(AppColors.success),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'ESTIMATED ARRIVAL',
-                      style: TextStyle(
-                        color: AppColors.primary.withOpacity(0.6),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _eta,
-                      style: const TextStyle(
-                        color: AppColors.onSurface,
-                        fontSize: 20,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
+            // ── Simulation overlays ──────────────────────────────────────────
+            // Flutter widgets replace the Google Maps markers during simulation.
+            // IgnorePointer ensures they never block touch on the map.
+            if (_simActive && _patientScreenCoord != null)
+              Positioned(
+                left: _patientScreenCoord!.x.toDouble() - _PatientPin.width / 2,
+                top: _patientScreenCoord!.y.toDouble() - _PatientPin.height,
+                child: IgnorePointer(
+                  child: _PatientPin(imageUrl: user?.profileImageUrl, name: user?.fullName),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.error.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.error.withOpacity(0.25)),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Colors.redAccent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    const Text(
-                      'LIVE',
-                      style: TextStyle(
-                        color: Colors.redAccent,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 10,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
+
+            if (_simActive && _responderScreenCoord != null)
+              AnimatedPositioned(
+                duration: MfMotion.of(context, const Duration(milliseconds: 600)),
+                curve: Curves.easeInOut,
+                left: _responderScreenCoord!.x.toDouble() - AmbulanceMascot.logicalSize / 2,
+                top: _responderScreenCoord!.y.toDouble() - AmbulanceMascot.logicalSize / 2,
+                child: IgnorePointer(
+                  child: Transform.rotate(
+                    angle: _currentBearing * math.pi / 180,
+                    child: const AmbulanceMascotBadge(size: AmbulanceMascot.logicalSize),
+                  ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildPulseIndicator(Color color) {
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
-        shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.35), width: 1.5),
-      ),
-      child: Icon(Icons.emergency_share_rounded, color: color, size: 20),
-    );
-  }
+            // 2. Floating header over the map
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              child: MfFloatingHeader(
+                title: EmergencyStatus.label(_currentStatus),
+                subtitle: _responderId != null || _responderName != null ? 'ETA: $_eta' : 'Live emergency tracking',
+                onBack: () => context.go('/home'),
+                titleTrailing: const MfStatusChip(
+                  label: 'Live',
+                  tone: MfTone.success,
+                  icon: Icons.fiber_manual_record_rounded,
+                ),
+              ),
+            ),
 
-  Widget _buildFloatingMapButton(IconData icon, VoidCallback onTap) {
-    return Semantics(
-      button: true,
-      label: 'Show responder on map',
-      child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 12, offset: const Offset(0, 4))
+            // 3. Map control: recenter on responder
+            Positioned(
+              right: MfSpace.sm,
+              top: mapHeight - MfSize.minTouch - MfSpace.sm,
+              child: Material(
+                color: cs.surface,
+                elevation: 1,
+                shape: RoundedRectangleBorder(
+                  borderRadius: MfRadius.mdAll,
+                  side: BorderSide(color: cs.outlineVariant),
+                ),
+                child: MfIconButton(
+                  icon: Icons.my_location_rounded,
+                  tooltip: 'Show responder on map',
+                  onPressed: _animateToResponder,
+                ),
+              ),
+            ),
+
+            // 4. Bottom panel
+            DraggableScrollableSheet(
+              initialChildSize: sheetSize,
+              minChildSize: sheetSize,
+              maxChildSize: 0.92,
+              builder: (context, scrollController) =>
+                  _buildSheet(context, scrollController, isDeafPatient),
+            ),
+
+            // Deaf patients: visual pulse border while help is close.
+            if (isDeafPatient && (_currentStatus == 'EN_ROUTE' || _currentStatus == 'ARRIVED'))
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: _AnimatedPulseBorder(
+                    color: _currentStatus == 'ARRIVED'
+                        ? MfColors.tone(context, MfTone.success).solid
+                        : MfColors.tone(context, MfTone.primary).solid,
+                    animate: !reducedMotion,
+                  ),
+                ),
+              ),
+
+            // 5. Resolution / completion screen (RESOLVED or legacy COMPLETED)
+            if (EmergencyStatus.isResolved(_currentStatus))
+              Positioned.fill(child: _buildResolutionOverlay(context)),
           ],
-        ),
-        child: Icon(icon, color: AppColors.primary, size: 22),
-      ),
-      ),
-    );
-  }
-
-  Widget _buildDraggableBottomSheet(BuildContext context, ThemeData theme, Emergency emergency, AccessibilitySettings settings, bool isDeafPatient) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.35,
-      minChildSize: 0.35,
-      maxChildSize: 0.85,
-      builder: (context, scrollController) {
-        return Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            boxShadow: [
-              BoxShadow(color: AppColors.primary.withOpacity(0.12), blurRadius: 32, offset: const Offset(0, -8))
-            ],
-          ),
-          child: ListView(
-            controller: scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
-            children: [
-              // ── drag handle ──
-              Center(child: Container(width: 36, height: 4, decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)))),
-              const SizedBox(height: 18),
-
-              // ── Status chip ──
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.2)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle)),
-                        const SizedBox(width: 6),
-                        Text(
-                          EmergencyStatus.isAssigned(_currentStatus) || _responderName != null
-                              ? EmergencyStatus.label(_currentStatus).toUpperCase()
-                              : 'FINDING RESPONDER…',
-                          style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.8,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-
-              // ── Responder card ──
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: AppColors.background,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.primary.withOpacity(0.12)),
-                  boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 4))],
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        // Avatar
-                        Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: AppColors.primary.withOpacity(0.3), width: 2),
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFE2F0F3), Color(0xFFB7D9E0)],
-                            ),
-                          ),
-                          clipBehavior: Clip.hardEdge,
-                          child: _responderProfileImage != null
-                              ? Image.network(_responderProfileImage!, fit: BoxFit.cover,
-                                  errorBuilder: (_, __, ___) => _buildInitialsAvatar())
-                              : _responderName == null
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(6),
-                                      child: AmbulanceMascotBadge(size: 48),
-                                    )
-                                  : _buildInitialsAvatar(),
-                        ),
-                        const SizedBox(width: 14),
-
-                        // Name + badge + rating
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _responderName ?? 'Finding a responder…',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 17,
-                                  color: AppColors.onSurface,
-                                  letterSpacing: -0.3,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Row(
-                                children: [
-                                  if (_responderType != null) ...[
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.primaryLight.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(color: AppColors.primaryLight.withOpacity(0.25)),
-                                      ),
-                                      child: Text(
-                                        _responderType!.replaceAll('_', ' '),
-                                        style: const TextStyle(color: AppColors.primaryLight, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.4),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 8),
-                                  ],
-                                  if (_responderRating != null) ...[
-                                    const Icon(Icons.star_rounded, color: Color(0xFFF59E0B), size: 14),
-                                    const SizedBox(width: 3),
-                                    Text(
-                                      _responderRating!.toStringAsFixed(1),
-                                      style: const TextStyle(color: Color(0xFFF59E0B), fontSize: 12, fontWeight: FontWeight.w800),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              if (_organization != null)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 3),
-                                  child: Text(
-                                    _organization!,
-                                    style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 11),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-
-                        // Action buttons
-                        Column(
-                          children: [
-                            if (!isDeafPatient && _responderPhone != null) ...[
-                              _buildPremiumAction(Icons.phone_rounded, AppColors.success, () => _makePhoneCall(_responderPhone!), 'Call responder'),
-                              const SizedBox(height: 10),
-                            ],
-                            if (_responderId != null || _responderName != null)
-                              _buildPremiumAction(Icons.chat_bubble_rounded, AppColors.primary, _openChat, 'Chat with responder'),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-                    Divider(color: Colors.grey.shade200),
-                    const SizedBox(height: 12),
-
-                    // Vehicle row
-                    Row(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFFF3E0),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.warning.withOpacity(0.2)),
-                          ),
-                          child: const Icon(Icons.two_wheeler_rounded, color: AppColors.warning, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                (_vehicleType == 'MOTORBIKE_AMBULANCE' || _vehicleType == null)
-                                    ? 'Motorbike Ambulance'
-                                    : _vehicleType!.replaceAll('_', ' '),
-                                style: const TextStyle(color: AppColors.onSurface, fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                              const SizedBox(height: 2),
-                              const Text('Emergency Response Vehicle', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 11)),
-                            ],
-                          ),
-                        ),
-                        // Number plate
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppColors.onSurface,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            (_motorbikeNumber ?? 'N/A').toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w900,
-                              fontSize: 12,
-                              letterSpacing: 1.5,
-                              fontFamily: 'monospace',
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-              Divider(color: Colors.grey.shade100),
-              const SizedBox(height: 16),
-              const Text('Live Status', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.onSurface)),
-              const SizedBox(height: 20),
-              _buildModernStatusTimeline(theme, settings),
-              const SizedBox(height: 28),
-              if (_currentStatus == 'ACTIVE' || _currentStatus == 'PENDING')
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () => _showCancelDialog(context),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.error,
-                    side: BorderSide(color: AppColors.error.withOpacity(0.4)),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: const Text('CANCEL EMERGENCY', style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.1, fontSize: 13)),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
         );
       },
     );
   }
 
-  Widget _buildInitialsAvatar() {
-    final initials = (_responderName?.isNotEmpty == true)
-        ? _responderName!.trim().split(' ').map((w) => w.isNotEmpty ? w[0] : '').take(2).join().toUpperCase()
-        : '?';
-    return Center(
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w900,
-          fontSize: initials.length == 1 ? 26 : 20,
+  Widget _buildSheet(BuildContext context, ScrollController scrollController, bool isDeafPatient) {
+    final cs = Theme.of(context).colorScheme;
+    final terminal = EmergencyStatus.isTerminal(_currentStatus);
+    final hasResponder = _responderId != null || _responderName != null;
+    final canCall = !isDeafPatient && _responderPhone != null;
+    final canCancel = _currentStatus == 'ACTIVE' || _currentStatus == 'PENDING';
+
+    final secondaryActions = <Widget>[
+      if (hasResponder)
+        MfSecondaryButton(
+          label: 'Chat',
+          icon: Icons.chat_bubble_outline_rounded,
+          semanticLabel: 'Chat with responder',
+          onPressed: _openChat,
         ),
+      if (canCall)
+        MfSecondaryButton(
+          label: 'Call',
+          icon: Icons.phone_outlined,
+          semanticLabel: 'Call responder',
+          onPressed: () => _makePhoneCall(_responderPhone!),
+        ),
+      if (isDeafPatient)
+        MfSecondaryButton(
+          label: 'Show card',
+          icon: Icons.badge_outlined,
+          semanticLabel: 'Show deaf communication card',
+          onPressed: () => context.push('/home/show-card'),
+        ),
+    ];
+
+    return Material(
+      color: cs.surface,
+      elevation: 2,
+      shadowColor: Colors.black26,
+      shape: RoundedRectangleBorder(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(MfRadius.lg)),
+        side: BorderSide(color: cs.outlineVariant),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.fromLTRB(MfSpace.gutter, 0, MfSpace.gutter, MfSpace.lg),
+        children: [
+          const MfSheetHandle(),
+
+          if (isDeafPatient) ...[
+            const MfInfoBanner(
+              icon: Icons.hearing_disabled_outlined,
+              tone: MfTone.primary,
+              title: 'Deaf mode: visual updates on',
+              message: 'Status changes flash on screen and vibrate.',
+            ),
+            const SizedBox(height: MfSpace.sm),
+          ],
+
+          _buildResponderCard(context),
+          const SizedBox(height: MfSpace.md),
+
+          // ── Actions ──
+          if (isDeafPatient && !terminal) ...[
+            MfPrimaryButton(
+              label: 'Quick message',
+              icon: Icons.textsms_outlined,
+              semanticLabel: 'Send a quick message to your responder',
+              onPressed: () => _showQuickMessageBoard(context),
+            ),
+            const SizedBox(height: MfSpace.xs),
+          ],
+          if (secondaryActions.length == 2)
+            Row(
+              children: [
+                Expanded(child: secondaryActions[0]),
+                const SizedBox(width: MfSpace.xs),
+                Expanded(child: secondaryActions[1]),
+              ],
+            )
+          else
+            for (final action in secondaryActions)
+              Padding(
+                padding: const EdgeInsets.only(bottom: MfSpace.xs),
+                child: action,
+              ),
+
+          const SizedBox(height: MfSpace.md),
+          const MfSectionTitle('Live status'),
+          const SizedBox(height: MfSpace.xs),
+          MfStatusTimeline.emergency(
+            status: _currentStatus,
+            perspective: MfTimelinePerspective.patient,
+          ),
+
+          if (canCancel) ...[
+            const SizedBox(height: MfSpace.lg),
+            MfSecondaryButton(
+              label: 'Cancel SOS',
+              icon: Icons.close_rounded,
+              tone: MfTone.danger,
+              onPressed: _showCancelDialog,
+            ),
+          ],
+        ],
       ),
     );
   }
 
-  Widget _buildPremiumAction(IconData icon, Color color, VoidCallback onTap, String label) {
-    return Semantics(
-      button: true,
-      label: label,
-      child: GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withOpacity(0.10),
-          shape: BoxShape.circle,
-          border: Border.all(color: color.withOpacity(0.22), width: 1),
-        ),
-        child: Icon(icon, color: color, size: 22),
-      ),
+  Widget _buildResponderCard(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final hasResponder = _responderName != null;
+
+    String? distance;
+    final patient = _patientLatLng;
+    if (_responderLat != null && _responderLong != null && patient != null) {
+      distance = GeoUtils.formatDistance(
+        GeoUtils.haversineKm(_responderLat!, _responderLong!, patient.latitude, patient.longitude),
+      );
+    }
+
+    final vehicleLabel = (_vehicleType == 'MOTORBIKE_AMBULANCE' || _vehicleType == null)
+        ? 'Motorbike ambulance'
+        : _vehicleType!.replaceAll('_', ' ');
+
+    return MfCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(MfSpace.md),
+            child: Row(
+              children: [
+                if (hasResponder || _responderProfileImage != null)
+                  MfAvatar(imageUrl: _responderProfileImage, name: _responderName, size: 56)
+                else
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: cs.surfaceContainer,
+                      border: Border.all(color: cs.outlineVariant),
+                    ),
+                    padding: const EdgeInsets.all(MfSpace.md),
+                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                  ),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      MfStatusChip.emergency(_currentStatus),
+                      const SizedBox(height: MfSpace.xxs),
+                      Text(
+                        _responderName ?? 'Finding a responder…',
+                        style: text.titleMedium,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (_responderType != null || _responderRating != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2),
+                          child: Wrap(
+                            spacing: MfSpace.xs,
+                            runSpacing: MfSpace.xxs,
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            children: [
+                              if (_responderType != null)
+                                Text(
+                                  _formatLabel(_responderType!),
+                                  style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              if (_responderRating != null)
+                                Semantics(
+                                  label: 'Rating ${_responderRating!.toStringAsFixed(1)} out of 5',
+                                  excludeSemantics: true,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.star_rounded, size: 16, color: MfColors.warning(context)),
+                                      const SizedBox(width: 2),
+                                      Text(_responderRating!.toStringAsFixed(1), style: text.labelLarge),
+                                    ],
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      if (_organization != null)
+                        Text(
+                          _organization!,
+                          style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.all(MfSpace.md),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: MfColors.tone(context, MfTone.primary).container,
+                    borderRadius: MfRadius.smAll,
+                  ),
+                  child: Icon(Icons.two_wheeler_rounded, size: 22, color: MfColors.tone(context, MfTone.primary).foreground),
+                ),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(vehicleLabel, style: text.titleSmall),
+                      Text(
+                        'Emergency response vehicle',
+                        style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: MfSpace.xs),
+                Semantics(
+                  label: 'Bike plate ${_motorbikeNumber ?? 'not available'}',
+                  excludeSemantics: true,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: MfSpace.xs, vertical: MfSpace.xxs),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: MfRadius.smAll,
+                      border: Border.all(color: cs.onSurface, width: 1.5),
+                    ),
+                    child: Text(
+                      (_motorbikeNumber ?? 'N/A').toUpperCase(),
+                      style: text.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: MfSpace.xxs),
+            child: Row(
+              children: [
+                Expanded(child: MfKeyValueRow(label: 'ETA', value: _eta, icon: Icons.schedule_rounded)),
+                Expanded(
+                  child: MfKeyValueRow(
+                    label: 'Distance',
+                    value: distance ?? '—',
+                    icon: Icons.place_outlined,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  static String _formatLabel(String raw) {
+    final words = raw.replaceAll('_', ' ').toLowerCase().split(' ').where((w) => w.isNotEmpty);
+    final joined = words.join(' ');
+    return joined.isEmpty ? raw : joined[0].toUpperCase() + joined.substring(1);
   }
 
   void _makePhoneCall(String phoneNumber) async {
@@ -1257,9 +1037,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       if (!ok) throw Exception('launch failed');
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start a call to $phoneNumber')),
-        );
+        showMfSnackBar(context, 'Could not start a call to $phoneNumber', tone: MfTone.danger);
       }
     }
   }
@@ -1269,7 +1047,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const MfLoading(),
     );
 
     try {
@@ -1282,200 +1060,89 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     } catch (e) {
       if (mounted) {
         Navigator.pop(context); // dismiss loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not open chat: $e'),
-            backgroundColor: AppColors.error,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showMfSnackBar(context, 'Could not open chat: $e', tone: MfTone.danger);
       }
     }
   }
 
-  Widget _buildModernStatusTimeline(ThemeData theme, AccessibilitySettings settings) {
-    // 4-step UI: 0 searching, 1 assigned, 2 en route, 3 arrived (or later)
-    final status = EmergencyStatus.normalize(_currentStatus);
-    int uiIndex = 0;
-    if (status == 'ASSIGNED' || status == 'RESPONDER_ASSIGNED' || status == 'ACCEPTED') uiIndex = 1;
-    if (status == 'EN_ROUTE') uiIndex = 2;
-    if (status == 'ARRIVED' || status == 'TREATING' || status == 'TRANSPORTED' || EmergencyStatus.isResolved(status)) {
-      uiIndex = 3;
-    }
+  Widget _buildResolutionOverlay(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final success = MfColors.tone(context, MfTone.success);
 
-    return Column(
-      children: [
-        _ModernTimelineItem(label: 'SOS Signal Received', time: 'LIVE', isDone: uiIndex >= 0, isLast: false, color: Colors.blueAccent),
-        _ModernTimelineItem(label: 'Responder Assigned', time: uiIndex >= 1 ? 'SUCCESS' : '--:--', isDone: uiIndex >= 1, isCurrent: uiIndex == 1, isLast: false, color: Colors.orangeAccent),
-        _ModernTimelineItem(label: 'En Route to You', time: uiIndex >= 2 ? 'TRACKING' : '--:--', isDone: uiIndex >= 2, isCurrent: uiIndex == 2, isLast: false, color: Colors.purpleAccent),
-        _ModernTimelineItem(label: 'Arrived at Destination', time: uiIndex >= 3 ? 'HERE' : '--:--', isDone: uiIndex >= 3, isCurrent: uiIndex == 3, isLast: true, color: Colors.greenAccent),
-      ],
-    );
-  }
-
-
-  Widget _buildDeafVisualPulse(ThemeData theme) {
-    return Positioned.fill(
-      child: IgnorePointer(
-        child: _AnimatedPulseBorder(
-          color: _currentStatus == 'ARRIVED' ? Colors.greenAccent : Colors.blueAccent,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildArrivedVisualAlert(ThemeData theme) {
-    return Positioned.fill(
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.success.withOpacity(0.95),
-              AppColors.success.withOpacity(0.98),
-            ],
-          ),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.elasticOut,
-              builder: (context, value, child) => Transform.scale(scale: value, child: child),
-              child: Container(
-                padding: const EdgeInsets.all(32),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 4),
-                ),
-                child: const Icon(Icons.check_circle_rounded, color: Colors.white, size: 100),
-              ),
-            ),
-            const SizedBox(height: 40),
-            const Text(
-              'HELP IS HERE',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 42,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 4,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: const Text(
-                'LOOK FOR THE RESPONDER NOW',
-                style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 1),
-              ),
-            ),
-            const SizedBox(height: 64),
-            ElevatedButton(
-              // Only hides this overlay — the emergency stays open until the
-              // responder resolves it.
-              onPressed: () => setState(() => _arrivedAlertDismissed = true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.success,
-                elevation: 10,
-                padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 20),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(40)),
-              ),
-              child: const Text('I SEE THEM / DISMISS', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 16)),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildResolutionOverlay(BuildContext context, ThemeData theme) {
-    return Positioned.fill(
-      child: Container(
-        color: AppColors.background,
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0.0, end: 1.0),
-                  duration: const Duration(milliseconds: 700),
-                  curve: Curves.elasticOut,
-                  builder: (_, v, child) => Transform.scale(scale: v, child: child),
-                  child: Container(
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withOpacity(0.12),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.success.withOpacity(0.4), width: 2),
+    return ColoredBox(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(MfSpace.lg),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: success.container,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: success.border),
+                      ),
+                      child: Icon(Icons.check_circle_outline_rounded, color: success.solid, size: 44),
                     ),
-                    child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 56),
                   ),
-                ),
-                const SizedBox(height: 28),
-                const Text(
-                  'Emergency Resolved',
-                  style: TextStyle(color: AppColors.onSurface, fontSize: 24, fontWeight: FontWeight.w900, letterSpacing: -0.5),
-                ),
-                const SizedBox(height: 10),
-                const Text(
-                  'Help has been provided and the\nsituation is now under control.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Color(0xFF64748B), fontSize: 14, height: 1.5),
-                ),
-                const SizedBox(height: 36),
+                  const SizedBox(height: MfSpace.lg),
+                  Semantics(
+                    header: true,
+                    liveRegion: true,
+                    child: Text('Emergency resolved', textAlign: TextAlign.center, style: text.headlineSmall),
+                  ),
+                  const SizedBox(height: MfSpace.xs),
+                  Text(
+                    'Help has been provided and the situation is now under control.',
+                    textAlign: TextAlign.center,
+                    style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: MfSpace.xl),
 
-                if (!_ratingSubmitted && _responderId != null) ...[
-                  Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: AppColors.primary.withOpacity(0.1)),
-                      boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4))],
-                    ),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Rate your responder',
-                          style: TextStyle(color: AppColors.onSurface, fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
-                        const SizedBox(height: 4),
-                        const Text('How was your experience?', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (i) {
-                            final star = i + 1;
-                            return GestureDetector(
-                              onTap: () => setState(() => _selectedStars = star),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: 4),
-                                child: Icon(
-                                  _selectedStars >= star ? Icons.star_rounded : Icons.star_outline_rounded,
-                                  color: _selectedStars >= star ? const Color(0xFFF59E0B) : const Color(0xFFCBD5E1),
-                                  size: 40,
+                  if (!_ratingSubmitted && _responderId != null) ...[
+                    MfCard(
+                      padding: const EdgeInsets.all(MfSpace.md),
+                      child: Column(
+                        children: [
+                          Text('Rate your responder', textAlign: TextAlign.center, style: text.titleMedium),
+                          const SizedBox(height: 2),
+                          Text(
+                            'How was your experience?',
+                            textAlign: TextAlign.center,
+                            style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          const SizedBox(height: MfSpace.sm),
+                          Wrap(
+                            alignment: WrapAlignment.center,
+                            children: List.generate(5, (i) {
+                              final star = i + 1;
+                              final filled = _selectedStars >= star;
+                              return IconButton(
+                                tooltip: star == 1 ? '1 star' : '$star stars',
+                                isSelected: filled,
+                                constraints: const BoxConstraints(minWidth: MfSize.minTouch, minHeight: MfSize.minTouch),
+                                onPressed: () => setState(() => _selectedStars = star),
+                                icon: Icon(
+                                  filled ? Icons.star_rounded : Icons.star_outline_rounded,
+                                  color: filled ? MfColors.warning(context) : cs.outline,
+                                  size: 36,
                                 ),
-                              ),
-                            );
-                          }),
-                        ),
-                        if (_selectedStars > 0) ...[
-                          const SizedBox(height: 16),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
+                              );
+                            }),
+                          ),
+                          if (_selectedStars > 0) ...[
+                            const SizedBox(height: MfSpace.sm),
+                            MfPrimaryButton(
+                              label: 'Submit rating',
                               onPressed: () async {
                                 final responderId = _responderId!;
                                 final stars = _selectedStars;
@@ -1488,54 +1155,35 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                                   )).future);
                                 } catch (_) {}
                               },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                                elevation: 0,
-                              ),
-                              child: const Text('Submit Rating', style: TextStyle(fontWeight: FontWeight.bold)),
                             ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextButton(
-                    onPressed: () => context.go('/home'),
-                    child: const Text('Skip', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 13)),
-                  ),
-                ] else ...[
-                  if (_ratingSubmitted)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.check_circle, color: AppColors.success, size: 18),
-                          const SizedBox(width: 6),
-                          Text('Thanks for your feedback!', style: TextStyle(color: AppColors.success, fontSize: 14, fontWeight: FontWeight.w600)),
+                          ],
                         ],
                       ),
                     ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
+                    const SizedBox(height: MfSpace.sm),
+                    Center(
+                      child: MfTextButton(
+                        label: 'Skip',
+                        onPressed: () => context.go('/home'),
+                      ),
+                    ),
+                  ] else ...[
+                    if (_ratingSubmitted) ...[
+                      const MfInfoBanner(
+                        icon: Icons.check_circle_outline_rounded,
+                        tone: MfTone.success,
+                        title: 'Thanks for your feedback',
+                      ),
+                      const SizedBox(height: MfSpace.md),
+                    ],
+                    MfPrimaryButton(
+                      label: 'Back to home',
+                      icon: Icons.home_outlined,
                       onPressed: () => context.go('/home'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                        elevation: 0,
-                      ),
-                      child: const Text('Return Home', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     ),
-                  ),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
         ),
@@ -1543,41 +1191,73 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     );
   }
 
-  void _showCancelDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cancel Emergency?', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.onSurface)),
-        content: const Text('Are you sure you want to cancel the active emergency?', style: TextStyle(color: Color(0xFF64748B))),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Keep waiting', style: TextStyle(color: Color(0xFF64748B)))),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
-                SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
-                if (mounted) context.go('/home');
-              } catch (e) {
-                if (!mounted) return;
-                final msg = e.toString().toLowerCase();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(msg.contains('expired')
-                        ? 'Too late to cancel — responders are already being dispatched.'
-                        : msg.contains('not active')
-                            ? 'A responder has already accepted, so this can no longer be cancelled.'
-                            : 'Could not cancel: $e'),
-                    backgroundColor: AppColors.error,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-            },
-            child: const Text('Yes, cancel'),
+  Future<void> _showCancelDialog() async {
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: 'Cancel SOS?',
+      message: 'Are you sure you want to cancel the active emergency?',
+      confirmLabel: 'Yes, cancel',
+      cancelLabel: 'Keep waiting',
+      destructive: true,
+      icon: Icons.warning_amber_rounded,
+    );
+    if (!confirmed || !mounted) return;
+    try {
+      await ref.read(cancelEmergencyProvider(widget.emergencyId).future);
+      SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
+      if (mounted) context.go('/home');
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().toLowerCase();
+      showMfSnackBar(
+        context,
+        msg.contains('expired')
+            ? 'Too late to cancel. Responders are already being dispatched.'
+            : msg.contains('not active')
+                ? 'A responder has already accepted, so this can no longer be cancelled.'
+                : 'Could not cancel: $e',
+        tone: MfTone.danger,
+      );
+    }
+  }
+}
+
+/// Patient location pin used on the map during simulation mode.
+class _PatientPin extends StatelessWidget {
+  static const double width = 52;
+  static const double height = 64;
+
+  final String? imageUrl;
+  final String? name;
+  const _PatientPin({this.imageUrl, this.name});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final sos = MfColors.sos(context);
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(2),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              shape: BoxShape.circle,
+              border: Border.all(color: sos, width: 2),
+              boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4, offset: Offset(0, 1))],
+            ),
+            child: MfAvatar(imageUrl: imageUrl, name: name, size: 40),
+          ),
+          Container(width: 2, height: 10, color: sos),
+          Container(
+            width: 8,
+            height: 4,
+            decoration: BoxDecoration(
+              color: sos.withValues(alpha: 0.5),
+              borderRadius: const BorderRadius.all(Radius.elliptical(4, 2)),
+            ),
           ),
         ],
       ),
@@ -1585,92 +1265,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   }
 }
 
-class _ModernTimelineItem extends StatelessWidget {
-  final String label;
-  final String time;
-  final bool isDone;
-  final bool isCurrent;
-  final bool isLast;
-
-  final Color color;
-
-  const _ModernTimelineItem({
-    required this.label,
-    required this.time,
-    required this.isDone,
-    this.isCurrent = false,
-    required this.isLast,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final active = isDone || isCurrent;
-    final dotColor = active ? color : const Color(0xFFE2E8F0);
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 500),
-              width: 16,
-              height: 16,
-              decoration: BoxDecoration(
-                color: isDone ? color : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(color: dotColor, width: 2),
-                boxShadow: isCurrent ? [
-                  BoxShadow(color: color.withOpacity(0.35), blurRadius: 8, spreadRadius: 1)
-                ] : [],
-              ),
-              child: isDone ? const Icon(Icons.check, size: 10, color: Colors.white) : null,
-            ),
-            if (!isLast)
-              Container(
-                width: 2,
-                height: 32,
-                color: isDone ? color.withOpacity(0.25) : const Color(0xFFE2E8F0),
-              ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: active ? AppColors.onSurface : const Color(0xFF94A3B8),
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  time,
-                  style: TextStyle(
-                    color: active ? color : const Color(0xFFCBD5E1),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
+/// Screen-edge border for deaf patients. Pulses gently unless reduced motion
+/// is on, in which case it is shown as a static border.
 class _AnimatedPulseBorder extends StatefulWidget {
   final Color color;
-  const _AnimatedPulseBorder({required this.color});
+  final bool animate;
+  const _AnimatedPulseBorder({required this.color, this.animate = true});
 
   @override
   State<_AnimatedPulseBorder> createState() => _AnimatedPulseBorderState();
@@ -1683,8 +1283,23 @@ class _AnimatedPulseBorderState extends State<_AnimatedPulseBorder> with SingleT
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1))..repeat(reverse: true);
-    _opacity = Tween<double>(begin: 0.1, end: 0.6).animate(_controller);
+    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 1));
+    _opacity = Tween<double>(begin: 0.15, end: 0.6).animate(_controller);
+    _syncAnimation();
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedPulseBorder oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.animate != widget.animate) _syncAnimation();
+  }
+
+  void _syncAnimation() {
+    if (widget.animate) {
+      _controller.repeat(reverse: true);
+    } else {
+      _controller.stop();
+    }
   }
 
   @override
@@ -1695,17 +1310,23 @@ class _AnimatedPulseBorderState extends State<_AnimatedPulseBorder> with SingleT
 
   @override
   Widget build(BuildContext context) {
+    if (!widget.animate) {
+      return DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border.all(color: widget.color.withValues(alpha: 0.5), width: 8),
+        ),
+      );
+    }
     return AnimatedBuilder(
       animation: _opacity,
-      builder: (context, child) => Container(
+      builder: (context, child) => DecoratedBox(
         decoration: BoxDecoration(
           border: Border.all(
-            color: widget.color.withOpacity(_opacity.value),
-            width: 12,
+            color: widget.color.withValues(alpha: _opacity.value),
+            width: 8,
           ),
         ),
       ),
     );
   }
 }
-

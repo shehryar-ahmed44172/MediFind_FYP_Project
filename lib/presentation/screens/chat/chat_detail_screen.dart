@@ -1,25 +1,30 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/chat_provider.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/accessibility_provider.dart';
-import '../../theme/app_theme.dart';
-import '../../../domain/entities/chat_message.dart';
-import '../patient/predefined_messages_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:just_audio/just_audio.dart';
-import '../../../services/audio/voice_recorder_service.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'dart:io';
 import '../../../core/utils/exceptions.dart';
+import '../../../domain/entities/chat_message.dart';
+import '../../../services/audio/voice_recorder_service.dart';
 import '../../../services/location/location_service.dart';
+import '../../providers/accessibility_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/chat_provider.dart';
+import '../../widgets/design_system/design_system.dart';
+import '../patient/predefined_messages_screen.dart';
+import 'chat_list_screen.dart' show chatRoomDisplayName, chatRoomIsEmergency, chatRoomOtherUser;
 
 final RegExp _urlRegex = RegExp(r'https?://[^\s]+', caseSensitive: false);
+
+/// Names callers pass when they do not know the real name yet.
+const _genericNames = {'patient', 'responder', 'user', 'chat', 'caregiver', 'sender'};
 
 class ChatDetailScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -40,14 +45,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   final ScrollController _scrollController = ScrollController();
   final VoiceRecorderService _recorderService = VoiceRecorderService();
   final AudioPlayer _audioPlayer = AudioPlayer();
-  
+
   bool _isRecording = false;
   bool _isSending = false;
+
+  /// Text currently being sent (shown as a "Sending" bubble).
+  String? _pendingText;
   String? _playingMessageId;
   DateTime? _recordingStartTime;
   Timer? _recordingTimer;
   String _recordingDuration = '0:00';
   StreamSubscription<PlayerState>? _playerStateSub;
+  int _lastMessageCount = 0;
 
   @override
   void initState() {
@@ -74,15 +83,14 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     super.dispose();
   }
 
-  void _showSnack(String message, {bool isError = false, SnackBarAction? action}) {
+  void _showSnack(String message, {bool isError = false, String? actionLabel, VoidCallback? onAction}) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? AppColors.error : null,
-        behavior: SnackBarBehavior.floating,
-        action: action,
-      ),
+    showMfSnackBar(
+      context,
+      message,
+      tone: isError ? MfTone.danger : MfTone.neutral,
+      actionLabel: actionLabel,
+      onAction: onAction,
     );
   }
 
@@ -90,66 +98,68 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (_scrollController.hasClients) {
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
+        duration: MfMotion.of(context, const Duration(milliseconds: 300)),
         curve: Curves.easeOut,
       );
     }
   }
 
+  // ── Participant ──────────────────────────────────────────────────────────
+  /// Resolves the real participant name from the rooms list when the caller
+  /// only passed a generic label ("Patient", "Responder").
+  ({String name, String? imageUrl, bool emergency}) _participant() {
+    final passed = widget.otherUserName?.trim();
+    final role = ref.watch(currentUserProvider).valueOrNull?.role;
+    final rooms = ref.watch(chatRoomsProvider).valueOrNull;
+    final room = rooms?.where((r) => r.id == widget.roomId).firstOrNull;
+    if (room == null) {
+      return (name: (passed == null || passed.isEmpty) ? 'Chat' : passed, imageUrl: null, emergency: false);
+    }
+    final resolved = chatRoomDisplayName(room, role);
+    final useResolved = passed == null || passed.isEmpty || _genericNames.contains(passed.toLowerCase());
+    return (
+      name: useResolved ? resolved : passed,
+      imageUrl: chatRoomOtherUser(room, role)?['profileImageUrl'] as String?,
+      emergency: chatRoomIsEmergency(room),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(chatMessagesProvider(widget.roomId));
-    final theme = Theme.of(context);
     final currentUserId = ref.watch(currentUserIdProvider).value;
+    final participant = _participant();
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: theme.scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: Text(widget.otherUserName ?? 'Chat', style: const TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 0,
+      appBar: MfHeader(
+        title: participant.name,
+        subtitle: participant.emergency ? 'Emergency chat' : null,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
+          MfIconButton(
+            icon: Icons.info_outline_rounded,
             tooltip: 'Chat info',
-            onPressed: () {
-              showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (_) => Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 4,
-                        margin: const EdgeInsets.only(bottom: 20),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[300],
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const CircleAvatar(radius: 32, child: Icon(Icons.person, size: 32)),
-                      const SizedBox(height: 12),
-                      Text(
-                        widget.otherUserName ?? 'Chat',
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Room: ${widget.roomId}',
-                        style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+            onPressed: () => showMfBottomSheet<void>(
+              context,
+              builder: (ctx) => Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  MfAvatar(imageUrl: participant.imageUrl, name: participant.name, size: 64),
+                  const SizedBox(height: MfSpace.sm),
+                  Text(participant.name, style: text.titleLarge, textAlign: TextAlign.center),
+                  const SizedBox(height: MfSpace.xxs),
+                  Text(
+                    participant.emergency
+                        ? 'Emergency conversation. Messages are shared with the assigned responder.'
+                        : 'Private conversation',
+                    textAlign: TextAlign.center,
+                    style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
                   ),
-                ),
-              );
-            },
+                  const SizedBox(height: MfSpace.lg),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -158,166 +168,262 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
           Expanded(
             child: messagesAsync.when(
               data: (messages) {
-                WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-                
-                if (messages.isEmpty) {
-                  return const Center(child: Text('Start your conversation...'));
+                if (messages.length != _lastMessageCount) {
+                  _lastMessageCount = messages.length;
+                  WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
                 }
-                
+
+                if (messages.isEmpty && _pendingText == null) {
+                  return MfEmptyState(
+                    icon: Icons.chat_bubble_outline_rounded,
+                    title: 'No messages yet',
+                    message: 'Send a message to start the conversation with ${participant.name}.',
+                  );
+                }
+
+                final itemCount = messages.length + (_pendingText != null ? 1 : 0);
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                  itemCount: messages.length,
+                  padding: const EdgeInsets.fromLTRB(MfSpace.sm, MfSpace.md, MfSpace.sm, MfSpace.md),
+                  itemCount: itemCount,
                   itemBuilder: (context, index) {
+                    if (index >= messages.length) {
+                      return _PendingBubble(text: _pendingText!);
+                    }
                     final message = messages[index];
                     final isMe = message.senderId == currentUserId;
-                    return _buildMessageBubble(message, isMe, theme);
+                    final prev = index > 0 ? messages[index - 1] : null;
+                    final showDay = prev == null || !_sameDay(prev.createdAt, message.createdAt);
+                    final grouped = !showDay && prev.senderId == message.senderId;
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (showDay) _DaySeparator(date: message.createdAt),
+                        _buildMessageBubble(message, isMe, grouped: grouped, senderName: participant.name),
+                      ],
+                    );
                   },
                 );
               },
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Unable to load messages',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      const SizedBox(height: 8),
-                      Text('$e', textAlign: TextAlign.center, style: const TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 16),
-                      ElevatedButton.icon(
-                        onPressed: () => ref.read(chatMessagesProvider(widget.roomId).notifier).fetchMessages(),
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Retry'),
-                        style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
-                      ),
-                    ],
-                  ),
-                ),
+              loading: () => const MfLoading(label: 'Loading messages'),
+              error: (e, _) => MfErrorState(
+                title: 'Unable to load messages',
+                message: 'Check your connection and try again.',
+                onRetry: () => ref.read(chatMessagesProvider(widget.roomId).notifier).fetchMessages(),
               ),
             ),
           ),
-          _buildMessageInput(theme),
+          _buildMessageInput(),
         ],
       ),
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message, bool isMe, ThemeData theme) {
-    return Align(
-      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Column(
-        crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          if (!isMe)
-            Padding(
-              padding: const EdgeInsets.only(left: 4, bottom: 4),
-              child: Text(
-                widget.otherUserName ?? 'Sender',
-                style: TextStyle(color: Colors.grey.shade600, fontSize: 10, fontWeight: FontWeight.bold),
-              ),
-            ),
-          Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: isMe ? AppColors.primary : Colors.grey.shade200,
-              borderRadius: BorderRadius.only(
-                topLeft: const Radius.circular(20),
-                topRight: const Radius.circular(20),
-                bottomLeft: Radius.circular(isMe ? 20 : 4),
-                bottomRight: Radius.circular(isMe ? 4 : 20),
-              ),
-              boxShadow: isMe 
-                  ? [BoxShadow(color: AppColors.primary.withOpacity(0.2), blurRadius: 8, offset: const Offset(0, 4))] 
-                  : [],
-            ),
-            child: Column(
-              crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+  static bool _sameDay(DateTime a, DateTime b) {
+    final la = a.toLocal();
+    final lb = b.toLocal();
+    return la.year == lb.year && la.month == lb.month && la.day == lb.day;
+  }
+
+  // ── Bubbles ──────────────────────────────────────────────────────────────
+  Widget _buildMessageBubble(ChatMessage message, bool isMe, {required bool grouped, required String senderName}) {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final fg = isMe ? cs.onPrimary : cs.onSurface;
+    final meta = isMe ? cs.onPrimary.withValues(alpha: 0.8) : cs.onSurfaceVariant;
+    final time = DateFormat('h:mm a').format(message.createdAt.toLocal());
+
+    Widget content;
+    String semanticsContent;
+    switch (message.messageType) {
+      case MessageType.AUDIO:
+      case MessageType.VOICE_ALERT:
+        final playing = _playingMessageId == message.id;
+        semanticsContent = 'Voice message';
+        content = InkWell(
+          onTap: () => _playVoiceNote(message.id, message.mediaUrl),
+          borderRadius: MfRadius.smAll,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: MfSize.minTouch),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (message.messageType == MessageType.TEXT)
-                  _buildTextContent(message.content, isMe)
-                else if (message.messageType == MessageType.AUDIO)
-                  GestureDetector(
-                    onTap: () => _playVoiceNote(message.id, message.mediaUrl),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          _playingMessageId == message.id ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, 
-                          color: isMe ? Colors.white : AppColors.primary, 
-                          size: 32
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _playingMessageId == message.id ? 'Playing...' : 'Voice Message', 
-                          style: TextStyle(
-                            fontWeight: FontWeight.w500,
-                            color: isMe ? Colors.white : Colors.black87
-                          )
-                        ),
-                      ],
-                    ),
-                  )
-                else if (message.messageType == MessageType.DOCUMENT)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.insert_drive_file_rounded, color: isMe ? Colors.white : Colors.grey, size: 24),
-                      const SizedBox(width: 8),
-                      Flexible(
-                        child: Text(
-                          message.content,
-                          style: TextStyle(color: isMe ? Colors.white : Colors.black87),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  )
-                else if (message.messageType == MessageType.IMAGE && message.mediaUrl != null)
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.network(message.mediaUrl!, width: 200, height: 200, fit: BoxFit.cover),
+                Icon(playing ? Icons.pause_circle_filled_rounded : Icons.play_circle_fill_rounded, color: fg, size: 36),
+                const SizedBox(width: MfSpace.xs),
+                Flexible(
+                  child: Text(
+                    playing ? 'Playing voice message' : 'Voice message',
+                    style: text.bodyMedium?.copyWith(color: fg, fontWeight: FontWeight.w500),
                   ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      DateFormat('hh:mm a').format(message.createdAt),
-                      style: TextStyle(
-                        color: isMe ? Colors.white70 : Colors.grey.shade500,
-                        fontSize: 10,
-                      ),
-                    ),
-                    if (isMe) ...[
-                      const SizedBox(width: 4),
-                      const Icon(Icons.done_all_rounded, size: 12, color: Colors.white70),
-                    ],
-                  ],
                 ),
               ],
             ),
           ),
-        ],
+        );
+        break;
+      case MessageType.DOCUMENT:
+        semanticsContent = 'Document ${message.content}';
+        content = InkWell(
+          onTap: message.mediaUrl == null ? null : () => _openLink(message.mediaUrl!),
+          borderRadius: MfRadius.smAll,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: MfSize.minTouch),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.description_outlined, color: fg, size: 28),
+                const SizedBox(width: MfSpace.xs),
+                Flexible(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        message.content,
+                        style: text.bodyMedium?.copyWith(color: fg, fontWeight: FontWeight.w500),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (message.mediaUrl != null)
+                        Text('Tap to open', style: text.labelSmall?.copyWith(color: meta)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+        break;
+      case MessageType.IMAGE:
+        semanticsContent = 'Photo';
+        content = message.mediaUrl == null
+            ? Text('Photo unavailable', style: text.bodyMedium?.copyWith(color: fg))
+            : InkWell(
+                onTap: () => _openLink(message.mediaUrl!),
+                child: ClipRRect(
+                  borderRadius: MfRadius.smAll,
+                  child: Image.network(
+                    message.mediaUrl!,
+                    width: 220,
+                    height: 220,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, progress) => progress == null
+                        ? child
+                        : const SizedBox(width: 220, height: 220, child: MfLoading()),
+                    errorBuilder: (_, __, ___) => SizedBox(
+                      width: 220,
+                      height: 120,
+                      child: Center(child: Icon(Icons.broken_image_outlined, color: meta, size: 32)),
+                    ),
+                  ),
+                ),
+              );
+        break;
+      case MessageType.TEXT:
+        semanticsContent = message.content;
+        content = _buildTextContent(message.content, isMe);
+        break;
+    }
+
+    const radius = Radius.circular(MfRadius.lg);
+    const tail = Radius.circular(MfRadius.sm / 2);
+    final status = isMe ? (message.isRead ? 'Read' : 'Delivered') : null;
+
+    return Semantics(
+      container: true,
+      label: '${isMe ? 'You' : senderName}: $semanticsContent. $time${status != null ? '. $status' : ''}',
+      excludeSemantics: message.messageType == MessageType.TEXT && !_urlRegex.hasMatch(message.content),
+      child: Padding(
+        padding: EdgeInsets.only(top: grouped ? 2 : MfSpace.xs),
+        child: Align(
+          alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: isMe ? cs.primary : cs.surface,
+                border: isMe ? null : Border.all(color: cs.outlineVariant),
+                borderRadius: BorderRadius.only(
+                  topLeft: radius,
+                  topRight: radius,
+                  bottomLeft: isMe ? radius : tail,
+                  bottomRight: isMe ? tail : radius,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(MfSpace.sm, MfSpace.xs, MfSpace.sm, MfSpace.xs),
+                child: Column(
+                  crossAxisAlignment: isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    content,
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(time, style: text.labelSmall?.copyWith(color: meta)),
+                        if (isMe) ...[
+                          const SizedBox(width: MfSpace.xxs),
+                          Icon(
+                            message.isRead ? Icons.done_all_rounded : Icons.done_rounded,
+                            size: 16,
+                            color: meta,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildTextContent(String content, bool isMe) {
-    final color = isMe ? Colors.white : Colors.black87;
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    final color = isMe ? cs.onPrimary : cs.onSurface;
     final match = _urlRegex.firstMatch(content);
     if (match == null) {
-      return Text(content, style: TextStyle(color: color, fontSize: 15));
+      return Text(content, style: text.bodyLarge?.copyWith(color: color));
     }
     final url = match.group(0)!;
+
+    // Shared location: show a labeled card with an explicit action.
+    if (url.contains('google.com/maps')) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.location_on_outlined, color: color, size: 22),
+              const SizedBox(width: MfSpace.xxs),
+              Flexible(
+                child: Text('Shared location', style: text.titleSmall?.copyWith(color: color)),
+              ),
+            ],
+          ),
+          const SizedBox(height: MfSpace.xxs),
+          TextButton.icon(
+            onPressed: () => _openLink(url),
+            style: TextButton.styleFrom(
+              foregroundColor: color,
+              padding: const EdgeInsets.symmetric(horizontal: MfSpace.xs),
+              minimumSize: const Size(MfSize.minTouch, MfSize.minTouch),
+              side: BorderSide(color: color.withValues(alpha: 0.5)),
+            ),
+            icon: const Icon(Icons.map_outlined, size: 18),
+            label: const Text('Open in Maps'),
+          ),
+        ],
+      );
+    }
+
     return Semantics(
       link: true,
       label: 'Open link',
@@ -325,15 +431,15 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         onTap: () => _openLink(url),
         child: Text.rich(
           TextSpan(
-            style: TextStyle(color: color, fontSize: 15),
+            style: text.bodyLarge?.copyWith(color: color),
             children: [
               TextSpan(text: content.substring(0, match.start)),
               TextSpan(
                 text: url,
                 style: TextStyle(
-                  color: isMe ? Colors.white : AppColors.primary,
+                  color: isMe ? cs.onPrimary : cs.primary,
                   decoration: TextDecoration.underline,
-                  decorationColor: isMe ? Colors.white : AppColors.primary,
+                  decorationColor: isMe ? cs.onPrimary : cs.primary,
                 ),
               ),
               TextSpan(text: content.substring(match.end)),
@@ -357,243 +463,241 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (!opened) _showSnack('Could not open link', isError: true);
   }
 
+  // ── Quick phrases (deaf patients) ────────────────────────────────────────
+  /// Sends a quick phrase immediately. On failure the phrase is placed in the
+  /// input so the user can retry.
+  Future<void> _sendQuickPhrase(String phrase) async {
+    if (_isSending) return;
+    HapticFeedback.lightImpact();
+    setState(() {
+      _isSending = true;
+      _pendingText = phrase;
+    });
+    try {
+      final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(phrase);
+      if (!mounted) return;
+      if (!ok) {
+        _messageController.text = phrase;
+        _messageController.selection = TextSelection.collapsed(offset: phrase.length);
+        _showSnack('Message not sent. It is in the text box so you can try again.', isError: true);
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _pendingText = null;
+        });
+      }
+    }
+  }
+
   void _showQuickPhrases() {
-    final messages = ref.read(predefinedMessagesProvider);
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (ctx) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.hearing_disabled, color: Color(0xFF0C637E)),
-                const SizedBox(width: 8),
-                const Text('Quick Phrases', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                const Spacer(),
-                IconButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Close',
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (messages.isEmpty)
-              const Center(
-                child: Text('No phrases saved. Go to Settings → Quick Phrases to add them.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.grey)),
-              )
-            else
-              ConstrainedBox(
-                constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: messages.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (_, i) => ListTile(
-                    leading: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C637E).withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(8),
+    showMfBottomSheet<void>(
+      context,
+      title: 'Quick phrases',
+      subtitle: 'Tap a phrase to send it now',
+      builder: (ctx) => Consumer(
+        builder: (ctx, ref, _) {
+          final messages = ref.watch(predefinedMessagesProvider);
+          final text = Theme.of(ctx).textTheme;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (messages.isEmpty)
+                const MfEmptyState(
+                  compact: true,
+                  icon: Icons.quickreply_outlined,
+                  title: 'No phrases saved',
+                  message: 'Add phrases you use often so you can send them with one tap.',
+                )
+              else
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(ctx).height * 0.5),
+                  child: MfCard(
+                    padding: EdgeInsets.zero,
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: messages.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
+                      itemBuilder: (_, i) => ListTile(
+                        minVerticalPadding: MfSpace.sm,
+                        title: Text(messages[i], style: text.bodyLarge),
+                        trailing: const Icon(Icons.send_rounded),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _sendQuickPhrase(messages[i]);
+                        },
                       ),
-                      child: Text('${i + 1}', style: const TextStyle(color: Color(0xFF0C637E), fontWeight: FontWeight.bold, fontSize: 12)),
-                    ),
-                    title: Text(messages[i], style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
-                    onTap: () {
-                      Navigator.pop(ctx);
-                      _messageController.text = messages[i];
-                      _messageController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: messages[i].length),
-                      );
-                    },
-                    trailing: IconButton(
-                      icon: const Icon(Icons.send_rounded, color: Color(0xFF0C637E), size: 20),
-                      tooltip: 'Send phrase',
-                      onPressed: () async {
-                        Navigator.pop(ctx);
-                        final ok = await ref
-                            .read(chatMessagesProvider(widget.roomId).notifier)
-                            .sendMessage(messages[i]);
-                        if (!ok) _showSnack('Failed to send message. Please try again.', isError: true);
-                      },
                     ),
                   ),
                 ),
+              const SizedBox(height: MfSpace.sm),
+              MfSecondaryButton(
+                label: 'Edit quick phrases',
+                icon: Icons.edit_outlined,
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  context.push('/predefined-messages');
+                },
               ),
-            const SizedBox(height: 8),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildMessageInput(ThemeData theme) {
+  // ── Composer ─────────────────────────────────────────────────────────────
+  Widget _buildMessageInput() {
     if (_isRecording) {
-      return _buildRecordingOverlay(theme);
+      return _buildRecordingOverlay();
     }
 
+    final cs = Theme.of(context).colorScheme;
     final settings = ref.watch(accessibilityProvider);
-    final isDeaf = settings.textOnlyMode;
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final isPatient = (user?.role ?? '').toUpperCase() == 'PATIENT';
+    final isDeafPatient = isPatient && ((user?.patientType ?? '').toUpperCase() == 'DEAF' || settings.textOnlyMode);
+    // Text-only users never see the microphone.
+    final hideMic = isDeafPatient || settings.textOnlyMode;
+    final phrases = isDeafPatient ? ref.watch(predefinedMessagesProvider) : const <String>[];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 24),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            offset: const Offset(0, -4),
-            blurRadius: 10,
-          ),
-        ],
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isDeaf) ...[
-            // Deaf mode: quick phrases shortcut bar
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                itemCount: ref.watch(predefinedMessagesProvider).take(5).length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (_, i) {
-                  final msg = ref.watch(predefinedMessagesProvider)[i];
-                  return GestureDetector(
-                    onTap: () {
-                      _messageController.text = msg;
-                      _messageController.selection = TextSelection.fromPosition(
-                        TextPosition(offset: msg.length),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(MfSpace.xs, MfSpace.xs, MfSpace.xs, MfSpace.xs),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (isDeafPatient && phrases.isNotEmpty) ...[
+                // Deaf mode: one-tap quick phrases (send instantly)
+                SizedBox(
+                  height: MfSize.minTouch,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: MfSpace.xxs),
+                    itemCount: phrases.take(6).length,
+                    separatorBuilder: (_, __) => const SizedBox(width: MfSpace.xs),
+                    itemBuilder: (_, i) {
+                      final msg = phrases[i];
+                      return Center(
+                        child: ActionChip(
+                          avatar: const Icon(Icons.send_rounded, size: 16),
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 220),
+                            child: Text(msg, maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ),
+                          tooltip: 'Send "$msg"',
+                          onPressed: _isSending ? null : () => _sendQuickPhrase(msg),
+                        ),
                       );
                     },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0C637E).withOpacity(0.08),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFF0C637E).withOpacity(0.2)),
-                      ),
-                      child: Text(
-                        msg.length > 25 ? '${msg.substring(0, 25)}…' : msg,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF0C637E), fontWeight: FontWeight.w600),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-          Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.primary),
-            tooltip: 'Attach',
-            onPressed: _isSending ? null : _showAttachmentOptions,
-          ),
-          if (isDeaf)
-            IconButton(
-              icon: const Icon(Icons.hearing_disabled_rounded, color: Color(0xFF2496A7)),
-              tooltip: 'Quick Phrases',
-              onPressed: _showQuickPhrases,
-            ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: theme.scaffoldBackgroundColor,
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: TextField(
-                controller: _messageController,
-                decoration: const InputDecoration(
-                  hintText: 'Type a message...',
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
-                maxLines: null,
+                const SizedBox(height: MfSpace.xxs),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  MfIconButton(
+                    icon: Icons.add_circle_outline_rounded,
+                    tooltip: 'Attach photo, document or location',
+                    color: cs.primary,
+                    onPressed: _isSending ? null : _showAttachmentOptions,
+                  ),
+                  if (isDeafPatient)
+                    MfIconButton(
+                      icon: Icons.quickreply_outlined,
+                      tooltip: 'Quick phrases',
+                      color: cs.primary,
+                      onPressed: _showQuickPhrases,
+                    ),
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      minLines: 1,
+                      maxLines: 5,
+                      textCapitalization: TextCapitalization.sentences,
+                      keyboardType: TextInputType.multiline,
+                      decoration: InputDecoration(
+                        hintText: 'Type a message',
+                        isDense: true,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
+                        border: const OutlineInputBorder(borderRadius: MfRadius.lgAll),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: MfRadius.lgAll,
+                          borderSide: BorderSide(color: cs.outlineVariant),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: MfSpace.xs),
+                  _isSending
+                      ? const SizedBox(
+                          width: MfSize.minTouch,
+                          height: MfSize.minTouch,
+                          child: Center(
+                            child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
+                          ),
+                        )
+                      : ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _messageController,
+                          builder: (context, value, child) {
+                            final hasText = value.text.trim().isNotEmpty;
+                            // Mic only for hearing users with an empty input;
+                            // deaf / text-only users always get the send button.
+                            final showMic = !hasText && !hideMic;
+                            return IconButton.filled(
+                              tooltip: showMic ? 'Record voice message' : 'Send message',
+                              style: IconButton.styleFrom(
+                                minimumSize: const Size(MfSize.minTouch, MfSize.minTouch),
+                              ),
+                              onPressed: showMic ? _startVoiceRecording : (hasText ? _sendMessage : null),
+                              icon: Icon(showMic ? Icons.mic_none_rounded : Icons.send_rounded),
+                            );
+                          },
+                        ),
+                ],
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          _isSending
-            ? const Padding(
-                padding: EdgeInsets.all(12),
-                child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)),
-              )
-            : ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _messageController,
-                builder: (context, value, child) {
-                  final hasText = value.text.trim().isNotEmpty;
-                  // Deaf/text-only patients cannot use voice recording
-                  final canSend = hasText || isDeaf;
-                  return Semantics(
-                    button: true,
-                    label: (hasText || isDeaf) ? 'Send message' : 'Record voice message',
-                    child: GestureDetector(
-                    onTap: canSend ? (hasText ? _sendMessage : null) : _startVoiceRecording,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: (canSend && !hasText)
-                            ? AppColors.primary.withOpacity(0.35)
-                            : AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        // Always show send icon for deaf users; mic only for hearing users
-                        (hasText || isDeaf) ? Icons.send_rounded : Icons.mic_none_rounded,
-                        color: Colors.white,
-                        size: 24,
-                      ),
-                    ),
-                    ),
-                  );
-                },
-              ),
-        ],
-      ),
-        ],
+        ),
       ),
     );
   }
 
   void _showAttachmentOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildAttachmentItem(Icons.image_rounded, 'Gallery', Colors.purple, _pickImage),
-                _buildAttachmentItem(Icons.description_rounded, 'Document', AppColors.primary, _pickDocument),
-                _buildAttachmentItem(Icons.location_on_rounded, 'Location', AppColors.success, _shareLocation),
-              ],
-            ),
-          ],
-        ),
+    showMfBottomSheet<void>(
+      context,
+      title: 'Share',
+      builder: (ctx) => MfListGroup(
+        children: [
+          MfIconTile(
+            icon: Icons.photo_outlined,
+            label: 'Photo',
+            subtitle: 'Choose an image from your gallery',
+            onTap: _pickImage,
+          ),
+          MfIconTile(
+            icon: Icons.description_outlined,
+            label: 'Document',
+            subtitle: 'Send a file such as a report or prescription',
+            onTap: _pickDocument,
+          ),
+          MfIconTile(
+            icon: Icons.location_on_outlined,
+            label: 'Current location',
+            subtitle: 'Send a map link to where you are now',
+            onTap: _shareLocation,
+          ),
+        ],
       ),
     );
   }
@@ -636,7 +740,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       final position = await LocationService().getCurrentLocation();
       final lat = position.latitude.toStringAsFixed(6);
       final lng = position.longitude.toStringAsFixed(6);
-      final content = '📍 My location: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
+      final content = 'My location: https://www.google.com/maps/search/?api=1&query=$lat,$lng';
       final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);
       if (!ok) {
         _showSnack('Failed to send location. Please try again.', isError: true);
@@ -653,35 +757,51 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     }
   }
 
-  Widget _buildRecordingOverlay(ThemeData theme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-      color: Colors.white,
-      child: Row(
-        children: [
-          const Icon(Icons.mic, color: AppColors.error, size: 20),
-          const SizedBox(width: 12),
-          Text(_recordingDuration, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const Spacer(),
-          TextButton(
-            onPressed: _cancelRecording,
-            style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
-            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-          ),
-          const SizedBox(width: 8),
-          Semantics(
-            button: true,
-            label: 'Send voice message',
-            child: GestureDetector(
-              onTap: _stopRecording,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: const BoxDecoration(color: AppColors.success, shape: BoxShape.circle),
-                child: const Icon(Icons.check, color: Colors.white),
-              ),
+  Widget _buildRecordingOverlay() {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.xs),
+          child: Semantics(
+            liveRegion: true,
+            label: 'Recording voice message, $_recordingDuration',
+            child: Row(
+              children: [
+                Icon(Icons.mic_rounded, color: cs.primary),
+                const SizedBox(width: MfSpace.xs),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Recording', style: text.titleSmall),
+                      Text(_recordingDuration, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+                MfTextButton(
+                  label: 'Discard',
+                  icon: Icons.delete_outline_rounded,
+                  tone: MfTone.neutral,
+                  onPressed: _cancelRecording,
+                ),
+                const SizedBox(width: MfSpace.xs),
+                FilledButton.icon(
+                  onPressed: _stopRecording,
+                  style: FilledButton.styleFrom(minimumSize: const Size(MfSize.minTouch, MfSize.minTouch)),
+                  icon: const Icon(Icons.send_rounded, size: 18),
+                  label: const Text('Send'),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -693,11 +813,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       _showSnack(
         'Microphone access is blocked. Enable it in Settings to send voice messages.',
         isError: true,
-        action: const SnackBarAction(
-          label: 'Open settings',
-          textColor: Colors.white,
-          onPressed: openAppSettings,
-        ),
+        actionLabel: 'Open settings',
+        onAction: openAppSettings,
       );
       return;
     }
@@ -758,7 +875,10 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     if (content.isEmpty || _isSending) return;
 
     HapticFeedback.lightImpact();
-    setState(() => _isSending = true);
+    setState(() {
+      _isSending = true;
+      _pendingText = content;
+    });
     try {
       final ok = await ref.read(chatMessagesProvider(widget.roomId).notifier).sendMessage(content);
       if (!mounted) return;
@@ -771,13 +891,18 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         _showSnack('Message not sent. Please check your connection and try again.', isError: true);
       }
     } finally {
-      if (mounted) setState(() => _isSending = false);
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+          _pendingText = null;
+        });
+      }
     }
   }
 
   void _playVoiceNote(String messageId, String? url) async {
     if (url == null) return;
-    
+
     if (_playingMessageId == messageId) {
       await _audioPlayer.pause();
       setState(() => _playingMessageId = null);
@@ -791,35 +916,103 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       // play() completes when playback finishes/pauses; don't block on it.
       unawaited(_audioPlayer.play());
     } catch (e) {
-      debugPrint('❌ Error playing audio: $e');
+      debugPrint('Error playing audio: $e');
       if (mounted) {
         setState(() => _playingMessageId = null);
         _showSnack('Could not play voice message', isError: true);
       }
     }
   }
+}
 
-  Widget _buildAttachmentItem(IconData icon, String label, Color color, VoidCallback onTap) {
+/// Outgoing message that has not been confirmed by the server yet.
+class _PendingBubble extends StatelessWidget {
+  final String text;
+  const _PendingBubble({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    final fg = cs.onPrimary;
     return Semantics(
-      button: true,
-      label: label,
+      liveRegion: true,
+      label: 'Sending: $text',
       excludeSemantics: true,
-      child: GestureDetector(
-      onTap: onTap,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+      child: Padding(
+        padding: const EdgeInsets.only(top: MfSpace.xs),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.8),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: cs.primary.withValues(alpha: 0.7),
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(MfRadius.lg),
+                  topRight: Radius.circular(MfRadius.lg),
+                  bottomLeft: Radius.circular(MfRadius.lg),
+                  bottomRight: Radius.circular(MfRadius.sm / 2),
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(MfSpace.sm, MfSpace.xs, MfSpace.sm, MfSpace.xs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(text, style: t.bodyLarge?.copyWith(color: fg)),
+                    const SizedBox(height: 2),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Sending', style: t.labelSmall?.copyWith(color: fg)),
+                        const SizedBox(width: MfSpace.xxs),
+                        Icon(Icons.schedule_rounded, size: 14, color: fg),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
             ),
-            child: Icon(icon, color: color, size: 28),
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-        ],
+        ),
       ),
+    );
+  }
+}
+
+class _DaySeparator extends StatelessWidget {
+  final DateTime date;
+  const _DaySeparator({required this.date});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final local = date.toLocal();
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final day = DateTime(local.year, local.month, local.day);
+    final diff = today.difference(day).inDays;
+    final label = diff == 0
+        ? 'Today'
+        : diff == 1
+            ? 'Yesterday'
+            : DateFormat('EEE, d MMM yyyy').format(local);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: MfSpace.sm),
+      child: Row(
+        children: [
+          Expanded(child: Divider(color: cs.outlineVariant)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: MfSpace.sm),
+            child: Semantics(
+              header: true,
+              child: Text(label, style: Theme.of(context).textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant)),
+            ),
+          ),
+          Expanded(child: Divider(color: cs.outlineVariant)),
+        ],
       ),
     );
   }

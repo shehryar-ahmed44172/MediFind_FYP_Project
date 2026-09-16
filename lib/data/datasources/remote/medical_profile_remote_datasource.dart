@@ -13,7 +13,7 @@ class MedicalProfileRemoteDataSource {
       final response = await _dio.get(path);
 
       if (response.statusCode == 200) {
-        return MedicalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
+        return MedicalProfile.fromJson(_normalizeProfile(response.data['data'] as Map<String, dynamic>));
       }
 
       throw NetworkException(message: 'Failed to fetch medical profile');
@@ -58,7 +58,7 @@ class MedicalProfileRemoteDataSource {
       );
 
       if (response.statusCode == 200) {
-        return MedicalProfile.fromJson(response.data['data'] as Map<String, dynamic>);
+        return MedicalProfile.fromJson(_normalizeProfile(response.data['data'] as Map<String, dynamic>));
       }
 
       throw NetworkException(message: 'Failed to update medical profile');
@@ -130,5 +130,21 @@ class MedicalProfileRemoteDataSource {
       message: errorMessage,
       originalException: e,
     );
+  }
+
+  /// Profiles may store medications as plain strings (older data, web or seed
+  /// data) or as `{ name, dosage }` objects; the entity expects objects.
+  /// Also tolerates a missing blood type.
+  Map<String, dynamic> _normalizeProfile(Map<String, dynamic> json) {
+    final data = Map<String, dynamic>.from(json);
+    final meds = data['medications'];
+    if (meds is List) {
+      data['medications'] = meds
+          .map((m) => m is String ? <String, dynamic>{'name': m} : m)
+          .where((m) => m is Map)
+          .toList();
+    }
+    data['bloodType'] ??= '';
+    return data;
   }
 }

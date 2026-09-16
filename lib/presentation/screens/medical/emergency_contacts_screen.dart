@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/medical_profile_provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/app_theme.dart';
+import '../../widgets/design_system/design_system.dart';
 import '../../../domain/entities/medical_profile.dart';
 
 // ─── Relationship options ────────────────────────────────────────────────────
@@ -14,6 +13,8 @@ const _relationships = [
   'Son', 'Daughter', 'Family', 'Friend', 'Doctor', 'Other',
 ];
 
+String _contactKey(EmergencyContact c) => c.name + c.phoneNumber;
+
 class EmergencyContactsScreen extends ConsumerWidget {
   const EmergencyContactsScreen({super.key});
 
@@ -21,203 +22,170 @@ class EmergencyContactsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userId = ref.watch(currentUserIdProvider).valueOrNull;
 
-    return Scaffold(
-      // ── AppBar with back navigation ──────────────────────────────────────
-      appBar: AppBar(
-        title: const Text(
-          'Emergency Contacts',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18),
-        ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/home');
-            }
-          },
-          tooltip: 'Go Back',
-        ),
-        backgroundColor: Colors.white,
-        foregroundColor: AppColors.primary,
-        elevation: 0,
-        surfaceTintColor: Colors.white,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: Colors.grey.shade200),
-        ),
-      ),
-
-      body: SafeArea(
-        child: userId == null
-            ? const Center(child: Text('Please log in to view contacts'))
-            : _ContactsBody(userId: userId),
-      ),
-
-      // ── FAB — opens the Add Contact bottom sheet directly ────────────────
-      floatingActionButton: userId == null
+    // Header back is handled by MfScaffold: it pops, or falls back to the
+    // role home (/home for patients) when there is nothing to pop.
+    return MfScaffold(
+      title: 'Emergency contacts',
+      subtitle: 'People to reach in an emergency',
+      actions: [
+        if (userId != null)
+          MfIconButton(
+            icon: Icons.person_add_alt_1_outlined,
+            tooltip: 'Add contact',
+            onPressed: () => _showAddContactSheet(context, ref, userId),
+          ),
+      ],
+      bottomBar: userId == null
           ? null
-          : FloatingActionButton.extended(
+          : MfPrimaryButton(
+              label: 'Add contact',
+              icon: Icons.add_rounded,
               onPressed: () => _showAddContactSheet(context, ref, userId),
-              backgroundColor: AppColors.primary,
-              icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(
-                'Add Contact',
-                style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
-              ),
             ),
+      body: userId == null
+          ? const MfEmptyState(
+              icon: Icons.lock_outline_rounded,
+              title: 'Please log in to view contacts',
+            )
+          : _ContactsBody(userId: userId),
     );
   }
 }
 
 // ─── Body ────────────────────────────────────────────────────────────────────
 
-class _ContactsBody extends ConsumerWidget {
+class _ContactsBody extends ConsumerStatefulWidget {
   final String userId;
   const _ContactsBody({required this.userId});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ContactsBody> createState() => _ContactsBodyState();
+}
+
+class _ContactsBodyState extends ConsumerState<_ContactsBody> {
+  /// Contacts removed optimistically (swiped / deleted) while the profile
+  /// refreshes, so a dismissed card is never left in the tree.
+  final Set<String> _removed = {};
+
+  Future<bool> _confirmRemove(EmergencyContact contact) {
+    return showMfConfirmDialog(
+      context,
+      icon: Icons.delete_outline_rounded,
+      title: 'Remove contact?',
+      message: 'Remove ${contact.name} from your emergency contacts?',
+      confirmLabel: 'Remove',
+      destructive: true,
+    );
+  }
+
+  Future<void> _remove(EmergencyContact contact) async {
+    final key = _contactKey(contact);
+    setState(() => _removed.add(key));
+    try {
+      final repo = await ref.read(medicalProfileRepositoryProvider.future);
+      await repo.removeEmergencyContact(widget.userId, contact.name);
+      ref.invalidate(getMedicalProfileProvider(widget.userId));
+      if (mounted) {
+        showMfSnackBar(context, '${contact.name} removed');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _removed.remove(key));
+        showMfSnackBar(context, 'Failed to remove: $e', tone: MfTone.danger);
+      }
+    }
+  }
+
+  Future<void> _deleteWithConfirm(EmergencyContact contact) async {
+    if (await _confirmRemove(contact)) {
+      await _remove(contact);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final userId = widget.userId;
     final profileAsync = ref.watch(getMedicalProfileProvider(userId));
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
 
     return profileAsync.when(
       data: (profile) {
-        final contacts = profile?.emergencyContacts ?? [];
+        final all = profile?.emergencyContacts ?? [];
+        // Drop optimistic removals once the server no longer returns them.
+        _removed.removeWhere((k) => !all.any((c) => _contactKey(c) == k));
+        final contacts = all.where((c) => !_removed.contains(_contactKey(c))).toList();
 
         if (contacts.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.contact_phone_outlined,
-                    size: 88, color: Colors.grey.shade300),
-                const SizedBox(height: 16),
-                Text(
-                  'No emergency contacts added yet',
-                  style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Tap the button below to add your first contact.',
-                  style:
-                      TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 28),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      _showAddContactSheet(context, ref, userId),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 28, vertical: 14),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                  ),
-                  icon:
-                      const Icon(Icons.add, color: Colors.white, size: 18),
-                  label: const Text('Add Emergency Contact',
-                      style: TextStyle(
-                          color: Colors.white, fontWeight: FontWeight.w700)),
-                ),
-              ],
-            ),
+          return MfEmptyState(
+            icon: Icons.contact_phone_outlined,
+            title: 'No emergency contacts added yet',
+            message: 'Add people who should be reached if you need help.',
+            actionLabel: 'Add emergency contact',
+            actionIcon: Icons.add_rounded,
+            onAction: () => _showAddContactSheet(context, ref, userId),
           );
         }
 
-        return Column(
-          children: [
-            // ── Count header ──────────────────────────────────────────────
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: AppColors.primary.withOpacity(0.06),
-              child: Row(
-                children: [
-                  Icon(Icons.info_outline,
-                      size: 15, color: AppColors.primary.withOpacity(0.7)),
-                  const SizedBox(width: 6),
-                  Text(
-                    '${contacts.length} contact${contacts.length > 1 ? 's' : ''} saved  •  Swipe left to delete',
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary.withOpacity(0.8),
-                        fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
-            ),
-
-            // ── Contact list ──────────────────────────────────────────────
-            Expanded(
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 16, vertical: 12),
-                itemCount: contacts.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 8),
-                itemBuilder: (context, index) {
-                  final contact = contacts[index];
-                  return _ContactCard(
-                    contact: contact,
-                    userId: userId,
-                    ref: ref,
-                  );
-                },
-              ),
-            ),
-          ],
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.sm, MfSpace.gutter, MfSpace.lg),
+          itemCount: contacts.length + 1,
+          separatorBuilder: (_, __) => const SizedBox(height: MfSpace.xs),
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              // ── Count header ────────────────────────────────────────────
+              return Padding(
+                padding: const EdgeInsets.only(bottom: MfSpace.xxs),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 18, color: cs.onSurfaceVariant),
+                    const SizedBox(width: MfSpace.xs),
+                    Expanded(
+                      child: Text(
+                        '${contacts.length} contact${contacts.length > 1 ? 's' : ''} saved · Swipe left or use Delete to remove',
+                        style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final contact = contacts[index - 1];
+            return _ContactCard(
+              contact: contact,
+              confirmDismiss: () => _confirmRemove(contact),
+              onDismissed: () => _remove(contact),
+              onDelete: () => _deleteWithConfirm(contact),
+            );
+          },
         );
       },
-      loading: () =>
-          const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.cloud_off_rounded, color: Colors.grey, size: 56),
-              const SizedBox(height: 16),
-              const Text(
-                'Unable to load contacts',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '$e',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref.invalidate(getMedicalProfileProvider(userId)),
-                icon: const Icon(Icons.refresh_rounded),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(minimumSize: const Size(0, 48)),
-              ),
-            ],
-          ),
-        ),
+      loading: () => Padding(
+        padding: const EdgeInsets.all(MfSpace.gutter),
+        child: MfSkeleton.list(count: 3, itemHeight: 120),
+      ),
+      error: (e, _) => MfErrorState(
+        title: 'Unable to load contacts',
+        message: '$e',
+        onRetry: () => ref.invalidate(getMedicalProfileProvider(userId)),
       ),
     );
   }
 }
 
-// ─── Contact card with swipe-to-delete ───────────────────────────────────────
+// ─── Contact card with swipe-to-delete + explicit actions ────────────────────
 
 class _ContactCard extends StatelessWidget {
   final EmergencyContact contact;
-  final String userId;
-  final WidgetRef ref;
+  final Future<bool> Function() confirmDismiss;
+  final VoidCallback onDismissed;
+  final VoidCallback onDelete;
 
   const _ContactCard({
     required this.contact,
-    required this.userId,
-    required this.ref,
+    required this.confirmDismiss,
+    required this.onDismissed,
+    required this.onDelete,
   });
 
   Future<void> _callContact(BuildContext context) async {
@@ -232,141 +200,94 @@ class _ContactCard extends StatelessWidget {
       }
     }
     if (!launched && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not start a call to ${contact.phoneNumber}'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      showMfSnackBar(context, 'Could not start a call to ${contact.phoneNumber}', tone: MfTone.danger);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+    final danger = MfColors.tone(context, MfTone.danger);
+
     return Dismissible(
-      key: ValueKey(contact.name + contact.phoneNumber),
+      key: ValueKey(_contactKey(contact)),
       direction: DismissDirection.endToStart,
       background: Container(
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 20),
+        padding: const EdgeInsets.only(right: MfSpace.lg),
         decoration: BoxDecoration(
-          color: AppColors.error.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.error.withOpacity(0.3)),
+          color: Color.alphaBlend(danger.container, cs.surface),
+          borderRadius: MfRadius.mdAll,
+          border: Border.all(color: danger.border),
         ),
-        child: const Icon(Icons.delete_outline_rounded,
-            color: Colors.redAccent, size: 28),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.delete_outline_rounded, color: danger.foreground),
+            const SizedBox(width: MfSpace.xs),
+            Text('Remove', style: text.labelLarge?.copyWith(color: danger.foreground)),
+          ],
+        ),
       ),
-      confirmDismiss: (_) async {
-        return await showDialog<bool>(
-          context: context,
-          builder: (ctx) => AlertDialog(
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16)),
-            title: const Text('Remove Contact?',
-                style: TextStyle(fontWeight: FontWeight.w700)),
-            content: Text(
-                'Remove ${contact.name} from your emergency contacts?'),
-            actions: [
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx, false),
-                  child: const Text('Cancel')),
-              TextButton(
-                  onPressed: () => Navigator.pop(ctx, true),
-                  child: const Text('Remove',
-                      style: TextStyle(color: AppColors.error))),
-            ],
-          ),
-        );
-      },
-      onDismissed: (_) async {
-        try {
-          final repo =
-              await ref.read(medicalProfileRepositoryProvider.future);
-          await repo.removeEmergencyContact(userId, contact.name);
-          ref.invalidate(getMedicalProfileProvider(userId));
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('${contact.name} removed'),
-              behavior: SnackBarBehavior.floating,
-            ));
-          }
-        } catch (e) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-              content: Text('Failed to remove: $e'),
-              backgroundColor: AppColors.error,
-              behavior: SnackBarBehavior.floating,
-            ));
-          }
-        }
-      },
-      child: Card(
-        elevation: 0,
-        shape:
-            RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        color: Colors.white,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade200),
-          ),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            leading: CircleAvatar(
-              backgroundColor: AppColors.primary.withOpacity(0.12),
-              radius: 24,
-              child: Text(
-                contact.name.isNotEmpty
-                    ? contact.name[0].toUpperCase()
-                    : '?',
-                style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 18),
-              ),
-            ),
-            title: Text(
-              contact.name,
-              style: const TextStyle(
-                  fontWeight: FontWeight.w700, fontSize: 15),
-            ),
-            subtitle: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      confirmDismiss: (_) => confirmDismiss(),
+      onDismissed: (_) => onDismissed(),
+      child: MfCard(
+        semanticLabel: '${contact.name}, ${contact.relationship}, ${contact.phoneNumber}',
+        padding: const EdgeInsets.fromLTRB(MfSpace.md, MfSpace.sm, MfSpace.xs, MfSpace.sm),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                const SizedBox(height: 2),
-                Row(
-                  children: [
-                    Icon(Icons.people_outline,
-                        size: 13, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(contact.relationship,
-                        style: TextStyle(
-                            fontSize: 12, color: Colors.grey.shade600)),
-                  ],
+                MfAvatar(name: contact.name, size: 44),
+                const SizedBox(width: MfSpace.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(contact.name, style: text.titleSmall),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          Icon(Icons.people_outline_rounded, size: 16, color: cs.onSurfaceVariant),
+                          const SizedBox(width: MfSpace.xxs),
+                          Flexible(
+                            child: Text(
+                              contact.relationship,
+                              style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ),
+                        ],
+                      ),
+                      Row(
+                        children: [
+                          Icon(Icons.phone_outlined, size: 16, color: cs.onSurfaceVariant),
+                          const SizedBox(width: MfSpace.xxs),
+                          Flexible(child: Text(contact.phoneNumber, style: text.bodyMedium)),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-                Row(
-                  children: [
-                    Icon(Icons.phone_outlined,
-                        size: 13, color: Colors.grey.shade500),
-                    const SizedBox(width: 4),
-                    Text(contact.phoneNumber,
-                        style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 13)),
-                  ],
+                MfIconButton(
+                  icon: Icons.delete_outline_rounded,
+                  tooltip: 'Delete contact',
+                  color: danger.foreground,
+                  onPressed: onDelete,
                 ),
               ],
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.call_rounded,
-                  color: AppColors.success, size: 26),
-              tooltip: 'Call ${contact.name}',
-              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-              onPressed: () => _callContact(context),
+            const SizedBox(height: MfSpace.xs),
+            Padding(
+              padding: const EdgeInsets.only(right: MfSpace.xs),
+              child: MfSecondaryButton(
+                label: 'Call ${contact.name}',
+                icon: Icons.call_outlined,
+                onPressed: () => _callContact(context),
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
@@ -377,10 +298,10 @@ class _ContactCard extends StatelessWidget {
 
 void _showAddContactSheet(
     BuildContext context, WidgetRef ref, String userId) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    backgroundColor: Colors.transparent,
+  showMfBottomSheet<void>(
+    context,
+    title: 'Add emergency contact',
+    subtitle: 'Name, phone number and relationship',
     builder: (_) => _AddContactSheet(userId: userId, ref: ref),
   );
 }
@@ -431,163 +352,105 @@ class _AddContactSheetState extends State<_AddContactSheet> {
       widget.ref.invalidate(getMedicalProfileProvider(widget.userId));
 
       if (mounted) {
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        final snack = mfSnackBar(
+          context,
+          '${contact.name} added to emergency contacts',
+          tone: MfTone.success,
+        );
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${contact.name} added to emergency contacts ✓'),
-          backgroundColor: AppColors.success,
-          behavior: SnackBarBehavior.floating,
-        ));
+        messenger
+          ?..hideCurrentSnackBar()
+          ..showSnackBar(snack);
       }
     } catch (e) {
-      setState(() => _saving = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('Failed to add contact: $e'),
-          backgroundColor: AppColors.error,
-          behavior: SnackBarBehavior.floating,
-        ));
+        setState(() => _saving = false);
+        showMfSnackBar(context, 'Failed to add contact: $e', tone: MfTone.danger);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bottom = MediaQuery.of(context).viewInsets.bottom;
-
-    return Container(
-      padding: EdgeInsets.fromLTRB(24, 8, 24, 24 + bottom),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle bar
-          Container(
-            width: 40, height: 4,
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2)),
-          ),
-
-          Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const SizedBox(height: MfSpace.xs),
+        Form(
+          key: _formKey,
+          child: Column(
             children: [
-              CircleAvatar(
-                backgroundColor: AppColors.primary.withOpacity(0.1),
-                child: Icon(Icons.person_add_alt_1_rounded,
-                    color: AppColors.primary, size: 20),
+              // Name
+              TextFormField(
+                controller: _nameCtrl,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                decoration: const InputDecoration(
+                  labelText: 'Full name *',
+                  prefixIcon: Icon(Icons.person_outline_rounded),
+                ),
+                validator: (v) =>
+                    (v == null || v.trim().isEmpty)
+                        ? 'Name is required'
+                        : null,
               ),
-              const SizedBox(width: 12),
-              const Text('Add Emergency Contact',
-                  style: TextStyle(
-                      fontSize: 17, fontWeight: FontWeight.w800)),
+              const SizedBox(height: MfSpace.sm),
+
+              // Phone
+              TextFormField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [_phoneMask],
+                decoration: const InputDecoration(
+                  labelText: 'Phone number *',
+                  hintText: '+92-300-1234567',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Phone number is required';
+                  }
+                  final digits =
+                      v.replaceAll(RegExp(r'[^0-9]'), '');
+                  if (digits.length < 10) {
+                    return 'Enter a valid phone number';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: MfSpace.sm),
+
+              // Relationship dropdown
+              DropdownButtonFormField<String>(
+                initialValue: _relationship,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Relationship *',
+                  prefixIcon: Icon(Icons.people_outline_rounded),
+                ),
+                items: _relationships
+                    .map((r) => DropdownMenuItem(
+                        value: r, child: Text(r)))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _relationship = v);
+                },
+              ),
             ],
           ),
-          const SizedBox(height: 24),
+        ),
+        const SizedBox(height: MfSpace.lg),
 
-          Form(
-            key: _formKey,
-            child: Column(
-              children: [
-                // Name
-                TextFormField(
-                  controller: _nameCtrl,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: InputDecoration(
-                    labelText: 'Full Name *',
-                    prefixIcon:
-                        const Icon(Icons.person_outline_rounded),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  validator: (v) =>
-                      (v == null || v.trim().isEmpty)
-                          ? 'Name is required'
-                          : null,
-                ),
-                const SizedBox(height: 14),
-
-                // Phone
-                TextFormField(
-                  controller: _phoneCtrl,
-                  keyboardType: TextInputType.phone,
-                  inputFormatters: [_phoneMask],
-                  decoration: InputDecoration(
-                    labelText: 'Phone Number *',
-                    hintText: '+92-300-1234567',
-                    prefixIcon:
-                        const Icon(Icons.phone_outlined),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  validator: (v) {
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Phone number is required';
-                    }
-                    final digits =
-                        v.replaceAll(RegExp(r'[^0-9]'), '');
-                    if (digits.length < 10) {
-                      return 'Enter a valid phone number';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 14),
-
-                // Relationship dropdown
-                DropdownButtonFormField<String>(
-                  value: _relationship,
-                  decoration: InputDecoration(
-                    labelText: 'Relationship *',
-                    prefixIcon:
-                        const Icon(Icons.people_outline_rounded),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  items: _relationships
-                      .map((r) => DropdownMenuItem(
-                          value: r, child: Text(r)))
-                      .toList(),
-                  onChanged: (v) {
-                    if (v != null) setState(() => _relationship = v);
-                  },
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Save button
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: _saving ? null : _save,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              icon: _saving
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.check_rounded,
-                      color: Colors.white),
-              label: Text(
-                _saving ? 'Saving…' : 'Save Contact',
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 15),
-              ),
-            ),
-          ),
-        ],
-      ),
+        // Save button
+        MfPrimaryButton(
+          label: _saving ? 'Saving...' : 'Save contact',
+          icon: Icons.check_rounded,
+          loading: _saving,
+          onPressed: _save,
+        ),
+      ],
     );
   }
 }

@@ -23,7 +23,10 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      // Core ESLint has no JSX reference tracking (that lives in eslint-plugin-react),
+      // so identifiers used only as JSX tags — `motion` (<motion.div>) and PascalCase
+      // component variables/destructured props like `{ Icon }` — look unused.
+      'no-unused-vars': ['error', { varsIgnorePattern: '^([A-Z_]|motion$)', argsIgnorePattern: '^[A-Z_]' }],
     },
   },
 ])

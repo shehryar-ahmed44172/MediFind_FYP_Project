@@ -5,20 +5,20 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/hooks';
 import logo from '../assets/Medifind_New_Logo-removebg-preview.png';
 
 /* ─── Brand tokens ────────────────────────────────────────────────────────── */
-const PANEL_BG   = 'linear-gradient(160deg,#03293C 0%,#0A5570 55%,#0E6E82 100%)';
-const ACCENT     = '#2891C2';
-const FORM_BG    = '#F3F7FA';
+const PANEL_BG   = 'linear-gradient(160deg, var(--primary-dark) 0%, var(--primary) 70%, var(--primary-mid) 130%)';
+const ACCENT     = 'var(--primary-light)';
+const FORM_BG    = 'var(--background)';
 const WHITE      = '#FFFFFF';
-const TEXT_MAIN  = '#0F1A22';
-const TEXT_MUTED = '#7A96A3';
-const BORDER     = '#D4E6EC';
-const ERROR_BG   = '#FEF2F2';
-const ERROR_FG   = '#DC2626';
-const ERROR_BORD = '#FECACA';
+const TEXT_MAIN  = 'var(--text-main)';
+const TEXT_MUTED = 'var(--text-muted)';
+const BORDER     = 'var(--border)';
+const ERROR_BG   = 'var(--tint-red)';
+const ERROR_FG   = 'var(--error-fg)';
+const ERROR_BORD = 'var(--error-border)';
 
 /* ─── Left panel feature highlights ──────────────────────────────────────── */
 const FEATURES = [
@@ -27,6 +27,21 @@ const FEATURES = [
   { Icon: Shield,   label: 'Responder Verification',     desc: 'Credential review and approval queue' },
   { Icon: Zap,      label: 'Instant Push Notifications', desc: 'AI-drafted broadcasts to all users' },
 ];
+
+/* Map API / network failures to clear, actionable messages */
+function loginErrorMessage(err) {
+  if (!err?.response) {
+    if (err?.message?.startsWith('Access denied')) return 'This account is not an administrator. Use an admin account to sign in.';
+    return 'Cannot reach the MediFind server. Check your connection and try again.';
+  }
+  const { status, data } = err.response;
+  if (status === 401) return 'Incorrect email or password.';
+  if (status === 403) return data?.message || 'This account is not allowed to access the admin console.';
+  if (status === 423) return data?.message || 'This account is temporarily locked after too many failed attempts. Try again later.';
+  if (status === 429) return 'Too many sign-in attempts. Please wait a moment and try again.';
+  if (status >= 500) return 'The server had a problem signing you in. Please try again shortly.';
+  return data?.message || 'Sign-in failed. Please check your details and try again.';
+}
 
 /* ─── Component ───────────────────────────────────────────────────────────── */
 const LoginPage = () => {
@@ -42,9 +57,8 @@ const LoginPage = () => {
   // ── Already signed in — show a choice screen instead of auto-redirecting ──
   if (isAuthenticated) {
     return (
-      <div style={{
-        minHeight: '100vh', display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
+      <div className="mf-login-grid" style={{
+        minHeight: '100vh',
         fontFamily: "'Montserrat', sans-serif",
       }}>
         {/* Left panel — same brand panel */}
@@ -105,19 +119,19 @@ const LoginPage = () => {
             <div style={{
               display: 'flex', alignItems: 'center', gap: '10px',
               padding: '14px 18px', marginBottom: '32px',
-              background: '#F0FDF4', border: '1px solid #BBF7D0',
+              background: 'var(--tint-green)', border: '1px solid var(--success-border)',
               borderRadius: '14px',
             }}>
               <div style={{
                 width: '10px', height: '10px', borderRadius: '50%',
-                background: '#10B981', flexShrink: 0,
+                background: 'var(--success)', flexShrink: 0,
                 boxShadow: '0 0 0 3px rgba(16,185,129,0.2)',
               }} />
               <div>
-                <p style={{ fontSize: '0.82rem', fontWeight: 700, color: '#065F46' }}>
+                <p style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--success-fg)' }}>
                   Active Session
                 </p>
-                <p style={{ fontSize: '0.75rem', color: '#047857', marginTop: '1px' }}>
+                <p style={{ fontSize: '0.75rem', color: 'var(--success-fg)', marginTop: '1px' }}>
                   Signed in as <strong>{user?.fullName ?? 'Administrator'}</strong>
                 </p>
               </div>
@@ -141,7 +155,7 @@ const LoginPage = () => {
               style={{
                 width: '100%', height: '54px', marginBottom: '14px',
                 borderRadius: '14px', border: 'none',
-                background: 'linear-gradient(135deg,#0C637E 0%,#2891C2 100%)',
+                background: 'linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%)',
                 color: WHITE, fontWeight: 800, fontSize: '0.95rem',
                 letterSpacing: '0.02em', cursor: 'pointer',
                 fontFamily: 'inherit',
@@ -162,7 +176,7 @@ const LoginPage = () => {
                 width: '100%', height: '54px',
                 borderRadius: '14px',
                 border: `1.5px solid ${BORDER}`,
-                background: WHITE,
+                background: 'var(--surface)',
                 color: TEXT_MUTED, fontWeight: 700, fontSize: '0.9rem',
                 cursor: 'pointer', fontFamily: 'inherit',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
@@ -179,7 +193,7 @@ const LoginPage = () => {
                   textDecoration: 'none', display: 'inline-flex',
                   alignItems: 'center', gap: '5px',
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = '#0C637E'}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
                 onMouseLeave={e => e.currentTarget.style.color = TEXT_MUTED}
               >
                 ← Back to MediFind Hub
@@ -193,25 +207,24 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email || !password) { setError('Please enter your email and password.'); return; }
+    if (loading) return;
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail || !password) { setError('Please enter your email and password.'); return; }
     setLoading(true);
     setError('');
     try {
-      await login(email, password);
+      await login(trimmedEmail, password);
       navigate('/admin', { replace: true });
     } catch (err) {
-      const msg = err.response?.data?.message || err.message || 'Login failed. Please check your credentials.';
-      setError(msg);
+      setError(loginErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{
+    <div className="mf-login-grid" style={{
       minHeight: '100vh',
-      display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
       fontFamily: "'Montserrat', sans-serif",
     }}>
 
@@ -222,6 +235,7 @@ const LoginPage = () => {
         initial={{ opacity: 0, x: -30 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.7, ease: [0.2, 0.8, 0.2, 1] }}
+        className="mf-login-brand"
         style={{
           background: PANEL_BG,
           display: 'flex', flexDirection: 'column',
@@ -284,7 +298,7 @@ const LoginPage = () => {
             marginBottom: '16px',
           }}>
             Emergency Response<br />
-            <span style={{ color: '#7DD3F5' }}>Command Center</span>
+            <span style={{ color: '#BFE3EC' }}>Command Center</span>
           </h1>
           <p style={{
             fontSize: '1rem', color: 'rgba(255,255,255,0.6)',
@@ -295,7 +309,7 @@ const LoginPage = () => {
 
           {/* Feature list */}
           <div style={{ marginTop: '36px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
-            {FEATURES.map(({ Icon, label, desc }, i) => (
+            {FEATURES.map((feature, i) => (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, x: -16 }}
@@ -309,11 +323,11 @@ const LoginPage = () => {
                   border: '1px solid rgba(255,255,255,0.12)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
-                  <Icon size={17} color={ACCENT} strokeWidth={2.5} />
+                  <feature.Icon size={17} color={ACCENT} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <p style={{ fontSize: '0.875rem', fontWeight: 700, color: WHITE, marginBottom: '2px' }}>{label}</p>
-                  <p style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.5)', lineHeight: 1.5 }}>{desc}</p>
+                  <p style={{ fontSize: '0.875rem', fontWeight: 700, color: WHITE, marginBottom: '2px' }}>{feature.label}</p>
+                  <p style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.68)', lineHeight: 1.5 }}>{feature.desc}</p>
                 </div>
               </motion.div>
             ))}
@@ -328,7 +342,7 @@ const LoginPage = () => {
         }}>
           <div style={{
             width: '8px', height: '8px', borderRadius: '50%',
-            background: '#4ADE80',
+            background: 'var(--success)',
           }} />
           <span style={{ fontSize: '0.78rem', color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>
             All systems operational · Restricted access only
@@ -346,7 +360,7 @@ const LoginPage = () => {
         style={{
           background: FORM_BG,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: '48px 64px',
+          padding: 'clamp(24px, 5vw, 48px) clamp(16px, 6vw, 64px)',
           position: 'relative',
         }}
       >
@@ -357,11 +371,11 @@ const LoginPage = () => {
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: '6px',
               padding: '4px 12px', borderRadius: '100px',
-              background: '#E2F0F3', border: '1px solid #B8D8E2',
+              background: 'var(--primary-pale)', border: '1px solid var(--border)',
               marginBottom: '16px',
             }}>
-              <Shield size={11} color="#0C637E" strokeWidth={2.5} />
-              <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#0C637E' }}>
+              <Shield size={11} color="var(--primary)" strokeWidth={2.5} />
+              <span style={{ fontSize: '0.68rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--primary)' }}>
                 Secure Access
               </span>
             </div>
@@ -381,6 +395,8 @@ const LoginPage = () => {
           {/* Error banner */}
           {error && (
             <motion.div
+              id="login-error"
+              role="alert"
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               style={{
@@ -405,7 +421,7 @@ const LoginPage = () => {
                 display: 'block', fontWeight: 700, fontSize: '0.75rem',
                 textTransform: 'uppercase', letterSpacing: '0.07em',
                 marginBottom: '8px', color: TEXT_MUTED,
-              }}>
+              }} htmlFor="admin-email">
                 Email Address
               </label>
               <div style={{ position: 'relative' }}>
@@ -415,9 +431,13 @@ const LoginPage = () => {
                   pointerEvents: 'none',
                 }} size={16} />
                 <input
+                  id="admin-email"
                   type="email"
                   value={email}
-                  onChange={e => setEmail(e.target.value)}
+                  disabled={loading}
+                  aria-invalid={!!error}
+                  aria-describedby={error ? 'login-error' : undefined}
+                  onChange={e => { setEmail(e.target.value); if (error) setError(''); }}
                   placeholder="admin@medifind.com"
                   required
                   autoComplete="email"
@@ -426,7 +446,7 @@ const LoginPage = () => {
                     paddingLeft: '46px', paddingRight: '16px',
                     borderRadius: '14px',
                     border: `1.5px solid ${BORDER}`,
-                    background: WHITE, color: TEXT_MAIN,
+                    background: 'var(--input-bg)', color: TEXT_MAIN,
                     fontSize: '0.9rem', outline: 'none',
                     fontFamily: 'inherit',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
@@ -450,7 +470,7 @@ const LoginPage = () => {
                 display: 'block', fontWeight: 700, fontSize: '0.75rem',
                 textTransform: 'uppercase', letterSpacing: '0.07em',
                 marginBottom: '8px', color: TEXT_MUTED,
-              }}>
+              }} htmlFor="admin-password">
                 Password
               </label>
               <div style={{ position: 'relative' }}>
@@ -460,9 +480,13 @@ const LoginPage = () => {
                   pointerEvents: 'none',
                 }} size={16} />
                 <input
+                  id="admin-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={e => setPassword(e.target.value)}
+                  disabled={loading}
+                  aria-invalid={!!error}
+                  aria-describedby={error ? 'login-error' : undefined}
+                  onChange={e => { setPassword(e.target.value); if (error) setError(''); }}
                   placeholder="••••••••••••"
                   required
                   autoComplete="current-password"
@@ -471,7 +495,7 @@ const LoginPage = () => {
                     paddingLeft: '46px', paddingRight: '52px',
                     borderRadius: '14px',
                     border: `1.5px solid ${BORDER}`,
-                    background: WHITE, color: TEXT_MAIN,
+                    background: 'var(--input-bg)', color: TEXT_MAIN,
                     fontSize: '1rem', outline: 'none',
                     fontFamily: 'inherit',
                     transition: 'border-color 0.2s, box-shadow 0.2s',
@@ -489,6 +513,9 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  title={showPassword ? 'Hide password' : 'Show password'}
                   style={{
                     position: 'absolute', right: '16px', top: '50%',
                     transform: 'translateY(-50%)',
@@ -512,8 +539,8 @@ const LoginPage = () => {
                 width: '100%', height: '54px', marginTop: '8px',
                 borderRadius: '14px', border: 'none',
                 background: loading
-                  ? '#7AB8D4'
-                  : 'linear-gradient(135deg,#0C637E 0%,#2891C2 100%)',
+                  ? 'var(--primary-mid)'
+                  : 'linear-gradient(135deg,var(--primary) 0%,var(--primary-light) 100%)',
                 color: WHITE, fontWeight: 800, fontSize: '0.95rem',
                 letterSpacing: '0.02em', cursor: loading ? 'not-allowed' : 'pointer',
                 fontFamily: 'inherit',
@@ -544,16 +571,16 @@ const LoginPage = () => {
           {/* Security note */}
           <div style={{
             marginTop: '32px', padding: '14px 16px',
-            background: '#EFF9F0', borderRadius: '12px',
-            border: '1px solid #C6F0CA',
+            background: 'var(--tint-green)', borderRadius: '12px',
+            border: '1px solid var(--success-border)',
             display: 'flex', alignItems: 'flex-start', gap: '10px',
           }}>
-            <CheckCircle size={15} color="#16A34A" style={{ flexShrink: 0, marginTop: '1px' }} />
+            <CheckCircle size={15} color="var(--success-fg)" style={{ flexShrink: 0, marginTop: '1px' }} />
             <div>
-              <p style={{ fontSize: '0.78rem', fontWeight: 700, color: '#15803D', marginBottom: '2px' }}>
+              <p style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--success-fg)', marginBottom: '2px' }}>
                 Restricted Access
               </p>
-              <p style={{ fontSize: '0.75rem', color: '#4ADE80', fontWeight: 600, lineHeight: 1.5, color: '#166534' }}>
+              <p style={{ fontSize: '0.75rem', fontWeight: 600, lineHeight: 1.5, color: 'var(--success-fg)' }}>
                 This console is for authorized MediFind administrators only. All sessions are logged and monitored.
               </p>
             </div>
@@ -568,7 +595,7 @@ const LoginPage = () => {
                 textDecoration: 'none', display: 'inline-flex',
                 alignItems: 'center', gap: '5px', transition: 'color 0.2s',
               }}
-              onMouseEnter={e => e.currentTarget.style.color = '#0C637E'}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--primary)'}
               onMouseLeave={e => e.currentTarget.style.color = TEXT_MUTED}
             >
               ← Back to MediFind Hub

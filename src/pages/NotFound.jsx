@@ -26,7 +26,7 @@ export default function NotFound() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(135deg, #03293C 0%, #0C637E 55%, #2496A7 100%)',
+      background: 'linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 55%, var(--primary-mid) 100%)',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
@@ -103,8 +103,8 @@ export default function NotFound() {
           padding: '0.35rem 1rem',
           marginBottom: '1.5rem',
         }}>
-          <AlertTriangle size={14} color="#FCA5A5" />
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#FCA5A5', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+          <AlertTriangle size={14} color="var(--error-border)" />
+          <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--error-border)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
             Error 404 — Page Not Found
           </span>
         </div>
@@ -115,7 +115,7 @@ export default function NotFound() {
           fontWeight: 900,
           lineHeight: 1,
           marginBottom: '1rem',
-          background: 'linear-gradient(135deg, #ffffff 0%, #7DD3FC 60%, #38BDF8 100%)',
+          background: 'linear-gradient(135deg, #ffffff 0%, var(--primary-pale) 60%, var(--primary-light) 100%)',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           backgroundClip: 'text',
@@ -147,7 +147,7 @@ export default function NotFound() {
             padding: '2px 8px',
             borderRadius: '6px',
             fontSize: '0.85rem',
-            color: '#7DD3FC',
+            color: 'var(--primary-pale)',
             fontFamily: 'monospace',
           }}>{location.pathname}</code> could not be found.
         </p>
@@ -184,7 +184,7 @@ export default function NotFound() {
             style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.75rem 1.5rem', borderRadius: '12px',
-              background: 'linear-gradient(135deg, #0C637E, #2891C2)',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-light))',
               border: 'none',
               color: 'white', fontWeight: 700, fontSize: '0.875rem',
               cursor: 'pointer', transition: 'all 0.2s',
@@ -204,7 +204,7 @@ export default function NotFound() {
               padding: '0.75rem 1.5rem', borderRadius: '12px',
               background: 'rgba(36,150,167,0.2)',
               border: '1px solid rgba(36,150,167,0.4)',
-              color: '#7DD3FC', fontWeight: 600, fontSize: '0.875rem',
+              color: 'var(--primary-pale)', fontWeight: 600, fontSize: '0.875rem',
               cursor: 'pointer', transition: 'all 0.2s',
               fontFamily: 'inherit',
             }}
@@ -224,7 +224,7 @@ export default function NotFound() {
             <circle cx="14" cy="14" r="11" fill="none" stroke="rgba(255,255,255,0.1)" strokeWidth="2.5" />
             <circle
               cx="14" cy="14" r="11" fill="none"
-              stroke="#2891C2" strokeWidth="2.5"
+              stroke="var(--primary-light)" strokeWidth="2.5"
               strokeDasharray={`${2 * Math.PI * 11}`}
               strokeDashoffset={`${2 * Math.PI * 11 * (1 - countdown / 10)}`}
               strokeLinecap="round"

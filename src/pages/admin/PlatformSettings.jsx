@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
-import { useAlert } from '../../context/AlertContext';
+import { useAlert } from '../../context/hooks';
 
 /* ─── Toggle Switch ─────────────────────────────────────────────────────────── */
 const Toggle = ({ value, onChange, disabled }) => (
@@ -16,7 +16,7 @@ const Toggle = ({ value, onChange, disabled }) => (
     onClick={() => !disabled && onChange(!value)}
     style={{
       width: '48px', height: '26px', borderRadius: '13px',
-      background: value ? 'var(--primary)' : '#CBD5E1',
+      background: value ? 'var(--primary)' : 'var(--border)',
       border: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
       position: 'relative', transition: 'background 0.25s',
       flexShrink: 0, opacity: disabled ? 0.5 : 1,
@@ -36,8 +36,8 @@ const Toggle = ({ value, onChange, disabled }) => (
 const EnvBadge = () => (
   <span style={{
     fontSize: '0.62rem', fontWeight: 800, padding: '2px 7px',
-    borderRadius: '6px', background: '#F1F5F9', color: '#64748B',
-    border: '1px solid #E2E8F0', letterSpacing: '0.04em',
+    borderRadius: '6px', background: 'var(--tint-slate)', color: 'var(--text-muted)',
+    border: '1px solid var(--border)', letterSpacing: '0.04em',
   }}>
     ENV VAR · READ ONLY
   </span>
@@ -141,8 +141,8 @@ const PlatformSettings = () => {
       label: 'Server .env',
       desc: 'Use SMTP_HOST / SMTP_USER / SMTP_PASS from the server environment file',
       icon: Server,
-      color: '#64748B',
-      pale:  '#F1F5F9',
+      color: 'var(--text-muted)',
+      pale:  'var(--tint-slate)',
       preset: null,
     },
     {
@@ -151,7 +151,7 @@ const PlatformSettings = () => {
       desc: 'Google Workspace or personal Gmail with App Password',
       icon: Mail,
       color: '#EA4335',
-      pale:  '#FEF2F2',
+      pale:  'var(--tint-red)',
       preset: { smtpHost: 'smtp.gmail.com', smtpPort: '587', smtpEncryption: 'tls' },
     },
     {
@@ -159,8 +159,8 @@ const PlatformSettings = () => {
       label: 'Mailtrap Sandbox',
       desc: 'Email testing sandbox — catches all outbound mail without delivery',
       icon: FlaskConical,
-      color: '#6366F1',
-      pale:  '#EEF2FF',
+      color: 'var(--primary-light)',
+      pale:  'var(--tint-blue)',
       preset: { smtpHost: 'sandbox.smtp.mailtrap.io', smtpPort: '2525', smtpEncryption: 'tls' },
     },
     {
@@ -169,7 +169,7 @@ const PlatformSettings = () => {
       desc: 'Microsoft 365 organizational email account',
       icon: Mail,
       color: '#0078D4',
-      pale:  '#EFF6FF',
+      pale:  'var(--tint-blue)',
       preset: { smtpHost: 'smtp.office365.com', smtpPort: '587', smtpEncryption: 'tls' },
     },
     {
@@ -177,8 +177,8 @@ const PlatformSettings = () => {
       label: 'Custom SMTP',
       desc: 'Any SMTP server — enter host, port and credentials manually',
       icon: Zap,
-      color: '#F59E0B',
-      pale:  '#FFFBEB',
+      color: 'var(--warning)',
+      pale:  'var(--tint-amber)',
       preset: { smtpHost: '', smtpPort: '587', smtpEncryption: 'tls' },
     },
   ];
@@ -432,14 +432,14 @@ const PlatformSettings = () => {
                     </div>
 
                     {/* ── Active gateway info banner ── */}
-                    <div style={{ background: activeGw.pale, border: `1px solid ${activeGw.color}30`, borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ background: activeGw.pale, border: `1px solid color-mix(in srgb, ${activeGw.color} 20%, transparent)`, borderRadius: '12px', padding: '1rem 1.25rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '12px' }}>
                       <activeGw.icon size={20} color={activeGw.color} style={{ flexShrink: 0 }} />
                       <div>
                         <p style={{ fontWeight: 700, fontSize: '0.875rem', color: 'var(--text-sub)', margin: 0 }}>{activeGw.label}</p>
                         <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>{activeGw.desc}</p>
                       </div>
-                      {smtpStatus === 'ok'   && <CheckCircle size={18} color="#10B981" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
-                      {smtpStatus === 'fail' && <WifiOff     size={18} color="#EF4444" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                      {smtpStatus === 'ok'   && <CheckCircle size={18} color="var(--success)" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
+                      {smtpStatus === 'fail' && <WifiOff     size={18} color="var(--sos)" style={{ marginLeft: 'auto', flexShrink: 0 }} />}
                     </div>
 
                     {/* ── If .env mode: show read-only display ── */}
@@ -527,14 +527,14 @@ const PlatformSettings = () => {
 
                         {/* Gmail App Password hint */}
                         {settings.emailGateway === 'gmail' && (
-                          <div style={{ marginBottom: '1.25rem', padding: '0.875rem 1rem', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '10px', fontSize: '0.78rem', color: '#92400E', display: 'flex', gap: '8px' }}>
+                          <div style={{ marginBottom: '1.25rem', padding: '0.875rem 1rem', background: 'var(--tint-amber)', border: '1px solid var(--warning-border)', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--warning-fg)', display: 'flex', gap: '8px' }}>
                             <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
                             <span>Gmail requires a 16-character <strong>App Password</strong>, not your regular password. Generate one at <strong>myaccount.google.com → Security → 2-Step Verification → App passwords</strong>.</span>
                           </div>
                         )}
 
                         {settings.emailGateway === 'mailtrap' && (
-                          <div style={{ marginBottom: '1.25rem', padding: '0.875rem 1rem', background: '#EEF2FF', border: '1px solid #C7D2FE', borderRadius: '10px', fontSize: '0.78rem', color: '#3730A3', display: 'flex', gap: '8px' }}>
+                          <div style={{ marginBottom: '1.25rem', padding: '0.875rem 1rem', background: 'var(--tint-blue)', border: '1px solid var(--info-border)', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--primary-dark)', display: 'flex', gap: '8px' }}>
                             <AlertCircle size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
                             <span>Copy your <strong>SMTP username and password</strong> from Mailtrap → your inbox → SMTP Settings. All emails are caught in the sandbox — nothing is delivered to real users.</span>
                           </div>
@@ -607,14 +607,14 @@ const PlatformSettings = () => {
                   </div>
 
                   {/* HIPAA summary */}
-                  <div style={{ border: '1px solid var(--success-border)', borderRadius: '16px', padding: '1.5rem', background: '#f0fdf4', marginBottom: '1.5rem' }}>
+                  <div style={{ border: '1px solid var(--success-border)', borderRadius: '16px', padding: '1.5rem', background: 'var(--tint-green)', marginBottom: '1.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1.25rem' }}>
-                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: '#10b981', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'var(--success)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <Shield size={20} />
                       </div>
                       <div>
-                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: '#064e3b', margin: 0 }}>HIPAA Compliance Status</h3>
-                        <p style={{ fontSize: '0.78rem', color: '#047857', margin: 0 }}>All data protection standards are active</p>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--success-fg)', margin: 0 }}>HIPAA Compliance Status</h3>
+                        <p style={{ fontSize: '0.78rem', color: 'var(--success-fg)', margin: 0 }}>All data protection standards are active</p>
                       </div>
                     </div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem' }}>
@@ -624,8 +624,8 @@ const PlatformSettings = () => {
                         { key: 'Auto Timeout', val: `${settings.sessionTimeoutMinutes}m` },
                       ].map(({ key, val }) => (
                         <div key={key} style={{ padding: '0.75rem', background: 'white', borderRadius: '9px', border: '1px solid var(--success-border)' }}>
-                          <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#059669', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{key}</p>
-                          <p style={{ fontSize: '0.875rem', fontWeight: 700, color: '#064e3b' }}>{val}</p>
+                          <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--success-fg)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '3px' }}>{key}</p>
+                          <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--success-fg)' }}>{val}</p>
                         </div>
                       ))}
                     </div>
@@ -656,7 +656,7 @@ const PlatformSettings = () => {
                       onChange={set('twoFactorRequired')}
                     />
                     {settings.twoFactorRequired && (
-                      <div style={{ marginTop: '8px', padding: '10px 14px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', fontSize: '0.78rem', color: '#1D4ED8', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
+                      <div style={{ marginTop: '8px', padding: '10px 14px', background: 'var(--tint-blue)', border: '1px solid var(--info-border)', borderRadius: '10px', fontSize: '0.78rem', color: 'var(--primary)', display: 'flex', gap: '8px', alignItems: 'flex-start' }}>
                         <ShieldCheck size={14} style={{ flexShrink: 0, marginTop: '1px' }} />
                         <span><strong>Email OTP enabled.</strong> After entering the correct password, a 6-digit one-time code will be sent to the admin's registered email address. The session only starts after the code is verified.</span>
                       </div>
@@ -704,15 +704,15 @@ const PlatformSettings = () => {
 
                         {/* Current IP helper */}
                         {myIp && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '8px 12px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px' }}>
-                            <Globe size={14} color="#2563EB" />
-                            <span style={{ fontSize: '0.78rem', color: '#1D4ED8', flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', padding: '8px 12px', background: 'var(--tint-blue)', border: '1px solid var(--info-border)', borderRadius: '8px' }}>
+                            <Globe size={14} color="var(--primary-light)" />
+                            <span style={{ fontSize: '0.78rem', color: 'var(--primary)', flex: 1 }}>
                               Your current IP: <strong style={{ fontFamily: 'monospace' }}>{myIp}</strong>
                             </span>
                             {!settings.allowedIps.includes(myIp) && (
                               <button
                                 onClick={() => addIp(myIp)}
-                                style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', background: '#2563EB', color: 'white', border: 'none', cursor: 'pointer' }}
+                                style={{ fontSize: '0.72rem', fontWeight: 700, padding: '3px 10px', borderRadius: '6px', background: 'var(--primary-light)', color: 'white', border: 'none', cursor: 'pointer' }}
                               >
                                 + Add My IP
                               </button>
@@ -732,7 +732,7 @@ const PlatformSettings = () => {
                                 <ShieldCheck size={14} color="var(--primary)" />
                                 <code style={{ flex: 1, fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-sub)' }}>{ip}</code>
                                 {ip === myIp && <span style={{ fontSize: '0.65rem', fontWeight: 700, padding: '2px 6px', background: 'var(--primary-pale)', color: 'var(--primary)', borderRadius: '4px' }}>YOU</span>}
-                                <button onClick={() => removeIp(ip)} style={{ background: 'none', border: 'none', color: '#EF4444', cursor: 'pointer', display: 'flex', padding: '2px' }}>
+                                <button onClick={() => removeIp(ip)} style={{ background: 'none', border: 'none', color: 'var(--sos)', cursor: 'pointer', display: 'flex', padding: '2px' }}>
                                   <Trash2 size={14} />
                                 </button>
                               </div>
@@ -747,7 +747,7 @@ const PlatformSettings = () => {
                             onChange={e => { setNewIp(e.target.value); setIpError(''); }}
                             onKeyDown={e => e.key === 'Enter' && addIp(newIp)}
                             placeholder="192.168.1.100"
-                            style={{ flex: 1, padding: '0.65rem 0.875rem', borderRadius: '9px', border: `1px solid ${ipError ? '#EF4444' : 'var(--border)'}`, background: 'var(--surface)', fontSize: '0.875rem', fontFamily: 'monospace', outline: 'none' }}
+                            style={{ flex: 1, padding: '0.65rem 0.875rem', borderRadius: '9px', border: `1px solid ${ipError ? 'var(--sos)' : 'var(--border)'}`, background: 'var(--surface)', fontSize: '0.875rem', fontFamily: 'monospace', outline: 'none' }}
                           />
                           <button
                             onClick={() => addIp(newIp)}
@@ -756,9 +756,9 @@ const PlatformSettings = () => {
                             <Plus size={14} /> Add
                           </button>
                         </div>
-                        {ipError && <p style={{ fontSize: '0.75rem', color: '#EF4444', marginTop: '5px' }}>{ipError}</p>}
+                        {ipError && <p style={{ fontSize: '0.75rem', color: 'var(--sos)', marginTop: '5px' }}>{ipError}</p>}
 
-                        <div style={{ marginTop: '10px', padding: '8px 12px', background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '8px', fontSize: '0.74rem', color: '#92400E', display: 'flex', gap: '6px' }}>
+                        <div style={{ marginTop: '10px', padding: '8px 12px', background: 'var(--tint-amber)', border: '1px solid var(--warning-border)', borderRadius: '8px', fontSize: '0.74rem', color: 'var(--warning-fg)', display: 'flex', gap: '6px' }}>
                           <AlertCircle size={13} style={{ flexShrink: 0, marginTop: '1px' }} />
                           <span>If you remove your own IP and save, you will be locked out of the admin panel immediately. Always keep your IP in the list.</span>
                         </div>

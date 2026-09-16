@@ -1,7 +1,6 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import api from '../services/api';
-
-const AuthContext = createContext(null);
+import { AuthContext } from './contexts';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
@@ -40,15 +39,15 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('medifind_token');
       localStorage.removeItem('medifind_refresh_token');
       localStorage.removeItem('medifind_user');
-      
+
       // Explicitly clear common headers to prevent persistence across logins
       if (api.defaults.headers.common['Authorization']) {
         delete api.defaults.headers.common['Authorization'];
       }
-      
+
       setUser(null);
-      
-      // Nuclear option: Hard reload to /login to ensure all memory state is wiped
+
+      // Hard reload to /login to ensure all in-memory state (sockets, caches) is wiped
       window.location.href = '/login';
     }
   }, []);
@@ -60,10 +59,4 @@ export const AuthProvider = ({ children }) => {
       {children}
     </AuthContext.Provider>
   );
-};
-
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
-  return ctx;
 };

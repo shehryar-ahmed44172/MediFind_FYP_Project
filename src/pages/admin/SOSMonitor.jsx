@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Activity, MapPin, Clock, Phone, AlertTriangle, ShieldCheck, RefreshCw, User, Filter, Wifi, WifiOff, Users, Navigation } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { MapPin, Clock, Phone, AlertTriangle, ShieldCheck, RefreshCw, User, Filter, Wifi, WifiOff, Navigation } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { io } from 'socket.io-client';
 import api from '../../services/api';
+import { acquireSocket, releaseSocket } from '../../services/socket';
 
 // Fix Leaflet default marker icons broken by Vite/Webpack bundling
 delete L.Icon.Default.prototype._getIconUrl;
@@ -37,13 +37,6 @@ const greenIconLarge = new L.Icon({
   iconSize: [32, 52], iconAnchor: [16, 52], popupAnchor: [1, -46], shadowSize: [52, 52],
 });
 
-// Orange icon for assigned/en-route responders
-const orangeIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-orange.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
-});
-
 // ── Compass bearing (0-360°) from point A to point B ───────────────────────
 const calcBearing = (lat1, lon1, lat2, lon2) => {
   const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
@@ -69,9 +62,9 @@ const makeAmbulanceIcon = (bearing = 0) => L.divIcon({
       <svg xmlns="http://www.w3.org/2000/svg" width="52" height="32" viewBox="0 0 52 32">
         <style>@keyframes siren{0%,49%{opacity:1}50%,100%{opacity:0.18}}</style>
         <!-- Main body -->
-        <rect x="10" y="10" width="30" height="11" rx="4" fill="#059669"/>
+        <rect x="10" y="10" width="30" height="11" rx="4" fill="var(--success-fg)"/>
         <!-- Siren bar (animated red) -->
-        <rect x="17" y="4" width="15" height="7" rx="3" fill="#EF4444" style="animation:siren 0.75s ease infinite"/>
+        <rect x="17" y="4" width="15" height="7" rx="3" fill="var(--sos)" style="animation:siren 0.75s ease infinite"/>
         <!-- Siren lights -->
         <circle cx="20" cy="7.5" r="1.5" fill="white" style="animation:siren 0.75s 0.375s ease infinite"/>
         <circle cx="29" cy="7.5" r="1.5" fill="white"/>
@@ -80,15 +73,15 @@ const makeAmbulanceIcon = (bearing = 0) => L.divIcon({
         <!-- White cross vertical -->
         <rect x="23.5" y="10" width="3" height="9" rx="0.5" fill="white"/>
         <!-- Front fork / handlebar -->
-        <rect x="40" y="12" width="7" height="3" rx="1.5" fill="#047857"/>
+        <rect x="40" y="12" width="7" height="3" rx="1.5" fill="var(--success-fg)"/>
         <!-- Rear exhaust -->
-        <rect x="4" y="14.5" width="6" height="2" rx="1" fill="#047857" opacity="0.8"/>
+        <rect x="4" y="14.5" width="6" height="2" rx="1" fill="var(--success-fg)" opacity="0.8"/>
         <!-- Back wheel -->
-        <circle cx="14" cy="25" r="6" fill="#111827" stroke="#10B981" stroke-width="2"/>
-        <circle cx="14" cy="25" r="2" fill="#10B981"/>
+        <circle cx="14" cy="25" r="6" fill="var(--text-main)" stroke="var(--success)" stroke-width="2"/>
+        <circle cx="14" cy="25" r="2" fill="var(--success)"/>
         <!-- Front wheel -->
-        <circle cx="38" cy="25" r="6" fill="#111827" stroke="#10B981" stroke-width="2"/>
-        <circle cx="38" cy="25" r="2" fill="#10B981"/>
+        <circle cx="38" cy="25" r="6" fill="var(--text-main)" stroke="var(--success)" stroke-width="2"/>
+        <circle cx="38" cy="25" r="2" fill="var(--success)"/>
       </svg>
     </div>
   `,
@@ -96,6 +89,27 @@ const makeAmbulanceIcon = (bearing = 0) => L.divIcon({
   iconAnchor:  [26, 30],
   popupAnchor: [0, -32],
 });
+
+// Escape values interpolated into Leaflet popup HTML
+const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, ch => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]
+));
+
+const vehiclePopupHtml = (vehicle) => `
+  <div style="min-width:175px">
+    <strong style="color:var(--success-fg);font-size:13px;display:block;margin-bottom:5px">
+      ${vehicle.isDemo ? 'Demo simulation — not real data' : 'En Route'}
+    </strong>
+    <b style="font-size:12px">${escapeHtml(vehicle.name)}</b><br/>
+    <span style="font-size:11px;color:var(--text-muted)">${escapeHtml((vehicle.responderType || 'Responder').replace(/_/g, ' '))}</span><br/>
+    ${vehicle.eta != null
+      ? `<span style="font-size:12px;font-weight:700;color:var(--warning-fg)">ETA ≈ ${escapeHtml(vehicle.eta)} min</span><br/>`
+      : ''}
+    <span style="font-size:10px;color:var(--text-muted);font-family:monospace">
+      ${Number(vehicle.lat).toFixed(5)}, ${Number(vehicle.lon).toFixed(5)}
+    </span>
+  </div>
+`;
 
 // ── MovingVehicleMarker ─────────────────────────────────────────────────────
 // Renders an ambulance motorbike that moves & rotates smoothly.
@@ -111,12 +125,7 @@ function MovingVehicleMarker({ vehicle }) {
       icon: makeAmbulanceIcon(vehicle.bearing || 0),
       zIndexOffset: 2000,
     }).addTo(map);
-    marker.bindPopup(`
-      <div style="min-width:170px">
-        <strong style="color:#059669;font-size:13px;display:block;margin-bottom:5px">🚑 En Route</strong>
-        <b style="font-size:12px">${vehicle.name}</b>
-      </div>
-    `);
+    marker.bindPopup(vehiclePopupHtml(vehicle));
     markerRef.current = marker;
     return () => { marker.remove(); markerRef.current = null; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -127,20 +136,9 @@ function MovingVehicleMarker({ vehicle }) {
     if (!markerRef.current) return;
     markerRef.current.setLatLng([vehicle.lat, vehicle.lon]);
     markerRef.current.setIcon(makeAmbulanceIcon(vehicle.bearing || 0));
-    markerRef.current.setPopupContent(`
-      <div style="min-width:175px">
-        <strong style="color:#059669;font-size:13px;display:block;margin-bottom:5px">🚑 En Route</strong>
-        <b style="font-size:12px">${vehicle.name}</b><br/>
-        <span style="font-size:11px;color:#64748B">${(vehicle.responderType || 'Responder').replace(/_/g, ' ')}</span><br/>
-        ${vehicle.eta != null
-          ? `<span style="font-size:12px;font-weight:700;color:#D97706">ETA ≈ ${vehicle.eta} min</span><br/>`
-          : ''}
-        <span style="font-size:10px;color:#94A3B8;font-family:monospace">
-          ${vehicle.lat.toFixed(5)}, ${vehicle.lon.toFixed(5)}
-        </span>
-      </div>
-    `);
-  }, [vehicle.lat, vehicle.lon, vehicle.bearing, vehicle.eta, vehicle.name]);
+    markerRef.current.setPopupContent(vehiclePopupHtml(vehicle));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vehicle.lat, vehicle.lon, vehicle.bearing, vehicle.eta, vehicle.name, vehicle.responderType]);
 
   return null;
 }
@@ -276,6 +274,8 @@ const timeAgo = (iso) => {
   return `${Math.floor(diff / 3600)}h ago`;
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const SOSMonitor = () => {
   const [searchParams] = useSearchParams();
   const urlFilter = searchParams.get('filter')?.toUpperCase();
@@ -288,104 +288,82 @@ const SOSMonitor = () => {
   const [loading,            setLoading]            = useState(true);
   const [error,              setError]              = useState('');
   const [lastUpdated,        setLastUpdated]        = useState(null);
-  const [activeFilter,       setActiveFilter]       = useState(initialFilter);
+  // A local filter choice only applies while the URL filter it was made under is unchanged,
+  // so clicking an Overview stat card (which changes ?filter=) always wins.
+  const [filterChoice,       setFilterChoice]       = useState(null); // { urlFilter, value }
   const [socketOnline,       setSocketOnline]       = useState(false);
   const [timeRange,          setTimeRange]          = useState('today'); // 'today' | 'week' | 'all'
   const [onlineResponders,   setOnlineResponders]   = useState([]); // live GPS-located available responders
   const [selectedEmergency,  setSelectedEmergency]  = useState(null); // clicked emergency for map focus
   const [responderFocused,   setResponderFocused]   = useState(false); // Online Responders card clicked — focus map on responders
   const mapRef = useRef(null); // scroll-to-map anchor
-  const intervalRef    = useRef(null);
-  const respIntervalRef = useRef(null);
-  const socketRef      = useRef(null);
   // Moving ambulance markers (live GPS + simulation)
-  const [movingVehicles, setMovingVehicles] = useState({}); // { responderId: { lat, lon, bearing, emergencyId, name, responderType, eta, status } }
+  const [movingVehicles, setMovingVehicles] = useState({}); // { responderId: { lat, lon, bearing, emergencyId, eta, status, isDemo? } }
   const [simRunning,     setSimRunning]     = useState(false);
   const simIntervalRef = useRef(null);
   const simIndexRef    = useRef(0);
 
-  const fetchEmergencies = async () => {
-    try {
-      const response = await api.get('/api/emergencies');
-      if (response.data.success) {
-        setEmergencies(response.data.data);
-        setLastUpdated(new Date());
-        setError('');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to fetch emergencies.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const activeFilter = filterChoice && filterChoice.urlFilter === initialFilter ? filterChoice.value : initialFilter;
+  const setActiveFilter = (value) => setFilterChoice({ urlFilter: initialFilter, value });
 
+  /* ── Data loaders: fetch → apply (state is only set in async callbacks) ── */
+  const applyEmergencies = useCallback((response) => {
+    if (response?.data?.success) {
+      setEmergencies(response.data.data || []);
+      setLastUpdated(new Date());
+      setError('');
+    }
+    setLoading(false);
+  }, []);
+
+  const handleEmergencyError = useCallback((err) => {
+    setError(err.response?.data?.message || 'Failed to fetch emergencies. Retrying automatically…');
+    setLoading(false);
+  }, []);
+
+  const fetchEmergencies = useCallback(() => (
+    api.get('/api/emergencies').then(applyEmergencies, handleEmergencyError)
+  ), [applyEmergencies, handleEmergencyError]);
+
+  const fetchOnlineResponders = useCallback(() => (
+    api.get('/api/admin/responders/online')
+      .then(res => { if (res.data?.success) setOnlineResponders(res.data.data || []); })
+      .catch(() => { /* silent — map still shows without responder pins */ })
+  ), []);
+
+  // Emergencies: poll every 4 s (fast enough to catch status changes without the socket)
   useEffect(() => {
     fetchEmergencies();
-    intervalRef.current = setInterval(fetchEmergencies, 4000); // 4s — fast enough to catch status changes without socket
-    return () => clearInterval(intervalRef.current);
-  }, []);
+    const id = setInterval(fetchEmergencies, 4000);
+    return () => clearInterval(id);
+  }, [fetchEmergencies]);
 
-  // ── Online responders: fetch on mount then every 10 s ──────────────────────
-  const fetchOnlineResponders = async () => {
-    try {
-      const res = await api.get('/api/admin/responders/online');
-      if (res.data.success) setOnlineResponders(res.data.data || []);
-    } catch { /* silent — map still shows without responder pins */ }
-  };
-
+  // Online responders: fetch on mount then every 10 s
   useEffect(() => {
     fetchOnlineResponders();
-    respIntervalRef.current = setInterval(fetchOnlineResponders, 10000);
-    return () => clearInterval(respIntervalRef.current);
-  }, []);
+    const id = setInterval(fetchOnlineResponders, 10000);
+    return () => clearInterval(id);
+  }, [fetchOnlineResponders]);
 
-  // ── Real-time Socket.io connection ──────────────────────────────────────
+  // ── Real-time updates over the shared admin socket ─────────────────────
   useEffect(() => {
-    const BACKEND = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-    const token   = localStorage.getItem('accessToken') || sessionStorage.getItem('accessToken') || '';
+    const socket = acquireSocket();
 
-    const socket = io(BACKEND, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnectionAttempts: 5,
-      reconnectionDelay: 2000,
-    });
-    socketRef.current = socket;
-
-    socket.on('connect', () => {
-      setSocketOnline(true);
-      // Join admin_notifications room so we receive emergency status changes
-      socket.emit('join', { role: 'ADMIN' });
-    });
-
-    socket.on('disconnect', () => setSocketOnline(false));
-    socket.on('connect_error', () => setSocketOnline(false));
-
-    // Backend emits EMERGENCY_STATUS_CHANGE to admin_notifications on cancel/update
-    socket.on('EMERGENCY_STATUS_CHANGE', () => {
-      // Re-fetch immediately — don't wait for the 10-second poll
-      fetchEmergencies();
-    });
-
-    // Also listen for new SOS triggers broadcast to admin
-    socket.on('admin_notification', (data) => {
-      if (data?.type === 'SOS_TRIGGERED' || data?.type === 'EMERGENCY_STATUS_CHANGE') {
-        fetchEmergencies();
-      }
-    });
-
-    // Responder moved during an active emergency — update the moving ambulance marker
-    // and refresh the idle-responder green pins in the background.
-    // Backend now also emits LOCATION_UPDATE to admin_notifications (added in trackingService.ts).
-    socket.on('LOCATION_UPDATE', (payload) => {
+    const onConnect    = () => setSocketOnline(true);
+    const onDisconnect = () => setSocketOnline(false);
+    const onStatus     = () => fetchEmergencies(); // re-fetch immediately, don't wait for the poll
+    const onAdminNotif = (data) => {
+      if (data?.type === 'SOS_TRIGGERED' || data?.type === 'EMERGENCY_STATUS_CHANGE') fetchEmergencies();
+    };
+    // Responder moved during an active emergency — move the ambulance marker
+    const onLocation = (payload) => {
       const d = payload?.data || payload;
       if (d?.responderId && d?.latitude != null && d?.longitude != null) {
         setMovingVehicles(prev => {
           const existing = prev[d.responderId];
-          // Calculate bearing from previous position → new position
           const bearing = existing
             ? calcBearing(existing.lat, existing.lon, d.latitude, d.longitude)
-            : (existing?.bearing ?? 0);
+            : 0;
           return {
             ...prev,
             [d.responderId]: {
@@ -395,82 +373,44 @@ const SOSMonitor = () => {
               emergencyId: d.emergencyId,
               eta:         d.estimatedArrivalMinutes,
               status:      d.status,
-              name:        existing?.name         || 'Responder',
-              responderType: existing?.responderType || '',
             },
           };
         });
       }
       fetchOnlineResponders();
-    });
-    socket.on('RESPONDER_LOCATION_UPDATE', () => { fetchOnlineResponders(); });
+    };
+
+    // The shared socket may already be connected (e.g. opened by the dashboard shell)
+    if (socket.connected) queueMicrotask(onConnect);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+    socket.on('connect_error', onDisconnect);
+    socket.on('EMERGENCY_STATUS_CHANGE', onStatus);
+    socket.on('admin_notification', onAdminNotif);
+    socket.on('LOCATION_UPDATE', onLocation);
+    socket.on('RESPONDER_LOCATION_UPDATE', fetchOnlineResponders);
 
     return () => {
-      socket.disconnect();
-      socketRef.current = null;
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
+      socket.off('connect_error', onDisconnect);
+      socket.off('EMERGENCY_STATUS_CHANGE', onStatus);
+      socket.off('admin_notification', onAdminNotif);
+      socket.off('LOCATION_UPDATE', onLocation);
+      socket.off('RESPONDER_LOCATION_UPDATE', fetchOnlineResponders);
+      releaseSocket();
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Enrich movingVehicles with responder name/type once onlineResponders loads ──
-  useEffect(() => {
-    if (Object.keys(movingVehicles).length === 0 || onlineResponders.length === 0) return;
-    setMovingVehicles(prev => {
-      let changed = false;
-      const next = { ...prev };
-      for (const [rid, v] of Object.entries(next)) {
-        if (v.name === 'Responder') {
-          const r = onlineResponders.find(r => r.userId === rid);
-          if (r) {
-            next[rid] = { ...v, name: r.user?.fullName || 'Responder', responderType: r.responderType || '' };
-            changed = true;
-          }
-        }
-      }
-      return changed ? next : prev;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onlineResponders]);
-
-  // ── Remove moving vehicles whose emergencies are resolved/cancelled ────────
-  useEffect(() => {
-    if (Object.keys(movingVehicles).length === 0) return;
-    const activeIds = new Set(
-      emergencies.filter(e => ['ACTIVE', 'ASSIGNED'].includes(e.status)).map(e => e.id)
-    );
-    setMovingVehicles(prev => {
-      const next = {};
-      let removed = false;
-      for (const [rid, v] of Object.entries(prev)) {
-        // Keep demo vehicles and vehicles whose emergency is still active
-        if (!v.emergencyId || v.emergencyId === 'DEMO' || activeIds.has(v.emergencyId)) {
-          next[rid] = v;
-        } else {
-          removed = true;
-        }
-      }
-      return removed ? next : prev;
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [emergencies]);
+  }, [fetchEmergencies, fetchOnlineResponders]);
 
   // ── Clean up simulation interval if the component unmounts ────────────────
   useEffect(() => () => clearInterval(simIntervalRef.current), []);
 
-  // Update filter when URL param changes (e.g. user clicks a stat card again)
-  useEffect(() => { setActiveFilter(initialFilter); }, [initialFilter]);
-
-  /* ── Time-range scoping — applied before status filter ── */
-  const scopedEmergencies = (() => {
-    if (timeRange === 'today') {
-      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      return emergencies.filter(e => new Date(e.createdAt) >= cutoff);
-    }
-    if (timeRange === 'week') {
-      const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-      return emergencies.filter(e => new Date(e.createdAt) >= cutoff);
-    }
-    return emergencies; // 'all'
-  })();
+  /* ── Time-range scoping — relative to the last successful fetch ── */
+  const refTime = lastUpdated ? lastUpdated.getTime() : 0;
+  const scopedEmergencies = timeRange === 'all'
+    ? emergencies
+    : emergencies.filter(e => new Date(e.createdAt).getTime() >= refTime - (timeRange === 'week' ? 7 : 1) * DAY_MS);
 
   /* ── Derived data ── */
   const filterOpt = FILTER_OPTIONS.find(f => f.key === activeFilter);
@@ -479,6 +419,21 @@ const SOSMonitor = () => {
     : scopedEmergencies.filter(e => filterOpt?.statuses?.includes(e.status));
 
   const activeEmergencies = scopedEmergencies.filter(e => e.status === 'ACTIVE');
+
+  /* ── Moving vehicles: drop finished emergencies, enrich with responder names ── */
+  const liveEmergencyIds = new Set(
+    emergencies.filter(e => ['ACTIVE', 'ASSIGNED'].includes(e.status)).map(e => e.id)
+  );
+  const displayVehicles = Object.entries(movingVehicles)
+    .filter(([, v]) => v.isDemo || !v.emergencyId || liveEmergencyIds.has(v.emergencyId))
+    .map(([rid, v]) => {
+      const r = onlineResponders.find(o => o.userId === rid);
+      return [rid, {
+        ...v,
+        name: v.name || r?.user?.fullName || 'Responder',
+        responderType: v.responderType || r?.responderType || '',
+      }];
+    });
 
   /* ── Status breakdown counts (scoped to selected time range) ── */
   const breakdown = {
@@ -500,7 +455,7 @@ const SOSMonitor = () => {
   const shouldShowMap = !loading && (
     activeEmergencies.length > 0 ||
     onlineResponders.length > 0 ||
-    Object.keys(movingVehicles).length > 0
+    displayVehicles.length > 0
   );
 
   /* ── Defence demo: simulate an ambulance moving along SIM_ROUTE ── */
@@ -523,9 +478,10 @@ const SOSMonitor = () => {
         DEMO_AMBULANCE: {
           lat, lon, bearing,
           emergencyId:  'DEMO',
+          isDemo:       true,
           eta,
           status:       idx === SIM_ROUTE.length - 1 ? 'ARRIVED' : 'EN_ROUTE',
-          name:         'Paramedic Demo Unit',
+          name:         'Demo Unit (simulated)',
           responderType:'PARAMEDIC',
         },
       }));
@@ -561,10 +517,10 @@ const SOSMonitor = () => {
       transition={{ duration: 0.4 }}
     >
       {/* ── Page Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', gap: '12px 16px', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '0.375rem' }}>
-            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '-0.03em' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.375rem' }}>
+            <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '-0.03em', whiteSpace: 'nowrap' }}>
               SOS Logistics
             </h1>
             <div style={{
@@ -587,7 +543,7 @@ const SOSMonitor = () => {
               padding: '0.25rem 0.75rem', borderRadius: '100px',
               fontSize: '0.68rem', fontWeight: 700,
               background: socketOnline ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)',
-              color: socketOnline ? '#059669' : '#DC2626',
+              color: socketOnline ? 'var(--success-fg)' : 'var(--error-fg)',
               border: `1px solid ${socketOnline ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.2)'}`,
             }}>
               {socketOnline ? <Wifi size={11} /> : <WifiOff size={11} />}
@@ -623,7 +579,7 @@ const SOSMonitor = () => {
                 key={tr.key}
                 onClick={() => setTimeRange(tr.key)}
                 style={{
-                  padding: '6px 14px', border: 'none',
+                  padding: '6px 14px', border: 'none', whiteSpace: 'nowrap',
                   background: timeRange === tr.key ? 'var(--primary)' : 'transparent',
                   color: timeRange === tr.key ? 'white' : 'var(--text-muted)',
                   fontWeight: 700, fontSize: '0.78rem',
@@ -653,7 +609,7 @@ const SOSMonitor = () => {
 
       {/* ── Stats Breakdown Cards ── */}
       {!loading && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: '12px', marginBottom: '1.25rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginBottom: '1.25rem' }}>
           {[
             { key: 'ACTIVE',    label: 'Active SOS', count: breakdown.ACTIVE,    color: 'var(--s-active)',    bg: 'var(--s-active-bg)'    },
             { key: 'ASSIGNED',  label: 'Assigned',   count: breakdown.ASSIGNED,  color: 'var(--s-assigned)',  bg: 'var(--s-assigned-bg)'  },
@@ -688,8 +644,8 @@ const SOSMonitor = () => {
               setTimeout(() => mapRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80);
             }}
             style={{
-              background: responderFocused ? '#ECFDF5' : 'var(--surface)',
-              border: `1.5px solid ${responderFocused ? '#059669' : '#10B981'}`,
+              background: responderFocused ? 'var(--tint-green)' : 'var(--surface)',
+              border: `1.5px solid ${responderFocused ? 'var(--success-fg)' : 'var(--success)'}`,
               borderRadius: '14px', padding: '14px 18px',
               position: 'relative', overflow: 'hidden',
               cursor: 'pointer', transition: 'all 0.18s ease',
@@ -700,23 +656,23 @@ const SOSMonitor = () => {
             <motion.div
               animate={{ opacity: [0.12, 0.28, 0.12] }}
               transition={{ repeat: Infinity, duration: 2 }}
-              style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg,#10B98114,transparent)', pointerEvents: 'none' }}
+              style={{ position: 'absolute', inset: 0, background: 'linear-gradient(135deg, rgba(16,185,129,0.08), transparent)', pointerEvents: 'none' }}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
-              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: '#059669', lineHeight: 1 }}>
+              <p style={{ fontSize: '1.75rem', fontWeight: 800, color: 'var(--success-fg)', lineHeight: 1 }}>
                 {onlineResponders.length}
               </p>
               <motion.div
                 animate={{ scale: [1, 1.5, 1], opacity: [0.5, 1, 0.5] }}
                 transition={{ repeat: Infinity, duration: 1.6 }}
-                style={{ width: '7px', height: '7px', borderRadius: '50%', background: '#10B981', flexShrink: 0 }}
+                style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'var(--success)', flexShrink: 0 }}
               />
             </div>
-            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: responderFocused ? '#059669' : 'var(--text-muted)', position: 'relative' }}>
+            <p style={{ fontSize: '0.8rem', fontWeight: 700, color: responderFocused ? 'var(--success-fg)' : 'var(--text-muted)', position: 'relative' }}>
               Online Responders
             </p>
             {responderFocused && (
-              <p style={{ fontSize: '0.65rem', fontWeight: 700, color: '#059669', marginTop: '3px', position: 'relative', letterSpacing: '0.04em' }}>
+              <p style={{ fontSize: '0.65rem', fontWeight: 700, color: 'var(--success-fg)', marginTop: '3px', position: 'relative', letterSpacing: '0.04em' }}>
                 📍 Pinned on map ↓
               </p>
             )}
@@ -794,8 +750,8 @@ const SOSMonitor = () => {
           style={{
             marginBottom: '1.5rem', borderRadius: '16px',
             border: responderFocused
-              ? '2px solid #059669'
-              : activeEmergencies.length > 0 ? '1.5px solid var(--s-active)' : '1.5px solid #10B981',
+              ? '2px solid var(--success-fg)'
+              : activeEmergencies.length > 0 ? '1.5px solid var(--s-active)' : '1.5px solid var(--success)',
             overflow: 'hidden',
             boxShadow: responderFocused
               ? '0 0 0 4px rgba(16,185,129,0.15), 0 8px 32px rgba(16,185,129,0.2)'
@@ -810,7 +766,7 @@ const SOSMonitor = () => {
             background: responderFocused
               ? 'rgba(16,185,129,0.08)'
               : activeEmergencies.length > 0 ? 'var(--error-bg)' : 'rgba(16,185,129,0.06)',
-            borderBottom: `1px solid ${responderFocused ? '#059669' : activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981'}`,
+            borderBottom: `1px solid ${responderFocused ? 'var(--success-fg)' : activeEmergencies.length > 0 ? 'var(--s-active)' : 'var(--success)'}`,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -818,9 +774,9 @@ const SOSMonitor = () => {
               <motion.div
                 animate={{ opacity: [1, 0.25, 1] }}
                 transition={{ repeat: Infinity, duration: responderFocused ? 1.8 : 1.2 }}
-                style={{ width: '8px', height: '8px', borderRadius: '50%', background: responderFocused ? '#10B981' : 'var(--s-active)', flexShrink: 0 }}
+                style={{ width: '8px', height: '8px', borderRadius: '50%', background: responderFocused ? 'var(--success)' : 'var(--s-active)', flexShrink: 0 }}
               />
-              <span style={{ fontWeight: 800, color: responderFocused ? '#059669' : activeEmergencies.length > 0 ? 'var(--s-active)' : '#10B981', fontSize: '0.85rem' }}>
+              <span style={{ fontWeight: 800, color: responderFocused ? 'var(--success-fg)' : activeEmergencies.length > 0 ? 'var(--s-active)' : 'var(--success)', fontSize: '0.85rem' }}>
                 {responderFocused
                   ? `RESPONDER VIEW — ${onlineResponders.length} Online Responder${onlineResponders.length !== 1 ? 's' : ''}`
                   : `LIVE MAP${activeEmergencies.length > 0 ? ` — ${activeEmergencies.length} Active SOS Signal${activeEmergencies.length !== 1 ? 's' : ''}` : ''}`}
@@ -835,46 +791,50 @@ const SOSMonitor = () => {
             {/* Legend + controls */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
               {activeEmergencies.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#EF4444' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--sos)' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--sos)' }} />
                   Patient SOS
                 </div>
               )}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
-                <div style={{ width: responderFocused ? '12px' : '10px', height: responderFocused ? '12px' : '10px', borderRadius: '50%', background: '#10B981', transition: 'all 0.2s', boxShadow: responderFocused ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none' }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--success-fg)' }}>
+                <div style={{ width: responderFocused ? '12px' : '10px', height: responderFocused ? '12px' : '10px', borderRadius: '50%', background: 'var(--success)', transition: 'all 0.2s', boxShadow: responderFocused ? '0 0 0 3px rgba(16,185,129,0.25)' : 'none' }} />
                 Responder ({onlineResponders.length})
               </div>
               {/* Ambulance legend — only when at least one vehicle is moving */}
-              {Object.keys(movingVehicles).length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#059669' }}>
-                  🚑 En Route ({Object.keys(movingVehicles).length})
+              {displayVehicles.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--success-fg)' }}>
+                  🚑 En Route ({displayVehicles.length})
                 </div>
               )}
               {selectedEmergency && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: '#3B82F6' }}>
-                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#3B82F620', border: '1.5px solid #3B82F6' }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', fontWeight: 700, color: 'var(--primary-light)' }}>
+                  <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'rgba(40,145,194,0.12)', border: '1.5px solid var(--primary-light)' }} />
                   {NEARBY_RADIUS_KM} km radius
                 </div>
               )}
-              {/* Simulate Route button — for defence demo */}
+              {/* Demo-only route simulation (for presentations) — clearly labelled as not real data */}
               <button
+                type="button"
                 onClick={simRunning ? stopSimulation : startSimulation}
+                title="Plays a simulated ambulance along a fixed Lahore route. Not real responder data."
                 style={{
-                  fontSize: '0.68rem', fontWeight: 800, cursor: 'pointer',
-                  padding: '4px 11px', borderRadius: '7px',
-                  background: simRunning ? 'rgba(239,68,68,0.1)' : 'rgba(5,150,105,0.1)',
-                  color: simRunning ? '#DC2626' : '#059669',
-                  border: `1px solid ${simRunning ? '#FCA5A5' : '#6EE7B7'}`,
+                  display: 'inline-flex', alignItems: 'center', gap: '6px',
+                  fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer',
+                  padding: '4px 11px', borderRadius: '7px', fontFamily: 'inherit',
+                  background: simRunning ? 'var(--tint-red)' : 'var(--tint-slate)',
+                  color: simRunning ? 'var(--error-fg)' : 'var(--text-muted)',
+                  border: `1px dashed ${simRunning ? 'var(--error-border)' : 'var(--border)'}`,
                   transition: 'all 0.15s ease',
                 }}
               >
-                {simRunning ? '🛑 Stop Simulation' : '🚑 Simulate Route'}
+                <span style={{ fontSize: '0.6rem', letterSpacing: '0.08em', padding: '1px 5px', borderRadius: '4px', background: simRunning ? 'var(--error-fg)' : 'var(--text-muted)', color: 'white' }}>DEMO</span>
+                {simRunning ? 'Stop simulation' : 'Demo simulation'}
               </button>
               {/* Clear buttons */}
               {responderFocused && (
                 <button
                   onClick={() => setResponderFocused(false)}
-                  style={{ fontSize: '0.68rem', fontWeight: 700, color: '#059669', background: 'rgba(16,185,129,0.12)', border: '1px solid #10B981', cursor: 'pointer', padding: '3px 10px', borderRadius: '6px' }}
+                  style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--success-fg)', background: 'rgba(16,185,129,0.12)', border: '1px solid var(--success)', cursor: 'pointer', padding: '3px 10px', borderRadius: '6px' }}
                 >
                   ✕ Exit Responder View
                 </button>
@@ -896,7 +856,7 @@ const SOSMonitor = () => {
               center={mapCenter}
               zoom={activeEmergencies.length > 0 ? 12 : 6}
               style={{ height: responderFocused ? '500px' : '420px', width: '100%', transition: 'height 0.35s ease' }}
-              key={`${activeFilter}-${onlineResponders.length}`}
+              key={activeFilter}
               scrollWheelZoom={false}
             >
               <TileLayer
@@ -915,7 +875,7 @@ const SOSMonitor = () => {
                     <Circle
                       center={[e.latitude, e.longitude]}
                       radius={250}
-                      color="#EF4444" fillColor="#EF4444"
+                      color="var(--sos)" fillColor="var(--sos)"
                       fillOpacity={responderFocused ? 0.04 : 0.12}
                       opacity={responderFocused ? 0.3 : 1}
                     />
@@ -927,26 +887,26 @@ const SOSMonitor = () => {
                     >
                       <Popup>
                         <div style={{ minWidth: '200px' }}>
-                          <strong style={{ color: '#EF4444', fontSize: '13px', display: 'block', marginBottom: '6px' }}>
+                          <strong style={{ color: 'var(--sos)', fontSize: '13px', display: 'block', marginBottom: '6px' }}>
                             🆘 {e.emergencyType || 'Medical'} Emergency
                           </strong>
                           <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 600 }}>
                             {e.patient?.fullName || 'Unknown Patient'}
                           </p>
-                          <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
+                          <p style={{ margin: '0 0 4px', fontSize: '12px', color: 'var(--text-muted)' }}>
                             📞 {e.patient?.phoneNumber || 'No phone'}
                           </p>
-                          <p style={{ margin: '0 0 6px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                          <p style={{ margin: '0 0 6px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                             {e.latitude?.toFixed(5)}, {e.longitude?.toFixed(5)}
                           </p>
-                          <div style={{ background: nearbyCount(e) > 0 ? '#ECFDF5' : '#FEF2F2', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', fontWeight: 700, color: nearbyCount(e) > 0 ? '#059669' : '#DC2626' }}>
+                          <div style={{ background: nearbyCount(e) > 0 ? 'var(--tint-green)' : 'var(--tint-red)', borderRadius: '6px', padding: '4px 8px', fontSize: '12px', fontWeight: 700, color: nearbyCount(e) > 0 ? 'var(--success-fg)' : 'var(--error-fg)' }}>
                             {nearbyCount(e) > 0
                               ? `✅ ${nearbyCount(e)} responder${nearbyCount(e) !== 1 ? 's' : ''} within ${NEARBY_RADIUS_KM} km`
                               : `⚠️ No responders within ${NEARBY_RADIUS_KM} km`}
                           </div>
                           <button
                             onClick={() => { setSelectedEmergency(e); setResponderFocused(false); }}
-                            style={{ marginTop: '8px', width: '100%', padding: '5px', borderRadius: '6px', background: '#3B82F6', color: 'white', border: 'none', fontWeight: 700, fontSize: '11px', cursor: 'pointer' }}
+                            style={{ marginTop: '8px', width: '100%', padding: '5px', borderRadius: '6px', background: 'var(--primary-light)', color: 'white', border: 'none', fontWeight: 700, fontSize: '11px', cursor: 'pointer' }}
                           >
                             Show {NEARBY_RADIUS_KM} km radius
                           </button>
@@ -962,7 +922,7 @@ const SOSMonitor = () => {
                 <Circle
                   center={[selectedEmergency.latitude, selectedEmergency.longitude]}
                   radius={NEARBY_RADIUS_KM * 1000}
-                  color="#3B82F6" fillColor="#3B82F6" fillOpacity={0.06}
+                  color="var(--primary-light)" fillColor="var(--primary-light)" fillOpacity={0.06}
                   weight={2} dashArray="6 4"
                 />
               )}
@@ -977,7 +937,7 @@ const SOSMonitor = () => {
                       <Circle
                         center={[r.currentLatitude, r.currentLongitude]}
                         radius={180}
-                        color="#10B981" fillColor="#10B981" fillOpacity={0.18}
+                        color="var(--success)" fillColor="var(--success)" fillOpacity={0.18}
                         weight={2}
                       />
                     )}
@@ -987,24 +947,24 @@ const SOSMonitor = () => {
                     >
                       <Popup>
                         <div style={{ minWidth: '200px' }}>
-                          <strong style={{ color: '#059669', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
+                          <strong style={{ color: 'var(--success-fg)', fontSize: '13px', display: 'block', marginBottom: '5px' }}>
                             🟢 Available Responder
                           </strong>
                           <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: 700 }}>
                             {r.user?.fullName || 'Responder'}
                           </p>
-                          <p style={{ margin: '0 0 2px', fontSize: '12px', color: '#64748B' }}>
+                          <p style={{ margin: '0 0 2px', fontSize: '12px', color: 'var(--text-muted)' }}>
                             {r.responderType?.replace(/_/g, ' ') || 'Responder'}{r.organization ? ` · ${r.organization}` : ''}
                           </p>
                           {r.user?.phoneNumber && (
-                            <p style={{ margin: '0 0 4px', fontSize: '12px', color: '#64748B' }}>
+                            <p style={{ margin: '0 0 4px', fontSize: '12px', color: 'var(--text-muted)' }}>
                               📞 {r.user.phoneNumber}
                             </p>
                           )}
-                          <p style={{ margin: '4px 0 4px', fontSize: '11px', color: '#94A3B8', fontFamily: 'monospace' }}>
+                          <p style={{ margin: '4px 0 4px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'monospace' }}>
                             {r.currentLatitude?.toFixed(5)}, {r.currentLongitude?.toFixed(5)}
                           </p>
-                          <div style={{ background: '#ECFDF5', borderRadius: '5px', padding: '3px 7px', fontSize: '11px', fontWeight: 700, color: '#059669', display: 'inline-block' }}>
+                          <div style={{ background: 'var(--tint-green)', borderRadius: '5px', padding: '3px 7px', fontSize: '11px', fontWeight: 700, color: 'var(--success-fg)', display: 'inline-block' }}>
                             ⭐ {Number(r.rating || 5).toFixed(1)}
                           </div>
                         </div>
@@ -1021,7 +981,7 @@ const SOSMonitor = () => {
                    rotates to face the actual direction of travel, exactly like
                    how Uber / Careem / InDrive show moving vehicles.
               ──────────────────────────────────────────────────────────────────── */}
-              {Object.entries(movingVehicles).map(([rid, v]) => (
+              {displayVehicles.map(([rid, v]) => (
                 <MovingVehicleMarker key={rid} vehicle={{ ...v, responderId: rid }} />
               ))}
             </MapContainer>
@@ -1043,7 +1003,7 @@ const SOSMonitor = () => {
 
       {/* ── Loading Skeleton ── */}
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(380px, 100%), 1fr))', gap: '1.5rem' }}>
           {Array(4).fill(null).map((_, i) => (
             <div key={i} className="card" style={{
               padding: '1.5rem', border: '1px solid var(--border)',
@@ -1075,7 +1035,7 @@ const SOSMonitor = () => {
       /* ── Emergency Cards Grid ── */
       ) : (
         <AnimatePresence>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(380px, 1fr))', gap: '1.5rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(380px, 100%), 1fr))', gap: '1.5rem' }}>
             {filtered.map((e, idx) => {
               const s = STATUS_STYLE[e.status] || STATUS_STYLE.ACTIVE;
               return (
@@ -1087,10 +1047,10 @@ const SOSMonitor = () => {
                   className="card"
                   style={{
                     padding: '1.625rem',
-                    border: selectedEmergency?.id === e.id ? '1.5px solid #3B82F6' : '1px solid var(--border)',
-                    borderLeft: `4px solid ${selectedEmergency?.id === e.id ? '#3B82F6' : s.color}`,
+                    border: selectedEmergency?.id === e.id ? '1.5px solid var(--primary-light)' : '1px solid var(--border)',
+                    borderLeft: `4px solid ${selectedEmergency?.id === e.id ? 'var(--primary-light)' : s.color}`,
                     borderRadius: 'var(--radius-md)',
-                    background: selectedEmergency?.id === e.id ? 'rgba(59,130,246,0.04)' : 'var(--surface)',
+                    background: selectedEmergency?.id === e.id ? 'rgba(40,145,194,0.06)' : 'var(--surface)',
                     transition: 'box-shadow 0.2s ease, border-color 0.2s ease',
                     cursor: e.latitude && e.longitude ? 'pointer' : 'default',
                   }}
@@ -1163,11 +1123,11 @@ const SOSMonitor = () => {
                     <div style={{
                       display: 'flex', alignItems: 'center', gap: '0.5rem',
                       padding: '0.55rem 0.875rem', borderRadius: '10px', marginBottom: '0.875rem',
-                      background: nearbyCount(e) > 0 ? '#ECFDF5' : '#FEF9EC',
-                      border: `1px solid ${nearbyCount(e) > 0 ? '#A7F3D0' : '#FDE68A'}`,
+                      background: nearbyCount(e) > 0 ? 'var(--tint-green)' : 'var(--tint-amber)',
+                      border: `1px solid ${nearbyCount(e) > 0 ? 'var(--success-border)' : 'var(--warning-border)'}`,
                     }}>
-                      <Navigation size={13} color={nearbyCount(e) > 0 ? '#059669' : '#D97706'} />
-                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: nearbyCount(e) > 0 ? '#059669' : '#D97706' }}>
+                      <Navigation size={13} color={nearbyCount(e) > 0 ? 'var(--success-fg)' : 'var(--warning-fg)'} />
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: nearbyCount(e) > 0 ? 'var(--success-fg)' : 'var(--warning-fg)' }}>
                         {nearbyCount(e) > 0
                           ? `${nearbyCount(e)} responder${nearbyCount(e) !== 1 ? 's' : ''} within ${NEARBY_RADIUS_KM} km`
                           : `No responders within ${NEARBY_RADIUS_KM} km`}

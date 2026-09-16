@@ -1,12 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Bell, Send, Users, User, Shield, Clock, AlertTriangle,
-  CheckCircle, Search, Trash2,
-  Eye, Smartphone, Mail, Zap, RotateCcw, X, ChevronLeft, ChevronRight
+  Bell, Send, Shield, Clock, AlertTriangle,
+  CheckCircle, Search,
+  Eye, Smartphone, Mail, Zap, RotateCcw, X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAlert } from '../../context/AlertContext';
+import { useAlert } from '../../context/hooks';
 import api from '../../services/api';
+import { errorMessage } from '../../services/adminApi';
+import { PageHeader, Pagination, EmptyState, TableSkeletonRows } from '../../components/ui';
+import { paginate } from '../../components/uiStyles';
 
 // Uses CSS vars so badges adapt automatically in dark mode
 const PRIORITY_COLORS = {
@@ -28,8 +31,11 @@ const inputStyle = {
   transition: 'border-color 0.2s, box-shadow 0.2s',
 };
 
+const RECIPIENT_LABELS = { ALL: 'all users', PATIENTS: 'all patients', RESPONDERS: 'all responders', CAREGIVERS: 'all caregivers' };
+const CHANNEL_LABELS = { IN_APP: 'in-app', PUSH: 'push', EMAIL: 'email' };
+
 const SystemNotifications = () => {
-  const { showAlert } = useAlert();
+  const { showAlert, showConfirm } = useAlert();
   const [sending, setSending] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
@@ -45,11 +51,12 @@ const SystemNotifications = () => {
   });
 
   const [history, setHistory] = useState([]);
+  const [historyLoading, setHistoryLoading] = useState(true);
   const [historySearch, setHistorySearch] = useState('');
   const [selectedHistoryDetail, setSelectedHistoryDetail] = useState(null);
 
   // Pagination state (Broadcast History)
-  const [currentPage, setCurrentPage] = useState(1);
+  const [page, setPage] = useState(1);
   const itemsPerPage = 10;
 
   const handleChannelToggle = (channel) => {
@@ -96,14 +103,34 @@ const SystemNotifications = () => {
         setActiveTab('HISTORY');
         fetchHistory();
       }
-    } catch {
-      showAlert('Failed to send notification', 'error');
+    } catch (err) {
+      showAlert(errorMessage(err, 'Failed to send notification'), 'error');
     } finally {
       setSending(false);
     }
   };
 
-  const fetchHistory = async () => {
+  const confirmAndSend = (e) => {
+    e.preventDefault();
+    if (!formData.title || !formData.body) { showAlert('Title and body are required', 'error'); return; }
+    if (formData.channels.length === 0) { showAlert('Select at least one notification channel', 'error'); return; }
+    if (formData.recipientType === 'INDIVIDUAL' && !formData.targetId.trim()) {
+      showAlert('Please enter the target email address for individual notification', 'error');
+      return;
+    }
+    const audience = formData.recipientType === 'INDIVIDUAL'
+      ? formData.targetId.trim()
+      : RECIPIENT_LABELS[formData.recipientType] || formData.recipientType;
+    showConfirm({
+      title: 'Send this broadcast?',
+      message: `"${formData.title}" will be sent to ${audience} via ${formData.channels.map(c => CHANNEL_LABELS[c] || c).join(', ')}. Sent notifications cannot be recalled.`,
+      type: formData.priority === 'CRITICAL' ? 'warning' : 'info',
+      confirmLabel: 'Send now',
+      onConfirm: () => handleSend(e),
+    });
+  };
+
+  const fetchHistory = useCallback(async () => {
     try {
       const res = await api.get('/api/notifications/admin-history?limit=100');
       if (res.data.success) {
@@ -122,22 +149,24 @@ const SystemNotifications = () => {
       }
     } catch (err) {
       console.error('Failed to fetch admin broadcast history:', err);
+    } finally {
+      setHistoryLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => { fetchHistory(); }, [fetchHistory]);
 
+  const hq = historySearch.trim().toLowerCase();
   const filteredHistory = history.filter(item =>
-    !historySearch ||
-    item.title.toLowerCase().includes(historySearch.toLowerCase()) ||
-    item.recipient.toLowerCase().includes(historySearch.toLowerCase()) ||
-    item.body.toLowerCase().includes(historySearch.toLowerCase())
+    !hq ||
+    String(item.title || '').toLowerCase().includes(hq) ||
+    String(item.recipient || '').toLowerCase().includes(hq) ||
+    String(item.body || '').toLowerCase().includes(hq)
   );
 
-  // Reset pagination to page 1 on search or tab changes
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [historySearch, activeTab]);
+  const { page: currentPage, rows: historyRows } = paginate(filteredHistory, page, itemsPerPage);
+  const setCurrentPage = setPage;
+  const lastBroadcast = history[0]?.timestamp;
 
   return (
     <motion.div
@@ -146,18 +175,11 @@ const SystemNotifications = () => {
       transition={{ duration: 0.4 }}
     >
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '2rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--text-sub)', letterSpacing: '-0.03em', marginBottom: '0.375rem' }}>
-            System Notifications
-          </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            Broadcast alerts and manage communications across the network.
-          </p>
-        </div>
-
-        {/* Tab Switcher */}
-        <div style={{
+      <PageHeader
+        title="System Notifications"
+        subtitle="Broadcast alerts to users and review what has been sent."
+        actions={(
+        <div role="tablist" aria-label="Notification views" style={{
           display: 'flex', gap: '0.375rem',
           background: 'var(--surface-raised)',
           border: '1px solid var(--border)',
@@ -165,11 +187,14 @@ const SystemNotifications = () => {
         }}>
           {[
             { id: 'COMPOSE', label: 'Compose', Icon: Send },
-            { id: 'HISTORY', label: 'History', Icon: Clock },
+            { id: 'HISTORY', label: `History${history.length ? ` (${history.length})` : ''}`, Icon: Clock },
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              onClick={() => { setActiveTab(tab.id); setPage(1); }}
               style={{
                 display: 'flex', alignItems: 'center', gap: '0.5rem',
                 padding: '0.55rem 1.125rem', borderRadius: '8px', border: 'none',
@@ -185,9 +210,10 @@ const SystemNotifications = () => {
             </button>
           ))}
         </div>
-      </div>
+        )}
+      />
 
-      <div style={{ display: 'grid', gridTemplateColumns: activeTab === 'COMPOSE' ? '1.2fr 0.8fr' : '1fr', gap: '1.75rem' }}>
+      <div className={activeTab === 'COMPOSE' ? 'mf-grid-main-side mf-compose-grid' : undefined} style={{ gap: '1.5rem' }}>
 
         {/* ── Main Area ── */}
         <AnimatePresence mode="wait">
@@ -251,7 +277,7 @@ const SystemNotifications = () => {
                 </p>
               </div>
 
-              <form onSubmit={handleSend}>
+              <form onSubmit={confirmAndSend}>
                 {/* Recipient + Priority */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                   <div>
@@ -338,7 +364,7 @@ const SystemNotifications = () => {
                   <div style={{ display: 'flex', gap: '0.875rem' }}>
                     {[
                       { id: 'IN_APP', label: 'In-App', Icon: Bell, color: 'var(--primary)' },
-                      { id: 'PUSH', label: 'Push', Icon: Smartphone, color: '#8b5cf6' },
+                      { id: 'PUSH', label: 'Push', Icon: Smartphone, color: 'var(--primary-mid)' },
                       { id: 'EMAIL', label: 'Email Copy', Icon: Mail, color: 'var(--s-pending)' },
                     ].map(ch => {
                       const active = formData.channels.includes(ch.id);
@@ -409,7 +435,7 @@ const SystemNotifications = () => {
                     type="text"
                     placeholder="Search logs..."
                     value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
+                    onChange={(e) => { setHistorySearch(e.target.value); setPage(1); }}
                     style={{ ...inputStyle, width: '200px', padding: '0.45rem 1rem 0.45rem 2.125rem', fontSize: '0.8rem', borderRadius: '8px' }}
                   />
                 </div>
@@ -427,19 +453,23 @@ const SystemNotifications = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredHistory.length === 0 ? (
+                    {historyLoading ? (
+                      <TableSkeletonRows rows={4} cols={6} />
+                    ) : filteredHistory.length === 0 ? (
                       <tr>
-                        <td colSpan={6} style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                          <Bell size={40} style={{ opacity: 0.15, display: 'block', margin: '0 auto 1rem' }} />
-                          <p style={{ fontWeight: 600 }}>{historySearch ? 'No results found' : 'No broadcasts yet'}</p>
+                        <td colSpan={6}>
+                          <EmptyState
+                            icon={Bell}
+                            title={historySearch ? 'No broadcasts match your search' : 'No broadcasts yet'}
+                            message={historySearch ? undefined : 'Messages you send from the Compose tab will appear here.'}
+                          />
                         </td>
                       </tr>
-                    ) : filteredHistory.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item) => (
+                    ) : historyRows.map((item) => (
                       <tr
                         key={item.id}
-                        style={{ borderBottom: '1px solid var(--border)', transition: 'background 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'var(--surface-raised)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                        className="mf-table-row"
+                        style={{ borderBottom: '1px solid var(--border)' }}
                       >
                         <td style={{ padding: '1.125rem 1.5rem' }}>
                           <p style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-sub)', margin: 0, marginBottom: '0.2rem' }}>{item.title}</p>
@@ -478,16 +508,13 @@ const SystemNotifications = () => {
                         <td style={{ padding: '1.125rem 1.5rem' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
                             <button
+                              type="button"
                               onClick={() => setSelectedHistoryDetail(item)}
-                              style={{ padding: '0.35rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--text-muted)', cursor: 'pointer' }}
+                              aria-label={`View broadcast "${item.title}"`}
+                              title="View details"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '0.4rem 0.7rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--surface-raised)', color: 'var(--text-sub)', cursor: 'pointer', fontSize: '0.76rem', fontWeight: 700, fontFamily: 'inherit' }}
                             >
-                              <Eye size={13} />
-                            </button>
-                            <button
-                              onClick={() => setHistory(h => h.filter(i => i.id !== item.id))}
-                              style={{ padding: '0.35rem', borderRadius: '6px', border: '1px solid var(--error-border)', background: 'var(--error-bg)', color: 'var(--error-fg)', cursor: 'pointer' }}
-                            >
-                              <Trash2 size={13} />
+                              <Eye size={13} /> View
                             </button>
                           </div>
                         </td>
@@ -497,82 +524,7 @@ const SystemNotifications = () => {
                 </table>
               </div>
 
-              {/* Footer & Pagination */}
-              <div style={{ padding: '1.25rem 2rem', background: 'var(--surface-raised)', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                <span style={{ fontSize: '0.875rem', color: 'var(--text-muted)', fontWeight: 500 }}>
-                  {filteredHistory.length === 0 
-                    ? 'Showing 0 of 0 entries'
-                    : `Showing ${((currentPage - 1) * itemsPerPage) + 1}–${Math.min(currentPage * itemsPerPage, filteredHistory.length)} of ${filteredHistory.length} entries`
-                  }
-                </span>
-
-                {Math.ceil(filteredHistory.length / itemsPerPage) > 1 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    {/* Previous Button */}
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
-                      disabled={currentPage === 1}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: '32px', height: '32px', borderRadius: '8px',
-                        border: '1px solid var(--border)', background: 'var(--surface)',
-                        color: currentPage === 1 ? 'var(--text-muted)' : 'var(--text-sub)',
-                        cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
-                        opacity: currentPage === 1 ? 0.5 : 1,
-                        transition: 'all 0.2s ease',
-                      }}
-                      onMouseEnter={e => { if (currentPage !== 1) e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-                    >
-                      <ChevronLeft size={16} />
-                    </button>
-
-                    {/* Page Numbers */}
-                    {Array.from({ length: Math.ceil(filteredHistory.length / itemsPerPage) }, (_, i) => i + 1).map(page => {
-                      const isCurrent = page === currentPage;
-                      return (
-                        <button
-                          key={page}
-                          onClick={() => setCurrentPage(page)}
-                          style={{
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            minWidth: '32px', height: '32px', padding: '0 6px', borderRadius: '8px',
-                            border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border)',
-                            background: isCurrent ? 'var(--primary)' : 'var(--surface)',
-                            color: isCurrent ? 'white' : 'var(--text-sub)',
-                            fontWeight: isCurrent ? 700 : 600,
-                            fontSize: '0.82rem', cursor: 'pointer',
-                            transition: 'all 0.2s ease',
-                          }}
-                          onMouseEnter={e => { if (!isCurrent) e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                          onMouseLeave={e => { if (!isCurrent) e.currentTarget.style.borderColor = 'var(--border)'; }}
-                        >
-                          {page}
-                        </button>
-                      );
-                    })}
-
-                    {/* Next Button */}
-                    <button
-                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredHistory.length / itemsPerPage)))}
-                      disabled={currentPage === Math.ceil(filteredHistory.length / itemsPerPage)}
-                      style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        width: '32px', height: '32px', borderRadius: '8px',
-                        border: '1px solid var(--border)', background: 'var(--surface)',
-                        color: currentPage === Math.ceil(filteredHistory.length / itemsPerPage) ? 'var(--text-muted)' : 'var(--text-sub)',
-                        cursor: currentPage === Math.ceil(filteredHistory.length / itemsPerPage) ? 'not-allowed' : 'pointer',
-                        opacity: currentPage === Math.ceil(filteredHistory.length / itemsPerPage) ? 0.5 : 1,
-                        transition: 'all 0.2s ease',
-                      }}
-                      onMouseEnter={e => { if (currentPage !== Math.ceil(filteredHistory.length / itemsPerPage)) e.currentTarget.style.borderColor = 'var(--primary)'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; }}
-                    >
-                      <ChevronRight size={16} />
-                    </button>
-                  </div>
-                )}
-              </div>
+              <Pagination page={currentPage} pageSize={itemsPerPage} total={filteredHistory.length} onChange={setCurrentPage} loading={historyLoading} />
             </motion.div>
           )}
 
@@ -586,7 +538,7 @@ const SystemNotifications = () => {
             <div className="card" style={{
               padding: '1.75rem',
               border: '1px solid var(--border)',
-              background: 'linear-gradient(135deg, #0C637E, #2496A7)',
+              background: 'linear-gradient(135deg, var(--primary), var(--primary-mid))',
               color: 'white',
             }}>
               <h3 style={{ fontSize: '0.975rem', fontWeight: 700, marginBottom: '0.875rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -596,7 +548,10 @@ const SystemNotifications = () => {
                 All notifications are logged for HIPAA compliance auditing. Ensure messages containing PHI are sent via secure channels only.
               </p>
               <div style={{ display: 'flex', gap: '0.75rem' }}>
-                {[{ label: 'Total Reach', val: '12.4K' }, { label: 'Delivery', val: '99.9%' }].map(s => (
+                {[
+                  { label: 'Broadcasts sent', val: historyLoading ? '—' : history.length },
+                  { label: 'Last broadcast', val: historyLoading ? '—' : (lastBroadcast ? new Date(lastBroadcast).toLocaleDateString('en-PK', { day: '2-digit', month: 'short' }) : 'Never') },
+                ].map(s => (
                   <div key={s.label} style={{ flex: 1, padding: '0.75rem', background: 'rgba(255,255,255,0.12)', borderRadius: '10px', textAlign: 'center' }}>
                     <p style={{ fontSize: '0.62rem', fontWeight: 800, textTransform: 'uppercase', opacity: 0.72, marginBottom: '2px' }}>{s.label}</p>
                     <p style={{ fontSize: '1.25rem', fontWeight: 800 }}>{s.val}</p>

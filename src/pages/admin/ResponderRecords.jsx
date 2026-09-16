@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { FileText, Search, Download, Eye, RefreshCw, CheckCircle, Award, Calendar, Phone, Mail, Printer } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Search, Eye, CheckCircle, XCircle, Award } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
+import { errorMessage } from '../../services/adminApi';
 import { resolveFileUrl } from '../../utils/resolveFileUrl';
+import { PageHeader, RefreshButton, Pagination, EmptyState, TableSkeletonRows, SearchInput, ErrorBanner } from '../../components/ui';
+import { thStyle, paginate, lightTokenCss } from '../../components/uiStyles';
 
-/* ─── Theme ────────────────────────────────────────────────────────────── */
+/* ─── Theme (CSS tokens) ───────────────────────────────────────────────── */
 const C = {
-  accent:   '#2891C2',
-  border:   '#E4EEF3',
-  bg:       '#F3F7FA',
-  white:    '#FFFFFF',
-  textMain: '#0F1A22',
-  textSub:  '#3D5360',
-  textMuted:'#7A96A3',
+  accent:   'var(--admin-accent)',
+  border:   'var(--admin-border)',
+  white:    'var(--surface)',
+  textMain: 'var(--admin-text-main)',
+  textSub:  'var(--admin-text-sub)',
+  textMuted:'var(--admin-text-muted)',
 };
 
 const RESPONDER_TYPE_LABELS = {
@@ -74,10 +76,11 @@ const ApplicationModal = ({ responder, onClose }) => {
             }
             .header-banner { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             input, textarea {
-              border: none; border-bottom: 1.5px solid #9CA3AF;
+              border: none; border-bottom: 1.5px solid var(--text-muted);
               width: 100%; padding: 4px 0; font-size: 0.875rem;
               font-family: Arial, sans-serif; background: transparent; outline: none;
             }
+            ${lightTokenCss()}
           </style>
         </head>
         <body>${clone.innerHTML}</body>
@@ -113,7 +116,7 @@ const ApplicationModal = ({ responder, onClose }) => {
           style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem',
             padding: '0.6rem 1.25rem', borderRadius: '10px',
-            background: '#0C637E', color: 'white', border: 'none',
+            background: 'var(--primary)', color: 'white', border: 'none',
             fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
@@ -124,7 +127,7 @@ const ApplicationModal = ({ responder, onClose }) => {
           style={{
             display: 'flex', alignItems: 'center', gap: '0.5rem',
             padding: '0.6rem 1.25rem', borderRadius: '10px',
-            background: 'white', color: '#374151', border: '1px solid #d1d5db',
+            background: 'white', color: 'var(--text-sub)', border: '1px solid var(--border)',
             fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit',
           }}
         >
@@ -135,6 +138,7 @@ const ApplicationModal = ({ responder, onClose }) => {
       {/* Printable Form */}
       <div
         id="application-print-area"
+        data-theme="light"
         style={{
           width: '100%', maxWidth: '820px',
           background: 'white', borderRadius: '16px',
@@ -144,7 +148,7 @@ const ApplicationModal = ({ responder, onClose }) => {
       >
         {/* Header */}
         <div style={{
-          background: 'linear-gradient(135deg, #03293C 0%, #0C637E 100%)',
+          background: 'linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%)',
           padding: '2rem 2.5rem', color: 'white',
         }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -173,7 +177,7 @@ const ApplicationModal = ({ responder, onClose }) => {
         <div style={{ padding: '2rem 2.5rem' }}>
           {/* Personal Info */}
           <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0C637E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
               1. Personal Information
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -186,10 +190,10 @@ const ApplicationModal = ({ responder, onClose }) => {
                 { label: 'DOB', value: responder.user?.dateOfBirth ? new Date(responder.user.dateOfBirth).toLocaleDateString('en-PK') : '—' },
               ].map((item) => (
                 <div key={item.label}>
-                  <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600, marginBottom: '0.3rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.3rem' }}>
                     {item.label}
                   </div>
-                  <div style={{ fontSize: '0.95rem', color: '#111827', fontWeight: 500 }}>
+                  <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500 }}>
                     {item.value}
                   </div>
                 </div>
@@ -199,7 +203,7 @@ const ApplicationModal = ({ responder, onClose }) => {
 
           {/* Professional Credentials */}
           <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0C637E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
               2. Professional Credentials
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -210,10 +214,10 @@ const ApplicationModal = ({ responder, onClose }) => {
                 { label: 'Vehicle Type', value: responder.vehicleType || 'Not specified' },
               ].map((item) => (
                 <div key={item.label}>
-                  <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600, marginBottom: '0.3rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.3rem' }}>
                     {item.label}
                   </div>
-                  <div style={{ fontSize: '0.95rem', color: '#111827', fontWeight: 500 }}>
+                  <div style={{ fontSize: '0.95rem', color: 'var(--text-main)', fontWeight: 500 }}>
                     {item.value}
                   </div>
                 </div>
@@ -221,13 +225,13 @@ const ApplicationModal = ({ responder, onClose }) => {
             </div>
             {Array.isArray(responder.specialization) && responder.specialization.length > 0 && (
               <div style={{ marginTop: '1rem' }}>
-                <div style={{ fontSize: '0.75rem', color: '#6B7280', fontWeight: 600, marginBottom: '0.5rem' }}>
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600, marginBottom: '0.5rem' }}>
                   Specializations
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
                   {responder.specialization.map((spec) => (
                     <span key={spec} style={{
-                      background: '#EEF5F8', color: '#0C637E',
+                      background: 'var(--primary-pale)', color: 'var(--primary)',
                       padding: '0.25rem 0.75rem', borderRadius: '999px',
                       fontSize: '0.8rem', fontWeight: 600,
                     }}>
@@ -241,24 +245,24 @@ const ApplicationModal = ({ responder, onClose }) => {
 
           {/* Documents */}
           <div style={{ marginBottom: '2rem' }}>
-            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: '#0C637E', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
+            <h3 style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '1rem' }}>
               3. Documents Submitted
             </h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '1rem' }}>
               {docs.map(({ label, url }) => (
                 <div key={label} style={{
-                  border: '1.5px solid #D8ECF2', borderRadius: '10px',
-                  overflow: 'hidden', background: '#F7FAFB',
+                  border: '1.5px solid var(--border)', borderRadius: '10px',
+                  overflow: 'hidden', background: 'var(--surface-alt)',
                 }}>
-                  <div style={{ padding: '0.5rem 0.75rem', background: '#EEF5F8', fontSize: '0.8rem', fontWeight: 700 }}>
+                  <div style={{ padding: '0.5rem 0.75rem', background: 'var(--primary-pale)', fontSize: '0.8rem', fontWeight: 700 }}>
                     {label}
                   </div>
                   {url ? (
-                    <div style={{ height: '120px', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9CA3AF' }}>
+                    <div style={{ height: '120px', background: 'var(--surface-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
                       📎 Document Uploaded
                     </div>
                   ) : (
-                    <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#D1D5DB' }}>
+                    <div style={{ height: '120px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--border)' }}>
                       Not provided
                     </div>
                   )}
@@ -269,16 +273,16 @@ const ApplicationModal = ({ responder, onClose }) => {
 
           {/* Verification Status */}
           <div style={{
-            background: '#D1FAE5', border: '1px solid #6EE7B7',
+            background: 'var(--tint-green)', border: '1px solid var(--success-border)',
             borderRadius: '10px', padding: '1.25rem', marginTop: '2rem',
           }}>
             <div style={{ display: 'flex', gap: '1rem' }}>
               <div style={{ fontSize: '1.5rem' }}>✅</div>
               <div>
-                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: '#065F46' }}>
+                <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--success-fg)' }}>
                   Verified & Approved
                 </h4>
-                <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: '#047857', lineHeight: 1.6 }}>
+                <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: 'var(--success-fg)', lineHeight: 1.6 }}>
                   This responder has passed verification and is registered in the MediFind Emergency Response Network.
                 </p>
               </div>
@@ -291,195 +295,192 @@ const ApplicationModal = ({ responder, onClose }) => {
 };
 
 /* ─── Main Component ───────────────────────────────────────────────────── */
+const PAGE_SIZE = 10;
+
+// Backend does not store a verification timestamp yet; prefer it when present.
+const verifiedDate = (r) => r.verifiedAt || null;
+
 export default function ResponderRecords() {
   const [responders, setResponders] = useState([]);
+  const [activeById, setActiveById] = useState({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [selectedResponder, setSelectedResponder] = useState(null);
-  const [showModal, setShowModal] = useState(false);
 
-  const fetchApprovedResponders = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await api.get('/api/admin/responders/verified');
-      setResponders(response.data.data || []);
-    } catch (error) {
-      console.error('Failed to fetch verified responders:', error);
-      setResponders([]);
-    } finally {
+  const loadRecords = useCallback(() => (
+    Promise.allSettled([
+      api.get('/api/admin/responders/verified'),
+      // /responders/verified does not include the account's isActive flag — join it from the users list
+      api.get('/api/admin/users?role=RESPONDER'),
+    ]).then(([verifiedR, usersR]) => {
+      if (verifiedR.status === 'fulfilled') {
+        setResponders(verifiedR.value.data?.data || []);
+        setError('');
+      } else {
+        setResponders([]);
+        setError(errorMessage(verifiedR.reason, 'Failed to load responder records.'));
+      }
+      if (usersR.status === 'fulfilled' && Array.isArray(usersR.value.data?.data)) {
+        setActiveById(Object.fromEntries(usersR.value.data.data.map(u => [u.id, u.isActive !== false])));
+      }
       setLoading(false);
-    }
-  }, []);
+    })
+  ), []);
 
-  useEffect(() => {
-    fetchApprovedResponders();
-  }, [fetchApprovedResponders]);
+  useEffect(() => { loadRecords(); }, [loadRecords]);
 
-  const filteredResponders = responders.filter((r) => {
-    const q = search.toLowerCase();
-    return (
-      (r.user?.fullName || '').toLowerCase().includes(q) ||
-      (r.user?.email || '').toLowerCase().includes(q) ||
-      (r.licenseNumber || '').toLowerCase().includes(q) ||
-      (r.organization || '').toLowerCase().includes(q)
-    );
-  });
+  const refresh = () => { setLoading(true); loadRecords(); };
 
-  const handleViewApplication = (responder) => {
-    setSelectedResponder(responder);
-    setShowModal(true);
-  };
+  const q = search.trim().toLowerCase();
+  const filteredResponders = responders.filter((r) => (
+    !q ||
+    (r.user?.fullName || '').toLowerCase().includes(q) ||
+    (r.user?.email || '').toLowerCase().includes(q) ||
+    (r.licenseNumber || '').toLowerCase().includes(q) ||
+    (r.organization || '').toLowerCase().includes(q)
+  ));
+  const { page: currentPage, rows } = paginate(filteredResponders, page, PAGE_SIZE);
+
+  const hasActiveData = Object.keys(activeById).length > 0;
+  const activeCount = responders.filter(r => activeById[r.userId ?? r.user?.id] !== false).length;
+  const hasVerifiedDates = responders.some(verifiedDate);
+  const now = new Date();
+  const thisMonthCount = responders.filter(r => {
+    const d = new Date(verifiedDate(r) || r.createdAt || r.user?.createdAt);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  }).length;
+
+  const stats = [
+    { label: 'Total Approved', value: responders.length, color: 'var(--primary-light)', hint: 'Responders with verified credentials' },
+    { label: 'Active Accounts', value: hasActiveData ? activeCount : '—', color: 'var(--success)', hint: hasActiveData ? `${responders.length - activeCount} deactivated` : 'Account status unavailable' },
+    { label: hasVerifiedDates ? 'Verified This Month' : 'Applied This Month', value: thisMonthCount, color: 'var(--warning)', hint: hasVerifiedDates ? 'By verification date' : 'By application date' },
+  ];
+
+  const COLS = 6;
 
   return (
     <>
-      {/* Header */}
-      <div style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ margin: '0 0 0.5rem', fontSize: '1.5rem', fontWeight: 800, color: C.textMain }}>
-          Responder Records
-        </h2>
-        <p style={{ margin: 0, fontSize: '0.95rem', color: C.textMuted }}>
-          Complete verified responder records and credentials
-        </p>
-      </div>
+      <PageHeader
+        title="Responder Records"
+        subtitle="Verified responder profiles and printable application records."
+        actions={<RefreshButton onClick={refresh} loading={loading} />}
+      />
 
-      {/* Search + Refresh */}
-      <div style={{
-        display: 'flex', gap: '0.75rem', marginBottom: '1.5rem',
-        background: C.white, padding: '1rem', borderRadius: '10px',
-        border: `1px solid ${C.border}`,
-      }}>
-        <Search size={18} style={{ color: C.textMuted, flexShrink: 0, marginTop: '0.25rem' }} />
-        <input
-          type="text"
-          placeholder="Search by name, email, license, or organization..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          style={{
-            flex: 1, border: 'none', outline: 'none', fontSize: '0.9rem',
-            fontFamily: 'inherit', background: 'transparent', color: C.textMain,
-          }}
-        />
-        <button
-          onClick={() => fetchApprovedResponders()}
-          title="Refresh"
-          style={{
-            background: 'transparent', border: 'none', cursor: 'pointer',
-            color: C.accent, padding: '0.5rem', flexShrink: 0,
-          }}
-        >
-          <RefreshCw size={18} />
-        </button>
-      </div>
+      <ErrorBanner onRetry={refresh}>{error}</ErrorBanner>
 
       {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem', marginBottom: '1.5rem' }}>
-        {[
-          { label: 'Total Approved', value: responders.length, color: C.accent },
-          { label: 'Active', value: responders.filter(r => r.isVerified).length, color: '#10B981' },
-          { label: 'This Month', value: responders.filter(r => {
-            const d = new Date(r.user?.createdAt);
-            const n = new Date();
-            return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
-          }).length, color: '#F59E0B' },
-        ].map((s) => (
-          <div key={s.label} style={{
-            background: C.white, padding: '1.25rem', borderRadius: '10px',
-            border: `1px solid ${C.border}`,
-          }}>
-            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.25rem' }}>
+        {stats.map((s) => (
+          <div key={s.label} style={{ background: C.white, padding: '1.1rem 1.25rem', borderRadius: '14px', border: `1px solid ${C.border}` }}>
+            <div style={{ fontSize: '0.74rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
               {s.label}
             </div>
-            <div style={{ fontSize: '1.875rem', fontWeight: 800, color: s.color }}>
-              {s.value}
+            <div style={{ fontSize: '1.75rem', fontWeight: 800, color: s.color, lineHeight: 1.1 }}>
+              {loading ? '—' : s.value}
             </div>
+            <div style={{ fontSize: '0.74rem', color: C.textMuted, marginTop: '0.3rem' }}>{s.hint}</div>
           </div>
         ))}
       </div>
 
       {/* Table */}
-      <div style={{ background: C.white, borderRadius: '10px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
-        {loading ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: C.textMuted }}>
-            Loading responder records...
-          </div>
-        ) : filteredResponders.length === 0 ? (
-          <div style={{ padding: '2rem', textAlign: 'center', color: C.textMuted }}>
-            {search ? 'No responders match your search' : 'No approved responders yet'}
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ borderBottom: `1px solid ${C.border}`, background: C.bg }}>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Name & Email</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Type</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Organization</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>License</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Verified</th>
-                  <th style={{ padding: '1rem', textAlign: 'left', fontSize: '0.75rem', fontWeight: 700, color: C.textMuted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Action</th>
+      <div style={{ background: C.white, borderRadius: '16px', border: `1px solid ${C.border}`, overflow: 'hidden' }}>
+        <div style={{ padding: '14px 20px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <SearchInput
+            icon={Search}
+            width={360}
+            value={search}
+            onChange={(v) => { setSearch(v); setPage(1); }}
+            placeholder="Search by name, email, license or organization…"
+          />
+        </div>
+        <div className="mf-table-scroll">
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '820px' }}>
+            <thead>
+              <tr>
+                {['Name & Email', 'Type', 'Organization', 'License', 'Account', 'Applied', ''].slice(0, COLS + 1).map((h, i) => (
+                  <th key={h || i} scope="col" style={{ ...thStyle, textAlign: i === COLS ? 'right' : 'left' }}>{h || <span className="sr-only">Actions</span>}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <TableSkeletonRows rows={5} cols={COLS + 1} />
+              ) : filteredResponders.length === 0 ? (
+                <tr>
+                  <td colSpan={COLS + 1}>
+                    <EmptyState
+                      icon={Award}
+                      title={search ? 'No responders match your search' : 'No approved responders yet'}
+                      message={search ? 'Try a different name, license or organization.' : 'Approved responders from the Verification Queue will appear here.'}
+                    />
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {filteredResponders.map((r) => (
-                  <tr
-                    key={r.id}
-                    style={{
-                      borderBottom: `1px solid ${C.border}`,
-                      transition: 'background 0.15s',
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = C.bg}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                  >
-                    <td style={{ padding: '1rem' }}>
+              ) : rows.map((r) => {
+                const isActive = activeById[r.userId ?? r.user?.id];
+                return (
+                  <tr key={r.id} className="mf-table-row" style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: '12px 20px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                        <div style={{ width: '32px', height: '32px', borderRadius: '6px', background: C.accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.75rem', fontWeight: 700, flexShrink: 0 }}>
+                        <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: 'linear-gradient(135deg,var(--primary),var(--primary-mid))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '0.8rem', fontWeight: 700, flexShrink: 0 }}>
                           {r.user?.fullName?.charAt(0).toUpperCase() || '?'}
                         </div>
-                        <div>
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600, color: C.textMain }}>{r.user?.fullName || '—'}</div>
-                          <div style={{ fontSize: '0.8rem', color: C.textMuted, marginTop: '0.2rem' }}>{r.user?.email || '—'}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: C.textMain }}>{r.user?.fullName || '—'}</div>
+                          <div style={{ fontSize: '0.78rem', color: C.textMuted, marginTop: '0.1rem' }}>{r.user?.email || '—'}</div>
                         </div>
                       </div>
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: C.textMain }}>
-                      <span style={{ background: '#EEF5F8', color: '#0C637E', padding: '0.3rem 0.6rem', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 600 }}>
+                    <td style={{ padding: '12px 20px' }}>
+                      <span style={{ background: 'var(--tint-teal)', color: C.accent, padding: '0.25rem 0.6rem', borderRadius: '6px', fontSize: '0.76rem', fontWeight: 700, whiteSpace: 'nowrap' }}>
                         {RESPONDER_TYPE_LABELS[r.responderType]?.split('(')[0].trim() || '—'}
                       </span>
                     </td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: C.textSub }}>{r.organization || 'Independent'}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.85rem', color: C.textSub, fontFamily: 'monospace' }}>{r.licenseNumber || '—'}</td>
-                    <td style={{ padding: '1rem', fontSize: '0.9rem', color: C.textSub }}>{formatDate(r.user?.createdAt)}</td>
-                    <td style={{ padding: '1rem' }}>
+                    <td style={{ padding: '12px 20px', fontSize: '0.86rem', color: C.textSub }}>{r.organization || 'Independent'}</td>
+                    <td style={{ padding: '12px 20px', fontSize: '0.82rem', color: C.textSub, fontFamily: 'monospace' }}>{r.licenseNumber || '—'}</td>
+                    <td style={{ padding: '12px 20px' }}>
+                      {isActive === undefined ? (
+                        <span style={{ fontSize: '0.8rem', color: C.textMuted }}>—</span>
+                      ) : (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.74rem', fontWeight: 700, padding: '3px 9px', borderRadius: '6px', background: isActive ? 'var(--tint-green)' : 'var(--tint-red)', color: isActive ? 'var(--success-fg)' : 'var(--error-fg)' }}>
+                          {isActive ? <CheckCircle size={11} /> : <XCircle size={11} />} {isActive ? 'Active' : 'Deactivated'}
+                        </span>
+                      )}
+                    </td>
+                    <td style={{ padding: '12px 20px', fontSize: '0.84rem', color: C.textSub, whiteSpace: 'nowrap' }}>{formatDate(r.createdAt || r.user?.createdAt)}</td>
+                    <td style={{ padding: '12px 20px', textAlign: 'right' }}>
                       <button
-                        onClick={() => handleViewApplication(r)}
+                        type="button"
+                        onClick={() => setSelectedResponder(r)}
+                        aria-label={`View application record for ${r.user?.fullName || 'responder'}`}
                         style={{
                           display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
-                          padding: '0.5rem 0.875rem', borderRadius: '6px',
-                          background: C.accent, color: 'white',
+                          padding: '0.45rem 0.85rem', borderRadius: '8px',
+                          background: 'var(--primary-light)', color: 'white',
                           border: 'none', cursor: 'pointer',
-                          fontSize: '0.8rem', fontWeight: 600,
-                          fontFamily: 'inherit', transition: 'opacity 0.15s',
+                          fontSize: '0.8rem', fontWeight: 700, fontFamily: 'inherit',
                         }}
-                        onMouseEnter={(e) => e.currentTarget.style.opacity = '0.8'}
-                        onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
                       >
-                        <Eye size={14} /> View
+                        <Eye size={14} /> View record
                       </button>
                     </td>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <Pagination page={currentPage} pageSize={PAGE_SIZE} total={filteredResponders.length} onChange={setPage} loading={loading} />
       </div>
 
       {/* Modal */}
       <AnimatePresence>
-        {showModal && selectedResponder && (
+        {selectedResponder && (
           <ApplicationModal
             responder={selectedResponder}
-            onClose={() => setShowModal(false)}
+            onClose={() => setSelectedResponder(null)}
           />
         )}
       </AnimatePresence>

@@ -18,6 +18,13 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      // Socket.IO (polling + websocket upgrade) so the client can connect to the
+      // page origin in dev instead of hard-coding localhost:3000.
+      '/socket.io': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../services/api';
+import { lightTokenCss } from '../../components/uiStyles';
 import { resolveFileUrl } from '../../utils/resolveFileUrl';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -24,8 +25,8 @@ function timeAgo(dateStr) {
 function waitColor(dateStr) {
   if (!dateStr) return 'var(--text-muted)';
   const days = (Date.now() - new Date(dateStr).getTime()) / 86400000;
-  if (days >= 2) return '#dc2626';
-  if (days >= 1) return '#d97706';
+  if (days >= 2) return 'var(--error-fg)';
+  if (days >= 1) return 'var(--warning-fg)';
   return 'var(--text-muted)';
 }
 
@@ -72,8 +73,8 @@ const ApplicationModal = ({ responder, onClose }) => {
       <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#111;background:white}
       @media print{@page{margin:15mm;size:A4}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
       .print-page-break{page-break-before:always!important;break-before:page!important}}
-      input,textarea{border:none;border-bottom:1.5px solid #9CA3AF;width:100%;padding:4px 0;font-size:0.875rem;font-family:Arial,sans-serif;background:transparent;outline:none}
-      </style></head><body>${clone.innerHTML}</body></html>`);
+      input,textarea{border:none;border-bottom:1.5px solid var(--text-muted);width:100%;padding:4px 0;font-size:0.875rem;font-family:Arial,sans-serif;background:transparent;outline:none}
+      ${lightTokenCss()}</style></head><body>${clone.innerHTML}</body></html>`);
     win.document.close();
     win.focus();
     setTimeout(() => { win.print(); win.close(); }, 900);
@@ -110,16 +111,16 @@ const ApplicationModal = ({ responder, onClose }) => {
           flexShrink: 0,
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           padding: '12px 20px',
-          background: 'white', borderBottom: '1px solid #E5E7EB',
+          background: 'white', borderBottom: '1px solid var(--border)',
         }}>
-          <span style={{ fontSize: '0.82rem', color: '#6B7280', fontWeight: 600 }}>
+          <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600 }}>
             Emergency Responder Application
           </span>
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button onClick={handlePrint} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.55rem 1.15rem', borderRadius: '10px',
-              background: '#0C637E', color: 'white', border: 'none',
+              background: 'var(--primary)', color: 'white', border: 'none',
               fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit',
             }}>
               <Printer size={14} /> Print / Save as PDF
@@ -127,7 +128,7 @@ const ApplicationModal = ({ responder, onClose }) => {
             <button onClick={onClose} style={{
               display: 'flex', alignItems: 'center', gap: '0.5rem',
               padding: '0.55rem 1.15rem', borderRadius: '10px',
-              background: 'white', color: '#374151', border: '1px solid #D1D5DB',
+              background: 'white', color: 'var(--text-sub)', border: '1px solid var(--border)',
               fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit',
             }}>
               <X size={14} /> Close
@@ -139,12 +140,12 @@ const ApplicationModal = ({ responder, onClose }) => {
         <div style={{ flex: 1, overflowY: 'auto' }}>
 
       {/* Printable form */}
-      <div id="application-print-area" style={{
+      <div id="application-print-area" data-theme="light" style={{
         width: '100%', background: 'white',
         fontFamily: 'Arial, sans-serif',
       }}>
         {/* Banner */}
-        <div style={{ background: 'linear-gradient(135deg,#03293C 0%,#0C637E 100%)', padding: '2rem 2.5rem', color: 'white' }}>
+        <div style={{ background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 100%)', padding: '2rem 2.5rem', color: 'white' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
               <div style={{ fontSize: '0.7rem', letterSpacing: '0.12em', textTransform: 'uppercase', opacity: 0.7, marginBottom: '0.4rem' }}>
@@ -177,7 +178,7 @@ const ApplicationModal = ({ responder, onClose }) => {
             { label: 'Date of Birth', value: (() => {
               if (!responder.user?.dateOfBirth) return '—';
               const dob = new Date(responder.user.dateOfBirth);
-              const age = Math.floor((Date.now() - dob.getTime()) / (365.25 * 24 * 3600 * 1000));
+              const age = Math.floor((new Date().getTime() - dob.getTime()) / (365.25 * 24 * 3600 * 1000));
               return `${dob.toLocaleDateString('en-PK', { year: 'numeric', month: 'long', day: 'numeric' })}  (Age: ${age})`;
             })() },
           ]} />
@@ -196,15 +197,15 @@ const ApplicationModal = ({ responder, onClose }) => {
           } />
 
           <AppSectionTitle num="3" title="Identity &amp; Credential Documents" />
-          <p style={{ fontSize: '0.83rem', color: '#6B7280', margin: '-0.25rem 0 1.25rem', lineHeight: 1.6 }}>
+          <p style={{ fontSize: '0.83rem', color: 'var(--text-muted)', margin: '-0.25rem 0 1.25rem', lineHeight: 1.6 }}>
             Documents uploaded by the applicant during registration. Verify each carefully before deciding.
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem', marginBottom: '2rem' }}>
             {docs.map(({ label, url, required }) => (
-              <div key={label} style={{ border: `1.5px solid ${url ? '#D8ECF2' : '#e5e7eb'}`, borderRadius: '12px', overflow: 'hidden', background: url ? '#F7FAFB' : '#f9fafb' }}>
-                <div style={{ padding: '0.55rem 0.875rem', borderBottom: `1px solid ${url ? '#D8ECF2' : '#e5e7eb'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: url ? '#EEF5F8' : '#f3f4f6' }}>
-                  <span style={{ fontWeight: 700, fontSize: '0.78rem', color: '#374151' }}>{label}</span>
-                  <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '999px', background: url ? '#D1FAE5' : '#FEE2E2', color: url ? '#065F46' : '#991B1B' }}>
+              <div key={label} style={{ border: `1.5px solid ${url ? 'var(--border)' : 'var(--border)'}`, borderRadius: '12px', overflow: 'hidden', background: url ? 'var(--surface-alt)' : 'var(--surface-alt)' }}>
+                <div style={{ padding: '0.55rem 0.875rem', borderBottom: `1px solid ${url ? 'var(--border)' : 'var(--border)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: url ? 'var(--primary-pale)' : 'var(--tint-slate)' }}>
+                  <span style={{ fontWeight: 700, fontSize: '0.78rem', color: 'var(--text-sub)' }}>{label}</span>
+                  <span style={{ fontSize: '0.63rem', fontWeight: 700, padding: '0.15rem 0.5rem', borderRadius: '999px', background: url ? 'var(--tint-green)' : 'var(--tint-red)', color: url ? 'var(--success-fg)' : 'var(--error-fg)' }}>
                     {url ? 'UPLOADED' : required ? 'MISSING ⚠' : 'NOT PROVIDED'}
                   </span>
                 </div>
@@ -212,7 +213,7 @@ const ApplicationModal = ({ responder, onClose }) => {
                   <div style={{ position: 'relative' }}>
                     <img src={url} alt={label} style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
                       onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
-                    <div style={{ display: 'none', height: '160px', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px', background: '#f1f5f9', color: '#9CA3AF', fontSize: '0.78rem' }}>
+                    <div style={{ display: 'none', height: '160px', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '8px', background: 'var(--tint-slate)', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
                       <FileText size={24} style={{ opacity: 0.4 }} /><span>Cannot display</span>
                     </div>
                     <button className="no-print" onClick={() => window.open(url, '_blank')} style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '7px', padding: '4px 10px', fontSize: '0.7rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
@@ -220,7 +221,7 @@ const ApplicationModal = ({ responder, onClose }) => {
                     </button>
                   </div>
                 ) : (
-                  <div style={{ height: '160px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#9CA3AF', fontSize: '0.82rem' }}>
+                  <div style={{ height: '160px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px', color: 'var(--text-muted)', fontSize: '0.82rem' }}>
                     <Shield size={28} style={{ opacity: 0.25 }} />
                     <span style={{ fontWeight: 600 }}>{required ? 'Required — Not Submitted' : 'Optional — Not Provided'}</span>
                   </div>
@@ -230,11 +231,11 @@ const ApplicationModal = ({ responder, onClose }) => {
           </div>
 
           <AppSectionTitle num="4" title="Applicant Declaration" />
-          <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '1.25rem 1.5rem', marginBottom: '2rem' }}>
-            <p style={{ fontSize: '0.875rem', color: '#374151', lineHeight: 1.8, margin: 0 }}>
+          <div style={{ background: 'var(--tint-amber)', border: '1px solid var(--warning-border)', borderRadius: '10px', padding: '1.25rem 1.5rem', marginBottom: '2rem' }}>
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-sub)', lineHeight: 1.8, margin: 0 }}>
               By submitting this application, <strong>{responder.user?.fullName || '[Applicant]'}</strong> hereby declares and confirms:
             </p>
-            <ol style={{ margin: '1rem 0 0', paddingLeft: '1.4rem', fontSize: '0.875rem', color: '#374151', lineHeight: 2.1 }}>
+            <ol style={{ margin: '1rem 0 0', paddingLeft: '1.4rem', fontSize: '0.875rem', color: 'var(--text-sub)', lineHeight: 2.1 }}>
               <li>All information provided is accurate, complete, and truthful.</li>
               <li>I hold valid professional certification as a <strong>{RESPONDER_TYPE_LABELS[responder.responderType] || 'Emergency Responder'}</strong> and license <strong>{responder.licenseNumber || 'N/A'}</strong> is genuine and active.</li>
               <li>I understand I am joining the MediFind Emergency Response Network and will respond to real medical emergencies.</li>
@@ -246,17 +247,17 @@ const ApplicationModal = ({ responder, onClose }) => {
 
           <div className="print-page-break" style={{ paddingTop: '0.5rem' }}>
             <AppSectionTitle num="5" title="Administrative Review — For Official Use Only" />
-            <div style={{ border: '1.5px dashed #D1D5DB', borderRadius: '10px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', background: '#FAFAFA' }}>
+            <div style={{ border: '1.5px dashed var(--border)', borderRadius: '10px', padding: '1.25rem 1.5rem', marginBottom: '1.5rem', background: 'var(--surface-alt)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem', marginBottom: '1.25rem' }}>
                 <ReviewField label="Reviewed by (Admin Name)" value={reviewedBy} onChange={e => setReviewedBy(e.target.value)} placeholder="Enter admin name" />
                 <ReviewField label="Review Date" value={reviewDate} onChange={e => setReviewDate(e.target.value)} placeholder="DD/MM/YYYY" />
               </div>
               <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '0.75rem 1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.6rem', background: 'var(--tint-blue)', border: '1px solid var(--info-border)', borderRadius: '8px', padding: '0.75rem 1rem' }}>
                   <span style={{ fontSize: '1rem', flexShrink: 0 }}>ℹ️</span>
                   <div>
-                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#1D4ED8', marginBottom: '0.2rem' }}>Decision Recorded Digitally</div>
-                    <div style={{ fontSize: '0.78rem', color: '#3B82F6', lineHeight: 1.5 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', marginBottom: '0.2rem' }}>Decision Recorded Digitally</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--primary-light)', lineHeight: 1.5 }}>
                       The approval or rejection is executed via the <strong>Approve</strong> / <strong>Reject</strong> buttons in the Verification Queue. The outcome is automatically logged in the system audit trail.
                     </div>
                   </div>
@@ -269,7 +270,7 @@ const ApplicationModal = ({ responder, onClose }) => {
             </div>
           </div>
 
-          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: '#9CA3AF' }}>
+          <div style={{ marginTop: '1.5rem', paddingTop: '1rem', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--text-muted)' }}>
             <span>MediFind Healthcare Emergency Network · Pakistan · Confidential</span>
             <span>Application Ref: {responder.id?.slice(0, 16).toUpperCase() || 'N/A'}</span>
           </div>
@@ -334,7 +335,7 @@ const ResponderDetailModal = ({ responder, processingId, onApprove, onReject, on
           <div style={{
             display: 'flex', alignItems: 'center', gap: '1.25rem',
             padding: '1.5rem 1.75rem',
-            background: 'linear-gradient(135deg,#03293C 0%,#0C637E 100%)',
+            background: 'linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 100%)',
             flexShrink: 0,
           }}>
             {/* Avatar */}
@@ -421,17 +422,17 @@ const ResponderDetailModal = ({ responder, processingId, onApprove, onReject, on
             </p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem' }}>
               {docs.map(({ label, url, required }) => (
-                <div key={label} style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${url ? '#D8ECF2' : 'var(--border)'}`, background: url ? 'var(--surface)' : 'var(--surface-raised)' }}>
+                <div key={label} style={{ borderRadius: '12px', overflow: 'hidden', border: `1.5px solid ${url ? 'var(--border)' : 'var(--border)'}`, background: url ? 'var(--surface)' : 'var(--surface-raised)' }}>
                   {/* Header row */}
-                  <div style={{ padding: '0.5rem 0.625rem', background: url ? '#EEF5F8' : 'var(--surface-raised)', borderBottom: `1px solid ${url ? '#D8ECF2' : 'var(--border)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ padding: '0.5rem 0.625rem', background: url ? 'var(--primary-pale)' : 'var(--surface-raised)', borderBottom: `1px solid ${url ? 'var(--border)' : 'var(--border)'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-sub)' }}>{label}</span>
-                    <span style={{ fontSize: '0.58rem', fontWeight: 700, padding: '0.12rem 0.4rem', borderRadius: '999px', background: url ? '#D1FAE5' : '#FEE2E2', color: url ? '#065F46' : '#991B1B' }}>
+                    <span style={{ fontSize: '0.58rem', fontWeight: 700, padding: '0.12rem 0.4rem', borderRadius: '999px', background: url ? 'var(--tint-green)' : 'var(--tint-red)', color: url ? 'var(--success-fg)' : 'var(--error-fg)' }}>
                       {url ? '✓' : required ? '⚠' : 'N/A'}
                     </span>
                   </div>
                   {/* Preview */}
                   {url ? (
-                    <div style={{ position: 'relative', cursor: 'zoom-in', height: '110px', background: '#f1f5f9' }} onClick={() => setLightbox({ url, label })}>
+                    <div style={{ position: 'relative', cursor: 'zoom-in', height: '110px', background: 'var(--tint-slate)' }} onClick={() => setLightbox({ url, label })}>
                       <img src={url} alt={label} style={{ width: '100%', height: '110px', objectFit: 'cover', display: 'block' }}
                         onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
                       <div style={{ display: 'none', height: '110px', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '6px', color: 'var(--text-muted)', fontSize: '0.72rem' }}>
@@ -450,8 +451,8 @@ const ResponderDetailModal = ({ responder, processingId, onApprove, onReject, on
                     </div>
                   )}
                   {url && (
-                    <button onClick={() => window.open(url, '_blank')} style={{ width: '100%', padding: '0.4rem', background: 'transparent', border: 'none', borderTop: '1px solid #D8ECF2', fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontFamily: 'inherit' }}
-                      onMouseEnter={e => e.currentTarget.style.background = '#EEF5F8'}
+                    <button onClick={() => window.open(url, '_blank')} style={{ width: '100%', padding: '0.4rem', background: 'transparent', border: 'none', borderTop: '1px solid var(--border)', fontSize: '0.65rem', fontWeight: 700, color: 'var(--primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', fontFamily: 'inherit' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--primary-pale)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <ExternalLink size={10} /> Open original
                     </button>
@@ -518,9 +519,9 @@ const ResponderDetailModal = ({ responder, processingId, onApprove, onReject, on
                 {lightbox.label}
               </div>
               <button onClick={() => setLightbox(null)} style={{ position: 'absolute', top: '-14px', right: '-14px', width: '36px', height: '36px', borderRadius: '50%', background: 'white', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
-                <X size={16} color="#374151" />
+                <X size={16} color="var(--text-sub)" />
               </button>
-              <a href={lightbox.url} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', top: '-14px', right: '30px', padding: '0.35rem 0.875rem', borderRadius: '20px', background: '#0C637E', color: 'white', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
+              <a href={lightbox.url} target="_blank" rel="noopener noreferrer" style={{ position: 'absolute', top: '-14px', right: '30px', padding: '0.35rem 0.875rem', borderRadius: '20px', background: 'var(--primary)', color: 'white', fontSize: '0.75rem', fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', boxShadow: '0 4px 12px rgba(0,0,0,0.3)' }}>
                 <ExternalLink size={11} /> Open original
               </a>
             </motion.div>
@@ -550,33 +551,33 @@ const RejectModal = ({ responderName, onConfirm, onCancel, processing }) => {
         style={{ background: 'white', borderRadius: '18px', padding: '2rem', width: '100%', maxWidth: '500px', boxShadow: '0 20px 60px rgba(0,0,0,0.25)' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.875rem', marginBottom: '1.25rem' }}>
-          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: '#FEE2E2', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <AlertTriangle size={20} color="#DC2626" />
+          <div style={{ width: '42px', height: '42px', borderRadius: '12px', background: 'var(--tint-red)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <AlertTriangle size={20} color="var(--error-fg)" />
           </div>
           <div>
-            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: '#111827' }}>Reject Application</h3>
-            <p style={{ margin: 0, fontSize: '0.82rem', color: '#6B7280' }}>{responderName}</p>
+            <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 800, color: 'var(--text-main)' }}>Reject Application</h3>
+            <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--text-muted)' }}>{responderName}</p>
           </div>
         </div>
-        <p style={{ fontSize: '0.875rem', color: '#374151', marginBottom: '1rem', lineHeight: 1.6 }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-sub)', marginBottom: '1rem', lineHeight: 1.6 }}>
           Provide a reason. This message will be sent to the applicant so they know what to correct.
         </p>
-        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Quick select</p>
+        <p style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Quick select</p>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.875rem' }}>
           {presets.map(p => (
-            <button key={p} onClick={() => setReason(p)} style={{ padding: '0.3rem 0.7rem', borderRadius: '999px', border: `1px solid ${reason === p ? '#0C637E' : '#D1D5DB'}`, background: reason === p ? '#EEF5F8' : 'white', color: reason === p ? '#0C637E' : '#374151', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
+            <button key={p} onClick={() => setReason(p)} style={{ padding: '0.3rem 0.7rem', borderRadius: '999px', border: `1px solid ${reason === p ? 'var(--primary)' : 'var(--border)'}`, background: reason === p ? 'var(--primary-pale)' : 'white', color: reason === p ? 'var(--primary)' : 'var(--text-sub)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}>
               {p}
             </button>
           ))}
         </div>
         <textarea value={reason} onChange={e => setReason(e.target.value)} placeholder="Or type a custom reason here…" rows={3}
-          style={{ width: '100%', borderRadius: '10px', border: '1.5px solid #D1D5DB', padding: '0.75rem 0.875rem', fontSize: '0.875rem', fontFamily: 'inherit', resize: 'vertical', outline: 'none', color: '#374151', lineHeight: 1.6, boxSizing: 'border-box' }} />
+          style={{ width: '100%', borderRadius: '10px', border: '1.5px solid var(--border)', padding: '0.75rem 0.875rem', fontSize: '0.875rem', fontFamily: 'inherit', resize: 'vertical', outline: 'none', color: 'var(--text-sub)', lineHeight: 1.6, boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', gap: '0.875rem', marginTop: '1.25rem' }}>
-          <button onClick={onCancel} disabled={processing} style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid #D1D5DB', background: 'white', color: '#374151', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={onCancel} disabled={processing} style={{ flex: 1, padding: '0.8rem', borderRadius: '12px', border: '1px solid var(--border)', background: 'white', color: 'var(--text-sub)', fontWeight: 700, fontSize: '0.9rem', cursor: 'pointer', fontFamily: 'inherit' }}>
             Cancel
           </button>
           <button onClick={() => reason.trim() && onConfirm(reason.trim())} disabled={!reason.trim() || processing}
-            style={{ flex: 2, padding: '0.8rem', borderRadius: '12px', border: 'none', background: !reason.trim() || processing ? '#F3F4F6' : '#DC2626', color: !reason.trim() || processing ? '#9CA3AF' : 'white', fontWeight: 700, fontSize: '0.9rem', cursor: !reason.trim() || processing ? 'not-allowed' : 'pointer', fontFamily: 'inherit', transition: 'all 0.18s' }}>
+            style={{ flex: 2, padding: '0.8rem', borderRadius: '12px', border: 'none', background: !reason.trim() || processing ? 'var(--tint-slate)' : 'var(--error-fg)', color: !reason.trim() || processing ? 'var(--text-muted)' : 'white', fontWeight: 700, fontSize: '0.9rem', cursor: !reason.trim() || processing ? 'not-allowed' : 'pointer', fontFamily: 'inherit', transition: 'all 0.18s' }}>
             {processing ? 'Rejecting…' : 'Confirm Rejection'}
           </button>
         </div>
@@ -589,18 +590,18 @@ const RejectModal = ({ responderName, onConfirm, onCancel, processing }) => {
 
 const AppSectionTitle = ({ num, title }) => (
   <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem', marginTop: '1.75rem' }}>
-    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: '#0C637E', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem', flexShrink: 0 }}>{num}</div>
-    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: '#0C637E' }} dangerouslySetInnerHTML={{ __html: title }} />
-    <div style={{ flex: 1, height: '1px', background: '#D8ECF2' }} />
+    <div style={{ width: '28px', height: '28px', borderRadius: '8px', background: 'var(--primary)', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '0.875rem', flexShrink: 0 }}>{num}</div>
+    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 800, color: 'var(--primary)' }} dangerouslySetInnerHTML={{ __html: title }} />
+    <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
   </div>
 );
 
 const AppFieldGrid = ({ fields }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.875rem', marginBottom: '0.5rem' }}>
     {fields.map(({ label, value }) => (
-      <div key={label} style={{ background: '#F7FAFB', borderRadius: '8px', padding: '0.6rem 0.875rem', border: '1px solid #E0EEF3' }}>
-        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>{label}</div>
-        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1A2E3A' }}>{value}</div>
+      <div key={label} style={{ background: 'var(--surface-alt)', borderRadius: '8px', padding: '0.6rem 0.875rem', border: '1px solid var(--primary-pale)' }}>
+        <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.2rem' }}>{label}</div>
+        <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{value}</div>
       </div>
     ))}
   </div>
@@ -608,57 +609,57 @@ const AppFieldGrid = ({ fields }) => (
 
 const ReviewField = ({ label, value, onChange, placeholder }) => (
   <div>
-    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }} dangerouslySetInnerHTML={{ __html: label }} />
+    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.4rem' }} dangerouslySetInnerHTML={{ __html: label }} />
     <input type="text" value={value} onChange={onChange} placeholder={placeholder}
-      style={{ width: '100%', padding: '0.5rem 0.6rem', border: 'none', borderBottom: '1.5px solid #9CA3AF', fontSize: '0.875rem', fontFamily: 'Arial, sans-serif', color: '#1A2E3A', background: 'transparent', outline: 'none', fontWeight: value ? 600 : 400 }}
-      onFocus={e => e.target.style.borderBottomColor = '#0C637E'}
-      onBlur={e => e.target.style.borderBottomColor = '#9CA3AF'} />
+      style={{ width: '100%', padding: '0.5rem 0.6rem', border: 'none', borderBottom: '1.5px solid var(--text-muted)', fontSize: '0.875rem', fontFamily: 'Arial, sans-serif', color: 'var(--text-main)', background: 'transparent', outline: 'none', fontWeight: value ? 600 : 400 }}
+      onFocus={e => e.target.style.borderBottomColor = 'var(--primary)'}
+      onBlur={e => e.target.style.borderBottomColor = 'var(--text-muted)'} />
   </div>
 );
 
 const SignatureStampField = ({ value, onChange }) => (
   <div>
-    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>Admin Signature &amp; Official Stamp</div>
+    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.75rem' }}>Admin Signature &amp; Official Stamp</div>
     <div style={{ display: 'flex', alignItems: 'center', gap: '2rem' }}>
       <div style={{ flex: 1 }}>
-        <div style={{ position: 'relative', background: value ? 'rgba(12,99,126,0.03)' : '#FAFAFA', borderRadius: '8px 8px 0 0', border: '1px solid #E5E7EB', borderBottom: `2px solid ${value ? '#0C637E' : '#D1D5DB'}`, transition: 'border-color 0.25s', padding: '0.75rem 1rem 0.6rem' }}>
+        <div style={{ position: 'relative', background: value ? 'rgba(12,99,126,0.03)' : 'var(--surface-alt)', borderRadius: '8px 8px 0 0', border: '1px solid var(--border)', borderBottom: `2px solid ${value ? 'var(--primary)' : 'var(--border)'}`, transition: 'border-color 0.25s', padding: '0.75rem 1rem 0.6rem' }}>
           <input type="text" value={value} onChange={onChange} placeholder="Click here and sign your name…"
-            style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', fontFamily: value ? '"Great Vibes", cursive' : 'inherit', fontSize: value ? '2rem' : '0.9rem', color: value ? '#03293C' : '#9CA3AF', lineHeight: 1.3, transition: 'font-size 0.2s, font-family 0.1s', boxSizing: 'border-box' }}
-            onFocus={e => e.currentTarget.parentElement.style.borderBottomColor = '#0C637E'}
-            onBlur={e => e.currentTarget.parentElement.style.borderBottomColor = value ? '#0C637E' : '#D1D5DB'} />
+            style={{ width: '100%', border: 'none', outline: 'none', background: 'transparent', fontFamily: value ? '"Great Vibes", cursive' : 'inherit', fontSize: value ? '2rem' : '0.9rem', color: value ? 'var(--primary-dark)' : 'var(--text-muted)', lineHeight: 1.3, transition: 'font-size 0.2s, font-family 0.1s', boxSizing: 'border-box' }}
+            onFocus={e => e.currentTarget.parentElement.style.borderBottomColor = 'var(--primary)'}
+            onBlur={e => e.currentTarget.parentElement.style.borderBottomColor = value ? 'var(--primary)' : 'var(--border)'} />
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.3rem' }}>
-          <span style={{ fontSize: '0.62rem', color: '#9CA3AF', letterSpacing: '0.06em' }}>AUTHORIZED SIGNATURE</span>
-          {value && <span style={{ fontSize: '0.62rem', color: '#0C637E', fontWeight: 600, letterSpacing: '0.04em' }}>✓ SIGNED</span>}
+          <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', letterSpacing: '0.06em' }}>AUTHORIZED SIGNATURE</span>
+          {value && <span style={{ fontSize: '0.62rem', color: 'var(--primary)', fontWeight: 600, letterSpacing: '0.04em' }}>✓ SIGNED</span>}
         </div>
       </div>
       <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.4rem' }}>
-        <div style={{ width: '110px', height: '110px', border: '3px solid #0C637E', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', opacity: value ? 1 : 0.3, transition: 'opacity 0.4s', background: value ? 'rgba(12,99,126,0.04)' : 'transparent' }}>
-          <div style={{ position: 'absolute', inset: '5px', border: '1.5px dashed #0C637E', borderRadius: '50%' }} />
+        <div style={{ width: '110px', height: '110px', border: '3px solid var(--primary)', borderRadius: '50%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', position: 'relative', opacity: value ? 1 : 0.3, transition: 'opacity 0.4s', background: value ? 'rgba(12,99,126,0.04)' : 'transparent' }}>
+          <div style={{ position: 'absolute', inset: '5px', border: '1.5px dashed var(--primary)', borderRadius: '50%' }} />
           <div style={{ textAlign: 'center', zIndex: 1, padding: '0 8px' }}>
-            <div style={{ fontSize: '0.52rem', fontWeight: 800, color: '#0C637E', textTransform: 'uppercase', letterSpacing: '0.12em', lineHeight: 1.4, marginBottom: '3px' }}>MediFind</div>
-            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: '#0C637E', fontFamily: 'Arial, sans-serif', lineHeight: 1 }}>✦</div>
-            <div style={{ fontSize: '0.42rem', fontWeight: 800, color: '#0C637E', textTransform: 'uppercase', letterSpacing: '0.1em', lineHeight: 1.5, marginTop: '3px' }}>Emergency Response<br />Network · Pakistan</div>
+            <div style={{ fontSize: '0.52rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.12em', lineHeight: 1.4, marginBottom: '3px' }}>MediFind</div>
+            <div style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--primary)', fontFamily: 'Arial, sans-serif', lineHeight: 1 }}>✦</div>
+            <div style={{ fontSize: '0.42rem', fontWeight: 800, color: 'var(--primary)', textTransform: 'uppercase', letterSpacing: '0.1em', lineHeight: 1.5, marginTop: '3px' }}>Emergency Response<br />Network · Pakistan</div>
           </div>
           <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }} viewBox="0 0 110 110">
             <path id="topArc" d="M 10,55 A 45,45 0 0 1 100,55" fill="none" />
-            <text fontSize="7" fontWeight="800" fill="#0C637E" fontFamily="Arial, sans-serif" letterSpacing="2">
+            <text fontSize="7" fontWeight="800" fill="var(--primary)" fontFamily="Arial, sans-serif" letterSpacing="2">
               <textPath href="#topArc" startOffset="8%">OFFICIAL · VERIFIED · AUTHORIZED</textPath>
             </text>
           </svg>
         </div>
-        <div style={{ fontSize: '0.6rem', color: value ? '#0C637E' : '#CBD5E1', fontWeight: 700, letterSpacing: '0.08em', transition: 'color 0.4s' }}>OFFICIAL STAMP</div>
+        <div style={{ fontSize: '0.6rem', color: value ? 'var(--primary)' : 'var(--border)', fontWeight: 700, letterSpacing: '0.08em', transition: 'color 0.4s' }}>OFFICIAL STAMP</div>
       </div>
     </div>
   </div>
 );
 
 const SpecializationRow = ({ specs }) => (
-  <div style={{ background: '#F7FAFB', borderRadius: '8px', padding: '0.6rem 0.875rem', border: '1px solid #E0EEF3', marginBottom: '0.5rem' }}>
-    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Specializations ({specs.length})</div>
+  <div style={{ background: 'var(--surface-alt)', borderRadius: '8px', padding: '0.6rem 0.875rem', border: '1px solid var(--primary-pale)', marginBottom: '0.5rem' }}>
+    <div style={{ fontSize: '0.68rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '0.5rem' }}>Specializations ({specs.length})</div>
     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
       {specs.map(spec => (
-        <span key={spec} style={{ padding: '0.25rem 0.75rem', borderRadius: '999px', background: '#E2F0F3', color: '#0C637E', fontSize: '0.78rem', fontWeight: 700, border: '1px solid #C8E4EC' }}>{spec}</span>
+        <span key={spec} style={{ padding: '0.25rem 0.75rem', borderRadius: '999px', background: 'var(--primary-pale)', color: 'var(--primary)', fontSize: '0.78rem', fontWeight: 700, border: '1px solid var(--border)' }}>{spec}</span>
       ))}
     </div>
   </div>
@@ -681,19 +682,14 @@ const ResponderVerification = () => {
     setTimeout(() => setToast(null), 3500);
   };
 
-  const fetchPending = async () => {
-    setLoading(true); setError('');
-    try {
-      const response = await api.get('/api/admin/responders/pending');
-      if (response.data.success) setPending(response.data.data);
-    } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load pending responders.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const loadPending = () => api.get('/api/admin/responders/pending')
+    .then(response => { if (response.data.success) setPending(response.data.data); setError(''); })
+    .catch(err => setError(err.response?.data?.message || 'Failed to load pending responders.'))
+    .finally(() => setLoading(false));
 
-  useEffect(() => { fetchPending(); }, []);
+  const fetchPending = () => { setLoading(true); setError(''); return loadPending(); };
+
+  useEffect(() => { loadPending(); }, []);
 
   const handleAction = async (id, action, reason = '') => {
     setProcessingId(id);
@@ -813,7 +809,7 @@ const ResponderVerification = () => {
 
                   {/* Type + org */}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
-                    <span style={{ background: '#EEF5F8', color: '#0C637E', padding: '0.25rem 0.7rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                    <span style={{ background: 'var(--primary-pale)', color: 'var(--primary)', padding: '0.25rem 0.7rem', borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
                       {RESPONDER_TYPE_LABELS[r.responderType]?.split('(')[0].trim() || r.responderType}
                     </span>
                     {r.organization && (

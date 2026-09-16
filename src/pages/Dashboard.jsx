@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight, TrendingUp, TrendingDown,
   Shield, Clock, ArrowRight, PanelLeftClose, PanelLeftOpen,
   Circle, Settings, CheckCircle, XCircle, EarOff, RefreshCw,
-  Send, LayoutDashboard, Sun, Moon,
+  Send, LayoutDashboard, Sun, Moon, MapPin, ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
@@ -18,6 +18,9 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, ResponsiveContainer, Legend,
 } from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup, Circle as MapCircle } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import UserManagement from './UserManagement';
 import ResponderVerification from './admin/ResponderVerification';
 import ResponderRecords from './admin/ResponderRecords';
@@ -25,10 +28,29 @@ import SOSMonitor from './admin/SOSMonitor';
 import SystemLogs from './admin/SystemLogs';
 import CommunicationAudit from './admin/CommunicationAudit';
 import SubscriptionManagement from './admin/SubscriptionManagement';
+import AllSubscriptions from './admin/AllSubscriptions';
 import PlatformSettings from './admin/PlatformSettings';
 import SystemNotifications from './admin/SystemNotifications';
 import AdminInbox from './admin/AdminInbox';
 import logo from '../assets/Medifind_New_Logo-removebg-preview.png';
+
+/* ─── Leaflet icon fix (Vite breaks default icon asset path) ────────────── */
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl:       'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
+const redMapIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [20, 33], iconAnchor: [10, 33], popupAnchor: [1, -28], shadowSize: [33, 33],
+});
+const greenMapIcon = new L.Icon({
+  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+  iconSize: [18, 29], iconAnchor: [9, 29], popupAnchor: [1, -24], shadowSize: [29, 29],
+});
 
 /* ─── Theme ────────────────────────────────────────────────────────────── */
 const C = {
@@ -59,7 +81,8 @@ const NAV = [
   { label: 'Verification Queue', to: '/admin/verify', Icon: UserCheck },
   { label: 'Responder Records', to: '/admin/records', Icon: CheckCircle },
   { label: 'SOS Logistics', to: '/admin/sos', Icon: Activity },
-  { label: 'Subscriptions', to: '/admin/subscriptions', Icon: CreditCard },
+  { label: 'Subscriptions', to: '/admin/subscriptions', Icon: CreditCard, exact: true },
+  { label: 'All Subscriptions', to: '/admin/subscriptions/all', Icon: CreditCard },
   { label: 'System Logs', to: '/admin/logs', Icon: History },
   { label: 'Comm Audit', to: '/admin/emails', Icon: Mail },
   { label: 'Notifications', to: '/admin/notifications', Icon: Bell },
@@ -690,6 +713,7 @@ export default function Dashboard() {
               <Route path="/records" element={<ResponderRecords />} />
               <Route path="/sos" element={<SOSMonitor />} />
               <Route path="/subscriptions" element={<SubscriptionManagement />} />
+              <Route path="/subscriptions/all" element={<AllSubscriptions />} />
               <Route path="/logs" element={<SystemLogs />} />
               <Route path="/emails" element={<CommunicationAudit />} />
               <Route path="/notifications" element={<SystemNotifications />} />
@@ -843,7 +867,13 @@ function Overview() {
   const [lastUpdated,       setLastUpdated]       = useState(null);
   const [refreshing,        setRefreshing]        = useState(false);
   const [statsDelta,        setStatsDelta]        = useState(null);
-  const prevStatsRef = useRef(null);
+  const prevStatsRef   = useRef(null);
+  const mapSectionRef  = useRef(null);
+  const prevEmCountRef = useRef(0);
+  const [mapEmergencies, setMapEmergencies] = useState([]);
+  const [mapResponders,  setMapResponders]  = useState([]);
+  const [popupDismissed, setPopupDismissed] = useState(false);
+  const [subStats,       setSubStats]       = useState(null);
 
   /* Helper: turn a numeric delta into a badge label */
   const deltaLabel = (d) => {
@@ -862,13 +892,14 @@ function Overview() {
       api.get('/api/admin/health'),
       api.get('/api/admin/logs?limit=7'),
       api.get('/api/admin/analytics/emergencies?days=14'),
+      api.get('/api/admin/subscriptions/all'),
     ])
-      .then(([statsRes, pendRes, healthRes, logsRes, analyticsRes]) => {
+      .then(([statsRes, pendRes, healthRes, logsRes, analyticsRes, subRes]) => {
         if (statsRes.data.success) {
           const s = statsRes.data.data;
-          prevStatsRef.current = s;   // baseline for delta tracking
+          prevStatsRef.current = s;
           setStats(s);
-          setStatsDelta(null);        // reset deltas on full reload
+          setStatsDelta(null);
         }
         if (pendRes.data.success) {
           const arr = pendRes.data.data || [];
@@ -878,6 +909,7 @@ function Overview() {
         if (healthRes.data.success)    setHealth(healthRes.data.data);
         if (logsRes.data.success)      setRecentActivity(logsRes.data.data || []);
         if (analyticsRes.data.success) setAnalytics(analyticsRes.data.data);
+        if (subRes.data.success)       setSubStats(subRes.data.data.stats);
         setLastUpdated(new Date());
       })
       .catch(() => setError('Unable to reach backend — check your server is running.'))
@@ -923,6 +955,37 @@ function Overview() {
     const interval = setInterval(silentRefresh, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  /* Fetch active SOS pins + online responders for the Live Map (10 s poll) */
+  useEffect(() => {
+    const fetchMapData = async () => {
+      try {
+        const [emRes, respRes] = await Promise.allSettled([
+          api.get('/api/emergencies'),
+          api.get('/api/admin/responders/online'),
+        ]);
+        if (emRes.status === 'fulfilled' && emRes.value.data.success) {
+          setMapEmergencies(
+            (emRes.value.data.data || []).filter(e => e.status === 'ACTIVE')
+          );
+        }
+        if (respRes.status === 'fulfilled' && respRes.value.data.success) {
+          setMapResponders(respRes.value.data.data || []);
+        }
+      } catch { /* silent — map renders empty while offline */ }
+    };
+    fetchMapData();
+    const id = setInterval(fetchMapData, 10000);
+    return () => clearInterval(id);
+  }, []);
+
+  /* Re-show popup whenever a new emergency fires (count goes 0 → N) */
+  useEffect(() => {
+    if (prevEmCountRef.current === 0 && mapEmergencies.length > 0) {
+      setPopupDismissed(false);
+    }
+    prevEmCountRef.current = mapEmergencies.length;
+  }, [mapEmergencies.length]);
 
   /* Stat card definitions — trends derived from real delta vs previous poll */
   const d = statsDelta;
@@ -1017,6 +1080,15 @@ function Overview() {
     },
   ];
 
+  const mapCenter = mapEmergencies.length > 0
+    ? [
+        mapEmergencies.reduce((s, e) => s + (e.latitude  || 30.3753), 0) / mapEmergencies.length,
+        mapEmergencies.reduce((s, e) => s + (e.longitude || 69.3451), 0) / mapEmergencies.length,
+      ]
+    : [30.3753, 69.3451];
+  const mapZoom   = mapEmergencies.length > 0 ? 11 : 5;
+  const showPopup = mapEmergencies.length > 0 && !popupDismissed;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }}
@@ -1024,6 +1096,60 @@ function Overview() {
       exit={{ opacity: 0, y: -12 }}
       transition={{ duration: 0.35 }}
     >
+      {/* ── Animated Emergency Popup Reminder ── */}
+      <AnimatePresence>
+        {showPopup && (
+          <motion.div
+            initial={{ x: 140, opacity: 0, scale: 0.88 }}
+            animate={{ x: 0, opacity: 1, scale: 1 }}
+            exit={{ x: 140, opacity: 0, scale: 0.88 }}
+            transition={{ type: 'spring', stiffness: 330, damping: 30 }}
+            style={{
+              position: 'fixed',
+              bottom: '28px',
+              right: '28px',
+              zIndex: 600,
+              background: '#FFF5F5',
+              border: '1.5px solid #FECACA',
+              borderRadius: '16px',
+              boxShadow: '0 12px 40px rgba(239,68,68,0.25)',
+              padding: '14px 16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              minWidth: '230px',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+            onClick={() => mapSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <motion.div
+                animate={{ scale: [1, 1.45, 1] }}
+                transition={{ repeat: Infinity, duration: 1.25, ease: 'easeInOut' }}
+                style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444', flexShrink: 0 }}
+              />
+              <span style={{ fontWeight: 800, color: '#DC2626', fontSize: '0.875rem', flex: 1 }}>
+                {mapEmergencies.length} Active SOS Alert{mapEmergencies.length > 1 ? 's' : ''}
+              </span>
+              <button
+                onClick={e => { e.stopPropagation(); setPopupDismissed(true); }}
+                style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: '#F87171', fontSize: '1rem', padding: '0 2px',
+                  lineHeight: 1, display: 'flex', alignItems: 'center',
+                }}
+              >
+                ✕
+              </button>
+            </div>
+            <p style={{ fontSize: '0.73rem', color: '#EF4444', margin: 0, paddingLeft: '20px' }}>
+              Click to scroll to Live Map ↓
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Page header ── */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '24px' }}>
         <div>
@@ -1512,183 +1638,241 @@ function Overview() {
       {/* ── Bottom Row ── */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: '16px' }}>
 
-        {/* ── Recent Activity (full-height, wider) ── */}
-        <div style={{
-          background: C.white, borderRadius: '16px',
-          border: `1px solid ${C.border}`,
-          boxShadow: '0 1px 4px rgba(12,99,126,0.05)',
-          overflow: 'hidden',
-        }}>
+        {/* ── SOS Live Map ── */}
+        <div
+          ref={mapSectionRef}
+          style={{
+            background: C.white, borderRadius: '16px',
+            border: `1px solid ${C.border}`,
+            boxShadow: '0 1px 4px rgba(12,99,126,0.05)',
+            overflow: 'hidden', display: 'flex', flexDirection: 'column',
+          }}
+        >
+          {/* Map header */}
           <div style={{
-            padding: '20px 24px', borderBottom: `1px solid ${C.border}`,
+            padding: '18px 24px', borderBottom: `1px solid ${C.border}`,
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            flexShrink: 0,
           }}>
-            <div>
-              <h3 style={{ fontSize: '1rem', fontWeight: 800, color: C.textMain }}>Recent Activity</h3>
-              <p style={{ fontSize: '0.8rem', color: C.textMuted, marginTop: '2px' }}>Latest system events across the platform</p>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <motion.div
-                animate={{ opacity: [1, 0.2, 1] }}
-                transition={{ repeat: Infinity, duration: 1.6 }}
-                style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }}
-              />
-              <span style={{ fontSize: '0.75rem', fontWeight: 800, color: '#10B981' }}>LIVE</span>
-            </div>
-          </div>
-
-          {/* Recent Activity list */}
-          <div style={{ padding: '8px 0', maxHeight: '340px', overflowY: 'auto' }}>
-              {loading ? (
-                Array(5).fill(null).map((_, i) => (
-                  <div key={i} style={{ padding: '12px 20px', display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-                    <Skeleton h={28} w="28px" br={14} />
-                    <div style={{ flex: 1 }}>
-                      <Skeleton h={11} w="70%" mb={5} />
-                      <Skeleton h={9} w="45%" />
-                    </div>
-                  </div>
-                ))
-              ) : recentActivity.length === 0 ? (
-                <div style={{ padding: '28px 20px', textAlign: 'center', color: C.textMuted }}>
-                  <History size={28} style={{ opacity: 0.25, marginBottom: '8px' }} />
-                  <p style={{ fontSize: '0.82rem', fontWeight: 600 }}>No activity yet</p>
-                  <p style={{ fontSize: '0.75rem', opacity: 0.7, marginTop: '2px' }}>Events will appear here as the system is used</p>
-                </div>
-              ) : (
-                recentActivity.map((entry, i) => {
-                  const isError   = entry.level === 'ERROR';
-                  const isWarning = entry.level === 'WARNING';
-                  const dotColor  = isError ? '#EF4444' : isWarning ? '#F59E0B' : '#10B981';
-                  const bgColor   = isError ? '#FEF2F2' : isWarning ? '#FFFBEB' : '#ECFDF5';
-                  const iconColor = dotColor;
-
-                  // pick an icon based on action keyword
-                  const action = (entry.action || '').toUpperCase();
-                  let Icon = Activity;
-                  if (action.includes('USER') || action.includes('REGISTER')) Icon = Users;
-                  else if (action.includes('LOGIN'))    Icon = Shield;
-                  else if (action.includes('SOS') || action.includes('EMERGENCY')) Icon = Zap;
-                  else if (action.includes('VERIFY') || action.includes('RESPONDER')) Icon = UserCheck;
-                  else if (action.includes('DELETE'))   Icon = XCircle;
-                  else if (action.includes('EMAIL') || action.includes('NOTIF')) Icon = Send;
-
-                  // relative time
-                  const ts = new Date(entry.timestamp);
-                  const diffMin = Math.floor((Date.now() - ts.getTime()) / 60000);
-                  const timeLabel = diffMin < 1 ? 'just now'
-                    : diffMin < 60 ? `${diffMin}m ago`
-                    : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago`
-                    : ts.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
-
-                  // clean up action label
-                  const label = (entry.action || 'System Event')
-                    .replace(/_/g, ' ')
-                    .toLowerCase()
-                    .replace(/^\w/, c => c.toUpperCase());
-
-                  return (
-                    <div
-                      key={entry.id || i}
-                      style={{
-                        display: 'flex', alignItems: 'flex-start', gap: '12px',
-                        padding: '11px 20px',
-                        borderBottom: i < recentActivity.length - 1 ? `1px solid ${C.border}` : 'none',
-                      }}
-                    >
-                      {/* Icon bubble */}
-                      <div style={{
-                        width: '30px', height: '30px', borderRadius: '9px',
-                        background: bgColor, color: iconColor, flexShrink: 0,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Icon size={14} strokeWidth={2.5} />
-                      </div>
-
-                      {/* Text */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{
-                          fontSize: '0.8rem', fontWeight: 700, color: C.textMain,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                          marginBottom: '2px',
-                        }}>
-                          {label}
-                        </p>
-                        <p style={{
-                          fontSize: '0.71rem', color: C.textMuted, lineHeight: 1.4,
-                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                        }}>
-                          {entry.user || 'System'}
-                          {entry.entity ? ` · ${entry.entity}` : ''}
-                        </p>
-                      </div>
-
-                      {/* Time */}
-                      <span style={{
-                        fontSize: '0.68rem', color: C.textMuted,
-                        fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0,
-                      }}>
-                        {timeLabel}
-                      </span>
-                    </div>
-                  );
-                })
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <MapPin size={16} color="#EF4444" />
+              <div>
+                <h3 style={{ fontSize: '1rem', fontWeight: 800, color: C.textMain }}>SOS Live Map</h3>
+                <p style={{ fontSize: '0.78rem', color: C.textMuted, marginTop: '2px' }}>
+                  Active emergencies &amp; responder positions
+                </p>
+              </div>
+              {mapEmergencies.length > 0 && (
+                <motion.span
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ repeat: Infinity, duration: 1.4 }}
+                  style={{
+                    fontSize: '0.7rem', fontWeight: 800, color: '#EF4444',
+                    background: '#FEF2F2', padding: '2px 8px',
+                    borderRadius: '20px', letterSpacing: '0.03em',
+                  }}
+                >
+                  {mapEmergencies.length} SOS
+                </motion.span>
               )}
+            </div>
+            <button
+              onClick={() => navigate('/admin/sos')}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '5px',
+                fontSize: '0.78rem', fontWeight: 700, color: C.accent,
+                background: '#E2F0F3', border: `1px solid ${C.border}`,
+                borderRadius: '8px', padding: '6px 14px',
+                cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#CCE4EF'}
+              onMouseLeave={e => e.currentTarget.style.background = '#E2F0F3'}
+            >
+              Full Monitor <ExternalLink size={12} />
+            </button>
           </div>
 
-          {/* View all link at bottom */}
-          <div style={{ padding: '12px 24px', borderTop: `1px solid ${C.border}`, textAlign: 'right' }}>
-            <Link to="/admin/logs" style={{ fontSize: '0.78rem', fontWeight: 700, color: C.accent, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-              View all logs <ArrowRight size={12} />
+          {/* Leaflet map */}
+          <div style={{ flex: 1 }}>
+            <MapContainer
+              key={mapCenter.join(',')}
+              center={mapCenter}
+              zoom={mapZoom}
+              style={{ height: '330px', width: '100%' }}
+              scrollWheelZoom={false}
+              zoomControl
+              attributionControl={false}
+            >
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+              {/* Active SOS — red pins */}
+              {mapEmergencies.map(e => e.latitude && e.longitude && (
+                <React.Fragment key={e.id}>
+                  <MapCircle
+                    center={[e.latitude, e.longitude]}
+                    radius={300}
+                    color="#EF4444" fillColor="#EF4444" fillOpacity={0.12}
+                  />
+                  <Marker position={[e.latitude, e.longitude]} icon={redMapIcon}>
+                    <Popup>
+                      <div style={{ minWidth: '160px' }}>
+                        <strong style={{ color: '#EF4444', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                          🆘 {e.emergencyType || 'Medical'} Emergency
+                        </strong>
+                        <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: 600 }}>
+                          {e.patient?.fullName || 'Unknown Patient'}
+                        </p>
+                        <p style={{ margin: 0, fontSize: '11px', color: '#64748B', fontFamily: 'monospace' }}>
+                          {e.latitude?.toFixed(5)}, {e.longitude?.toFixed(5)}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Marker>
+                </React.Fragment>
+              ))}
+
+              {/* Online responders — green pins */}
+              {mapResponders.map(r => r.currentLatitude && r.currentLongitude && (
+                <Marker key={r.userId} position={[r.currentLatitude, r.currentLongitude]} icon={greenMapIcon}>
+                  <Popup>
+                    <div style={{ minWidth: '150px' }}>
+                      <strong style={{ color: '#059669', fontSize: '12px', display: 'block', marginBottom: '4px' }}>
+                        🟢 {r.user?.fullName || 'Responder'}
+                      </strong>
+                      <p style={{ margin: 0, fontSize: '11px', color: '#64748B' }}>
+                        {r.responderType?.replace(/_/g, ' ') || 'Responder'}
+                      </p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+
+          {/* Map footer */}
+          <div style={{
+            padding: '10px 24px', borderTop: `1px solid ${C.border}`,
+            display: 'flex', alignItems: 'center', gap: '16px',
+            flexShrink: 0, background: '#FAFCFD',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#EF4444', fontWeight: 700 }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
+              SOS ({mapEmergencies.length})
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.72rem', color: '#059669', fontWeight: 700 }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} />
+              Responders ({mapResponders.length})
+            </div>
+            <span style={{ fontSize: '0.68rem', color: C.textMuted }}>Auto-refresh 10s</span>
+            <Link
+              to="/admin/sos"
+              style={{
+                marginLeft: 'auto', fontSize: '0.78rem', fontWeight: 700,
+                color: C.accent, textDecoration: 'none',
+                display: 'inline-flex', alignItems: 'center', gap: '4px',
+              }}
+            >
+              View More <ArrowRight size={12} />
             </Link>
           </div>
         </div>
 
-        {/* ── Right: Quick Actions ── */}
-        <div style={{
-          background: C.white, borderRadius: '16px',
-          border: `1px solid ${C.border}`,
-          boxShadow: '0 1px 4px rgba(12,99,126,0.05)',
-          overflow: 'hidden',
-        }}>
-          <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}` }}>
-            <h3 style={{ fontSize: '1rem', fontWeight: 800, color: C.textMain }}>Quick Actions</h3>
-            <p style={{ fontSize: '0.72rem', color: C.textMuted, marginTop: '2px' }}>Jump to key admin tasks</p>
-          </div>
-          <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {[
-              { label: 'Review Pending Responders', sub: `${pendingCount ?? 0} awaiting approval`, icon: UserCheck, color: '#F59E0B', bg: '#FFFBEB', to: '/admin/verify' },
-              { label: 'Monitor Active SOS', sub: `${stats?.activeEmergencies ?? 0} active emergencies`, icon: Activity, color: '#EF4444', bg: '#FEF2F2', to: '/admin/sos' },
-              { label: 'User Management', sub: `${stats?.totalUsers ?? 0} total users`, icon: Users, color: '#0C637E', bg: '#E2F0F3', to: '/admin/users' },
-              { label: 'Send Notification', sub: 'Broadcast to all users', icon: Bell, color: '#6366F1', bg: '#EEF2FF', to: '/admin/notifications' },
-              { label: 'Communication Audit', sub: 'Email & push history', icon: Send, color: '#2496A7', bg: '#E0F7FA', to: '/admin/emails' },
-              { label: 'Subscription Plans', sub: 'Manage user subscriptions', icon: CreditCard, color: '#10B981', bg: '#ECFDF5', to: '/admin/subscriptions' },
-            ].map((item, i) => (
-              <Link
-                key={i}
-                to={item.to}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '12px',
-                  padding: '10px 12px', borderRadius: '12px',
-                  border: `1px solid ${C.border}`,
-                  textDecoration: 'none', transition: 'all 0.15s',
-                  background: 'transparent',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = item.bg; e.currentTarget.style.borderColor = item.color + '44'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = C.border; }}
-              >
-                <div style={{ width: '34px', height: '34px', borderRadius: '9px', background: item.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <item.icon size={16} color={item.color} />
+        {/* ── Right: Subscription Revenue Stats ── */}
+        {(() => {
+          const proCount  = subStats?.PROFESSIONAL ?? 0;
+          const execCount = subStats?.EXECUTIVE    ?? 0;
+          const freeCount = subStats?.FREE         ?? 0;
+          const total     = subStats?.total        ?? 0;
+          const proRev    = proCount  * 499;
+          const execRev   = execCount * 2499;
+          const mrr       = proRev + execRev;
+          const paidCount = proCount + execCount;
+          const convRate  = total > 0 ? ((paidCount / total) * 100).toFixed(1) : '0.0';
+          const fmtPKR    = (n) => 'PKR ' + n.toLocaleString();
+
+          const planRows = [
+            { label: 'Executive',     count: execCount, rev: execRev,  color: '#0C637E', bg: '#E2F0F3', pct: total > 0 ? (execCount/total*100) : 0 },
+            { label: 'Professional',  count: proCount,  rev: proRev,   color: '#2496A7', bg: '#E0F7FA', pct: total > 0 ? (proCount/total*100)  : 0 },
+            { label: 'Free',          count: freeCount, rev: 0,        color: '#94A3B8', bg: '#F1F5F9', pct: total > 0 ? (freeCount/total*100) : 0 },
+          ];
+
+          return (
+            <div style={{
+              background: C.white, borderRadius: '16px',
+              border: `1px solid ${C.border}`,
+              boxShadow: '0 1px 4px rgba(12,99,126,0.05)',
+              overflow: 'hidden', display: 'flex', flexDirection: 'column',
+            }}>
+              {/* Header */}
+              <div style={{ padding: '18px 22px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <h3 style={{ fontSize: '1rem', fontWeight: 800, color: C.textMain }}>Subscription Revenue</h3>
+                  <p style={{ fontSize: '0.72rem', color: C.textMuted, marginTop: '2px' }}>Monthly recurring revenue overview</p>
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: '0.82rem', fontWeight: 700, color: C.textMain, marginBottom: '1px' }}>{item.label}</p>
-                  <p style={{ fontSize: '0.7rem', color: C.textMuted }}>{item.sub}</p>
+                <Link to="/admin/subscriptions/all" style={{ fontSize: '0.72rem', fontWeight: 700, color: C.accent, textDecoration: 'none' }}>
+                  View All →
+                </Link>
+              </div>
+
+              <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+                {/* MRR hero */}
+                <div style={{ background: 'linear-gradient(135deg, #0C637E 0%, #2496A7 100%)', borderRadius: '14px', padding: '18px 20px', color: '#fff' }}>
+                  <p style={{ fontSize: '0.7rem', fontWeight: 600, opacity: 0.75, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '6px' }}>Monthly Recurring Revenue</p>
+                  <p style={{ fontSize: '1.7rem', fontWeight: 900, letterSpacing: '-0.02em', lineHeight: 1 }}>{fmtPKR(mrr)}</p>
+                  <div style={{ display: 'flex', gap: '16px', marginTop: '12px' }}>
+                    <div>
+                      <p style={{ fontSize: '0.65rem', opacity: 0.7 }}>Paid Users</p>
+                      <p style={{ fontSize: '1rem', fontWeight: 800 }}>{paidCount}</p>
+                    </div>
+                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+                    <div>
+                      <p style={{ fontSize: '0.65rem', opacity: 0.7 }}>Conversion Rate</p>
+                      <p style={{ fontSize: '1rem', fontWeight: 800 }}>{convRate}%</p>
+                    </div>
+                    <div style={{ width: '1px', background: 'rgba(255,255,255,0.2)' }} />
+                    <div>
+                      <p style={{ fontSize: '0.65rem', opacity: 0.7 }}>Total Users</p>
+                      <p style={{ fontSize: '1rem', fontWeight: 800 }}>{total}</p>
+                    </div>
+                  </div>
                 </div>
-                <ArrowRight size={13} color={C.textMuted} />
-              </Link>
-            ))}
-          </div>
-        </div>
+
+                {/* Plan breakdown */}
+                {planRows.map((row) => (
+                  <div key={row.label}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '5px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.color }} />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 700, color: C.textMain }}>{row.label}</span>
+                        <span style={{ fontSize: '0.68rem', color: C.textMuted, background: row.bg, padding: '1px 7px', borderRadius: '10px' }}>{row.count} users</span>
+                      </div>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: row.rev > 0 ? row.color : C.textMuted }}>
+                        {row.rev > 0 ? fmtPKR(row.rev) : '—'}
+                      </span>
+                    </div>
+                    {/* Progress bar */}
+                    <div style={{ height: '5px', background: '#F1F5F9', borderRadius: '99px', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${row.pct}%`, background: row.color, borderRadius: '99px', transition: 'width 0.6s ease' }} />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Upgrade potential */}
+                <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '10px', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '1.1rem' }}>💡</span>
+                  <div>
+                    <p style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400E' }}>Upgrade Potential</p>
+                    <p style={{ fontSize: '0.68rem', color: '#B45309' }}>
+                      {freeCount} free user{freeCount !== 1 ? 's' : ''} · up to {fmtPKR(freeCount * 499)} additional MRR if converted
+                    </p>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
 
       </div>
     </motion.div>

@@ -93,37 +93,55 @@ const ApplicationModal = ({ responder, onClose }) => {
       position: 'fixed', inset: 0, zIndex: 10000,
       background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)',
       display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-      overflowY: 'auto', padding: '2rem 1rem',
+      padding: '1.5rem 1rem', overflowY: 'auto',
     }}>
-      {/* Toolbar */}
-      <div className="no-print" style={{
-        position: 'sticky', top: 0, zIndex: 1,
-        display: 'flex', justifyContent: 'flex-end', gap: '0.75rem',
-        width: '100%', maxWidth: '820px', marginBottom: '0.75rem',
+      {/* Modal shell — fixed max-height so toolbar stays pinned and form scrolls */}
+      <div style={{
+        width: '100%', maxWidth: '860px',
+        maxHeight: 'calc(100vh - 3rem)',
+        display: 'flex', flexDirection: 'column',
+        borderRadius: '18px', overflow: 'hidden',
+        boxShadow: '0 24px 64px rgba(0,0,0,0.4)',
+        background: 'white',
       }}>
-        <button onClick={handlePrint} style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.6rem 1.25rem', borderRadius: '10px',
-          background: '#0C637E', color: 'white', border: 'none',
-          fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit',
+
+        {/* ── Sticky toolbar ── */}
+        <div className="no-print" style={{
+          flexShrink: 0,
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          padding: '12px 20px',
+          background: 'white', borderBottom: '1px solid #E5E7EB',
         }}>
-          <Printer size={15} /> Print / Save as PDF
-        </button>
-        <button onClick={onClose} style={{
-          display: 'flex', alignItems: 'center', gap: '0.5rem',
-          padding: '0.6rem 1.25rem', borderRadius: '10px',
-          background: 'white', color: '#374151', border: '1px solid #d1d5db',
-          fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer', fontFamily: 'inherit',
-        }}>
-          <X size={15} /> Close
-        </button>
-      </div>
+          <span style={{ fontSize: '0.82rem', color: '#6B7280', fontWeight: 600 }}>
+            Emergency Responder Application
+          </span>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button onClick={handlePrint} style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.55rem 1.15rem', borderRadius: '10px',
+              background: '#0C637E', color: 'white', border: 'none',
+              fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              <Printer size={14} /> Print / Save as PDF
+            </button>
+            <button onClick={onClose} style={{
+              display: 'flex', alignItems: 'center', gap: '0.5rem',
+              padding: '0.55rem 1.15rem', borderRadius: '10px',
+              background: 'white', color: '#374151', border: '1px solid #D1D5DB',
+              fontWeight: 700, fontSize: '0.85rem', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              <X size={14} /> Close
+            </button>
+          </div>
+        </div>
+
+        {/* ── Scrollable form body ── */}
+        <div style={{ flex: 1, overflowY: 'auto' }}>
 
       {/* Printable form */}
       <div id="application-print-area" style={{
-        width: '100%', maxWidth: '820px', background: 'white',
-        borderRadius: '16px', boxShadow: '0 24px 64px rgba(0,0,0,0.3)',
-        overflow: 'hidden', fontFamily: 'Arial, sans-serif',
+        width: '100%', background: 'white',
+        fontFamily: 'Arial, sans-serif',
       }}>
         {/* Banner */}
         <div style={{ background: 'linear-gradient(135deg,#03293C 0%,#0C637E 100%)', padding: '2rem 2.5rem', color: 'white' }}>
@@ -255,6 +273,8 @@ const ApplicationModal = ({ responder, onClose }) => {
             <span>MediFind Healthcare Emergency Network · Pakistan · Confidential</span>
             <span>Application Ref: {responder.id?.slice(0, 16).toUpperCase() || 'N/A'}</span>
           </div>
+        </div>
+      </div>
         </div>
       </div>
     </div>

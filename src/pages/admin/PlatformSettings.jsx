@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Settings, Mail, CreditCard, Shield, Bell,
+  Settings, Mail, CreditCard, Shield,
   Save, RefreshCw, ChevronRight, AlertCircle,
   CheckCircle, Eye, EyeOff, Server, Lock,
   Zap, Wifi, WifiOff, FlaskConical,
@@ -120,8 +120,6 @@ const PlatformSettings = () => {
     supportEmail:         'support@medifind.pk',
     maintenanceMode:      false,
     debugLogging:         false,
-    alertEmail:           'ops@medifind.pk',
-    alertWebhook:         '',
     twoFactorRequired:    false,
     sessionTimeoutMinutes: 30,
     ipWhitelisting:       false,
@@ -296,7 +294,6 @@ const PlatformSettings = () => {
     { id: 'EMAILS',   label: 'Email Gateway',  icon: Mail      },
     { id: 'PAYMENTS', label: 'Gateways',       icon: CreditCard},
     { id: 'SECURITY', label: 'Security',       icon: Shield    },
-    { id: 'NOTIFY',   label: 'Alerts',         icon: Bell      },
   ];
 
   return (
@@ -788,40 +785,6 @@ const PlatformSettings = () => {
                 </div>
               )}
 
-              {/* ── ALERTS ────────────────────────────────────────────────── */}
-              {activeTab === 'NOTIFY' && (
-                <div style={{ maxWidth: '600px' }}>
-                  <SectionTitle title="System Alert Destinations" sub="Where critical system events are dispatched" />
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                    {/* Email alert */}
-                    <div style={{ padding: '1.5rem', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                          <Mail size={17} color="var(--primary)" />
-                          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-sub)' }}>Alert Email Address</span>
-                        </div>
-                        <CheckCircle size={16} color="var(--s-resolved)" />
-                      </div>
-                      <Field value={settings.alertEmail} onChange={set('alertEmail')} type="email" placeholder="ops@medifind.pk" />
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>Receives server errors, failed jobs, and critical system notifications.</p>
-                    </div>
-
-                    {/* Webhook */}
-                    <div style={{ padding: '1.5rem', background: 'var(--surface-raised)', border: '1px solid var(--border)', borderRadius: '14px' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.875rem' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                          <Bell size={17} color="#8b5cf6" />
-                          <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-sub)' }}>Webhook URL (Discord / Slack)</span>
-                        </div>
-                        {settings.alertWebhook ? <CheckCircle size={16} color="var(--s-resolved)" /> : <AlertCircle size={16} color="var(--text-muted)" />}
-                      </div>
-                      <Field value={settings.alertWebhook} onChange={set('alertWebhook')} placeholder="https://discord.com/api/webhooks/..." />
-                      <p style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px' }}>Leave blank to disable webhook notifications.</p>
-                    </div>
-                  </div>
-                </div>
-              )}
 
             </motion.div>
           </AnimatePresence>

@@ -136,6 +136,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         debugPrint('Voice briefing skipped: $e');
       }
     });
+    _warmPatientMarker();
     _startLiveTracking();
   }
 
@@ -208,6 +209,12 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     } else if (ui != 'CANCELLED' && _rank(ui) > _rank(_currentStatus)) {
       setState(() => _currentStatus = ui);
     }
+  }
+
+  void _warmPatientMarker() {
+    MapUtils.getPatientMarker().then((_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _startLiveTracking() {
@@ -317,6 +324,8 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         await repo.resolveEmergency(widget.emergencyId, outcome: outcome, note: note);
         ref.invalidate(getEmergencyProvider(widget.emergencyId));
         ref.invalidate(getActiveEmergenciesProvider);
+        // Resolving makes the responder available again on the server
+        ref.invalidate(currentUserProvider);
         SocketService.instance.forgetEmergencyRooms(widget.emergencyId);
       } else {
         await ref.read(updateEmergencyStatusProvider(
@@ -520,7 +529,8 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
           markerId: const MarkerId('patient'),
           position: LatLng(emergency.latitude, emergency.longitude),
           infoWindow: const InfoWindow(title: 'Patient location'),
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+          icon: MapUtils.patientMarkerOrDefault,
+          anchor: const Offset(0.5, 1.0),
         ),
       };
 

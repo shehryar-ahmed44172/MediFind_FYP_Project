@@ -183,7 +183,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       final bike = _SimulatedBike(id: 'sim_$i', start: start, speedMetersPerTick: 4.0 + _random.nextDouble() * 2.5);
       _simulatedBikes.add(bike);
       RoadRouteService.route(start, patient).then((route) {
-        if (mounted) bike.setRoute(route.points, startFraction: _random.nextDouble() * 0.35);
+        if (mounted) bike.setRoute(route.points, startFraction: 0.45 + _random.nextDouble() * 0.4);
       });
     }
   }
@@ -950,7 +950,8 @@ class _SimulatedBike {
   void advance() {
     if (!hasRoute) return;
     _progress += speedMetersPerTick;
-    if (_progress >= _length - 60) _progress = 0;
+    // Loop over the last part of the route so the bikes stay in view near the patient
+    if (_progress >= _length - 60) _progress = _length * 0.4;
     final next = RoadRouteService.pointAlong(_route, _progress);
     final ahead = RoadRouteService.pointAlong(_route, _progress + 12);
     if (RoadRouteService.distanceMeters(next, ahead) > 0.5) {

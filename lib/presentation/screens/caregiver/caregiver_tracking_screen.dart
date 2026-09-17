@@ -59,6 +59,9 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
     SocketService.instance.joinEmergencyRoom(widget.emergencyId);
     SocketService.instance.joinLocationRoom(widget.emergencyId);
     _socketSub = SocketService.instance.messageStream.listen(_onSocketMessage);
+    MapUtils.getPatientMarker().then((_) {
+      if (mounted) setState(() {});
+    });
     _load(silent: true); // _loading already starts true
   }
 
@@ -299,7 +302,8 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
         markerId: const MarkerId('patient'),
         position: p,
         infoWindow: InfoWindow(title: _details?.patientName ?? 'Patient location'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+        icon: MapUtils.patientMarkerOrDefault,
+        anchor: const Offset(0.5, 1.0),
       ));
     }
     return markers;

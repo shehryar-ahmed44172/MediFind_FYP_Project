@@ -107,6 +107,10 @@ class MapUtils {
 
   // ─── Patient / SOS Marker ─────────────────────────────────────────────────
   // Red pulsing pin with "SOS" label. Looks nothing like the default cyan pin.
+  /// Patient marker if already drawn (call [getPatientMarker] first to warm it up).
+  static BitmapDescriptor get patientMarkerOrDefault =>
+      _cachedPatientMarker ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed);
+
   static Future<BitmapDescriptor> getPatientMarker() async {
     if (_cachedPatientMarker != null) return _cachedPatientMarker!;
     const double w = 104.0;

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import '../../../core/utils/emergency_status.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
@@ -159,7 +160,7 @@ class CaregiverMapScreen extends ConsumerWidget {
   Widget _buildEmergencyCard(BuildContext context, CaregiverEmergencyDetails e) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
-    final type = e.emergencyType.replaceAll('_', ' ');
+    final type = EmergencyTypes.label(e.emergencyType);
     final name = e.patientName ?? 'Linked patient';
     return MfCard(
       tone: MfTone.danger,
@@ -371,7 +372,8 @@ class _ActiveEmergencyMapState extends ConsumerState<_ActiveEmergencyMap> {
         .map((e) => Marker(
               markerId: MarkerId(e.id),
               position: LatLng(e.latitude!, e.longitude!),
-              icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+              icon: MapUtils.patientMarkerOrDefault,
+              anchor: const Offset(0.5, 1.0),
               infoWindow: InfoWindow(
                 title: e.patientName ?? 'Linked patient',
                 snippet: '${caregiverStatusLabel(e.status)} - tap to track',

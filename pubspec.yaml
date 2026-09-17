@@ -149,7 +149,10 @@ flutter_launcher_icons:
 
 flutter_native_splash:
   color: "#FFFFFF"
-  image: "assets/logos/medifind_app_icon.png"
+  color_dark: "#0F172A"
+  image: "assets/logos/medifind_splash_mark.png"
   android_12:
-    image: "assets/logos/medifind_app_icon.png"
+    # Android 12+ crops the splash icon to a circle, so use the mark without text
+    image: "assets/logos/medifind_splash_mark.png"
     color: "#FFFFFF"
+    color_dark: "#0F172A"

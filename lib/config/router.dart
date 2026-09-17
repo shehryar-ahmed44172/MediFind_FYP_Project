@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../services/call/call_service.dart';
+import '../presentation/screens/call/call_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing GoRouter for handling app navigation and routing
 import 'package:go_router/go_router.dart';
@@ -533,6 +535,18 @@ class AppRouter {
         name: 'settings',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const SettingsScreen(),
+      ),
+      // In-app voice / video call (opened by CallService)
+      GoRoute(
+        path: CallService.callRoute,
+        name: 'call',
+        parentNavigatorKey: _navigatorKey,
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          fullscreenDialog: true,
+          child: const CallScreen(),
+          transitionsBuilder: (context, animation, _, child) => FadeTransition(opacity: animation, child: child),
+        ),
       ),
       GoRoute(
         path: '/chat/:roomId',

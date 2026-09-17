@@ -58,6 +58,40 @@ class SocketService {
   Stream<SocketMessage> get messageStream => _messageController.stream;
   bool get isConnected => _isConnected;
 
+  /// In-app call signalling events (`call:incoming`, `call:accepted`, `call:signal`, ...).
+  final StreamController<({String event, Map<String, dynamic> data})> _callController =
+      StreamController<({String event, Map<String, dynamic> data})>.broadcast();
+  Stream<({String event, Map<String, dynamic> data})> get callEvents => _callController.stream;
+
+  static const List<String> _callEventNames = [
+    'call:incoming', 'call:accepted', 'call:declined', 'call:cancelled', 'call:ended', 'call:missed', 'call:signal',
+  ];
+
+  /// Emits [event] and completes with the server's acknowledgement, or `{ok: false}` when
+  /// offline or when the server does not answer within [timeout].
+  Future<Map<String, dynamic>> emitWithAck(String event, Map<String, dynamic> data,
+      {Duration timeout = const Duration(seconds: 10)}) {
+    final socket = _socket;
+    if (!_isConnected || socket == null) {
+      return Future.value({'ok': false, 'code': 'OFFLINE', 'message': 'No connection to the server.'});
+    }
+    final completer = Completer<Map<String, dynamic>>();
+    socket.emitWithAck(event, data, ack: (response) {
+      if (completer.isCompleted) return;
+      completer.complete(response is Map ? Map<String, dynamic>.from(response) : {'ok': false});
+    });
+    return completer.future.timeout(timeout,
+        onTimeout: () => {'ok': false, 'code': 'TIMEOUT', 'message': 'The server did not respond.'});
+  }
+
+  /// Fire-and-forget emit (returns false when offline).
+  bool emit(String event, Map<String, dynamic> data) {
+    final socket = _socket;
+    if (!_isConnected || socket == null) return false;
+    socket.emit(event, data);
+    return true;
+  }
+
   /// Stores the token for the next [connect]. Does not reconnect by itself.
   void setAuthToken(String token) {
     _authToken = token;
@@ -138,6 +172,12 @@ class SocketService {
     socket.on('notification', (data) {
       _messageController.add(SocketMessage(SocketEvent.notification, data));
     });
+
+    for (final name in _callEventNames) {
+      socket.on(name, (data) {
+        if (data is Map) _callController.add((event: name, data: Map<String, dynamic>.from(data)));
+      });
+    }
 
     // Self-hosted push delivery (store-and-forward, must be acknowledged).
     socket.on('push', (data) {

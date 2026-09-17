@@ -310,6 +310,10 @@ class MedifindPushService {
         }
         break;
 
+      case PushTypes.callIncoming:
+        // App in the foreground: the socket already opened the ringing call screen
+        return;
+
       case PushTypes.chatMessage:
         if (role == 'RESPONDER') return; // responders never get chat pushes
         final roomId = data['roomId']?.toString();

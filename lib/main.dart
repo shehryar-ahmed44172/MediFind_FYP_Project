@@ -1,4 +1,5 @@
 // Importing core Flutter material design package
+import 'services/call/call_service.dart';
 import 'package:flutter/material.dart';
 // Importing Riverpod for state management across the app
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -89,6 +90,9 @@ class _MediFindAppState extends ConsumerState<MediFindApp> with WidgetsBindingOb
       // Push client: socket `push` events, local notifications, tap routing
       // (including launch from a terminated state).
       await MedifindPushService.initialize(AppRouter.navigatorKey, localDataSource, container);
+
+      // In-app voice/video calls (signalling over the same socket)
+      CallService.instance.init(dio: container.read(dioProvider), navigatorKey: AppRouter.navigatorKey);
 
       // Activate Socket Notification Persistence Handler (Plan v5)
       ref.read(socketNotificationHandlerProvider);

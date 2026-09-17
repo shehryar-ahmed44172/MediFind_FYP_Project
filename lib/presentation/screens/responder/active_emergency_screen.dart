@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../../widgets/call/call_launcher.dart';
+import '../../../services/call/call_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -282,16 +284,6 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   double? _distanceKm(emergency_entity.Emergency emergency) {
     if (_myLat == null || _myLng == null) return null;
     return GeoUtils.haversineKm(_myLat!, _myLng!, emergency.latitude, emergency.longitude);
-  }
-
-  Future<void> _callPatient(String phoneNumber) async {
-    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
-    try {
-      final ok = await launchUrl(uri);
-      if (!ok) throw Exception('launch failed');
-    } catch (_) {
-      if (mounted) showMfSnackBar(context, 'Could not start a call to $phoneNumber', tone: MfTone.danger);
-    }
   }
 
   Future<void> _openNavigation(emergency_entity.Emergency emergency) async {
@@ -832,19 +824,42 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
             ],
           ),
           const SizedBox(height: MfSpace.xs),
-          // Phone call for hearing patients; Deaf patients are reached through chat
-          if (emergency.patientType.toUpperCase() != 'DEAF') ...[
-            Builder(builder: (context) {
-              final phone = ref.watch(userProfileProvider(emergency.userId)).valueOrNull?.phoneNumber.trim() ?? '';
-              return MfSecondaryButton(
-                label: 'Call patient',
-                icon: Icons.phone_outlined,
-                semanticLabel: 'Call the patient by phone',
-                onPressed: phone.isEmpty ? null : () => _callPatient(phone),
-              );
-            }),
-            const SizedBox(height: MfSpace.xs),
-          ],
+          // In-app calls with the patient (Deaf patient: video only, chat stays primary)
+          Builder(builder: (context) {
+            final patient = ref.watch(userProfileProvider(emergency.userId)).valueOrNull;
+            final phone = patient?.phoneNumber.trim() ?? '';
+            final deaf = emergency.patientType.toUpperCase() == 'DEAF';
+            final peer = CallPeer(
+              id: emergency.userId,
+              name: patient?.fullName ?? 'Patient',
+              imageUrl: patient?.profileImageUrl,
+              phoneNumber: phone.isEmpty ? null : phone,
+            );
+            return Row(
+              children: [
+                if (!deaf) ...[
+                  Expanded(
+                    child: MfSecondaryButton(
+                      label: 'Call patient',
+                      icon: Icons.phone_outlined,
+                      semanticLabel: 'Voice call the patient',
+                      onPressed: () => startInAppCall(context, peer, CallMedia.audio),
+                    ),
+                  ),
+                  const SizedBox(width: MfSpace.xs),
+                ],
+                Expanded(
+                  child: MfSecondaryButton(
+                    label: 'Video call',
+                    icon: Icons.videocam_outlined,
+                    semanticLabel: 'Video call the patient',
+                    onPressed: () => startInAppCall(context, peer, CallMedia.video),
+                  ),
+                ),
+              ],
+            );
+          }),
+          const SizedBox(height: MfSpace.xs),
         ],
         MfSecondaryButton(
           icon: _isPlayingVoice ? Icons.stop_circle_outlined : Icons.volume_up_outlined,

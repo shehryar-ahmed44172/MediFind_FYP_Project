@@ -113,6 +113,7 @@ class PushTypes {
   static const caregiverResponse = 'CAREGIVER_RESPONSE';
   static const systemAlert = 'SYSTEM_ALERT';
   static const responderArriving = 'RESPONDER_ARRIVING';
+  static const callIncoming = 'CALL_INCOMING';
 }
 
 // ---------------------------------------------------------------------------

@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import '../../widgets/call/call_launcher.dart';
+import '../../../services/call/call_service.dart';
 import 'package:flutter/material.dart';
 import '../../../core/utils/map_utils.dart';
 import '../../../core/utils/emergency_status.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/socket/socket_service.dart';
 import '../../providers/auth_provider.dart';
@@ -287,23 +288,6 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
     return markers;
   }
 
-  Future<void> _callResponder() async {
-    final phone = _responderPhone;
-    if (phone == null) return;
-    final uri = Uri(scheme: 'tel', path: phone.replaceAll(RegExp(r'[^0-9+]'), ''));
-    try {
-      final ok = await launchUrl(uri);
-      if (!ok && mounted) _showSnack('Could not open the phone dialer.');
-    } catch (e) {
-      debugPrint('Caregiver tracking: call failed: $e');
-      if (mounted) _showSnack('Could not open the phone dialer.');
-    }
-  }
-
-  void _showSnack(String text) {
-    showMfSnackBar(context, text, tone: MfTone.danger);
-  }
-
   void _goBack() {
     if (context.canPop()) {
       context.pop();
@@ -555,13 +539,17 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
                         ),
                       ],
                     ),
-                    if (_responderPhone != null && !isTerminalEmergencyStatus(_currentStatus)) ...[
+                    if (_responderId != null && !isTerminalEmergencyStatus(_currentStatus)) ...[
                       const SizedBox(height: MfSpace.sm),
                       MfPrimaryButton(
                         label: 'Call ${_responderName ?? 'emergency responder'}',
                         icon: Icons.call_outlined,
                         semanticLabel: 'Call responder',
-                        onPressed: _callResponder,
+                        onPressed: () => startInAppCall(
+                          context,
+                          CallPeer(id: _responderId!, name: _responderName ?? 'Responder', phoneNumber: _responderPhone),
+                          CallMedia.audio,
+                        ),
                       ),
                     ],
                   ],

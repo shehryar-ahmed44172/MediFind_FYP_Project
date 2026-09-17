@@ -1,4 +1,6 @@
 import 'dart:async';
+import '../../widgets/call/call_launcher.dart';
+import '../../../services/call/call_service.dart';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -133,31 +135,29 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
-  /// Phone number of the other participant when a phone call makes sense: not when the
-  /// patient in this room is Deaf (chat is their channel). The number only reaches this
-  /// device if the server allows it (care or emergency relationship), so nothing extra
-  /// is exposed here.
-  String? _callablePhone() {
+  /// The other participant as a call target, when a call is allowed from this chat:
+  /// not in a locked (ended) emergency chat. [deaf] = the patient in this room is Deaf,
+  /// so only video calls are offered. The server enforces the same rules.
+  ({CallPeer peer, bool deaf})? _callTarget() {
     final role = ref.watch(currentUserProvider).valueOrNull?.role;
     final room = ref.watch(chatRoomsProvider).valueOrNull?.where((r) => r.id == widget.roomId).firstOrNull;
     if (room == null || room.isLocked) return null;
     final patient = ref.watch(userProfileProvider(room.patientId)).valueOrNull;
-    if (patient == null || (patient.patientType ?? '').toUpperCase() == 'DEAF') return null;
+    if (patient == null) return null;
     final otherId = (role ?? '').toUpperCase() == 'PATIENT' ? (room.responderId ?? room.caregiverId) : room.patientId;
     if (otherId == null) return null;
-    final phone = ref.watch(userProfileProvider(otherId)).valueOrNull?.phoneNumber.trim() ?? '';
-    return phone.isEmpty ? null : phone;
-  }
-
-  Future<void> _callPhone(String phoneNumber) async {
-    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
-    var opened = false;
-    try {
-      opened = await launchUrl(uri);
-    } catch (e) {
-      debugPrint('Could not start call: $e');
-    }
-    if (!opened) _showSnack('Could not start a call', isError: true);
+    final other = ref.watch(userProfileProvider(otherId)).valueOrNull;
+    final participant = _participant();
+    final phone = other?.phoneNumber.trim() ?? '';
+    return (
+      peer: CallPeer(
+        id: otherId,
+        name: participant.name,
+        imageUrl: participant.imageUrl,
+        phoneNumber: phone.isEmpty ? null : phone,
+      ),
+      deaf: (patient.patientType ?? '').toUpperCase() == 'DEAF',
+    );
   }
 
   @override
@@ -173,12 +173,19 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         title: participant.name,
         subtitle: participant.emergency ? 'Emergency chat' : null,
         actions: [
-          if (_callablePhone() case final phone?)
+          if (_callTarget() case final target?) ...[
             MfIconButton(
-              icon: Icons.call_outlined,
-              tooltip: 'Call ${participant.name}',
-              onPressed: () => _callPhone(phone),
+              icon: Icons.videocam_outlined,
+              tooltip: 'Video call ${participant.name}',
+              onPressed: () => startInAppCall(context, target.peer, CallMedia.video),
             ),
+            if (!target.deaf)
+              MfIconButton(
+                icon: Icons.call_outlined,
+                tooltip: 'Voice call ${participant.name}',
+                onPressed: () => startInAppCall(context, target.peer, CallMedia.audio),
+              ),
+          ],
           MfIconButton(
             icon: Icons.info_outline_rounded,
             tooltip: 'Chat info',

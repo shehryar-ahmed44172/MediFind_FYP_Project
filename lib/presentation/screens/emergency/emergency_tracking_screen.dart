@@ -1,9 +1,10 @@
 import 'dart:async';
+import '../../widgets/call/call_launcher.dart';
+import '../../../services/call/call_service.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../providers/emergency_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
@@ -777,7 +778,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     final terminal = EmergencyStatus.isTerminal(_currentStatus);
     final hasResponder = _responderId != null || _responderName != null;
     // Contact with the responder ends with the emergency
-    final canCall = !isDeafPatient && _responderPhone != null && !terminal;
+    // In-app calls with the responder while the emergency is open (Deaf: video only)
+    final canCall = _responderId != null && !terminal;
     final canCancel = _currentStatus == 'ACTIVE' || _currentStatus == 'PENDING';
 
     final secondaryActions = <Widget>[
@@ -788,12 +790,19 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           semanticLabel: 'Chat with responder',
           onPressed: _openChat,
         ),
-      if (canCall)
+      if (canCall && !isDeafPatient)
         MfSecondaryButton(
           label: 'Call',
           icon: Icons.phone_outlined,
-          semanticLabel: 'Call responder',
-          onPressed: () => _makePhoneCall(_responderPhone!),
+          semanticLabel: 'Voice call the responder',
+          onPressed: () => startInAppCall(context, _responderCallPeer(), CallMedia.audio),
+        ),
+      if (canCall)
+        MfSecondaryButton(
+          label: isDeafPatient ? 'Video call' : 'Video',
+          icon: Icons.videocam_outlined,
+          semanticLabel: 'Video call the responder',
+          onPressed: () => startInAppCall(context, _responderCallPeer(), CallMedia.video),
         ),
       if (isDeafPatient)
         MfSecondaryButton(
@@ -842,12 +851,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             ),
             const SizedBox(height: MfSpace.xs),
           ],
-          if (secondaryActions.length == 2)
+          if (secondaryActions.length == 2 || secondaryActions.length == 3)
             Row(
               children: [
-                Expanded(child: secondaryActions[0]),
-                const SizedBox(width: MfSpace.xs),
-                Expanded(child: secondaryActions[1]),
+                for (var i = 0; i < secondaryActions.length; i++) ...[
+                  if (i > 0) const SizedBox(width: MfSpace.xs),
+                  Expanded(child: secondaryActions[i]),
+                ],
               ],
             )
           else
@@ -1051,17 +1061,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     return joined.isEmpty ? raw : joined[0].toUpperCase() + joined.substring(1);
   }
 
-  void _makePhoneCall(String phoneNumber) async {
-    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
-    try {
-      final ok = await launchUrl(uri);
-      if (!ok) throw Exception('launch failed');
-    } catch (_) {
-      if (mounted) {
-        showMfSnackBar(context, 'Could not start a call to $phoneNumber', tone: MfTone.danger);
-      }
-    }
-  }
+  CallPeer _responderCallPeer() => CallPeer(
+        id: _responderId!,
+        name: _responderName ?? 'Responder',
+        imageUrl: _responderProfileImage,
+        phoneNumber: _responderPhone,
+      );
 
   void _openChat() async {
     // Show a loading indicator while we create/get the chat room

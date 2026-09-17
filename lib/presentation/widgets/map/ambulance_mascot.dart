@@ -24,6 +24,12 @@ class AmbulanceMascot {
   static List<BitmapDescriptor>? _frames;
   static Future<List<BitmapDescriptor>>? _loading;
 
+  /// Pre-rendered PNG sizes in assets/map (see tool/generate_map_mascot_test.dart).
+  static const List<double> assetPixelRatios = [2, 2.5, 3, 3.5, 4];
+
+  static String assetPath(double ratio, bool flash) =>
+      'assets/map/mascot_${ratio.toString().replaceAll('.', '_')}x_${flash ? 1 : 0}.png';
+
   /// Two pre-rendered frames for the siren flash. Cached for the app session.
   static Future<List<BitmapDescriptor>> frames() {
     final cached = _frames;
@@ -36,6 +42,16 @@ class AmbulanceMascot {
   }
 
   static Future<List<BitmapDescriptor>> _render() async {
+    // Android: asset icons are cached by the Maps SDK. A bytes icon is decoded again on
+    // every marker move, which costs frames and makes the moving marker blink.
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+      final views = ui.PlatformDispatcher.instance.views;
+      final dpr = views.isEmpty ? _pixelRatio : views.first.devicePixelRatio;
+      final ratio = assetPixelRatios.reduce((a, b) => (a - dpr).abs() <= (b - dpr).abs() ? a : b);
+      return [false, true]
+          .map((flash) => AssetMapBitmap(assetPath(ratio, flash), bitmapScaling: MapBitmapScaling.none))
+          .toList();
+    }
     return Future.wait([_renderFrame(false), _renderFrame(true)]);
   }
 
@@ -233,11 +249,18 @@ class AnimatedMascotMarker {
 
   final ValueNotifier<Marker?> marker = ValueNotifier<Marker?>(null);
 
+  /// Frame interval of the glide (~30 fps).
+  static const Duration _tick = Duration(milliseconds: 33);
+
+  /// A GPS fix further than this from the road route is followed in a straight line.
+  static const double _maxRouteOffsetMeters = 40;
+
   List<BitmapDescriptor>? _frames;
   LatLng? _current;
   LatLng? _from;
   LatLng? _to;
   double _bearing = 0;
+  double _targetBearing = 0;
   bool _flash = false;
   DateTime? _moveStart;
   DateTime? _lastUpdateAt;
@@ -245,6 +268,20 @@ class AnimatedMascotMarker {
   Timer? _moveTimer;
   Timer? _flashTimer;
   bool _disposed = false;
+
+  // Road route the responder is driving (from the route line); glides follow it.
+  List<LatLng>? _path;
+  List<double> _cumulative = const [];
+  // A new route is applied at the next GPS fix, never in the middle of a glide
+  List<LatLng>? _pendingPath;
+  bool _hasPendingPath = false;
+  double? _fromAlong;
+  double? _toAlong;
+  // Gap between the marker and its spot on the road at glide start; fades out
+  double _startDLat = 0;
+  double _startDLng = 0;
+  // Recent drawn positions: the heading follows the actual motion on screen
+  final List<LatLng> _trail = [];
 
   AnimatedMascotMarker({
     this.markerId = const MarkerId('responder_mascot'),
@@ -260,13 +297,42 @@ class AnimatedMascotMarker {
     if (flashSiren) {
       _flashTimer = Timer.periodic(const Duration(milliseconds: 500), (_) {
         _flash = !_flash;
-        _publish();
+        if (_moveTimer?.isActive != true) _publish(); // the glide publishes every frame anyway
       });
     }
   }
 
   LatLng? get position => _to ?? _current;
+
+  /// Where the marker is drawn right now (mid-glide).
+  LatLng? get displayPosition => _current;
   double get bearing => _bearing;
+
+  /// Road geometry between responder and patient. Glides between GPS fixes follow
+  /// it instead of cutting straight across blocks. Pass null to clear.
+  void setPath(List<LatLng>? points) {
+    if (_disposed) return;
+    _pendingPath = points;
+    _hasPendingPath = true;
+  }
+
+  void _applyPendingPath() {
+    if (!_hasPendingPath) return;
+    _hasPendingPath = false;
+    final points = _pendingPath;
+    _pendingPath = null;
+    if (points == null || points.length < 2) {
+      _path = null;
+      _cumulative = const [];
+      return;
+    }
+    final cumulative = List<double>.filled(points.length, 0);
+    for (var i = 1; i < points.length; i++) {
+      cumulative[i] = cumulative[i - 1] + _distance(points[i - 1], points[i]);
+    }
+    _path = points;
+    _cumulative = cumulative;
+  }
 
   /// Move to [target]. The first call places the marker without animation.
   void moveTo(LatLng target) {
@@ -280,9 +346,33 @@ class AnimatedMascotMarker {
     }
     if (_sameSpot(current, target)) return;
 
-    _bearing = bearingBetween(current, target);
     _from = current;
     _to = target;
+    _fromAlong = null;
+    _toAlong = null;
+    _applyPendingPath();
+
+    // Follow the road when both ends sit on the route and the move goes forward.
+    final path = _path;
+    if (path != null) {
+      final a = _project(current, preferLater: true);
+      final b = _project(target);
+      final straight = _distance(current, target);
+      if (a.offset < _maxRouteOffsetMeters &&
+          b.offset < _maxRouteOffsetMeters &&
+          b.along >= a.along - 5 &&
+          // Road distance close to the straight gap: skips U-turn hooks and wrong matches
+          b.along - a.along <= straight * 1.8 + 20 &&
+          !_reverses(a.along, math.max(a.along, b.along), bearingBetween(current, target))) {
+        _fromAlong = a.along;
+        _toAlong = math.max(a.along, b.along);
+        final onRoad = _pointAt(a.along);
+        _startDLat = current.latitude - onRoad.latitude;
+        _startDLng = current.longitude - onRoad.longitude;
+      }
+    }
+    if (_fromAlong == null && _distance(current, target) > 6) _targetBearing = bearingBetween(current, target);
+
     // Live location arrives every few seconds: glide over the whole gap so the
     // bike keeps moving continuously instead of jumping and then waiting.
     final now = DateTime.now();
@@ -292,24 +382,113 @@ class AnimatedMascotMarker {
     _currentMoveDuration = Duration(milliseconds: ms);
     _moveStart = now;
     _moveTimer?.cancel();
-    _moveTimer = Timer.periodic(const Duration(milliseconds: 50), (t) {
+    _moveTimer = Timer.periodic(_tick, (t) {
       final start = _moveStart;
       final from = _from;
       final to = _to;
-      if (start == null || from == null || to == null) {
+      if (_disposed || start == null || from == null || to == null) {
         t.cancel();
         return;
       }
       final elapsed = DateTime.now().difference(start).inMilliseconds;
       final raw = (elapsed / _currentMoveDuration.inMilliseconds).clamp(0.0, 1.0);
-      final eased = raw; // linear: constant speed between GPS fixes
-      _current = LatLng(
-        from.latitude + (to.latitude - from.latitude) * eased,
-        from.longitude + (to.longitude - from.longitude) * eased,
-      );
+      final fromAlong = _fromAlong;
+      final toAlong = _toAlong;
+      if (fromAlong != null && toAlong != null && _path != null) {
+        // Constant speed along the road geometry
+        final along = fromAlong + (toAlong - fromAlong) * raw;
+        final onRoad = _pointAt(along);
+        // Ends on the road point of the fix (GPS can sit a few metres off the road)
+        _current = LatLng(onRoad.latitude + _startDLat * (1 - raw), onRoad.longitude + _startDLng * (1 - raw));
+      } else {
+        _current = LatLng(
+          from.latitude + (to.latitude - from.latitude) * raw,
+          from.longitude + (to.longitude - from.longitude) * raw,
+        );
+      }
+      // Heading from the last ~0.4 s of real movement, eased instead of snapping
+      _trail.add(_current!);
+      if (_trail.length > 12) _trail.removeAt(0);
+      if (_distance(_trail.first, _current!) > 4) _targetBearing = bearingBetween(_trail.first, _current!);
+      _bearing = _lerpAngle(_bearing, _targetBearing, 0.18);
       _publish();
-      if (raw >= 1) t.cancel();
+      if (raw >= 1 && _angleDiff(_bearing, _targetBearing).abs() < 1) t.cancel();
     });
+  }
+
+  /// Closest spot on the path. With [preferLater], a later pass of the road that is
+  /// about as close wins (the marker has already driven the earlier one).
+  ({double along, double offset}) _project(LatLng p, {bool preferLater = false}) {
+    final path = _path!;
+    var bestAlong = 0.0;
+    var bestOffset = double.infinity;
+    final cosLat = math.cos(p.latitude * math.pi / 180);
+    for (var i = 0; i < path.length - 1; i++) {
+      final a = path[i];
+      final b = path[i + 1];
+      // Local flat projection in metres around p
+      final ax = (a.longitude - p.longitude) * 111320 * cosLat, ay = (a.latitude - p.latitude) * 110540;
+      final bx = (b.longitude - p.longitude) * 111320 * cosLat, by = (b.latitude - p.latitude) * 110540;
+      final dx = bx - ax, dy = by - ay;
+      final len2 = dx * dx + dy * dy;
+      final f = len2 == 0 ? 0.0 : ((-ax * dx - ay * dy) / len2).clamp(0.0, 1.0);
+      final cx = ax + dx * f, cy = ay + dy * f;
+      final offset = math.sqrt(cx * cx + cy * cy);
+      final along = _cumulative[i] + (_cumulative[i + 1] - _cumulative[i]) * f;
+      if (offset < bestOffset - 8 || (offset < bestOffset + (preferLater ? 8 : 0) && (preferLater ? along > bestAlong : offset < bestOffset))) {
+        bestOffset = math.min(offset, bestOffset);
+        bestAlong = along;
+      }
+    }
+    return (along: bestAlong, offset: bestOffset);
+  }
+
+  /// True when the road between two positions turns back against the direction of
+  /// travel (a U-turn hook), which would make the marker drive backwards.
+  bool _reverses(double fromAlong, double toAlong, double travelBearing) {
+    const step = 10.0;
+    var prev = _pointAt(fromAlong);
+    for (var s = fromAlong + step; s <= toAlong; s += step) {
+      final next = _pointAt(s);
+      if (_distance(prev, next) > 2 && _angleDiff(travelBearing, bearingBetween(prev, next)).abs() > 110) {
+        return true;
+      }
+      prev = next;
+    }
+    return false;
+  }
+
+  LatLng _pointAt(double along) {
+    final path = _path!;
+    final c = _cumulative;
+    if (along <= 0) return path.first;
+    if (along >= c.last) return path.last;
+    var lo = 0, hi = c.length - 1;
+    while (hi - lo > 1) {
+      final mid = (lo + hi) >> 1;
+      if (c[mid] <= along) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    final seg = c[hi] - c[lo];
+    final f = seg == 0 ? 0.0 : (along - c[lo]) / seg;
+    return LatLng(
+      path[lo].latitude + (path[hi].latitude - path[lo].latitude) * f,
+      path[lo].longitude + (path[hi].longitude - path[lo].longitude) * f,
+    );
+  }
+
+  static double _angleDiff(double from, double to) => ((to - from + 540) % 360) - 180;
+
+  static double _lerpAngle(double from, double to, double t) => (from + _angleDiff(from, to) * t + 360) % 360;
+
+  static double _distance(LatLng a, LatLng b) {
+    final cosLat = math.cos((a.latitude + b.latitude) / 2 * math.pi / 180);
+    final dx = (b.longitude - a.longitude) * 111320 * cosLat;
+    final dy = (b.latitude - a.latitude) * 110540;
+    return math.sqrt(dx * dx + dy * dy);
   }
 
   void _publish() {

@@ -35,6 +35,9 @@ class SocketMessage {
 /// the connection drops or the token rotates.
 class SocketService {
   io.Socket? _socket;
+  /// Last live-tracking location per emergency (see RESPONDER_LOCATION_UPDATE).
+  final Map<String, DateTime> _lastLiveLocationAt = {};
+
   final StreamController<SocketMessage> _messageController =
       StreamController<SocketMessage>.broadcast();
   bool _isConnected = false;
@@ -146,12 +149,21 @@ class SocketService {
     });
 
     socket.on('LOCATION_UPDATE', (data) {
-      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, _unpack(data)));
+      final unpacked = _unpack(data);
+      final id = unpacked is Map ? unpacked['emergencyId']?.toString() : null;
+      if (id != null) _lastLiveLocationAt[id] = DateTime.now();
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpacked));
     });
 
-    // Some server paths emit this name (not wrapped in {type, data}).
+    // Periodic availability sync from the responder app (separate GPS reading).
+    // Ignored while live tracking for that emergency is flowing, otherwise the
+    // marker would jump between the two readings.
     socket.on('RESPONDER_LOCATION_UPDATE', (data) {
-      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, _unpack(data)));
+      final unpacked = _unpack(data);
+      final id = unpacked is Map ? unpacked['emergencyId']?.toString() : null;
+      final live = id == null ? null : _lastLiveLocationAt[id];
+      if (live != null && DateTime.now().difference(live) < const Duration(seconds: 20)) return;
+      _messageController.add(SocketMessage(SocketEvent.responderLocationUpdate, unpacked));
     });
 
     socket.on('EMERGENCY_STATUS_CHANGE', (data) {

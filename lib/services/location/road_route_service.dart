@@ -34,15 +34,18 @@ class RoadRouteService {
   static const String baseUrl = 'https://router.project-osrm.org/route/v1/driving';
   static final Map<String, RoadRoute> _cache = {};
 
-  static Future<RoadRoute> route(LatLng from, LatLng to) async {
-    final key = '${_round(from)}|${_round(to)}';
+  /// [heading] (degrees, direction of travel at [from]) makes the router start on the
+  /// correct side of a divided road instead of adding a U-turn.
+  static Future<RoadRoute> route(LatLng from, LatLng to, {double? heading}) async {
+    final key = '${_round(from)}|${_round(to)}|${heading == null ? '-' : (heading / 30).round()}';
     final cached = _cache[key];
     if (cached != null) return cached;
 
     try {
       final uri = Uri.parse(
         '$baseUrl/${from.longitude},${from.latitude};${to.longitude},${to.latitude}'
-        '?overview=full&geometries=geojson',
+        '?overview=full&geometries=geojson'
+        '${heading == null ? '' : '&bearings=${heading.round() % 360},90;'}',
       );
       final res = await http.get(uri).timeout(const Duration(seconds: 6));
       if (res.statusCode == 200) {

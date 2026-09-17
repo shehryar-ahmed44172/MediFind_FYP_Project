@@ -19,6 +19,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../../core/utils/map_utils.dart';
 import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
+import '../../widgets/map/tracking_camera.dart';
 import '../../widgets/map/route_line.dart';
 import '../../../core/utils/emergency_status.dart';
 
@@ -61,6 +62,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   /// Animated motorbike-ambulance marker for the assigned responder.
   /// Road route from the responder to the patient (SRS FR6.2).
   final RouteLine _route = RouteLine(color: AppColors.primary);
+  final TrackingCamera _camera = TrackingCamera();
 
   AnimatedMascotMarker _responderMarker = AnimatedMascotMarker(
     markerId: const MarkerId('responder'),
@@ -85,6 +87,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     socketService.joinEmergencyRoom(widget.emergencyId);
     socketService.joinLocationRoom(widget.emergencyId);
     _socketSub = socketService.messageStream.listen(_onSocketMessage);
+    _route.route.addListener(_onRouteChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -287,6 +290,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           );
         });
         WidgetsBinding.instance.addPostFrameCallback((_) => old.dispose());
+        _onRouteChanged();
         showMfSnackBar(
           context,
           data['message']?.toString() ?? 'Finding another responder for you…',
@@ -366,12 +370,19 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     };
   }
 
-  void _animateToResponder() async {
-    if (_mapController != null && _responderLat != null && _responderLong != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLng(LatLng(_responderLat!, _responderLong!)),
-      );
-    }
+  /// The mascot glides along the road route instead of cutting across blocks.
+  void _onRouteChanged() {
+    final r = _route.route.value;
+    _responderMarker.setPath(r == null || r.isFallback ? null : r.points);
+  }
+
+  void _animateToResponder() {
+    if (_responderLat == null || _responderLong == null) return;
+    _camera.keepInView(
+      _mapController,
+      responder: LatLng(_responderLat!, _responderLong!),
+      patient: _patientLatLng,
+    );
   }
 
   // Recomputes screen-pixel positions for both overlay widgets after any

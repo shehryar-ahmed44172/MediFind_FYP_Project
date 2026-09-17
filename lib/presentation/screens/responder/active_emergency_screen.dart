@@ -74,6 +74,8 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   LatLng? _patientPosition;
 
   /// Animated motorbike-ambulance marker for "me".
+  Timer? _followTimer;
+
   final AnimatedMascotMarker _meMarker = AnimatedMascotMarker(
     markerId: const MarkerId('me'),
     infoWindow: const InfoWindow(title: 'You'),
@@ -115,6 +117,13 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     super.initState();
     SocketService.instance.joinEmergencyRoom(widget.emergencyId);
     _socketSub = SocketService.instance.messageStream.listen(_onSocketMessage);
+    _route.route.addListener(_onRouteChanged);
+    // Pan with the gliding marker instead of jumping to each raw GPS fix
+    _followTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final pos = _meMarker.displayPosition;
+      if (!mounted || !_followMe || _mapController == null || pos == null) return;
+      _mapController!.animateCamera(CameraUpdate.newLatLng(pos), duration: const Duration(milliseconds: 1000)).catchError((_) {});
+    });
     _loadInitialStatus();
     Future.microtask(() async {
       final voiceEnabled = ref.read(accessibilityProvider).voiceGuidanceEnabled;
@@ -239,7 +248,6 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         );
       }
 
-      if (_followMe) _animateToMe();
     }, onError: (Object e) {
       if (mounted) {
         setState(() => _locationError = e is AppException ? e.message : LocationService.unavailableMessage);
@@ -248,16 +256,22 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   }
 
   void _animateToMe() {
-    if (_mapController != null && _myLat != null && _myLng != null) {
-      _mapController!.animateCamera(
-        CameraUpdate.newLatLng(LatLng(_myLat!, _myLng!)),
-      );
+    final pos = _meMarker.displayPosition ?? (_myLat != null && _myLng != null ? LatLng(_myLat!, _myLng!) : null);
+    if (_mapController != null && pos != null) {
+      _mapController!.animateCamera(CameraUpdate.newLatLng(pos));
     }
+  }
+
+  /// The mascot glides along the road route instead of cutting across blocks.
+  void _onRouteChanged() {
+    final r = _route.route.value;
+    _meMarker.setPath(r == null || r.isFallback ? null : r.points);
   }
 
   @override
   void dispose() {
     _locationSubscription?.cancel();
+    _followTimer?.cancel();
     _socketSub?.cancel();
     _meMarker.dispose();
     _route.dispose();

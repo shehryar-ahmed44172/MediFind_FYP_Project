@@ -13,8 +13,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/caregiver_dashboard_provider.dart';
 import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
+import '../../widgets/map/tracking_camera.dart';
 import '../../widgets/map/route_line.dart';
-import '../../../services/location/road_route_service.dart';
 import '../../theme/app_theme.dart';
 
 class CaregiverTrackingScreen extends ConsumerStatefulWidget {
@@ -31,6 +31,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
   /// Animated motorbike-ambulance marker for the assigned responder.
   /// Road route from the responder to the patient.
   final RouteLine _route = RouteLine(color: AppColors.primary);
+  final TrackingCamera _camera = TrackingCamera();
 
   AnimatedMascotMarker _mascot = AnimatedMascotMarker(
     markerId: const MarkerId('responder'),
@@ -59,6 +60,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
     SocketService.instance.joinEmergencyRoom(widget.emergencyId);
     SocketService.instance.joinLocationRoom(widget.emergencyId);
     _socketSub = SocketService.instance.messageStream.listen(_onSocketMessage);
+    _route.route.addListener(_onRouteChanged);
     MapUtils.getPatientMarker().then((_) {
       if (mounted) setState(() {});
     });
@@ -258,39 +260,15 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
   }
 
   Future<void> _fitCamera() async {
-    final controller = _mapController;
-    final p = _patientLatLng;
     final r = _responderLatLng;
-    if (controller == null || r == null) return;
-    try {
-      if (p == null) {
-        await controller.animateCamera(CameraUpdate.newLatLng(r));
-        return;
-      }
-      final bounds = LatLngBounds(
-        southwest: LatLng(
-          p.latitude < r.latitude ? p.latitude : r.latitude,
-          p.longitude < r.longitude ? p.longitude : r.longitude,
-        ),
-        northeast: LatLng(
-          p.latitude > r.latitude ? p.latitude : r.latitude,
-          p.longitude > r.longitude ? p.longitude : r.longitude,
-        ),
-      );
-      // Very close together: a bounds fit would zoom in to street level
-      // where tiles look empty — keep a readable neighbourhood view instead.
-      final closeMeters = RoadRouteService.distanceMeters(p, r);
-      if (closeMeters < 400) {
-        await controller.animateCamera(CameraUpdate.newLatLngZoom(
-          LatLng((p.latitude + r.latitude) / 2, (p.longitude + r.longitude) / 2),
-          16,
-        ));
-      } else {
-        await controller.animateCamera(CameraUpdate.newLatLngBounds(bounds, 60));
-      }
-    } catch (e) {
-      debugPrint('Caregiver tracking: camera update skipped: $e');
-    }
+    if (r == null) return;
+    await _camera.keepInView(_mapController, responder: r, patient: _patientLatLng);
+  }
+
+  /// The mascot glides along the road route instead of cutting across blocks.
+  void _onRouteChanged() {
+    final route = _route.route.value;
+    _mascot.setPath(route == null || route.isFallback ? null : route.points);
   }
 
   /// Patient marker only; the responder mascot is added by the map's builder.

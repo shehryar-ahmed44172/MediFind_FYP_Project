@@ -21,13 +21,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
 });
 
-// Custom red icon for active emergencies (patient SOS)
-const redIcon = new L.Icon({
-  iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-red.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-  iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41],
-});
-
 // Green icon for available online responders (normal view)
 const greenIcon = new L.Icon({
   iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
@@ -53,52 +46,77 @@ const calcBearing = (lat1, lon1, lat2, lon2) => {
 
 // Map marker colours are literal values (SVG attributes) — map tiles are always light
 const MAP = chartColors(false);
-const AMBULANCE_BODY = '#047857';
-const AMBULANCE_WHEEL = '#0F172A';
 
-// ── Ambulance motorbike SVG DivIcon — rotates to face direction of travel ───
-// The SVG is drawn facing east (right). We subtract 90° so bearing=0 (north)
-// makes the icon point up, bearing=90 makes it point right, etc.
+// ── Ambulance motorbike mascot — same top-down design as the mobile app ─────
+// Drawn on a 64x64 grid facing north, so rotate(bearing) points it along the road.
+const MASCOT_SVG = `
+  <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 64 64" aria-hidden="true">
+    <style>
+      .mf-halo{animation:mfHalo 1.2s ease-in-out infinite;transform-origin:32px 33px}
+      .mf-l{animation:mfSiren .8s steps(1) infinite}
+      .mf-r{animation:mfSiren .8s steps(1) .4s infinite}
+      @keyframes mfHalo{0%,100%{opacity:.12;transform:scale(1)}50%{opacity:.22;transform:scale(1.1)}}
+      @keyframes mfSiren{0%{fill:#EF4444}50%{fill:#2891C2}}
+    </style>
+    <circle class="mf-halo" cx="32" cy="33" r="26" fill="#EF4444"/>
+    <rect x="21" y="9" width="22" height="50" rx="10" fill="#000" opacity=".22" filter="blur(1.5px)"/>
+    <rect x="28.8" y="5" width="6.4" height="12" rx="3" fill="#111827"/>
+    <rect x="28.4" y="48" width="7.2" height="12" rx="3" fill="#111827"/>
+    <line x1="22" y1="17" x2="42" y2="17" stroke="#374151" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="22" cy="17" r="1.8" fill="#9CA3AF"/><circle cx="42" cy="17" r="1.8" fill="#9CA3AF"/>
+    <rect x="26" y="12" width="12" height="22" rx="6" fill="#EF4444"/>
+    <rect x="28" y="13.5" width="8" height="4" rx="2" fill="#E2F0F3" opacity=".9"/>
+    <ellipse cx="32" cy="26.5" rx="8" ry="5.5" fill="#1F2937"/>
+    <circle cx="32" cy="24.5" r="5.2" fill="#fff" stroke="#EF4444" stroke-width="1.2"/>
+    <path d="M28.6 22.2 A4 4 0 0 1 35.4 22.2" fill="none" stroke="#2496A7" stroke-width="1.8" stroke-linecap="round"/>
+    <rect x="21" y="34" width="22" height="20" rx="4" fill="#fff" stroke="#CBD5E1" stroke-width="1"/>
+    <rect x="26" y="43" width="12" height="4" rx="1" fill="#EF4444"/>
+    <rect x="30" y="39" width="4" height="12" rx="1" fill="#EF4444"/>
+    <rect x="23" y="33" width="18" height="4.5" rx="2" fill="#374151"/>
+    <circle class="mf-l" cx="27" cy="35.2" r="2.3" fill="#EF4444"/>
+    <circle class="mf-r" cx="37" cy="35.2" r="2.3" fill="#2891C2"/>
+  </svg>`;
+
 const makeAmbulanceIcon = (bearing = 0) => L.divIcon({
   className: '',
-  html: `
-    <div style="
-      width:52px;height:32px;
-      transform:rotate(${bearing - 90}deg);
-      transform-origin:center center;
-      transition:transform 0.55s ease;
-      filter:drop-shadow(0 2px 4px rgba(15,23,42,0.35));
-    ">
-      <svg xmlns="http://www.w3.org/2000/svg" width="52" height="32" viewBox="0 0 52 32">
-        <style>@keyframes siren{0%,49%{opacity:1}50%,100%{opacity:0.18}}</style>
-        <!-- Main body -->
-        <rect x="10" y="10" width="30" height="11" rx="4" fill="${AMBULANCE_BODY}"/>
-        <!-- Siren bar (animated red) -->
-        <rect x="17" y="4" width="15" height="7" rx="3" fill="${MAP.sos}" style="animation:siren 0.75s ease infinite"/>
-        <!-- Siren lights -->
-        <circle cx="20" cy="7.5" r="1.5" fill="white" style="animation:siren 0.75s 0.375s ease infinite"/>
-        <circle cx="29" cy="7.5" r="1.5" fill="white"/>
-        <!-- White cross horizontal -->
-        <rect x="18" y="13" width="14" height="3" rx="0.5" fill="white"/>
-        <!-- White cross vertical -->
-        <rect x="23.5" y="10" width="3" height="9" rx="0.5" fill="white"/>
-        <!-- Front fork / handlebar -->
-        <rect x="40" y="12" width="7" height="3" rx="1.5" fill="${AMBULANCE_BODY}"/>
-        <!-- Rear exhaust -->
-        <rect x="4" y="14.5" width="6" height="2" rx="1" fill="${AMBULANCE_BODY}" opacity="0.8"/>
-        <!-- Back wheel -->
-        <circle cx="14" cy="25" r="6" fill="${AMBULANCE_WHEEL}" stroke="${MAP.success}" stroke-width="2"/>
-        <circle cx="14" cy="25" r="2" fill="${MAP.success}"/>
-        <!-- Front wheel -->
-        <circle cx="38" cy="25" r="6" fill="${AMBULANCE_WHEEL}" stroke="${MAP.success}" stroke-width="2"/>
-        <circle cx="38" cy="25" r="2" fill="${MAP.success}"/>
-      </svg>
-    </div>
-  `,
-  iconSize:    [52, 32],
-  iconAnchor:  [26, 30],
-  popupAnchor: [0, -32],
+  html: `<div style="width:56px;height:56px;transform:rotate(${bearing}deg);transform-origin:center center;transition:transform 0.55s ease;">${MASCOT_SVG}</div>`,
+  iconSize:    [56, 56],
+  iconAnchor:  [28, 28],
+  popupAnchor: [0, -26],
 });
+
+// ── Patient pin — same design as the mobile app (person pin + SOS badge) ─────
+const patientIcon = L.divIcon({
+  className: '',
+  html: `
+    <svg xmlns="http://www.w3.org/2000/svg" width="46" height="55" viewBox="0 0 104 124" aria-hidden="true">
+      <circle cx="52" cy="48" r="44" fill="#DC2626" opacity=".16"/>
+      <path d="M52 14a34 34 0 0 1 14 65 Q52 122 52 122 Q52 122 38 79 A34 34 0 0 1 52 14z" fill="#fff" stroke="#0C637E" stroke-width="4"/>
+      <circle cx="52" cy="39" r="10" fill="#04364E"/>
+      <path d="M34 68 Q34 51 52 51 Q70 51 70 68z" fill="#04364E"/>
+      <rect x="60" y="2" width="42" height="22" rx="11" fill="#DC2626" stroke="#fff" stroke-width="2"/>
+      <text x="81" y="18" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="12" font-weight="700" fill="#fff">SOS</text>
+    </svg>`,
+  iconSize:    [46, 55],
+  iconAnchor:  [23, 54],
+  popupAnchor: [0, -50],
+});
+
+// Frames the open emergencies and moving ambulances whenever that set changes,
+// so a new SOS is shown at street level instead of the country view.
+function FocusOpenEmergencies({ points, focusKey }) {
+  const map = useMap();
+  useEffect(() => {
+    if (!focusKey || points.length === 0) return;
+    if (points.length === 1) {
+      map.setView(points[0], 15, { animate: true });
+    } else {
+      map.fitBounds(L.latLngBounds(points).pad(0.3), { animate: true, maxZoom: 16 });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusKey]);
+  return null;
+}
 
 // Escape values interpolated into Leaflet popup HTML
 const escapeHtml = (s) => String(s ?? '').replace(/[&<>"']/g, ch => (
@@ -457,10 +475,12 @@ const SOSMonitor = () => {
     : scopedEmergencies.filter(e => filterOpt?.statuses?.includes(e.status));
 
   const activeEmergencies = scopedEmergencies.filter(e => e.status === 'ACTIVE');
+  const OPEN_STATUSES = ['ACTIVE', 'ASSIGNED', 'ARRIVED'];
+  const openEmergencies = scopedEmergencies.filter(e => OPEN_STATUSES.includes(e.status) && e.latitude && e.longitude);
 
   /* ── Moving vehicles: drop finished emergencies, enrich with responder names ── */
   const liveEmergencyIds = new Set(
-    emergencies.filter(e => ['ACTIVE', 'ASSIGNED'].includes(e.status)).map(e => e.id)
+    emergencies.filter(e => ['ACTIVE', 'ASSIGNED', 'ARRIVED'].includes(e.status)).map(e => e.id)
   );
   const displayVehicles = Object.entries(movingVehicles)
     .filter(([, v]) => v.isDemo || !v.emergencyId || liveEmergencyIds.has(v.emergencyId))
@@ -677,9 +697,18 @@ const SOSMonitor = () => {
 
                   {/* Auto-fit to all responders when Responder View is active */}
                   {responderFocused && <FitBoundsToResponders responders={onlineResponders} />}
+                  {!responderFocused && !selectedEmergency && (
+                    <FocusOpenEmergencies
+                      points={[
+                        ...openEmergencies.map(e => [e.latitude, e.longitude]),
+                        ...displayVehicles.filter(([, v]) => !v.isDemo).map(([, v]) => [v.lat, v.lon]),
+                      ]}
+                      focusKey={openEmergencies.map(e => `${e.id}:${e.status}`).join('|')}
+                    />
+                  )}
 
                   {/* ── Patient SOS markers (red) — dimmed in responder-focus mode ── */}
-                  {activeEmergencies.map((e) => (
+                  {openEmergencies.map((e) => (
                     e.latitude && e.longitude ? (
                       <React.Fragment key={e.id}>
                         <Circle
@@ -692,7 +721,7 @@ const SOSMonitor = () => {
                         />
                         <Marker
                           position={[e.latitude, e.longitude]}
-                          icon={redIcon}
+                          icon={patientIcon}
                           opacity={responderFocused ? 0.35 : 1}
                           eventHandlers={{ click: () => { if (!responderFocused) setSelectedEmergency(e); } }}
                         >

@@ -10,6 +10,7 @@ import '../../providers/connectivity_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../widgets/design_system/design_system.dart';
+import '../../widgets/map/map_warmup.dart';
 
 class EmergencyScreen extends ConsumerStatefulWidget {
   const EmergencyScreen({super.key});
@@ -27,6 +28,17 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   bool? _showTextClassifier; // null = default (open for deaf / text-only patients)
   Map<String, dynamic>? _aiResult;
   final FocusNode _otherFocusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    // Get the location and the map ready while the patient picks a type,
+    // so Send SOS opens the countdown without waiting.
+    LocationService().prewarm();
+    Future.delayed(const Duration(milliseconds: 450), () {
+      if (mounted) MapWarmup.run();
+    });
+  }
 
   // Values match the backend's specialist routing (SPECIALIST_MAP) + FALL/OTHER.
   static const List<Map<String, dynamic>> _emergencyTypes = [
@@ -121,7 +133,10 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
       }
 
       // Real GPS fix or last known position only — never fake coordinates.
-      final position = await locationService.getCurrentLocation();
+      // A fix from the last 2 minutes opens the countdown at once; the countdown
+      // refines it before anything is sent.
+      final recent = await locationService.recentPosition();
+      final position = recent ?? await locationService.getCurrentLocation();
 
       if (mounted) {
         context.push('/home/sos-countdown', extra: {
@@ -129,6 +144,7 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
           'latitude': position.latitude,
           'longitude': position.longitude,
           'isMocked': position.isMocked,
+          'refineLocation': recent != null,
           'additionalInfo': _additionalInfoController.text.trim().isNotEmpty
               ? _additionalInfoController.text.trim()
               : null,

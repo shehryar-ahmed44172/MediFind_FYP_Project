@@ -13,6 +13,9 @@ class LocationService {
   LocationService._internal();
 
   Stream<Position>? _positionStream;
+
+  /// Last fresh GPS fix obtained by this app session.
+  static Position? _lastFix;
   
   // Debug offsets for testing distance between devices
   static double debugLatOffset = 0.0;
@@ -155,7 +158,8 @@ class LocationService {
             timeLimit: timeLimit,
           ),
         );
-        return _applyDebugOffset(pos);
+        _lastFix = _applyDebugOffset(pos);
+        return _lastFix!;
       } catch (e) {
         debugPrint('Geolocator.getCurrentPosition failed/timed out: $e');
       }
@@ -178,6 +182,42 @@ class LocationService {
         message: unavailableMessage,
         originalException: e,
       );
+    }
+  }
+
+  /// A recent fix (no older than [maxAge], accurate to [maxAccuracyMeters]) without
+  /// waiting for the GPS. Returns null when none is available or permission is missing.
+  Future<Position?> recentPosition({
+    Duration maxAge = const Duration(minutes: 2),
+    double maxAccuracyMeters = 100,
+  }) async {
+    bool usable(Position p) =>
+        DateTime.now().difference(p.timestamp).abs() <= maxAge && p.accuracy <= maxAccuracyMeters;
+    final cached = _lastFix;
+    if (cached != null && usable(cached)) return cached;
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null && usable(last)) return _applyDebugOffset(last);
+    } catch (e) {
+      debugPrint('recentPosition failed: $e');
+    }
+    return null;
+  }
+
+  /// Starts a GPS fix in the background so the SOS flow can use it immediately.
+  /// Never prompts: does nothing unless permission was already granted.
+  Future<void> prewarm() async {
+    try {
+      final permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
+      if (!await Geolocator.isLocationServiceEnabled()) return;
+      await getCurrentLocation(timeLimit: const Duration(seconds: 20));
+    } catch (_) {
+      // The SOS button still fetches a fix itself
     }
   }
 

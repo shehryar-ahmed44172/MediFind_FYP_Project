@@ -309,6 +309,7 @@ class AppRouter {
                           longitude: (extra['longitude'] as num?)?.toDouble() ?? 0.0,
                           additionalInfo: extra['additionalInfo'],
                           isMocked: extra['isMocked'] == true,
+                          refineLocation: extra['refineLocation'] == true,
                         ),
                         transitionsBuilder: (context, animation, secondaryAnimation, child) =>
                             FadeTransition(opacity: animation, child: child),

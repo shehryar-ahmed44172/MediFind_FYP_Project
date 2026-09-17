@@ -79,6 +79,8 @@ dependencies:
 
   # Maps (Live tracking)
   google_maps_flutter: ^2.5.0
+  google_maps_flutter_android: ^2.19.1
+  google_maps_flutter_platform_interface: ^2.14.2
 
   # File picker for medical uploads
   file_picker: ^8.0.0+1
@@ -128,6 +130,7 @@ flutter:
   assets:
     - assets/images/
     - assets/logos/
+    - assets/map/
     - assets/icons/
     - assets/animations/
     - assets/sounds/

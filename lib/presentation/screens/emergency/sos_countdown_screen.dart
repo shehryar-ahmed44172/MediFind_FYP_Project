@@ -12,6 +12,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
 import '../../../services/location/road_route_service.dart';
+import '../../../services/location/location_service.dart';
 import '../../../core/utils/map_utils.dart';
 import '../../../core/utils/emergency_status.dart';
 import '../../../services/socket/socket_service.dart';
@@ -24,6 +25,9 @@ class SosCountdownScreen extends ConsumerStatefulWidget {
   final String? additionalInfo;
   final bool isMocked;
 
+  /// The position is a recent fix: look for a fresher one before sending.
+  final bool refineLocation;
+
   const SosCountdownScreen({
     super.key,
     this.emergencyType = 'OTHER',
@@ -31,6 +35,7 @@ class SosCountdownScreen extends ConsumerStatefulWidget {
     this.longitude = 0.0,
     this.additionalInfo,
     this.isMocked = false,
+    this.refineLocation = false,
   });
 
   @override
@@ -88,15 +93,28 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   GoogleMapController? _searchMapController;
   Timer? _zoomTimer;
   double _searchZoom = 16.2;
+
+  // Patient position used for the map and the SOS (may be refined during the countdown)
+  late double _lat = widget.latitude;
+  late double _lng = widget.longitude;
+  late bool _isMocked = widget.isMocked;
+
+  // The map is created after the page transition and fades in once drawn
+  bool _showMap = false;
+  bool _mapVisible = false;
   static const double _searchZoomMin = 14.2;
 
   @override
   void initState() {
     super.initState();
 
-    _radar1Controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000))..repeat();
-    _radar2Controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
-    _radar3Controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2000));
+    _radar1Controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2000))
+      ..repeat();
+    _radar2Controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2000));
+    _radar3Controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2000));
     Future.delayed(const Duration(milliseconds: 666), () {
       if (mounted) _radar2Controller.repeat();
     });
@@ -104,17 +122,60 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       if (mounted) _radar3Controller.repeat();
     });
 
-    _foundController = AnimationController(vsync: this, duration: MfMotion.normal);
+    _foundController =
+        AnimationController(vsync: this, duration: MfMotion.normal);
     _foundOpacity = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _foundController, curve: Curves.easeIn),
     );
 
     _initSimulatedBikes();
     _loadMarkerIcons();
-    _bikeTimer = Timer.periodic(const Duration(milliseconds: 100), (_) => _updateBikePositions());
+    _bikeTimer = Timer.periodic(
+        const Duration(milliseconds: 100), (_) => _updateBikePositions());
 
     _socketSub = SocketService.instance.messageStream.listen(_onSocketMessage);
     _startPreSendCountdown();
+    if (widget.refineLocation) _refineLocation();
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _showMapAfterTransition());
+  }
+
+  void _showMapAfterTransition() {
+    if (!mounted) return;
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.status == AnimationStatus.completed) {
+      setState(() => _showMap = true);
+      return;
+    }
+    void listener(AnimationStatus status) {
+      if (status != AnimationStatus.completed) return;
+      animation.removeStatusListener(listener);
+      if (mounted) setState(() => _showMap = true);
+    }
+
+    animation.addStatusListener(listener);
+  }
+
+  /// Opened with a recent fix: take a fresh one before the SOS goes out.
+  void _refineLocation() {
+    LocationService()
+        .getCurrentLocation(timeLimit: const Duration(seconds: 30))
+        .then((pos) {
+      if (!mounted || _sent || _cancelled) return;
+      final moved = RoadRouteService.distanceMeters(
+          LatLng(_lat, _lng), LatLng(pos.latitude, pos.longitude));
+      setState(() {
+        _lat = pos.latitude;
+        _lng = pos.longitude;
+        _isMocked = pos.isMocked;
+      });
+      if (moved > 25) {
+        _searchMapController
+            ?.animateCamera(CameraUpdate.newLatLng(LatLng(_lat, _lng)));
+      }
+    }).catchError((Object e) {
+      debugPrint('SOS location refine failed, using the recent fix: $e');
+    });
   }
 
   // ── Pre-send countdown ────────────────────────────────────────────────────
@@ -127,7 +188,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       }
       setState(() => _preSendLeft--);
       if (ref.read(accessibilityProvider).vibrationFeedback) {
-        _preSendLeft <= 10 ? HapticFeedback.heavyImpact() : HapticFeedback.lightImpact();
+        _preSendLeft <= 10
+            ? HapticFeedback.heavyImpact()
+            : HapticFeedback.lightImpact();
       }
       if (_preSendLeft <= 0) _sendNow();
     });
@@ -149,7 +212,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     if (_sent) return;
     _preSendTimer?.cancel();
     setState(() => _cancelled = true);
-    showMfSnackBar(context, 'SOS cancelled. Nothing was sent.', tone: MfTone.success);
+    showMfSnackBar(context, 'SOS cancelled. Nothing was sent.',
+        tone: MfTone.success);
     _navigateAway('/home');
   }
 
@@ -171,19 +235,26 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   // ── Search animation ──────────────────────────────────────────────────────
 
   void _initSimulatedBikes() {
-    final patient = LatLng(widget.latitude, widget.longitude);
+    final patient = LatLng(_lat, _lng);
     for (int i = 0; i < 4; i++) {
       // Start 0.9–1.6 km away in four directions, then drive the real road route in.
       final angle = (i * math.pi / 2) + _random.nextDouble() * 0.6;
       final km = 0.9 + _random.nextDouble() * 0.7;
       final start = LatLng(
         patient.latitude + (km / 111.0) * math.cos(angle),
-        patient.longitude + (km / (111.0 * math.cos(patient.latitude * math.pi / 180))) * math.sin(angle),
+        patient.longitude +
+            (km / (111.0 * math.cos(patient.latitude * math.pi / 180))) *
+                math.sin(angle),
       );
-      final bike = _SimulatedBike(id: 'sim_$i', start: start, speedMetersPerTick: 4.0 + _random.nextDouble() * 2.5);
+      final bike = _SimulatedBike(
+          id: 'sim_$i',
+          start: start,
+          speedMetersPerTick: 4.0 + _random.nextDouble() * 2.5);
       _simulatedBikes.add(bike);
       RoadRouteService.route(start, patient).then((route) {
-        if (mounted) bike.setRoute(route.points, startFraction: 0.45 + _random.nextDouble() * 0.4);
+        if (mounted)
+          bike.setRoute(route.points,
+              startFraction: 0.45 + _random.nextDouble() * 0.4);
       });
     }
   }
@@ -204,7 +275,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       }
       _searchZoom = math.max(_searchZoomMin, _searchZoom - 0.06);
       controller.animateCamera(CameraUpdate.newCameraPosition(
-        CameraPosition(target: LatLng(widget.latitude, widget.longitude), zoom: _searchZoom),
+        CameraPosition(target: LatLng(_lat, _lng), zoom: _searchZoom),
       ));
     });
   }
@@ -228,8 +299,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
   Marker _userMarker() => Marker(
         markerId: const MarkerId('user'),
-        position: LatLng(widget.latitude, widget.longitude),
-        icon: _userIcon ?? BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+        position: LatLng(_lat, _lng),
+        icon: _userIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
       );
 
   void _updateBikePositions() {
@@ -342,7 +414,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       if (_confirmedIcon != null)
         Marker(
           markerId: const MarkerId('confirmed_responder'),
-          position: LatLng(widget.latitude, widget.longitude),
+          position: LatLng(_lat, _lng),
           icon: _confirmedIcon!,
           anchor: const Offset(0.5, 0.5),
         ),
@@ -376,10 +448,10 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     try {
       final params = CreateEmergencyParams(
         emergencyType: widget.emergencyType,
-        latitude: widget.latitude,
-        longitude: widget.longitude,
+        latitude: _lat,
+        longitude: _lng,
         additionalInfo: widget.additionalInfo,
-        isMocked: widget.isMocked,
+        isMocked: _isMocked,
       );
 
       final result = await ref.read(createEmergencyProvider(params).future);
@@ -400,7 +472,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       }
 
       if (result.alreadyActive) {
-        showMfSnackBar(context, 'You already have an active emergency. Showing its status.', tone: MfTone.info);
+        showMfSnackBar(context,
+            'You already have an active emergency. Showing its status.',
+            tone: MfTone.info);
         if (EmergencyStatus.isAssigned(emergency.status)) {
           _navigateAway('/emergency/${emergency.id}/tracking');
           return;
@@ -409,10 +483,14 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 
       final user = ref.read(currentUserProvider).valueOrNull;
       final accessibility = ref.read(accessibilityProvider);
-      final isDeaf = (user?.patientType?.toUpperCase() == 'DEAF') || accessibility.textOnlyMode;
+      final isDeaf = (user?.patientType?.toUpperCase() == 'DEAF') ||
+          accessibility.textOnlyMode;
       // Spoken updates only when the patient turned on Voice Guidance.
-      if (!isDeaf && !result.alreadyActive && accessibility.voiceGuidanceEnabled) {
-        VoiceAlertService().speakMessage('Emergency request sent. Searching for nearby responders.');
+      if (!isDeaf &&
+          !result.alreadyActive &&
+          accessibility.voiceGuidanceEnabled) {
+        VoiceAlertService().speakMessage(
+            'Emergency request sent. Searching for nearby responders.');
       }
     } catch (e) {
       debugPrint('[SOS] Failed: $e');
@@ -437,7 +515,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
       await launchUrl(Uri(scheme: 'tel', path: '1122'));
     } catch (_) {
       if (mounted) {
-        showMfSnackBar(context, 'Could not open the dialer. Please dial 1122 manually.', tone: MfTone.danger);
+        showMfSnackBar(
+            context, 'Could not open the dialer. Please dial 1122 manually.',
+            tone: MfTone.danger);
       }
     }
   }
@@ -462,7 +542,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     final confirmed = await showMfConfirmDialog(
       context,
       title: 'Cancel SOS?',
-      message: 'Responders will stop being notified. Only cancel if you are safe.',
+      message:
+          'Responders will stop being notified. Only cancel if you are safe.',
       confirmLabel: 'Yes, cancel',
       cancelLabel: 'Keep searching',
       destructive: true,
@@ -532,14 +613,16 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        icon: Icon(Icons.info_outline_rounded, color: Theme.of(ctx).colorScheme.primary, size: 28),
+        icon: Icon(Icons.info_outline_rounded,
+            color: Theme.of(ctx).colorScheme.primary, size: 28),
         title: const Text('Too late to cancel'),
         content: const Text(
           'The cancellation window has closed and responders are already being '
           'dispatched. Stay where you are — help is on the way.',
         ),
         actions: [
-          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
         ],
       ),
     );
@@ -559,14 +642,14 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     final statusText = !_sent
         ? 'Your SOS will be sent in $_preSendLeft ${_preSendLeft == 1 ? 'second' : 'seconds'}'
         : _responderFound
-        ? 'Responder found. Opening live tracking…'
-        : _createFailed
-            ? 'Could not reach the server'
-            : _isCreating
-                ? 'Sending your alert…'
-                : canCancel
-                    ? 'Responders nearby are being notified'
-                    : 'Still searching for a responder…';
+            ? 'Responder found. Opening live tracking…'
+            : _createFailed
+                ? 'Could not reach the server'
+                : _isCreating
+                    ? 'Sending your alert…'
+                    : canCancel
+                        ? 'Responders nearby are being notified'
+                        : 'Still searching for a responder…';
     final mapHeight = MediaQuery.sizeOf(context).height * 0.38;
 
     return PopScope(
@@ -589,48 +672,64 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
               child: Stack(
                 fit: StackFit.expand,
                 children: [
-                  RepaintBoundary(
-                    child: ValueListenableBuilder<Set<Marker>>(
-                      valueListenable: _markers,
-                      builder: (context, markers, _) => GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: LatLng(widget.latitude, widget.longitude),
-                          zoom: _searchZoom,
+                  // Map-coloured placeholder while the page slides in
+                  const ColoredBox(color: Color(0xFFEFF3F2)),
+                  if (_showMap)
+                    AnimatedOpacity(
+                      opacity: _mapVisible ? 1 : 0,
+                      duration: const Duration(milliseconds: 300),
+                      child: RepaintBoundary(
+                        child: ValueListenableBuilder<Set<Marker>>(
+                          valueListenable: _markers,
+                          builder: (context, markers, _) => GoogleMap(
+                            initialCameraPosition: CameraPosition(
+                              target: LatLng(_lat, _lng),
+                              zoom: _searchZoom,
+                            ),
+                            markers: markers,
+                            style: MapUtils.getDarkMapStyle(),
+                            zoomControlsEnabled: false,
+                            myLocationButtonEnabled: false,
+                            // Camera is controlled by the search animation only
+                            scrollGesturesEnabled: false,
+                            zoomGesturesEnabled: false,
+                            rotateGesturesEnabled: false,
+                            tiltGesturesEnabled: false,
+                            mapToolbarEnabled: false,
+                            onMapCreated: (controller) {
+                              _searchMapController = controller;
+                              if (_sent) _startSearchZoom();
+                              // Give the first tiles a moment, then fade the map in
+                              Future.delayed(const Duration(milliseconds: 250),
+                                  () {
+                                if (mounted) setState(() => _mapVisible = true);
+                              });
+                            },
+                          ),
                         ),
-                        markers: markers,
-                        style: MapUtils.getDarkMapStyle(),
-                        zoomControlsEnabled: false,
-                        myLocationButtonEnabled: false,
-                        // Camera is controlled by the search animation only
-                        scrollGesturesEnabled: false,
-                        zoomGesturesEnabled: false,
-                        rotateGesturesEnabled: false,
-                        tiltGesturesEnabled: false,
-                        mapToolbarEnabled: false,
-                        onMapCreated: (controller) {
-                          _searchMapController = controller;
-                          if (_sent) _startSearchZoom();
-                        },
                       ),
                     ),
-                  ),
                   if (_sent && !reducedMotion && !_responderFound)
-                    ...[_radar1Controller, _radar2Controller, _radar3Controller].map(
+                    ...[_radar1Controller, _radar2Controller, _radar3Controller]
+                        .map(
                       (ctrl) => IgnorePointer(
                         child: Center(
                           child: AnimatedBuilder(
                             animation: ctrl,
                             builder: (_, __) {
                               final v = ctrl.value;
-                              final primary = MfColors.tone(context, MfTone.primary).solid;
+                              final primary =
+                                  MfColors.tone(context, MfTone.primary).solid;
                               return Container(
                                 width: 200 * v,
                                 height: 200 * v,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
-                                  color: primary.withValues(alpha: 0.08 * (1 - v)),
+                                  color:
+                                      primary.withValues(alpha: 0.08 * (1 - v)),
                                   border: Border.all(
-                                    color: primary.withValues(alpha: 0.55 * (1 - v)),
+                                    color: primary.withValues(
+                                        alpha: 0.55 * (1 - v)),
                                     width: 1.5,
                                   ),
                                 ),
@@ -654,17 +753,24 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(Icons.check_circle_rounded, color: MfColors.tone(context, MfTone.success).solid, size: 32),
+                                  Icon(Icons.check_circle_rounded,
+                                      color:
+                                          MfColors.tone(context, MfTone.success)
+                                              .solid,
+                                      size: 32),
                                   const SizedBox(width: MfSpace.sm),
                                   Flexible(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
-                                        Text('Responder found', style: text.titleMedium),
+                                        Text('Responder found',
+                                            style: text.titleMedium),
                                         Text(
                                           'On the way to your location',
-                                          style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                          style: text.bodySmall?.copyWith(
+                                              color: cs.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
@@ -680,7 +786,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   SafeArea(
                     bottom: false,
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(MfSpace.sm, MfSpace.xs, MfSpace.sm, 0),
+                      padding: const EdgeInsets.fromLTRB(
+                          MfSpace.sm, MfSpace.xs, MfSpace.sm, 0),
                       child: Align(
                         alignment: Alignment.topLeft,
                         child: _LiveSosChip(sent: _sent),
@@ -699,11 +806,14 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   border: Border(top: BorderSide(color: cs.outlineVariant)),
                 ),
                 child: ListView(
-                  padding: const EdgeInsets.fromLTRB(MfSpace.gutter, MfSpace.lg, MfSpace.gutter, MfSpace.md),
+                  padding: const EdgeInsets.fromLTRB(
+                      MfSpace.gutter, MfSpace.lg, MfSpace.gutter, MfSpace.md),
                   children: [
                     Semantics(
                       header: true,
-                      child: Text('Emergency SOS', textAlign: TextAlign.center, style: text.headlineSmall),
+                      child: Text('Emergency SOS',
+                          textAlign: TextAlign.center,
+                          style: text.headlineSmall),
                     ),
                     const SizedBox(height: MfSpace.xxs),
                     Semantics(
@@ -711,17 +821,22 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                       child: Text(
                         statusText,
                         textAlign: TextAlign.center,
-                        style: text.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+                        style: text.bodyLarge
+                            ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ),
                     const SizedBox(height: MfSpace.lg),
-                    Center(child: _sent ? _buildCountdownRing(context, canCancel) : _buildPreSendRing(context)),
+                    Center(
+                        child: _sent
+                            ? _buildCountdownRing(context, canCancel)
+                            : _buildPreSendRing(context)),
                     if (!_sent) ...[
                       const SizedBox(height: MfSpace.md),
                       Text(
                         'Cancel now if this was a mistake — nothing has been sent yet.',
                         textAlign: TextAlign.center,
-                        style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                        style: text.bodyMedium
+                            ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
                     if (isDeaf) ...[
@@ -730,7 +845,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         icon: Icons.hearing_disabled_outlined,
                         tone: MfTone.primary,
                         title: 'Visual alerts are on',
-                        message: 'You will get a flashing screen and vibration — no sound needed.',
+                        message:
+                            'You will get a flashing screen and vibration — no sound needed.',
                       ),
                     ],
                   ],
@@ -781,7 +897,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   onPressed: _isCreating ? null : _sendSOS,
                 ),
               ],
-              if (_responderFound) const MfLoading(label: 'Opening live tracking'),
+              if (_responderFound)
+                const MfLoading(label: 'Opening live tracking'),
             ],
           ),
         ),
@@ -807,7 +924,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
           children: [
             TweenAnimationBuilder<double>(
               tween: Tween(end: _preSendLeft / _preSendSeconds),
-              duration: MfMotion.reduced(context) ? Duration.zero : const Duration(milliseconds: 900),
+              duration: MfMotion.reduced(context)
+                  ? Duration.zero
+                  : const Duration(milliseconds: 900),
               builder: (context, value, _) => CircularProgressIndicator(
                 value: value,
                 strokeWidth: 8,
@@ -831,7 +950,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    Text('Sending SOS', style: text.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                    Text('Sending SOS',
+                        style: text.labelLarge
+                            ?.copyWith(color: cs.onSurfaceVariant)),
                   ],
                 ),
               ),
@@ -850,7 +971,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     const ringSize = 200.0;
 
     return Semantics(
-      label: canCancel ? '$_secondsLeft seconds left to cancel' : 'Searching for responders',
+      label: canCancel
+          ? '$_secondsLeft seconds left to cancel'
+          : 'Searching for responders',
       excludeSemantics: true,
       child: SizedBox.square(
         dimension: ringSize,
@@ -858,10 +981,14 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
           fit: StackFit.expand,
           children: [
             CircularProgressIndicator(
-              value: canCancel ? _secondsLeft / _cancelWindowSeconds : (_responderFound ? 1 : null),
+              value: canCancel
+                  ? _secondsLeft / _cancelWindowSeconds
+                  : (_responderFound ? 1 : null),
               strokeWidth: 8,
               backgroundColor: cs.surfaceContainerHighest,
-              color: _responderFound ? MfColors.tone(context, MfTone.success).solid : sos,
+              color: _responderFound
+                  ? MfColors.tone(context, MfTone.success).solid
+                  : sos,
               strokeCap: StrokeCap.round,
             ),
             Padding(
@@ -880,12 +1007,17 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                           fontFeatures: const [FontFeature.tabularFigures()],
                         ),
                       ),
-                      Text('left to cancel', style: text.labelLarge?.copyWith(color: cs.onSurfaceVariant)),
+                      Text('left to cancel',
+                          style: text.labelLarge
+                              ?.copyWith(color: cs.onSurfaceVariant)),
                     ] else if (_responderFound) ...[
-                      Icon(Icons.check_rounded, size: 56, color: MfColors.tone(context, MfTone.success).solid),
+                      Icon(Icons.check_rounded,
+                          size: 56,
+                          color: MfColors.tone(context, MfTone.success).solid),
                       Text('Found', style: text.titleMedium),
                     ] else ...[
-                      Icon(Icons.person_search_outlined, size: 48, color: cs.onSurfaceVariant),
+                      Icon(Icons.person_search_outlined,
+                          size: 48, color: cs.onSurfaceVariant),
                       const SizedBox(height: MfSpace.xxs),
                       Text('Searching', style: text.titleMedium),
                     ],
@@ -918,8 +1050,14 @@ class _LiveSosChip extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(MfSpace.xxs),
         child: sent
-            ? const MfStatusChip(label: 'SOS active', tone: MfTone.danger, icon: Icons.sos_rounded)
-            : const MfStatusChip(label: 'Not sent yet', tone: MfTone.warning, icon: Icons.timer_outlined),
+            ? const MfStatusChip(
+                label: 'SOS active',
+                tone: MfTone.danger,
+                icon: Icons.sos_rounded)
+            : const MfStatusChip(
+                label: 'Not sent yet',
+                tone: MfTone.warning,
+                icon: Icons.timer_outlined),
       ),
     );
   }
@@ -935,7 +1073,11 @@ class _SimulatedBike {
   double _length = 0;
   double _progress = 0;
 
-  _SimulatedBike({required this.id, required LatLng start, required this.speedMetersPerTick}) : position = start;
+  _SimulatedBike(
+      {required this.id,
+      required LatLng start,
+      required this.speedMetersPerTick})
+      : position = start;
 
   bool get hasRoute => _route.length >= 2;
 

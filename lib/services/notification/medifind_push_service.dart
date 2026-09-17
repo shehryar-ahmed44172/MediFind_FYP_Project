@@ -484,16 +484,28 @@ class MedifindPushService {
   // ---------------------------------------------------------------------------
 
   static void dismissCurrentEmergencyModal() {
-    if (_currentDialogContext != null) {
-      if (Navigator.of(_currentDialogContext!).canPop()) {
-        Navigator.of(_currentDialogContext!).pop();
-      }
-      _currentDialogContext = null;
+    final ctx = _currentDialogContext;
+    _currentDialogContext = null;
+    _closeDialog(ctx);
+  }
+
+  /// Closes only the given dialog. If other screens were pushed above it, the dialog
+  /// route is removed in place instead of popping whatever screen is on top.
+  static void _closeDialog(BuildContext? dialogContext) {
+    if (dialogContext == null || !dialogContext.mounted) return;
+    final route = ModalRoute.of(dialogContext);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(dialogContext);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
     }
   }
 
-  static String? _lastAlertKey;
-  static DateTime? _lastAlertAt;
+  /// Alerts already shown (SOS id + audience). The same SOS arrives by socket, push and
+  /// pending-sync replay; it must pop up only once.
+  static final Set<String> _shownAlertKeys = <String>{};
 
   static void showEmergencyAlert(Map<String, dynamic> rawData) {
     if (_navigatorKey == null || _navigatorKey!.currentContext == null) {
@@ -508,16 +520,9 @@ class MedifindPushService {
     // The same SOS can arrive via the in-app socket event AND a push within
     // seconds - show once.
     final key = '$requestId|$isCaregiverAlert';
-    final now = DateTime.now();
-    if (requestId.isNotEmpty &&
-        key == _lastAlertKey &&
-        _lastAlertAt != null &&
-        now.difference(_lastAlertAt!) < const Duration(seconds: 15) &&
-        _currentDialogContext != null) {
+    if (requestId.isNotEmpty && !_shownAlertKeys.add(key)) {
       return;
     }
-    _lastAlertKey = key;
-    _lastAlertAt = now;
 
     final context = _navigatorKey!.currentContext!;
 
@@ -599,7 +604,10 @@ class MedifindPushService {
                   EmergencyTimer(
                     expiresAt: data['expiresAt'].toString(),
                     serverTime: data['serverTime'],
-                    onExpired: () => dismissCurrentEmergencyModal(),
+                    onExpired: () {
+                      if (identical(_currentDialogContext, dialogContext)) _currentDialogContext = null;
+                      _closeDialog(dialogContext);
+                    },
                     style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.red, fontFamily: 'monospace'),
                   ),
                   const SizedBox(height: 12),

@@ -313,6 +313,9 @@ mixin _$ChatRoom {
   String? get responderId => throw _privateConstructorUsedError;
   String? get emergencyId => throw _privateConstructorUsedError;
   String? get roomType => throw _privateConstructorUsedError;
+
+  /// Emergency behind a responder room is over: read-only, no calls.
+  bool get isLocked => throw _privateConstructorUsedError;
   DateTime get createdAt => throw _privateConstructorUsedError;
   DateTime get updatedAt => throw _privateConstructorUsedError;
   Map<String, dynamic>? get patient => throw _privateConstructorUsedError;
@@ -338,6 +341,7 @@ abstract class $ChatRoomCopyWith<$Res> {
       String? responderId,
       String? emergencyId,
       String? roomType,
+      bool isLocked,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
@@ -365,6 +369,7 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
     Object? responderId = freezed,
     Object? emergencyId = freezed,
     Object? roomType = freezed,
+    Object? isLocked = null,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
@@ -397,6 +402,10 @@ class _$ChatRoomCopyWithImpl<$Res, $Val extends ChatRoom>
           ? _value.roomType
           : roomType // ignore: cast_nullable_to_non_nullable
               as String?,
+      isLocked: null == isLocked
+          ? _value.isLocked
+          : isLocked // ignore: cast_nullable_to_non_nullable
+              as bool,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -440,6 +449,7 @@ abstract class _$$ChatRoomImplCopyWith<$Res>
       String? responderId,
       String? emergencyId,
       String? roomType,
+      bool isLocked,
       DateTime createdAt,
       DateTime updatedAt,
       Map<String, dynamic>? patient,
@@ -465,6 +475,7 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
     Object? responderId = freezed,
     Object? emergencyId = freezed,
     Object? roomType = freezed,
+    Object? isLocked = null,
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? patient = freezed,
@@ -497,6 +508,10 @@ class __$$ChatRoomImplCopyWithImpl<$Res>
           ? _value.roomType
           : roomType // ignore: cast_nullable_to_non_nullable
               as String?,
+      isLocked: null == isLocked
+          ? _value.isLocked
+          : isLocked // ignore: cast_nullable_to_non_nullable
+              as bool,
       createdAt: null == createdAt
           ? _value.createdAt
           : createdAt // ignore: cast_nullable_to_non_nullable
@@ -535,6 +550,7 @@ class _$ChatRoomImpl implements _ChatRoom {
       this.responderId,
       this.emergencyId,
       this.roomType,
+      this.isLocked = false,
       required this.createdAt,
       required this.updatedAt,
       final Map<String, dynamic>? patient,
@@ -561,6 +577,11 @@ class _$ChatRoomImpl implements _ChatRoom {
   final String? emergencyId;
   @override
   final String? roomType;
+
+  /// Emergency behind a responder room is over: read-only, no calls.
+  @override
+  @JsonKey()
+  final bool isLocked;
   @override
   final DateTime createdAt;
   @override
@@ -607,7 +628,7 @@ class _$ChatRoomImpl implements _ChatRoom {
 
   @override
   String toString() {
-    return 'ChatRoom(id: $id, patientId: $patientId, caregiverId: $caregiverId, responderId: $responderId, emergencyId: $emergencyId, roomType: $roomType, createdAt: $createdAt, updatedAt: $updatedAt, patient: $patient, caregiver: $caregiver, responder: $responder, messages: $messages)';
+    return 'ChatRoom(id: $id, patientId: $patientId, caregiverId: $caregiverId, responderId: $responderId, emergencyId: $emergencyId, roomType: $roomType, isLocked: $isLocked, createdAt: $createdAt, updatedAt: $updatedAt, patient: $patient, caregiver: $caregiver, responder: $responder, messages: $messages)';
   }
 
   @override
@@ -626,6 +647,8 @@ class _$ChatRoomImpl implements _ChatRoom {
                 other.emergencyId == emergencyId) &&
             (identical(other.roomType, roomType) ||
                 other.roomType == roomType) &&
+            (identical(other.isLocked, isLocked) ||
+                other.isLocked == isLocked) &&
             (identical(other.createdAt, createdAt) ||
                 other.createdAt == createdAt) &&
             (identical(other.updatedAt, updatedAt) ||
@@ -648,6 +671,7 @@ class _$ChatRoomImpl implements _ChatRoom {
       responderId,
       emergencyId,
       roomType,
+      isLocked,
       createdAt,
       updatedAt,
       const DeepCollectionEquality().hash(_patient),
@@ -677,6 +701,7 @@ abstract class _ChatRoom implements ChatRoom {
       final String? responderId,
       final String? emergencyId,
       final String? roomType,
+      final bool isLocked,
       required final DateTime createdAt,
       required final DateTime updatedAt,
       final Map<String, dynamic>? patient,
@@ -699,6 +724,10 @@ abstract class _ChatRoom implements ChatRoom {
   String? get emergencyId;
   @override
   String? get roomType;
+  @override
+
+  /// Emergency behind a responder room is over: read-only, no calls.
+  bool get isLocked;
   @override
   DateTime get createdAt;
   @override

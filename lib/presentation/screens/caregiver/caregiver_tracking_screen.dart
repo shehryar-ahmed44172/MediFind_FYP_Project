@@ -555,7 +555,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
                         ),
                       ],
                     ),
-                    if (_responderPhone != null) ...[
+                    if (_responderPhone != null && !isTerminalEmergencyStatus(_currentStatus)) ...[
                       const SizedBox(height: MfSpace.sm),
                       MfPrimaryButton(
                         label: 'Call ${_responderName ?? 'emergency responder'}',

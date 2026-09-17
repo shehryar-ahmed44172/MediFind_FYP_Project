@@ -284,6 +284,16 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     return GeoUtils.haversineKm(_myLat!, _myLng!, emergency.latitude, emergency.longitude);
   }
 
+  Future<void> _callPatient(String phoneNumber) async {
+    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
+    try {
+      final ok = await launchUrl(uri);
+      if (!ok) throw Exception('launch failed');
+    } catch (_) {
+      if (mounted) showMfSnackBar(context, 'Could not start a call to $phoneNumber', tone: MfTone.danger);
+    }
+  }
+
   Future<void> _openNavigation(emergency_entity.Emergency emergency) async {
     final uri = Uri.parse(
       'https://www.google.com/maps/dir/?api=1'
@@ -822,6 +832,19 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
             ],
           ),
           const SizedBox(height: MfSpace.xs),
+          // Phone call for hearing patients; Deaf patients are reached through chat
+          if (emergency.patientType.toUpperCase() != 'DEAF') ...[
+            Builder(builder: (context) {
+              final phone = ref.watch(userProfileProvider(emergency.userId)).valueOrNull?.phoneNumber.trim() ?? '';
+              return MfSecondaryButton(
+                label: 'Call patient',
+                icon: Icons.phone_outlined,
+                semanticLabel: 'Call the patient by phone',
+                onPressed: phone.isEmpty ? null : () => _callPatient(phone),
+              );
+            }),
+            const SizedBox(height: MfSpace.xs),
+          ],
         ],
         MfSecondaryButton(
           icon: _isPlayingVoice ? Icons.stop_circle_outlined : Icons.volume_up_outlined,

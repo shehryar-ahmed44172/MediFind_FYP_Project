@@ -776,11 +776,12 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     final cs = Theme.of(context).colorScheme;
     final terminal = EmergencyStatus.isTerminal(_currentStatus);
     final hasResponder = _responderId != null || _responderName != null;
-    final canCall = !isDeafPatient && _responderPhone != null;
+    // Contact with the responder ends with the emergency
+    final canCall = !isDeafPatient && _responderPhone != null && !terminal;
     final canCancel = _currentStatus == 'ACTIVE' || _currentStatus == 'PENDING';
 
     final secondaryActions = <Widget>[
-      if (hasResponder)
+      if (hasResponder && !terminal)
         MfSecondaryButton(
           label: 'Chat',
           icon: Icons.chat_bubble_outline_rounded,

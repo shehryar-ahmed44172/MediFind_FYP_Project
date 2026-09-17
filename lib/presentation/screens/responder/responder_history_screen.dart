@@ -65,6 +65,8 @@ class ResponderHistoryScreen extends ConsumerWidget {
       return (label: 'Accepted', tone: MfTone.primary, icon: Icons.check_circle_outline_rounded);
     case 'REJECTED':
       return (label: 'Declined', tone: MfTone.neutral, icon: Icons.do_not_disturb_on_outlined);
+    case 'TAKEN':
+      return (label: 'Taken by another responder', tone: MfTone.neutral, icon: Icons.people_outline_rounded);
     case 'COMPLETED':
     case 'RESOLVED':
       return (label: 'Completed', tone: MfTone.success, icon: Icons.task_alt_rounded);
@@ -87,6 +89,7 @@ class _HistoryItemCard extends StatelessWidget {
     // Prefer the EmergencyRequest status, but if it is still PENDING and the
     // parent emergency ended, show the emergency's status.
     final emergencyStatus = (item['emergency'] as Map<String, dynamic>?)?['status'] as String? ?? '';
+    if (status == 'REJECTED' && item['rejectionReason'] == 'ASSIGNED_TO_ANOTHER_RESPONDER') return 'TAKEN';
     return (status == 'PENDING' &&
             (emergencyStatus == 'CANCELLED' || emergencyStatus == 'RESOLVED' || emergencyStatus == 'COMPLETED'))
         ? emergencyStatus
@@ -173,7 +176,7 @@ class _HistoryItemCard extends StatelessWidget {
                 label: 'Status',
                 value: visual.label,
               ),
-              if (item['rejectionReason'] != null)
+              if (item['rejectionReason'] != null && item['rejectionReason'] != 'ASSIGNED_TO_ANOTHER_RESPONDER')
                 MfKeyValueRow(
                   icon: Icons.notes_rounded,
                   label: 'Reason',

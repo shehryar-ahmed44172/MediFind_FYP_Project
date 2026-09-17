@@ -36,6 +36,8 @@ class ChatRoom with _$ChatRoom {
     String? responderId,
     String? emergencyId,
     String? roomType,
+    /// Emergency behind a responder room is over: read-only, no calls.
+    @Default(false) bool isLocked,
     required DateTime createdAt,
     required DateTime updatedAt,
     Map<String, dynamic>? patient,

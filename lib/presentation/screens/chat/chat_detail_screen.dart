@@ -68,6 +68,13 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         if (mounted) setState(() => _playingMessageId = null);
       }
     });
+    // A room opened from an emergency may be brand new: refresh the room list so the
+    // header (name, call button) and the lock state are known.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final known = ref.read(chatRoomsProvider).valueOrNull?.any((r) => r.id == widget.roomId) ?? false;
+      if (!known) ref.invalidate(chatRoomsProvider);
+    });
   }
 
   @override
@@ -85,6 +92,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
 
   void _showSnack(String message, {bool isError = false, String? actionLabel, VoidCallback? onAction}) {
     if (!mounted) return;
+    // A failed send may mean the emergency just ended: refresh so the lock shows
+    if (isError) ref.invalidate(chatRoomsProvider);
     showMfSnackBar(
       context,
       message,
@@ -124,6 +133,33 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     );
   }
 
+  /// Phone number of the other participant when a phone call makes sense: not when the
+  /// patient in this room is Deaf (chat is their channel). The number only reaches this
+  /// device if the server allows it (care or emergency relationship), so nothing extra
+  /// is exposed here.
+  String? _callablePhone() {
+    final role = ref.watch(currentUserProvider).valueOrNull?.role;
+    final room = ref.watch(chatRoomsProvider).valueOrNull?.where((r) => r.id == widget.roomId).firstOrNull;
+    if (room == null || room.isLocked) return null;
+    final patient = ref.watch(userProfileProvider(room.patientId)).valueOrNull;
+    if (patient == null || (patient.patientType ?? '').toUpperCase() == 'DEAF') return null;
+    final otherId = (role ?? '').toUpperCase() == 'PATIENT' ? (room.responderId ?? room.caregiverId) : room.patientId;
+    if (otherId == null) return null;
+    final phone = ref.watch(userProfileProvider(otherId)).valueOrNull?.phoneNumber.trim() ?? '';
+    return phone.isEmpty ? null : phone;
+  }
+
+  Future<void> _callPhone(String phoneNumber) async {
+    final uri = Uri(scheme: 'tel', path: phoneNumber.replaceAll(RegExp(r'[\s-]'), ''));
+    var opened = false;
+    try {
+      opened = await launchUrl(uri);
+    } catch (e) {
+      debugPrint('Could not start call: $e');
+    }
+    if (!opened) _showSnack('Could not start a call', isError: true);
+  }
+
   @override
   Widget build(BuildContext context) {
     final messagesAsync = ref.watch(chatMessagesProvider(widget.roomId));
@@ -137,6 +173,12 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         title: participant.name,
         subtitle: participant.emergency ? 'Emergency chat' : null,
         actions: [
+          if (_callablePhone() case final phone?)
+            MfIconButton(
+              icon: Icons.call_outlined,
+              tooltip: 'Call ${participant.name}',
+              onPressed: () => _callPhone(phone),
+            ),
           MfIconButton(
             icon: Icons.info_outline_rounded,
             tooltip: 'Chat info',
@@ -213,8 +255,41 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
               ),
             ),
           ),
-          _buildMessageInput(),
+          if (_roomLocked()) _buildClosedNotice() else _buildMessageInput(),
         ],
+      ),
+    );
+  }
+
+  bool _roomLocked() =>
+      ref.watch(chatRoomsProvider).valueOrNull?.where((r) => r.id == widget.roomId).firstOrNull?.isLocked ?? false;
+
+  /// Shown instead of the composer once the emergency behind this chat is over.
+  Widget _buildClosedNotice() {
+    final cs = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.all(MfSpace.md),
+          child: Row(
+            children: [
+              Icon(Icons.lock_outline_rounded, color: cs.onSurfaceVariant),
+              const SizedBox(width: MfSpace.sm),
+              Expanded(
+                child: Text(
+                  'This emergency has ended. Chat and calls with the responder are closed.',
+                  style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

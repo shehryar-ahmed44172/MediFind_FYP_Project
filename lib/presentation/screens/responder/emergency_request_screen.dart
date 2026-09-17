@@ -64,22 +64,19 @@ class _EmergencyRequestScreenState
       )).future);
 
       final voiceEnabled = ref.read(accessibilityProvider).voiceGuidanceEnabled;
-
       if (voiceEnabled) {
         VoiceAlertService().speakMessage("Emergency accepted. Preparing automated analysis.");
-      }
-
-      // Check if patient is deaf and play situational report
-      final profile = await ref.read(getMedicalProfileProvider(emergency.userId).future);
-
-      if (voiceEnabled &&
-          profile != null &&
-          (profile.patientType.toUpperCase() == 'DEAF' ||
-              emergency.patientType.toUpperCase() == 'DEAF')) {
-        await VoiceAlertService().speakAutomatedEmergencyReport(
-          emergency: emergency,
-          medical: profile,
-        );
+        // Deaf patient: spoken situational report. Runs in the background so the
+        // responder reaches the navigation screen without waiting for it.
+        final profileFuture = ref.read(getMedicalProfileProvider(emergency.userId).future);
+        profileFuture.then((profile) {
+          if (profile != null &&
+              (profile.patientType.toUpperCase() == 'DEAF' || emergency.patientType.toUpperCase() == 'DEAF')) {
+            VoiceAlertService().speakAutomatedEmergencyReport(emergency: emergency, medical: profile);
+          }
+        }).catchError((Object e) {
+          debugPrint('Situational report skipped: $e');
+        });
       }
     } catch (e) {
       if (mounted) {

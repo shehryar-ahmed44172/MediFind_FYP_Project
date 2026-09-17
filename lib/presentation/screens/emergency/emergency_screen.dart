@@ -24,7 +24,8 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   final _symptomsController = TextEditingController();
   bool _isFetchingLocation = false;
   bool _isClassifying = false;
-  bool _showTextClassifier = false;
+  bool? _showTextClassifier; // null = default (open for deaf / text-only patients)
+  Map<String, dynamic>? _aiResult;
   final FocusNode _otherFocusNode = FocusNode();
 
   // Values match the backend's specialist routing (SPECIALIST_MAP) + FALL/OTHER.
@@ -50,17 +51,26 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
   Future<void> _classifySymptoms() async {
     final symptoms = _symptomsController.text.trim();
     if (symptoms.isEmpty) return;
-    setState(() => _isClassifying = true);
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isClassifying = true;
+      _aiResult = null;
+    });
     try {
       final apiClient = ref.read(apiClientProvider);
       final result = await apiClient.classifyEmergencySymptoms(symptoms);
       final type = result['emergencyType'] as String?;
-      if (type != null && mounted) {
+      final confidence = (result['confidence'] as num?)?.toDouble() ?? 0;
+      if (type == null || confidence <= 0) {
+        throw StateError('classification unavailable');
+      }
+      if (mounted) {
         final knownValues = _emergencyTypes.map((e) => e['value'] as String).toSet();
         // Map classifier output to the screen's type list (best-effort)
         final mapped = knownValues.contains(type) ? type : _mapClassifierType(type);
         final reasoning = result['reasoning'] as String?;
         setState(() {
+          _aiResult = {'type': mapped, 'confidence': confidence, 'reasoning': reasoning ?? ''};
           _selectedEmergencyType = mapped;
           if (mapped == EmergencyTypes.other && reasoning != null && reasoning.isNotEmpty) {
             _additionalInfoController.text = reasoning;
@@ -318,15 +328,13 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
               const SizedBox(height: MfSpace.md),
             ],
 
+            // AI symptom check (Gemini): describe in words, AI picks the emergency type.
+            _buildTextClassifierCard(context, expandedByDefault: isDeafPatient),
+            const SizedBox(height: MfSpace.lg),
+
             const MfSectionTitle('What is happening?', subtitle: 'Tap the closest match'),
             const SizedBox(height: MfSpace.xs),
             _buildTypeGrid(),
-
-            // Deaf / text-only patients: AI symptom classifier as a secondary option.
-            if (isDeafPatient) ...[
-              const SizedBox(height: MfSpace.md),
-              _buildTextClassifierCard(context),
-            ],
 
             const SizedBox(height: MfSpace.lg),
             const MfSectionTitle('Additional details'),
@@ -392,26 +400,32 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
     );
   }
 
-  Widget _buildTextClassifierCard(BuildContext context) {
+  Widget _buildTextClassifierCard(BuildContext context, {required bool expandedByDefault}) {
     final text = Theme.of(context).textTheme;
     final cs = Theme.of(context).colorScheme;
+    final expanded = _showTextClassifier ?? expandedByDefault;
+    final result = _aiResult;
     return MfCard(
       padding: EdgeInsets.zero,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           MfIconTile(
-            icon: Icons.keyboard_outlined,
-            label: 'Describe in text',
-            subtitle: 'Type your symptoms and AI suggests the emergency type',
+            icon: Icons.auto_awesome_outlined,
+            label: 'AI symptom check',
+            subtitle: 'Describe what is happening in your own words. AI suggests the emergency type.',
             showChevron: false,
-            trailing: Icon(
-              _showTextClassifier ? Icons.expand_less_rounded : Icons.expand_more_rounded,
-              color: cs.onSurfaceVariant,
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const MfStatusChip(label: 'AI', tone: MfTone.primary),
+                const SizedBox(width: MfSpace.xs),
+                Icon(expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded, color: cs.onSurfaceVariant),
+              ],
             ),
-            onTap: () => setState(() => _showTextClassifier = !_showTextClassifier),
+            onTap: () => setState(() => _showTextClassifier = !expanded),
           ),
-          if (_showTextClassifier)
+          if (expanded)
             Padding(
               padding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.md),
               child: Column(
@@ -422,19 +436,33 @@ class _EmergencyScreenState extends ConsumerState<EmergencyScreen> {
                     maxLines: 3,
                     minLines: 2,
                     style: text.bodyLarge,
+                    textInputAction: TextInputAction.done,
                     decoration: const InputDecoration(
                       labelText: 'What do you feel?',
-                      hintText: 'e.g. chest pain, difficulty breathing',
+                      hintText: 'e.g. sudden chest pain spreading to my left arm',
                       alignLabelWithHint: true,
                     ),
                   ),
                   const SizedBox(height: MfSpace.sm),
                   MfSecondaryButton(
-                    label: _isClassifying ? 'Classifying…' : 'Suggest emergency type',
+                    label: _isClassifying ? 'Checking symptoms…' : 'Suggest emergency type',
                     icon: Icons.auto_awesome_outlined,
                     loading: _isClassifying,
                     onPressed: _isClassifying ? null : _classifySymptoms,
                   ),
+                  if (result != null) ...[
+                    const SizedBox(height: MfSpace.sm),
+                    MfInfoBanner(
+                      icon: Icons.auto_awesome_outlined,
+                      tone: MfTone.success,
+                      title: 'AI suggests: ${EmergencyTypes.label(result['type'] as String)} '
+                          '(${((result['confidence'] as double) * 100).round()}% sure)',
+                      message: [
+                        if ((result['reasoning'] as String).isNotEmpty) result['reasoning'] as String,
+                        'Selected below. You can change it before sending.',
+                      ].join('\n'),
+                    ),
+                  ],
                 ],
               ),
             ),

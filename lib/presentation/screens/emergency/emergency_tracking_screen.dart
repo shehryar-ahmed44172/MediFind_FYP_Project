@@ -89,6 +89,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(socketStreamProvider);
+      _prefetchAiQuickReplies();
       // Simulation mode (testing) is started/stopped outside build().
       ref.listenManual<bool>(simulationModeProvider, (_, isSim) {
         if (isSim) _startSimulation();
@@ -509,6 +510,14 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     {'icon': Icons.warning_amber_rounded,     'text': 'I have a drug allergy.'},
   ];
 
+  void _prefetchAiQuickReplies() {
+    ref.read(apiClientProvider).getDeafQuickReplies(widget.emergencyId).then((replies) {
+      if (mounted && replies.isNotEmpty) setState(() => _aiQuickReplies = replies);
+    }).catchError((_) {
+      // Static phrases remain the fallback
+    });
+  }
+
   void _showQuickMessageBoard(BuildContext context) {
     // Load AI replies from backend on first open; use static phrases as fallback
     if (_aiQuickReplies == null) {
@@ -814,8 +823,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           // ── Actions ──
           if (isDeafPatient && !terminal) ...[
             MfPrimaryButton(
-              label: 'Quick message',
-              icon: Icons.textsms_outlined,
+              label: _aiQuickReplies != null ? 'Quick message · AI suggested' : 'Quick message',
+              icon: _aiQuickReplies != null ? Icons.auto_awesome_outlined : Icons.textsms_outlined,
               semanticLabel: 'Send a quick message to your responder',
               onPressed: () => _showQuickMessageBoard(context),
             ),

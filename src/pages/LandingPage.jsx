@@ -447,35 +447,68 @@ function FinalCta() {
 }
 
 /* ── Footer ── */
+const FOOTER_COLUMNS = [
+  {
+    title: 'Product',
+    links: [
+      { href: '#features', label: 'Features' },
+      { href: '#deaf', label: 'For Deaf users' },
+      { href: '#how', label: 'How it works' },
+      { href: '#faq', label: 'FAQ' },
+    ],
+  },
+  {
+    title: 'Who it’s for',
+    links: [
+      { href: '#patients', label: 'Patients' },
+      { href: '#caregivers', label: 'Caregivers' },
+      { href: '#responders', label: 'Responders' },
+    ],
+  },
+  {
+    title: 'Support',
+    links: [
+      { href: '#contact', label: 'Contact us' },
+      { href: `mailto:${SUPPORT_EMAIL}`, label: SUPPORT_EMAIL, Icon: Mail },
+      { to: '/login', label: 'Admin login' },
+    ],
+  },
+];
+
 function SiteFooter() {
   const year = new Date().getFullYear();
   return (
     <footer className="lp-footer">
       <div className="lp-container">
         <div className="lp-footer-grid">
-          <div>
-            <span className="lp-logo lp-logo-badge"><img src={appMark} alt="" width="34" height="34" /><span>Medi<b>Find</b></span></span>
-            <p style={{ marginTop: 10, maxWidth: 360 }}>Deaf-first medical emergency response for Pakistan — verified motorbike ambulances, live tracking and text-based help.</p>
+          <div className="lp-footer-brand">
+            <Link to="/" className="lp-logo lp-logo-badge" aria-label="MediFind home">
+              <img src={appMark} alt="" width="34" height="34" /><span>Medi<b>Find</b></span>
+            </Link>
+            <p>Deaf-first medical emergency response for Pakistan — verified motorbike ambulances, live tracking and text-based help.</p>
+            <p className="lp-emergency-note"><PhoneCall size={15} /> Emergency? Call Rescue 1122</p>
           </div>
-          <nav aria-label="Footer">
-            <h3>Explore</h3>
-            <ul>
-              {NAV_LINKS.map(l => <li key={l.href}><a href={l.href}>{l.label}</a></li>)}
-            </ul>
-          </nav>
-          <div>
-            <h3>Company</h3>
-            <ul>
-              <li><a href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</a></li>
-              <li><Link to="/terms">Terms of Service</Link></li>
-              <li><Link to="/privacy">Privacy Policy</Link></li>
-              <li><Link to="/login">Admin login</Link></li>
-            </ul>
-          </div>
+          {FOOTER_COLUMNS.map(col => (
+            <nav key={col.title} aria-label={col.title}>
+              <h3>{col.title}</h3>
+              <ul>
+                {col.links.map(l => (
+                  <li key={l.label}>
+                    {l.to
+                      ? <Link to={l.to}>{l.label}</Link>
+                      : <a href={l.href}>{l.Icon && <l.Icon size={14} aria-hidden="true" />}{l.label}</a>}
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
         <div className="lp-footer-bottom">
           <span>© {year} MediFind. All rights reserved.</span>
-          <span className="lp-emergency-note"><PhoneCall size={15} /> In a life-threatening emergency, you can always call Rescue 1122.</span>
+          <nav className="lp-footer-legal" aria-label="Legal">
+            <Link to="/privacy">Privacy Policy</Link>
+            <Link to="/terms">Terms of Service</Link>
+          </nav>
         </div>
       </div>
     </footer>

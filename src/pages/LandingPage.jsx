@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MotionConfig, motion } from 'framer-motion';
 import {
-  ArrowRight, BadgeCheck, Bell, Check, ChevronDown, Download, Ear, Eye, FileLock2,
-  HeartHandshake, HeartPulse, IdCard, Mail, MapPin, Menu, MessageSquareText, Navigation,
-  PhoneCall, ScrollText, ShieldCheck, Smartphone, Sparkles, Stethoscope, Users, Vibrate, X, Zap,
+  Ambulance, ArrowRight, BellRing, BookmarkCheck, Check, ChevronDown, ClipboardPlus, Download,
+  EarOff, FileLock2, HeartHandshake, HeartPulse, IdCard, LayoutGrid, ListOrdered, LocateFixed,
+  Mail, Menu, MessageSquareText, MicOff, PhoneCall, Presentation, ScrollText, ShieldCheck,
+  Smartphone, Sparkles, UserRound, Users, Vibrate, X,
 } from 'lucide-react';
 import appMark from '../assets/medifind_mark.png';
 import { PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen } from '../components/landing/AppMockups';
@@ -88,7 +89,7 @@ function Hero() {
       <HeroBackdrop />
       <div className="lp-container lp-hero-grid">
         <motion.div {...fadeUp}>
-          <span className="lp-eyebrow"><Ear size={14} /> Deaf-first medical emergency app · Pakistan</span>
+          <span className="lp-eyebrow"><EarOff size={14} /> Deaf-first medical emergency app · Pakistan</span>
           <h1 id="hero-title">Emergency help that doesn't depend on hearing or speaking.</h1>
           <p className="lp-lead">
             One tap sends your location and medical profile to the nearest verified motorbike ambulance.
@@ -125,12 +126,12 @@ function Hero() {
 
 /* ── Built for Deaf users ── */
 const DEAF_FEATURES = [
-  { Icon: Zap,               title: 'Visual SOS, no voice',     text: 'Trigger help and pick the emergency type with taps — nothing to say or hear.' },
+  { Icon: MicOff,            title: 'Visual SOS, no voice',     text: 'Trigger help and pick the emergency type with taps — nothing to say or hear.' },
   { Icon: Vibrate,           title: 'Flash + vibration alerts', text: 'Full-screen flashing and strong vibration tell you when help accepts and arrives.' },
   { Icon: MessageSquareText, title: 'Text-only responder chat', text: 'Your responder is told you are Deaf and communicates with you in writing.' },
   { Icon: Sparkles,          title: 'AI quick-reply cards',     text: 'Suggested replies like “Chest pain” or “Please text me” so you can answer fast.' },
-  { Icon: ScrollText,        title: 'Saved quick phrases',      text: 'Prepare your own phrases in advance — allergies, conditions, how to reach you.' },
-  { Icon: Eye,               title: 'Show-to-bystander card',   text: 'A large on-screen card explains you are Deaf and need medical help.' },
+  { Icon: BookmarkCheck,     title: 'Saved quick phrases',      text: 'Prepare your own phrases in advance — allergies, conditions, how to reach you.' },
+  { Icon: Presentation,      title: 'Show-to-bystander card',   text: 'A large on-screen card explains you are Deaf and need medical help.' },
 ];
 
 function DeafSection() {
@@ -138,7 +139,7 @@ function DeafSection() {
     <section id="deaf" className="lp-section lp-section-alt" aria-labelledby="deaf-title">
       <div className="lp-container lp-split">
         <motion.div {...fadeUp}>
-          <span className="lp-eyebrow"><Ear size={14} /> Built for Deaf users</span>
+          <span className="lp-eyebrow"><EarOff size={14} /> Built for Deaf users</span>
           <h2 id="deaf-title">Designed around sight and touch — not sound.</h2>
           <p className="lp-lead">
             Most emergency services start with a voice call. MediFind starts with a tap, keeps you
@@ -179,7 +180,7 @@ function HowItWorks() {
     <section id="how" className="lp-section" aria-labelledby="how-title">
       <div className="lp-container lp-split reverse">
         <motion.div {...fadeUp}>
-          <span className="lp-eyebrow"><Navigation size={14} /> How it works</span>
+          <span className="lp-eyebrow"><ListOrdered size={14} /> How it works</span>
           <h2 id="how-title">From tap to treatment in four steps.</h2>
           <p className="lp-lead">Motorbike ambulances reach patients through traffic that stops larger vehicles.</p>
           <ol className="lp-steps" style={{ marginTop: 24 }}>
@@ -207,9 +208,9 @@ function HowItWorks() {
 /* ── Core features ── */
 const FEATURES = [
   { Icon: HeartPulse,  title: 'Medical-only emergencies', text: 'Built for health emergencies — no police or fire menus to get lost in.' },
-  { Icon: Stethoscope, title: 'Medical profile shared',   text: 'Blood type, allergies, conditions and medications reach your responder instantly.' },
-  { Icon: MapPin,      title: 'Precise location',         text: 'GPS location is sent with every alert and updated while help is on the way.' },
-  { Icon: Bell,        title: 'Caregiver alerts',         text: 'Linked caregivers are alerted the moment you raise an SOS, and your emergency contacts are kept on your profile.' },
+  { Icon: ClipboardPlus, title: 'Medical profile shared',   text: 'Blood type, allergies, conditions and medications reach your responder instantly.' },
+  { Icon: LocateFixed, title: 'Precise location',         text: 'GPS location is sent with every alert and updated while help is on the way.' },
+  { Icon: BellRing,    title: 'Caregiver alerts',         text: 'Linked caregivers are alerted the moment you raise an SOS, and your emergency contacts are kept on your profile.' },
 ];
 
 function Features() {
@@ -217,7 +218,7 @@ function Features() {
     <section id="features" className="lp-section lp-section-alt" aria-labelledby="features-title">
       <div className="lp-container">
         <motion.div className="lp-section-head center" {...fadeUp}>
-          <span className="lp-eyebrow"><Sparkles size={14} /> Features</span>
+          <span className="lp-eyebrow"><LayoutGrid size={14} /> Features</span>
           <h2 id="features-title">Everything a responder needs, before they arrive.</h2>
         </motion.div>
         <div className="lp-cards-4">
@@ -237,7 +238,7 @@ function Features() {
 /* ── Roles ── */
 const ROLES = [
   {
-    id: 'patients', Icon: HeartPulse, title: 'Patients',
+    id: 'patients', Icon: UserRound, title: 'Patients',
     text: 'For anyone who may need urgent medical help — with Deaf mode for people who cannot rely on calls.',
     points: ['One-tap SOS with a 60-second cancel window', 'Medical profile & emergency contacts', 'Text chat and visual alerts'],
   },
@@ -247,7 +248,7 @@ const ROLES = [
     points: ['Alerts when a linked patient raises SOS', 'Watch the responder on a live map', 'Chat with the patient and responder'],
   },
   {
-    id: 'responders', Icon: BadgeCheck, title: 'Responders',
+    id: 'responders', Icon: Ambulance, title: 'Responders',
     text: 'Paramedics, rescue officers and trained volunteers on motorbike ambulances.',
     points: ['Apply in the app with CNIC, license and employee ID', 'Every application reviewed by MediFind admins', 'Receive nearby emergencies with patient details'],
   },
@@ -283,7 +284,7 @@ const TRUST = [
   { Icon: IdCard,      title: 'Verified responders',       text: 'Every responder is reviewed by our admin team — CNIC, license and employee ID — before they can accept an emergency.' },
   { Icon: FileLock2,   title: 'Encrypted medical profile', text: 'Sensitive medical details are encrypted and only shared with the responder handling your emergency.' },
   { Icon: PhoneCall,   title: 'Rescue 1122 fallback',      text: 'MediFind works alongside public services. Rescue 1122 remains available across Pakistan.' },
-  { Icon: ShieldCheck, title: 'Audited admin actions',     text: 'Verification decisions and account changes are recorded in an audit log.' },
+  { Icon: ScrollText,  title: 'Audited admin actions',     text: 'Verification decisions and account changes are recorded in an audit log.' },
 ];
 
 function Trust() {

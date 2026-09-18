@@ -2,6 +2,7 @@ import React from 'react';
 import {
   HeartPulse, Wind, Brain, Zap, Droplet, Bone, BadgeCheck, Check,
   Vibrate, MessageSquare, Sparkles, Signal, BatteryFull, Wifi, MapPin, Ear,
+  TriangleAlert, ClipboardPlus, Navigation, Bell, Users,
 } from 'lucide-react';
 import appMark from '../../assets/medifind_mark.png';
 import bikeFrame0 from '../../assets/mascot_bike_0.png';
@@ -93,8 +94,19 @@ export function SosScreen() {
 export function TrackingScreen() {
   return (
     <div className="lp-screen">
-      <AppHeader right={<span className="lp-pill lp-pill-eta">ETA 4 min</span>} />
-      <p className="lp-screen-title">Help is on the way</p>
+      {/* Header pill and title change with the ride (see .lp-live-* keyframes) */}
+      <AppHeader right={(
+        <span className="lp-live-stack">
+          <span className="lp-pill lp-pill-eta lp-live-a">ETA 4 min</span>
+          <span className="lp-pill lp-pill-eta lp-live-b">Arrived</span>
+          <span className="lp-pill lp-pill-eta lp-live-c">Resolved</span>
+        </span>
+      )} />
+      <p className="lp-screen-title lp-live-stack">
+        <span className="lp-live-a">Help is on the way</span>
+        <span className="lp-live-b">Responder has arrived</span>
+        <span className="lp-live-c">Emergency resolved</span>
+      </p>
 
       <div className="lp-map">
         <svg className="lp-map-svg" width="100%" height="100%" viewBox="0 0 248 190" preserveAspectRatio="none">
@@ -127,15 +139,81 @@ export function TrackingScreen() {
         <div className="lp-avatar">HR</div>
         <div style={{ minWidth: 0 }}>
           <p className="lp-responder-name">Hamza R. <BadgeCheck size={13} color="var(--success)" /></p>
-          <p className="lp-responder-meta">Verified responder • Motorbike Ambulance • ETA 4 min</p>
+          <p className="lp-responder-meta">Verified responder • Motorbike Ambulance</p>
         </div>
       </div>
 
-      <ol className="lp-timeline">
+      {/* Same four steps as the responder app, advancing with the motorbike */}
+      <ol className="lp-timeline lp-timeline-live">
         <li className="is-done"><span className="lp-dot"><Check size={10} /></span>Accepted</li>
-        <li className="is-active"><span className="lp-dot" />En route</li>
-        <li><span className="lp-dot" />Arrived</li>
+        <li className="lp-tl-2 is-active"><span className="lp-dot"><Check size={10} className="lp-tl-check" /></span>On the way</li>
+        <li className="lp-tl-3"><span className="lp-dot"><Check size={10} className="lp-tl-check" /></span>Arrived</li>
+        <li className="lp-tl-4"><span className="lp-dot"><Check size={10} className="lp-tl-check" /></span>Resolved</li>
       </ol>
+    </div>
+  );
+}
+
+/* 2b — Responder's phone: the incoming emergency request (same content as the app's alert) */
+export function ResponderAlertScreen() {
+  return (
+    <div className="lp-screen">
+      <AppHeader right={<span className="lp-pill lp-pill-online"><span className="lp-online-dot" /> Online</span>} />
+      <p className="lp-screen-hello">Hello, Hamza</p>
+      <p className="lp-screen-sub">Responder dashboard</p>
+
+      <div className="lp-alert-card">
+        <span className="lp-alert-icon"><TriangleAlert size={22} /></span>
+        <p className="lp-alert-title">Emergency Request!</p>
+        <p className="lp-alert-type">CARDIAC</p>
+        <p className="lp-alert-expiry">Request expires in <b>0:52</b></p>
+        <p className="lp-alert-distance"><Navigation size={11} /> 1.4 km away · ~3 min</p>
+        <div className="lp-alert-medical">
+          <p className="lp-alert-medical-title"><ClipboardPlus size={12} /> Medical summary</p>
+          <p><b>Blood type:</b> B+</p>
+          <p className="lp-alert-allergy">Allergies: Penicillin</p>
+          <p className="lp-alert-condition">Conditions: Asthma</p>
+        </div>
+        <div className="lp-alert-actions">
+          <span className="lp-alert-btn lp-alert-btn-ghost">Reject</span>
+          <span className="lp-alert-btn lp-alert-btn-primary"><Check size={12} /> Accept</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* 4 — Caregiver's dashboard following the same emergency */
+export function CaregiverScreen() {
+  return (
+    <div className="lp-screen">
+      <div className="lp-notif">
+        <img src={appMark} alt="" width="18" height="18" />
+        <span><b>Ayesha Khan raised an SOS</b><br />Hamza R. accepted · on the way</span>
+      </div>
+      <AppHeader right={<span className="lp-pill lp-pill-outline"><Bell size={10} /> 1</span>} />
+      <p className="lp-screen-hello">Hello, Sara</p>
+      <p className="lp-screen-sub">Caregiver dashboard</p>
+
+      <div className="lp-cg-sos">
+        <p className="lp-cg-sos-label"><span className="lp-online-dot lp-dot-red" /> Active SOS · just now</p>
+        <p className="lp-cg-name">Ayesha Khan</p>
+        <p className="lp-cg-meta">Cardiac · Responder on the way</p>
+        <div className="lp-cg-map">
+          <svg width="100%" height="100%" viewBox="0 0 220 80" preserveAspectRatio="none">
+            <rect width="220" height="80" fill="var(--lp-map-bg)" />
+            <g stroke="var(--lp-map-street)" strokeWidth="6" fill="none"><path d="M0 28 H220" /><path d="M0 62 H220" /><path d="M70 0 V80" /><path d="M160 0 V80" /></g>
+            <path d="M16 62 H70 V28 H150" fill="none" stroke="var(--primary-light)" strokeWidth="3" strokeDasharray="6 5" strokeLinecap="round" />
+          </svg>
+          <span className="lp-cg-bike"><img src={bikeFrame0} alt="" /><img src={bikeFrame1} alt="" className="lp-bike-siren" /></span>
+          <span className="lp-cg-pin"><MapPin size={20} fill="var(--sos)" color="#FFFFFF" strokeWidth={1.6} /></span>
+        </div>
+        <span className="lp-cg-track"><MapPin size={12} /> Track live</span>
+      </div>
+
+      <p className="lp-screen-label">Linked patients</p>
+      <div className="lp-cg-row"><span className="lp-avatar lp-avatar-sm">AK</span><span><b>Ayesha Khan</b><br />Friend · SOS active</span><span className="lp-pill lp-pill-sos">SOS</span></div>
+      <div className="lp-cg-row"><span className="lp-avatar lp-avatar-sm">BA</span><span><b>Bilal Ahmed</b><br />Brother · Deaf</span><span className="lp-pill lp-pill-safe"><Users size={9} /> Safe</span></div>
     </div>
   );
 }

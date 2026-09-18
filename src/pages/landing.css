@@ -274,12 +274,12 @@
   offset-path: path('M20 150 L120 150 L120 96 L200 96 L200 60');
   /* Top-down mascot faces up; turn it to face along the road */
   offset-rotate: auto 90deg; offset-anchor: 50% 50%;
-  animation: lp-ride 9s ease-in-out infinite;
+  animation: lp-ride 12s ease-in-out infinite;
 }
 .lp-bike img { position: absolute; inset: 0; width: 100%; height: 100%; }
 .lp-bike-siren { animation: lp-siren-swap 0.9s steps(1, end) infinite; }
 @keyframes lp-siren-swap { 50% { opacity: 0; } }
-@keyframes lp-ride { 0% { offset-distance: 0%; } 85%, 100% { offset-distance: 100%; } }
+@keyframes lp-ride { 0% { offset-distance: 0%; } 62%, 100% { offset-distance: 100%; } }
 .lp-siren { animation: lp-blink 0.9s steps(2, jump-none) infinite; }
 @keyframes lp-blink { 50% { opacity: 0.25; } }
 .lp-patient-pin { position: absolute; left: 187px; top: 26px; width: 26px; height: 26px; }
@@ -298,6 +298,116 @@
 .lp-timeline .is-done .lp-dot { background: var(--success); border-color: var(--success); }
 .lp-timeline .is-active { color: var(--primary-mid); }
 .lp-timeline .is-active .lp-dot { border-color: var(--primary-mid); box-shadow: 0 0 0 4px rgba(36, 150, 167, 0.2); }
+
+/* Live tracking mockup: steps, title and pill advance with the 12 s ride (0–62% riding, 62% arrived, 82% resolved) */
+.lp-live-stack { display: inline-grid; }
+.lp-live-stack > * { grid-area: 1 / 1; }
+.lp-live-b, .lp-live-c { opacity: 0; }
+.lp-live-a { animation: lp-live-a 12s infinite; }
+.lp-live-b { animation: lp-live-b 12s infinite; }
+.lp-live-c { animation: lp-live-c 12s infinite; }
+@keyframes lp-live-a { 0%, 60% { opacity: 1; } 62%, 98% { opacity: 0; } 100% { opacity: 1; } }
+@keyframes lp-live-b { 0%, 60% { opacity: 0; } 62%, 80% { opacity: 1; } 82%, 100% { opacity: 0; } }
+@keyframes lp-live-c { 0%, 80% { opacity: 0; } 82%, 98% { opacity: 1; } 100% { opacity: 0; } }
+
+.lp-timeline-live li { font-size: 10px; }
+.lp-timeline-live::before { left: 12.5%; right: 12.5%; }
+.lp-timeline-live::after {
+  content: ''; position: absolute; top: 8px; left: 12.5%; height: 2px; width: 25%;
+  background: var(--success); animation: lp-tl-fill 12s infinite;
+}
+@keyframes lp-tl-fill { 0%, 60% { width: 25%; } 62%, 80% { width: 50%; } 82%, 98% { width: 75%; } 100% { width: 25%; } }
+.lp-tl-check { opacity: 0; }
+.lp-timeline-live li > .lp-dot { position: relative; z-index: 1; }
+.lp-tl-2 { animation: lp-tl-label-2 12s infinite; }
+.lp-tl-2 .lp-dot { animation: lp-tl-dot-2 12s infinite; }
+.lp-tl-2 .lp-tl-check { animation: lp-tl-check-2 12s infinite; }
+.lp-tl-3 { animation: lp-tl-label-3 12s infinite; }
+.lp-tl-3 .lp-dot { animation: lp-tl-dot-3 12s infinite; }
+.lp-tl-3 .lp-tl-check { animation: lp-tl-check-3 12s infinite; }
+.lp-tl-4 { animation: lp-tl-label-4 12s infinite; }
+.lp-tl-4 .lp-dot { animation: lp-tl-dot-4 12s infinite; }
+.lp-tl-4 .lp-tl-check { animation: lp-tl-check-4 12s infinite; }
+/* On the way: active while riding, done on arrival */
+@keyframes lp-tl-label-2 { 0%, 60% { color: var(--primary-mid); } 62%, 98% { color: var(--success); } 100% { color: var(--primary-mid); } }
+@keyframes lp-tl-dot-2 {
+  0%, 60% { background: var(--surface); border-color: var(--primary-mid); box-shadow: 0 0 0 4px rgba(36, 150, 167, 0.2); }
+  62%, 98% { background: var(--success); border-color: var(--success); box-shadow: none; }
+  100% { background: var(--surface); border-color: var(--primary-mid); box-shadow: 0 0 0 4px rgba(36, 150, 167, 0.2); }
+}
+@keyframes lp-tl-check-2 { 0%, 60% { opacity: 0; } 62%, 98% { opacity: 1; } 100% { opacity: 0; } }
+/* Arrived: done when the bike reaches the pin */
+@keyframes lp-tl-label-3 { 0%, 60% { color: var(--text-muted); } 62%, 98% { color: var(--success); } 100% { color: var(--text-muted); } }
+@keyframes lp-tl-dot-3 {
+  0%, 60% { background: var(--surface); border-color: var(--border); box-shadow: none; }
+  62% { background: var(--success); border-color: var(--success); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.25); }
+  66%, 98% { background: var(--success); border-color: var(--success); box-shadow: none; }
+  100% { background: var(--surface); border-color: var(--border); box-shadow: none; }
+}
+@keyframes lp-tl-check-3 { 0%, 60% { opacity: 0; } 62%, 98% { opacity: 1; } 100% { opacity: 0; } }
+/* Resolved: after the responder has helped */
+@keyframes lp-tl-label-4 { 0%, 80% { color: var(--text-muted); } 82%, 98% { color: var(--success); } 100% { color: var(--text-muted); } }
+@keyframes lp-tl-dot-4 {
+  0%, 80% { background: var(--surface); border-color: var(--border); box-shadow: none; }
+  82% { background: var(--success); border-color: var(--success); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0.25); }
+  86%, 98% { background: var(--success); border-color: var(--success); box-shadow: none; }
+  100% { background: var(--surface); border-color: var(--border); box-shadow: none; }
+}
+@keyframes lp-tl-check-4 { 0%, 80% { opacity: 0; } 82%, 98% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Responder alert mockup */
+.lp-pill-online { background: rgba(16, 185, 129, 0.14); color: var(--success-fg); }
+.lp-online-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
+.lp-dot-red { background: var(--sos); }
+.lp-alert-card { margin-top: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 10px 24px rgba(4, 54, 78, 0.12); padding: 14px 12px 12px; text-align: center; }
+.lp-alert-icon { width: 44px; height: 44px; border-radius: 50%; background: var(--sos); color: #fff; display: inline-flex; align-items: center; justify-content: center; animation: lp-sos-pulse 2.2s ease-in-out infinite; }
+.lp-alert-title { font-weight: 900; font-size: 15px; margin-top: 8px; color: var(--text-main) !important; }
+.lp-alert-type { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-muted) !important; }
+.lp-alert-expiry { font-size: 10.5px; color: var(--text-muted) !important; margin-top: 6px; }
+.lp-alert-expiry b { color: var(--sos); font-size: 13px; }
+.lp-alert-distance { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: var(--text-sub) !important; margin-top: 4px; }
+.lp-alert-medical { text-align: left; margin-top: 10px; padding: 8px 10px; border-radius: 10px; background: rgba(40, 145, 194, 0.08); border: 1px solid rgba(40, 145, 194, 0.25); font-size: 10.5px; line-height: 1.5; color: var(--text-sub); }
+.lp-alert-medical-title { display: flex; align-items: center; gap: 5px; font-weight: 800; color: var(--primary) !important; margin-bottom: 2px; }
+.lp-alert-allergy { color: var(--sos) !important; font-weight: 700; }
+.lp-alert-condition { color: #D97706 !important; font-weight: 700; }
+.lp-alert-actions { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; margin-top: 10px; }
+.lp-alert-btn { display: inline-flex; align-items: center; justify-content: center; gap: 4px; height: 32px; border-radius: 10px; font-weight: 800; font-size: 11.5px; }
+.lp-alert-btn-ghost { border: 1px solid var(--border); color: var(--text-sub); }
+.lp-alert-btn-primary { background: var(--primary); color: #fff; box-shadow: 0 6px 14px rgba(12, 99, 126, 0.3); }
+
+/* Caregiver dashboard mockup */
+.lp-notif { display: flex; gap: 8px; align-items: flex-start; margin: 2px 0 8px; padding: 8px 10px; border-radius: 12px; background: #1B2632; color: #fff; font-size: 10px; line-height: 1.35; box-shadow: 0 8px 18px rgba(0, 0, 0, 0.2); animation: lp-notif-in 0.6s ease-out both; }
+.lp-notif img { border-radius: 5px; background: #fff; flex-shrink: 0; }
+@keyframes lp-notif-in { from { opacity: 0; translate: 0 -10px; } to { opacity: 1; translate: 0 0; } }
+.lp-cg-sos { margin-top: 10px; padding: 10px; border-radius: 14px; background: rgba(239, 68, 68, 0.06); border: 1px solid rgba(239, 68, 68, 0.25); }
+.lp-cg-sos-label { display: flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 800; color: var(--sos) !important; text-transform: uppercase; letter-spacing: 0.04em; }
+.lp-cg-name { font-weight: 800; font-size: 14px; margin-top: 4px; color: var(--text-main) !important; }
+.lp-cg-meta { font-size: 10.5px; color: var(--text-muted) !important; }
+.lp-cg-map { position: relative; height: 80px; border-radius: 10px; overflow: hidden; margin-top: 8px; border: 1px solid var(--border); }
+.lp-cg-map svg { position: absolute; inset: 0; display: block; }
+.lp-cg-bike { position: absolute; top: 0; left: 0; width: 30px; height: 30px; offset-path: path('M16 62 L70 62 L70 28 L150 28'); offset-rotate: auto 90deg; offset-anchor: 50% 50%; animation: lp-cg-ride 6s ease-in-out infinite; }
+.lp-cg-bike img { position: absolute; inset: 0; width: 100%; height: 100%; }
+@keyframes lp-cg-ride { 0% { offset-distance: 0%; } 80%, 100% { offset-distance: 100%; } }
+.lp-cg-pin { position: absolute; left: 150px; top: 8px; translate: -50% 0; }
+.lp-cg-track { display: flex; align-items: center; justify-content: center; gap: 5px; margin-top: 8px; height: 30px; border-radius: 10px; background: var(--sos); color: #fff; font-weight: 800; font-size: 11.5px; }
+.lp-cg-row { display: flex; align-items: center; gap: 8px; padding: 7px 8px; border-radius: 10px; border: 1px solid var(--border); margin-top: 6px; font-size: 10.5px; line-height: 1.35; color: var(--text-muted); }
+.lp-cg-row b { color: var(--text-main); font-size: 11.5px; }
+.lp-cg-row .lp-pill { margin-left: auto; }
+.lp-avatar-sm { width: 28px; height: 28px; border-radius: 8px; font-size: 10px; }
+.lp-pill-sos { background: rgba(239, 68, 68, 0.12); color: var(--sos); }
+.lp-pill-safe { background: rgba(16, 185, 129, 0.14); color: var(--success-fg); }
+
+/* How it works: interactive steps driving the phone */
+.lp-step-btn { all: unset; box-sizing: border-box; display: flex; gap: 14px; align-items: flex-start; width: 100%; cursor: pointer; }
+.lp-step-title { display: block; font-weight: 800; font-size: 1rem; line-height: 1.35; color: var(--text-main); letter-spacing: -0.01em; }
+.lp-step-text { display: block; font-size: 0.9rem; margin-top: 2px; color: var(--text-muted); }
+.lp-step-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 10px; }
+.lp-steps-live .lp-step { position: relative; overflow: hidden; }
+.lp-steps-live .lp-step.is-current { border-color: var(--primary-light); background: color-mix(in srgb, var(--primary-pale) 55%, var(--surface)); box-shadow: 0 10px 24px rgba(4, 54, 78, 0.1); }
+.lp-steps-live .lp-step.is-current .lp-step-num { box-shadow: 0 0 0 6px var(--primary-pale); }
+.lp-steps-live .lp-step:not(.is-current) .lp-step-num { background: var(--surface-alt); color: var(--text-sub); }
+.lp-step-progress { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--primary-light); width: 0; animation: lp-step-progress linear forwards; }
+@keyframes lp-step-progress { to { width: 100%; } }
 
 /* Deaf-first alert + chat */
 .lp-deaf-alert {
@@ -455,6 +565,10 @@
   .lp-sos-ring-progress { animation: none; stroke-dashoffset: calc(var(--ring-c) * 0.13); }
   .lp-bike { animation: none; offset-distance: 62%; }
   .lp-bike-siren { animation: none; opacity: 0; }
+  .lp-cg-bike, .lp-alert-icon, .lp-notif, .lp-step-progress { animation: none; }
+  .lp-cg-bike { offset-distance: 60%; }
+  .lp-live-a, .lp-live-b, .lp-live-c, .lp-timeline-live::after, .lp-tl-2, .lp-tl-3, .lp-tl-4,
+  .lp-tl-2 .lp-dot, .lp-tl-3 .lp-dot, .lp-tl-4 .lp-dot, .lp-tl-check { animation: none; }
   .lp-bd-route, .lp-bd-pulse, .lp-bd-ecg, .lp-section-alt::before, .lp-section-alt::after, .lp-trust::after { animation: none; }
   .lp-bd-ecg { stroke-dashoffset: 0; }
   .lp-bd-rider, .lp-bd-rider-glow { display: none; }

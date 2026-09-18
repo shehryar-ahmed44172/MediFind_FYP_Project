@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { MotionConfig, motion } from 'framer-motion';
+import { AnimatePresence, MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion';
 import {
   Ambulance, ArrowRight, BellRing, BookmarkCheck, Check, ChevronDown, ClipboardPlus, Download,
   EarOff, FileLock2, HeartHandshake, HeartPulse, IdCard, LayoutGrid, ListOrdered, LocateFixed,
@@ -8,7 +8,9 @@ import {
   Smartphone, Sparkles, UserRound, Users, Vibrate, X,
 } from 'lucide-react';
 import appMark from '../assets/medifind_mark.png';
-import { PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen } from '../components/landing/AppMockups';
+import {
+  PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen, ResponderAlertScreen, CaregiverScreen,
+} from '../components/landing/AppMockups';
 import { HeroBackdrop } from '../components/landing/Backdrop';
 import './landing.css';
 
@@ -168,36 +170,76 @@ function DeafSection() {
 }
 
 /* ── How it works ── */
+/* Each step shows its own screen in the phone; `ms` is how long it stays before moving on */
 const STEPS = [
-  { title: 'Tap SOS and choose the emergency', text: 'Cardiac, breathing, stroke, seizure, diabetic or injury. You have 60 seconds to cancel an accidental alert.' },
-  { title: 'The nearest verified responder accepts', text: 'Available responders close to you are notified at once with your location and medical profile.' },
-  { title: 'Track the motorbike ambulance live', text: 'See the responder move on the map with an ETA, and chat by text while they travel.' },
-  { title: 'Caregivers follow along', text: 'Linked family members and caregivers are notified and can watch the same live map.' },
+  { title: 'Tap SOS and choose the emergency', text: 'Cardiac, breathing, stroke, seizure, diabetic or injury. You have 60 seconds to cancel an accidental alert.',
+    Screen: SosScreen, ms: 6000, label: 'Patient app: SOS button with the 60-second cancel ring and emergency types' },
+  { title: 'The nearest verified responder accepts', text: 'Available responders close to you are notified at once with your location and medical profile.',
+    Screen: ResponderAlertScreen, ms: 6000, label: 'Responder app: incoming emergency request with distance, medical summary and Accept button' },
+  { title: 'Track the motorbike ambulance live', text: 'See the responder move on the map with an ETA, and chat by text while they travel.',
+    Screen: TrackingScreen, ms: 12000, label: 'Patient app: motorbike ambulance moving on the map through Accepted, On the way, Arrived and Resolved' },
+  { title: 'Caregivers follow along', text: 'Linked family members and caregivers are notified and can watch the same live map.',
+    Screen: CaregiverScreen, ms: 7000, label: 'Caregiver app: SOS notification and a live map of the responder' },
 ];
 
 function HowItWorks() {
+  const sectionRef = useRef(null);
+  const inView = useInView(sectionRef, { amount: 0.35 });
+  const reduceMotion = useReducedMotion();
+  const [active, setActive] = useState(0);
+  const [hovered, setHovered] = useState(false);
+  const playing = inView && !hovered && !reduceMotion;
+
+  // Advance to the next step when the current one has had its time on screen
+  useEffect(() => {
+    if (!playing) return undefined;
+    const t = setTimeout(() => setActive(a => (a + 1) % STEPS.length), STEPS[active].ms);
+    return () => clearTimeout(t);
+  }, [active, playing]);
+
+  const { Screen, label } = STEPS[active];
   return (
-    <section id="how" className="lp-section" aria-labelledby="how-title">
-      <div className="lp-container lp-split reverse">
+    <section id="how" ref={sectionRef} className="lp-section" aria-labelledby="how-title">
+      <div className="lp-container lp-split reverse" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
         <motion.div {...fadeUp}>
           <span className="lp-eyebrow"><ListOrdered size={14} /> How it works</span>
           <h2 id="how-title">From tap to treatment in four steps.</h2>
           <p className="lp-lead">Motorbike ambulances reach patients through traffic that stops larger vehicles.</p>
-          <ol className="lp-steps" style={{ marginTop: 24 }}>
+          <ol className="lp-steps lp-steps-live" style={{ marginTop: 24 }}>
             {STEPS.map((s, i) => (
-              <li key={s.title} className="lp-step">
-                <span className="lp-step-num" aria-hidden="true">{i + 1}</span>
-                <div>
-                  <h3>{s.title}</h3>
-                  <p>{s.text}</p>
-                </div>
+              <li key={s.title} className={`lp-step${i === active ? ' is-current' : ''}`}>
+                <button type="button" className="lp-step-btn" onClick={() => setActive(i)} aria-current={i === active ? 'step' : undefined}>
+                  <span className="lp-step-num" aria-hidden="true">{i + 1}</span>
+                  <span>
+                    <span className="lp-step-title">{s.title}</span>
+                    <span className="lp-step-text">{s.text}</span>
+                  </span>
+                </button>
+                {i === active && !reduceMotion && (
+                  <span
+                    key={`progress-${active}`}
+                    className="lp-step-progress"
+                    aria-hidden="true"
+                    style={{ animationDuration: `${s.ms}ms`, animationPlayState: playing ? 'running' : 'paused' }}
+                  />
+                )}
               </li>
             ))}
           </ol>
         </motion.div>
         <div style={{ display: 'flex', justifyContent: 'center' }}>
-          <PhoneFrame label="MediFind app: responder card and Accepted, En route, Arrived timeline">
-            <TrackingScreen />
+          <PhoneFrame label={label}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={active}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3, ease: 'easeOut' }}
+              >
+                <Screen />
+              </motion.div>
+            </AnimatePresence>
           </PhoneFrame>
         </div>
       </div>

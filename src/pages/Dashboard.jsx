@@ -32,7 +32,7 @@ import {
 } from '../components/ui';
 import { chartColors } from '../components/uiStyles';
 import useAdminScope from '../components/useAdminScope';
-import appMark from '../assets/medifind_app_mark.png';
+import appMark from '../assets/medifind_mark.png';
 
 /* ─── Leaflet icon fix (Vite breaks default icon asset path) ────────────── */
 delete L.Icon.Default.prototype._getIconUrl;

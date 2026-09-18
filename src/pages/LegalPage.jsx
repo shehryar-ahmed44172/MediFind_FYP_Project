@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Shield, FileText, ChevronLeft, ArrowRight } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
-import logo from '../assets/Medifind_New_Logo-removebg-preview.png';
+import logo from '../assets/medifind_logo_full.png';
 
 const LegalPage = ({ type }) => {
   const { pathname } = useLocation();
@@ -21,7 +21,7 @@ const LegalPage = ({ type }) => {
       <nav style={{ background: 'rgba(255, 255, 255, 0.9)', backdropFilter: 'blur(10px)', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, borderBottom: '1px solid var(--border)' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '0.5rem 2rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            <img src={logo} alt="MediFind" style={{ height: '70px', objectFit: 'contain', display: 'block' }} />
+            <img src={logo} alt="MediFind" style={{ height: '110px', objectFit: 'contain', display: 'block' }} />
           </Link>
           <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-sub)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 600 }}>
             <ChevronLeft size={16} /> <span style={{ opacity: 0.8 }}>Back to Home</span>

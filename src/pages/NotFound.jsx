@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Home, ArrowLeft, AlertTriangle, Activity } from 'lucide-react';
-import logo from '../assets/Medifind_New_Logo-removebg-preview.png';
+import logo from '../assets/medifind_logo_full.png';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -87,9 +87,12 @@ export default function NotFound() {
             src={logo}
             alt="MediFind"
             style={{
-              height: '52px',
+              height: '112px',
               objectFit: 'contain',
-              filter: 'brightness(1.3) drop-shadow(0 2px 8px rgba(0,0,0,0.3))',
+              background: '#fff',
+              borderRadius: '20px',
+              padding: '12px 18px',
+              boxShadow: '0 2px 12px rgba(0,0,0,0.3)',
             }}
           />
         </div>

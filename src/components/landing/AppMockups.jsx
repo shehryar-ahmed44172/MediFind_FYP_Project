@@ -3,7 +3,7 @@ import {
   HeartPulse, Wind, Brain, Zap, Droplet, Bone, BadgeCheck, Check,
   Vibrate, MessageSquare, Sparkles, Signal, BatteryFull, Wifi, MapPin, Ear,
 } from 'lucide-react';
-import appMark from '../../assets/medifind_app_mark.png';
+import appMark from '../../assets/medifind_mark.png';
 
 /*
  * Lightweight HTML/CSS/SVG recreations of real MediFind mobile screens.
@@ -32,7 +32,7 @@ export function PhoneFrame({ label, children, className = '' }) {
 function AppHeader({ right }) {
   return (
     <div className="lp-app-header">
-      <img src={appMark} alt="" width="26" height="25" />
+      <img src={appMark} alt="" width="26" height="26" />
       <span className="lp-app-title">Medi<b>Find</b></span>
       <span style={{ marginLeft: 'auto' }}>{right}</span>
     </div>

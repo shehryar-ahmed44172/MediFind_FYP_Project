@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/hooks';
 import { Avatar, Button, Notice } from '../components/ui';
 import useAdminScope from '../components/useAdminScope';
-import appMark from '../assets/medifind_app_mark.png';
+import appMark from '../assets/medifind_mark.png';
 
 /* Map API / network failures to clear, actionable messages */
 function loginErrorMessage(err) {

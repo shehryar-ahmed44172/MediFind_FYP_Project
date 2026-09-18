@@ -6,7 +6,7 @@ import {
   HeartHandshake, HeartPulse, IdCard, Mail, MapPin, Menu, MessageSquareText, Navigation,
   PhoneCall, ScrollText, ShieldCheck, Smartphone, Sparkles, Stethoscope, Users, Vibrate, X, Zap,
 } from 'lucide-react';
-import appMark from '../assets/medifind_app_mark.png';
+import appMark from '../assets/medifind_mark.png';
 import { PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen } from '../components/landing/AppMockups';
 import './landing.css';
 
@@ -54,7 +54,7 @@ function SiteHeader() {
     <header className="lp-header">
       <div className="lp-container lp-header-inner">
         <Link to="/" className="lp-logo" aria-label="MediFind home">
-          <img src={appMark} alt="" width="34" height="32" />
+          <img src={appMark} alt="" width="34" height="34" />
           <span>Medi<b>Find</b></span>
         </Link>
         <nav className="lp-nav" aria-label="Primary">
@@ -451,7 +451,7 @@ function SiteFooter() {
       <div className="lp-container">
         <div className="lp-footer-grid">
           <div>
-            <span className="lp-logo" style={{ color: '#fff' }}><img src={appMark} alt="" width="34" height="32" /><span>Medi<b style={{ color: '#fff' }}>Find</b></span></span>
+            <span className="lp-logo" style={{ color: '#fff' }}><img src={appMark} alt="" width="34" height="34" /><span>Medi<b style={{ color: '#fff' }}>Find</b></span></span>
             <p style={{ marginTop: 10, maxWidth: 360 }}>Deaf-first medical emergency response for Pakistan — verified motorbike ambulances, live tracking and text-based help.</p>
           </div>
           <nav aria-label="Footer">

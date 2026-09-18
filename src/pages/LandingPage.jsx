@@ -3,13 +3,14 @@ import { Link } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion';
 import {
   Ambulance, ArrowRight, BellRing, BookmarkCheck, Check, ChevronDown, ClipboardPlus, Download,
-  EarOff, FileLock2, HeartHandshake, HeartPulse, IdCard, LayoutGrid, ListOrdered, LocateFixed,
-  Mail, Menu, MessageSquareText, MicOff, PhoneCall, Presentation, ScrollText, ShieldCheck,
-  Smartphone, Sparkles, UserRound, Users, Vibrate, X,
+  EarOff, FileLock2, HeartHandshake, HeartPulse, IdCard, LayoutDashboard, LayoutGrid, ListOrdered,
+  LocateFixed, Lock, Mail, Megaphone, Menu, MessageSquareText, MicOff, PhoneCall, Presentation,
+  ScrollText, ShieldCheck, Siren, Smartphone, Sparkles, UserCheck, UserRound, Users, Vibrate, X,
 } from 'lucide-react';
 import appMark from '../assets/medifind_mark.png';
 import {
   PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen, ResponderAlertScreen, CaregiverScreen,
+  LaptopFrame, AdminConsoleScreen,
 } from '../components/landing/AppMockups';
 import { HeroBackdrop } from '../components/landing/Backdrop';
 import './landing.css';
@@ -24,6 +25,7 @@ const NAV_LINKS = [
   { href: '#deaf',       label: 'For Deaf Users' },
   { href: '#how',        label: 'How it works' },
   { href: '#responders', label: 'Responders' },
+  { href: '#admin',      label: 'Admin' },
   { href: '#faq',        label: 'FAQ' },
 ];
 
@@ -329,6 +331,52 @@ const TRUST = [
   { Icon: ScrollText,  title: 'Audited admin actions',     text: 'Verification decisions and account changes are recorded in an audit log.' },
 ];
 
+/* ── Admin console ── */
+const ADMIN_FEATURES = [
+  { Icon: UserCheck,   title: 'Verify responders',  text: 'Review CNIC, license and employee ID before anyone can accept an emergency.' },
+  { Icon: Siren,       title: 'Live SOS logistics', text: 'Every active emergency and online responder on one live map.' },
+  { Icon: PhoneCall,   title: 'Call records',       text: 'Who called whom during an emergency, for how long and how it ended.' },
+  { Icon: Megaphone,   title: 'Broadcast alerts',   text: 'Send announcements to patients, caregivers or responders in one step.' },
+  { Icon: ScrollText,  title: 'Audit logs',         text: 'Verification decisions, account changes and messages are all traceable.' },
+  { Icon: ShieldCheck, title: 'Secure access',      text: 'Admin-only accounts, session timeout, IP whitelist and maintenance mode.' },
+];
+
+function AdminSection() {
+  return (
+    <section id="admin" className="lp-section lp-section-alt" aria-labelledby="admin-title">
+      <div className="lp-container lp-admin-split">
+        <motion.div {...fadeUp}>
+          <span className="lp-eyebrow"><LayoutDashboard size={14} /> Admin console</span>
+          <h2 id="admin-title">One console to keep every emergency accountable.</h2>
+          <p className="lp-lead">
+            MediFind administrators verify responders, watch live SOS activity and review every alert and call — from any browser.
+          </p>
+          <div className="lp-feature-grid">
+            {ADMIN_FEATURES.map(({ Icon, title, text }) => (
+              <div key={title} className="lp-mini-feature">
+                <span className="lp-icon" aria-hidden="true"><Icon size={18} /></span>
+                <div>
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="lp-admin-cta">
+            <Link to="/login" className="lp-btn lp-btn-secondary">Open admin console <ArrowRight size={18} /></Link>
+            <small><Lock size={13} aria-hidden="true" /> For MediFind administrators only</small>
+          </div>
+        </motion.div>
+        <motion.div {...fadeUp} style={{ display: 'flex', justifyContent: 'center' }}>
+          <LaptopFrame label="MediFind admin console: live SOS map, responder verification queue and recent emergency calls">
+            <AdminConsoleScreen />
+          </LaptopFrame>
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
 function Trust() {
   return (
     <section className="lp-section lp-trust" aria-labelledby="trust-title">
@@ -496,6 +544,7 @@ const FOOTER_COLUMNS = [
       { href: '#features', label: 'Features' },
       { href: '#deaf', label: 'For Deaf users' },
       { href: '#how', label: 'How it works' },
+      { href: '#admin', label: 'Admin console' },
       { href: '#faq', label: 'FAQ' },
     ],
   },
@@ -569,6 +618,7 @@ export default function LandingPage() {
           <HowItWorks />
           <Features />
           <Roles />
+          <AdminSection />
           <Trust />
           <Faq />
           <Contact />

@@ -3,6 +3,7 @@ import {
   HeartPulse, Wind, Brain, Zap, Droplet, Bone, BadgeCheck, Check,
   Vibrate, MessageSquare, Sparkles, Signal, BatteryFull, Wifi, MapPin, Ear,
   TriangleAlert, ClipboardPlus, Navigation, Bell, Users,
+  LayoutDashboard, Siren, UserCheck, PhoneCall, ScrollText, Search,
 } from 'lucide-react';
 import appMark from '../../assets/medifind_mark.png';
 import bikeFrame0 from '../../assets/mascot_bike_0.png';
@@ -241,6 +242,95 @@ export function DeafAlertScreen() {
       <p className="lp-chat-label" style={{ marginTop: 8 }}><Sparkles size={11} /> AI quick replies</p>
       <div className="lp-quick-replies">
         {QUICK_REPLIES.map(t => <span key={t} className="lp-quick-chip">{t}</span>)}
+      </div>
+    </div>
+  );
+}
+
+/* 5 — Admin console in a laptop (web portal overview, demo data only) */
+const ADMIN_NAV = [
+  { Icon: LayoutDashboard, label: 'Overview', active: true },
+  { Icon: Siren, label: 'SOS Logistics' },
+  { Icon: UserCheck, label: 'Verification' },
+  { Icon: PhoneCall, label: 'Call Records' },
+  { Icon: ScrollText, label: 'System Logs' },
+];
+
+export function LaptopFrame({ label, children }) {
+  return (
+    <figure className="lp-laptop-figure">
+      <div className="lp-laptop" role="img" aria-label={label}>
+        <div className="lp-laptop-screen" aria-hidden="true">{children}</div>
+      </div>
+      <div className="lp-laptop-base" aria-hidden="true" />
+    </figure>
+  );
+}
+
+export function AdminConsoleScreen() {
+  return (
+    <div className="lp-adm">
+      <aside className="lp-adm-side">
+        <div className="lp-adm-brand">
+          <img src={appMark} alt="" />
+          <span><b>MediFind</b><small>Admin console</small></span>
+        </div>
+        {ADMIN_NAV.map(({ Icon, label, active }) => (
+          <span key={label} className={`lp-adm-nav${active ? ' is-active' : ''}`}><Icon /> {label}</span>
+        ))}
+      </aside>
+
+      <div className="lp-adm-main">
+        <div className="lp-adm-top">
+          <span className="lp-adm-search"><Search /> Search users or pages…</span>
+          <span className="lp-adm-status"><span className="lp-online-dot" /> All systems operational</span>
+        </div>
+
+        <p className="lp-adm-title">Overview</p>
+        <div className="lp-adm-stats">
+          <div className="lp-adm-stat is-sos"><small>Active SOS</small><b>1</b><span className="lp-adm-live">Live</span></div>
+          <div className="lp-adm-stat"><small>Responders online</small><b>12</b></div>
+          <div className="lp-adm-stat"><small>Resolved today</small><b>7</b></div>
+          <div className="lp-adm-stat"><small>Pending verification</small><b>2</b></div>
+        </div>
+
+        <div className="lp-adm-grid">
+          <div className="lp-adm-panel">
+            <p className="lp-adm-panel-title">Live SOS map</p>
+            <div className="lp-adm-map">
+              <svg viewBox="0 0 200 110" preserveAspectRatio="none">
+                <rect width="200" height="110" fill="var(--lp-map-bg)" />
+                <g stroke="var(--lp-map-street)" strokeWidth="5" fill="none">
+                  <path d="M0 30 H200" /><path d="M0 78 H200" /><path d="M52 0 V110" /><path d="M140 0 V110" />
+                </g>
+                <path d="M18 78 H52 V30 H112" fill="none" stroke="var(--primary-light)" strokeWidth="2.5" strokeDasharray="5 4" strokeLinecap="round" />
+              </svg>
+              <span className="lp-adm-sos"><span /></span>
+              <span className="lp-adm-rider lp-adm-rider-1" />
+              <span className="lp-adm-rider lp-adm-rider-2" />
+              <span className="lp-adm-rider lp-adm-rider-3" />
+            </div>
+          </div>
+
+          <div className="lp-adm-panel">
+            <p className="lp-adm-panel-title">Verification queue</p>
+            <div className="lp-adm-row">
+              <span className="lp-adm-av">UA</span>
+              <span className="lp-adm-who"><b>Usman A.</b><small>Paramedic · CNIC ✓ License ✓</small></span>
+              <span className="lp-adm-btn">Approve</span>
+            </div>
+            <div className="lp-adm-row lp-adm-row-new">
+              <span className="lp-adm-av">SK</span>
+              <span className="lp-adm-who"><b>Sana K.</b><small>Rescue volunteer · New</small></span>
+              <span className="lp-adm-btn is-ghost">Review</span>
+            </div>
+            <p className="lp-adm-panel-title" style={{ marginTop: '2.2cqw' }}>Recent calls</p>
+            <div className="lp-adm-row">
+              <span className="lp-adm-av is-call"><PhoneCall /></span>
+              <span className="lp-adm-who"><b>Hamza R. ↔ Ayesha K.</b><small>Voice · 2m 14s · Completed</small></span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -77,7 +77,7 @@
 /* On dark backgrounds (footer, dark theme) a soft light edge keeps the navy pin visible */
 /* Footer: the full header logo on a white badge, same colours as the header */
 .lp-logo-badge { display: inline-flex; background: #fff; padding: 8px 16px 8px 10px; border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
-.lp-logo-badge, .lp-footer a.lp-logo-badge, [data-theme="dark"] .lp-logo-badge { color: var(--primary-mid); }
+.lp-logo-badge, .lp-footer a.lp-logo-badge, .lp-footer a.lp-logo-badge:hover, [data-theme="dark"] .lp-logo-badge { color: var(--primary-mid); text-decoration: none; }
 .lp-logo-badge b, [data-theme="dark"] .lp-logo-badge b { color: var(--primary-dark); }
 /* Dark theme header: the navy pin needs a light tile to stay visible */
 [data-theme="dark"] .lp-header .lp-logo img { padding: 3px; border-radius: 9px; background: #fff; }

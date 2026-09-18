@@ -334,6 +334,8 @@ class AnimatedMascotMarker {
     _cumulative = cumulative;
   }
 
+  static const double _teleportMeters = 20000;
+
   /// Move to [target]. The first call places the marker without animation.
   void moveTo(LatLng target) {
     if (_disposed) return;
@@ -345,6 +347,19 @@ class AnimatedMascotMarker {
       return;
     }
     if (_sameSpot(current, target)) return;
+    // A jump of many km is a GPS correction (e.g. the first good fix after a bad
+    // one), not driving: place it directly instead of gliding across the map.
+    if (_distance(current, target) > _teleportMeters) {
+      _moveTimer?.cancel();
+      _from = null;
+      _fromAlong = null;
+      _toAlong = null;
+      _current = target;
+      _to = target;
+      _lastUpdateAt = DateTime.now();
+      _publish();
+      return;
+    }
 
     _from = current;
     _to = target;

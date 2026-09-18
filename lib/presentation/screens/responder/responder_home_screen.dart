@@ -692,8 +692,8 @@ class _EmergencyRequestCardState extends ConsumerState<_EmergencyRequestCard> {
         ref.watch(userProfileProvider(request.userId)).valueOrNull?.fullName ??
         'Patient';
 
-    final d = alert.distanceKm;
-    final eta = alert.estimatedArrivalMinutes;
+    final d = GeoUtils.isPlausible(alert.distanceKm) ? alert.distanceKm : null;
+    final eta = d == null ? null : alert.estimatedArrivalMinutes;
 
     Widget meta(IconData icon, String value) => Row(
           mainAxisSize: MainAxisSize.min,

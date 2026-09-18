@@ -16,6 +16,7 @@ import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
 import '../../widgets/map/tracking_camera.dart';
 import '../../widgets/map/route_line.dart';
+import '../../widgets/map/map_loading_cover.dart';
 import '../../theme/app_theme.dart';
 
 class CaregiverTrackingScreen extends ConsumerStatefulWidget {
@@ -28,6 +29,7 @@ class CaregiverTrackingScreen extends ConsumerStatefulWidget {
 
 class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScreen> {
   GoogleMapController? _mapController;
+  final _mapCover = MapCoverController();
   StreamSubscription<SocketMessage>? _socketSub;
   /// Animated motorbike-ambulance marker for the assigned responder.
   /// Road route from the responder to the patient.
@@ -73,6 +75,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
     _socketSub?.cancel();
     _mascot.dispose();
     _route.dispose();
+    _mapCover.dispose();
     _mapController?.dispose();
     super.dispose();
   }
@@ -248,13 +251,14 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
   String get _etaText {
     final status = _currentStatus;
     if (status == 'ARRIVED') return 'Responder has arrived';
-    if (_socketEtaMinutes != null) {
+    if (_socketEtaMinutes != null && _socketEtaMinutes! <= GeoUtils.maxPlausibleEtaMin) {
       return _socketEtaMinutes! <= 0 ? 'Arriving now' : 'ETA: ~$_socketEtaMinutes min';
     }
     final p = _patientLatLng;
     final r = _responderLatLng;
     if (p != null && r != null) {
       final km = haversineKm(r.latitude, r.longitude, p.latitude, p.longitude);
+      if (!GeoUtils.isPlausible(km)) return 'Locating the responder…';
       return 'ETA: ~${estimateEtaMinutes(km)} min (${km.toStringAsFixed(1)} km away)';
     }
     return 'ETA unavailable';
@@ -343,6 +347,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
       body: Stack(
         children: [
           Positioned.fill(child: _buildMap(context)),
+          Positioned.fill(child: MapLoadingCover(controller: _mapCover, child: const SizedBox.expand())),
           Positioned(top: 0, left: 0, right: 0, child: header),
           DraggableScrollableSheet(
             initialChildSize: 0.5,
@@ -400,6 +405,7 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
         ),
         onMapCreated: (controller) {
           _mapController = controller;
+          _mapCover.markReady();
           _fitCamera();
         },
       );

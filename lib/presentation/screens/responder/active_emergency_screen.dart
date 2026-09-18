@@ -24,6 +24,7 @@ import '../../widgets/map/ambulance_mascot.dart';
 import '../../theme/app_theme.dart';
 import '../../../core/utils/map_utils.dart';
 import '../../widgets/map/route_line.dart';
+import '../../widgets/map/map_loading_cover.dart';
 import 'widgets/responder_widgets.dart';
 
 /// How a responder closed an emergency (sent to the resolve API).
@@ -55,6 +56,7 @@ class ActiveEmergencyScreen extends ConsumerStatefulWidget {
 
 class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
   GoogleMapController? _mapController;
+  final _mapCover = MapCoverController();
 
   /// UI step: ACCEPTED → EN_ROUTE → ARRIVED → RESOLVED (or CANCELLED).
   String _currentStatus = 'ACCEPTED';
@@ -124,7 +126,10 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     _followTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       final pos = _meMarker.displayPosition;
       if (!mounted || !_followMe || _mapController == null || pos == null) return;
-      _mapController!.animateCamera(CameraUpdate.newLatLng(pos), duration: const Duration(milliseconds: 1000)).catchError((_) {});
+      // Stay on the patient while my GPS fix is implausible (hundreds of km away)
+      final target = _isPlausibleFrom(pos) ? pos : _patientPosition;
+      if (target == null) return;
+      _mapController!.animateCamera(CameraUpdate.newLatLng(target), duration: const Duration(milliseconds: 1000)).catchError((_) {});
     });
     _loadInitialStatus();
     Future.microtask(() async {
@@ -238,8 +243,14 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
         _myLng = position.longitude;
         _locationError = null;
       });
-      _meMarker.moveTo(LatLng(position.latitude, position.longitude));
-      _route.update(LatLng(position.latitude, position.longitude), _patientPosition);
+      final me = LatLng(position.latitude, position.longitude);
+      _meMarker.moveTo(me);
+      // No route from a bad GPS fix hundreds of km away (it would draw a line off the map)
+      if (_isPlausibleFrom(me)) {
+        _route.update(me, _patientPosition);
+      } else {
+        _route.clear();
+      }
 
       if (!EmergencyStatus.isTerminal(_currentStatus)) {
         SocketService.instance.sendLocationUpdate(
@@ -277,13 +288,21 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     _socketSub?.cancel();
     _meMarker.dispose();
     _route.dispose();
+    _mapCover.dispose();
     if (_isPlayingVoice) VoiceAlertService().stop();
     super.dispose();
   }
 
+  bool _isPlausibleFrom(LatLng me) {
+    final p = _patientPosition;
+    if (p == null) return true;
+    return GeoUtils.isPlausible(GeoUtils.haversineKm(me.latitude, me.longitude, p.latitude, p.longitude));
+  }
+
   double? _distanceKm(emergency_entity.Emergency emergency) {
     if (_myLat == null || _myLng == null) return null;
-    return GeoUtils.haversineKm(_myLat!, _myLng!, emergency.latitude, emergency.longitude);
+    final km = GeoUtils.haversineKm(_myLat!, _myLng!, emergency.latitude, emergency.longitude);
+    return GeoUtils.isPlausible(km) ? km : null;
   }
 
   Future<void> _openNavigation(emergency_entity.Emergency emergency) async {
@@ -699,14 +718,14 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                       if (_patientPosition == null) {
                         _patientPosition = LatLng(emergency.latitude, emergency.longitude);
                         final meNow = _meMarker.position;
-                        if (meNow != null) _route.update(meNow, _patientPosition);
+                        if (meNow != null && _isPlausibleFrom(meNow)) _route.update(meNow, _patientPosition);
                       }
                       return GoogleMap(
                         initialCameraPosition: CameraPosition(
                           target: LatLng(emergency.latitude, emergency.longitude),
                           zoom: 15,
                         ),
-                        markers: {..._patientMarkers(emergency), if (me != null) me},
+                        markers: {..._patientMarkers(emergency), if (me != null && _distanceKm(emergency) != null) me},
                         polylines: EmergencyStatus.isTerminal(_currentStatus)
                             ? const <Polyline>{}
                             : _route.polylines.value,
@@ -714,10 +733,14 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
                         myLocationEnabled: false,
                         myLocationButtonEnabled: false,
                         zoomControlsEnabled: false,
-                        onMapCreated: (controller) => _mapController = controller,
+                        onMapCreated: (controller) {
+                          _mapController = controller;
+                          _mapCover.markReady();
+                        },
                       );
                     },
                   ),
+                  Positioned.fill(child: MapLoadingCover(controller: _mapCover, child: const SizedBox.expand())),
                   Positioned(
                     top: MfSpace.xs,
                     right: MfSpace.xs,

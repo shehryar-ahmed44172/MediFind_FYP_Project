@@ -22,6 +22,7 @@ import '../../widgets/design_system/design_system.dart';
 import '../../widgets/map/ambulance_mascot.dart';
 import '../../widgets/map/tracking_camera.dart';
 import '../../widgets/map/route_line.dart';
+import '../../widgets/map/map_loading_cover.dart';
 import '../../../core/utils/emergency_status.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
@@ -34,6 +35,7 @@ class EmergencyTrackingScreen extends ConsumerStatefulWidget {
 
 class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScreen> {
   GoogleMapController? _mapController;
+  final _mapCover = MapCoverController();
 
   double? _responderLat;
   double? _responderLong;
@@ -111,6 +113,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
 
   @override
   void dispose() {
+    _mapCover.dispose();
     _simTimer?.cancel();
     _simTimer = null;
     _socketSub?.cancel();
@@ -211,11 +214,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     final serverEta = etaMinutes == null ? null : num.tryParse(etaMinutes.toString());
     String eta;
     if (serverEta != null) {
-      eta = serverEta <= 0 ? 'Arriving' : '${serverEta.round()} min';
+      eta = serverEta <= 0
+          ? 'Arriving'
+          : (serverEta > GeoUtils.maxPlausibleEtaMin ? 'Locating' : '${serverEta.round()} min');
     } else if (patient != null) {
       final km = GeoUtils.haversineKm(lat, lng, patient.latitude, patient.longitude);
       final minutes = GeoUtils.etaMinutes(km);
-      eta = minutes == 0 ? 'Arriving' : '$minutes min';
+      eta = !GeoUtils.isPlausible(km) ? 'Locating' : (minutes == 0 ? 'Arriving' : '$minutes min');
     } else {
       eta = _eta;
     }
@@ -666,6 +671,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                   style: MapUtils.getDarkMapStyle(),
                   onMapCreated: (GoogleMapController controller) {
                     _mapController = controller;
+                    _mapCover.markReady();
                   },
                   polylines: EmergencyStatus.isAssigned(_currentStatus) && !_simActive
                       ? _route.polylines.value
@@ -678,6 +684,13 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                 );
                 },
               ),
+            ),
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: mapHeight + MfRadius.lg,
+              child: MapLoadingCover(controller: _mapCover, child: const SizedBox.expand()),
             ),
 
             // ── Simulation overlays ──────────────────────────────────────────

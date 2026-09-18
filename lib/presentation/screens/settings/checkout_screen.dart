@@ -18,6 +18,9 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _selectedMethod = 'CARD';
   bool _isProcessing = false;
 
+  /// What the Pay button says while busy: opening Stripe's sheet, then confirming.
+  String _busyLabel = 'Opening secure payment…';
+
   /// The payment is prepared (PaymentIntent + payment sheet) as soon as the
   /// screen opens, so tapping Pay shows Stripe's sheet without waiting.
   Future<PaymentIntentInfo>? _prepared;
@@ -25,7 +28,12 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   @override
   void initState() {
     super.initState();
-    if (widget.planId == 'PROFESSIONAL' || widget.planId == 'EXECUTIVE') _startPreparing();
+    if (widget.planId == 'PROFESSIONAL' || widget.planId == 'EXECUTIVE') {
+      // After the first frame, so the sheet can match the app's theme colours
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _prepared == null) _startPreparing();
+      });
+    }
   }
 
   void _startPreparing() {
@@ -34,13 +42,46 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     _prepared!.ignore();
   }
 
+  /// Stripe's sheet in MediFind colours. On Android the sheet ignores `style`
+  /// and follows the phone's dark mode, so the colours are set explicitly to
+  /// match the app's current theme.
+  PaymentSheetAppearance _sheetAppearance() {
+    final cs = Theme.of(context).colorScheme;
+    return PaymentSheetAppearance(
+      colors: PaymentSheetAppearanceColors(
+        primary: cs.primary,
+        background: cs.surface,
+        componentBackground: cs.surfaceContainerLowest,
+        componentBorder: cs.outlineVariant,
+        componentDivider: cs.outlineVariant,
+        componentText: cs.onSurface,
+        primaryText: cs.onSurface,
+        secondaryText: cs.onSurfaceVariant,
+        placeholderText: cs.onSurfaceVariant,
+        icon: cs.onSurfaceVariant,
+        error: cs.error,
+      ),
+      shapes: const PaymentSheetShape(borderRadius: 12, borderWidth: 1),
+      primaryButton: PaymentSheetPrimaryButtonAppearance(
+        colors: PaymentSheetPrimaryButtonTheme(
+          light: PaymentSheetPrimaryButtonThemeColors(background: cs.primary, text: cs.onPrimary),
+          dark: PaymentSheetPrimaryButtonThemeColors(background: cs.primary, text: cs.onPrimary),
+        ),
+      ),
+    );
+  }
+
   Future<PaymentIntentInfo> _preparePayment() async {
+    final appearance = _sheetAppearance();
+    final priceLabel = 'PKR ${_getPlanDetails()['price'].toStringAsFixed(0)}';
     final intent = await ref.read(apiClientProvider).createPaymentIntent(widget.planId);
     await Stripe.instance.initPaymentSheet(
       paymentSheetParameters: SetupPaymentSheetParameters(
         paymentIntentClientSecret: intent.clientSecret,
         merchantDisplayName: 'MediFind',
-        style: ThemeMode.light,
+        style: Theme.of(context).brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+        appearance: appearance,
+        primaryButtonLabel: 'Pay $priceLabel',
         // FlowController mode: Stripe loads the sheet's data here, while the user is
         // still reading the checkout screen, instead of after Pay is tapped.
         customFlow: true,
@@ -71,7 +112,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       title: 'Checkout',
       // Sticky Pay button
       bottomBar: MfPrimaryButton(
-        label: _isProcessing ? 'Processing payment' : 'Pay $priceLabel',
+        label: _isProcessing ? _busyLabel : 'Pay $priceLabel',
         icon: Icons.lock_outline_rounded,
         loading: _isProcessing,
         onPressed: _isProcessing ? null : _handlePayment,
@@ -203,7 +244,10 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   }
 
   Future<void> _handlePayment() async {
-    setState(() => _isProcessing = true);
+    setState(() {
+      _isProcessing = true;
+      _busyLabel = 'Opening secure payment…';
+    });
     final plan = _getPlanDetails();
 
     try {
@@ -250,6 +294,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
     if (option == null) {
       throw const StripeException(error: LocalizedErrorMessage(code: FailureCode.Canceled));
     }
+    if (mounted) setState(() => _busyLabel = 'Confirming payment…');
     await Stripe.instance.confirmPaymentSheetPayment();
 
     // 4. Payment confirmed by Stripe — ask the server to apply the upgrade.

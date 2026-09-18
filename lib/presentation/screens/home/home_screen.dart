@@ -500,25 +500,28 @@ class _DeafTools extends ConsumerWidget {
           Text('No quick phrases yet. Tap Edit to add some.',
               style: text.bodyMedium?.copyWith(color: cs.onSurfaceVariant))
         else
-          SizedBox(
-            height: 56 * MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: phrases.length,
-              separatorBuilder: (_, __) => const SizedBox(width: MfSpace.xs),
-              itemBuilder: (context, i) => Center(
-                child: ActionChip(
+          // Wrapped, not a sideways list, so every phrase is fully readable
+          Wrap(
+            spacing: MfSpace.xs,
+            runSpacing: MfSpace.xs,
+            children: [
+              for (final phrase in phrases.take(_maxHomePhrases))
+                ActionChip(
                   avatar: const Icon(Icons.chat_bubble_outline_rounded, size: 18),
-                  label: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 260),
-                    child: Text(phrases[i], maxLines: 1, overflow: TextOverflow.ellipsis),
-                  ),
-                  tooltip: 'Show "${phrases[i]}" in large text',
+                  label: Text(phrase, maxLines: 2, overflow: TextOverflow.ellipsis),
+                  tooltip: 'Show "$phrase" in large text',
                   materialTapTargetSize: MaterialTapTargetSize.padded,
-                  onPressed: () => context.push('/home/show-card', extra: phrases[i]),
+                  onPressed: () => context.push('/home/show-card', extra: phrase),
                 ),
-              ),
-            ),
+              if (phrases.length > _maxHomePhrases)
+                ActionChip(
+                  avatar: const Icon(Icons.more_horiz_rounded, size: 18),
+                  label: Text('${phrases.length - _maxHomePhrases} more'),
+                  tooltip: 'See all quick phrases',
+                  materialTapTargetSize: MaterialTapTargetSize.padded,
+                  onPressed: () => context.push('/predefined-messages'),
+                ),
+            ],
           ),
         const SizedBox(height: MfSpace.md),
         const MfInfoBanner(
@@ -532,6 +535,9 @@ class _DeafTools extends ConsumerWidget {
     );
   }
 }
+
+/// Quick phrases shown on the Deaf home screen; the rest are one tap away.
+const int _maxHomePhrases = 4;
 
 // ── Quick actions (2-column, icon + label) ─────────────────────────────────
 class _QuickActions extends StatelessWidget {

@@ -40,6 +40,10 @@ class _EmergencyRequestScreenState
       try {
         final position = await LocationService().getCurrentLocation();
         final km = GeoUtils.haversineKm(position.latitude, position.longitude, lat, lng);
+        if (!GeoUtils.isPlausible(km)) {
+          _etaText = null;
+          return 'Locating you…';
+        }
         final eta = GeoUtils.etaMinutes(km);
         _etaText = eta == 0 ? 'Arriving' : '~$eta min';
         return '${GeoUtils.formatDistance(km)} away';

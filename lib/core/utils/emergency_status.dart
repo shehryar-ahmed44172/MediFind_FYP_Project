@@ -143,6 +143,16 @@ class GeoUtils {
     return math.max(1, (distanceKm / speedKmh * 60).round());
   }
 
+  /// Farthest a responder can realistically be from the patient. A larger
+  /// distance means a bad GPS fix (e.g. a default emulator location), so the
+  /// UI shows "locating" instead of an absurd ETA like 17913 min.
+  static const double maxPlausibleKm = 150;
+
+  /// ETA above this (minutes) comes from the same kind of bad fix.
+  static const int maxPlausibleEtaMin = 240;
+
+  static bool isPlausible(double? km) => km != null && km.isFinite && km <= maxPlausibleKm;
+
   static String formatDistance(double km) =>
       km < 1 ? '${(km * 1000).round()} m' : '${km.toStringAsFixed(1)} km';
 }

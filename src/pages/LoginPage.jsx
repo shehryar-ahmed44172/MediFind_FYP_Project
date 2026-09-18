@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
-import { Lock, Mail, ArrowRight, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import {
+  Lock, Mail, ArrowRight, ArrowLeft, Eye, EyeOff, UserCheck, Siren, ScrollText, ShieldCheck, PhoneCall, LayoutDashboard,
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/hooks';
 import { Avatar, Button, Notice } from '../components/ui';
 import useAdminScope from '../components/useAdminScope';
 import appMark from '../assets/medifind_mark.png';
+import { HeroBackdrop } from '../components/landing/Backdrop';
+import './login.css';
 
 /* Map API / network failures to clear, actionable messages */
 function loginErrorMessage(err) {
@@ -22,33 +26,54 @@ function loginErrorMessage(err) {
 }
 
 /* ─── Layout pieces ───────────────────────────────────────────────────────── */
+const ADMIN_FEATURES = [
+  { Icon: UserCheck,  title: 'Verify responders',  text: 'Review CNIC, license and employee ID before anyone can accept an emergency.' },
+  { Icon: Siren,      title: 'Live SOS logistics', text: 'See every active emergency and responder on one live map.' },
+  { Icon: ScrollText, title: 'Full audit trail',   text: 'Alerts, calls and admin actions are logged and reviewable.' },
+];
+
 function AuthShell({ children }) {
   return (
-    <div style={{
-      minHeight: '100vh', background: 'var(--admin-bg)', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', padding: '32px 16px',
-    }}>
-      <div className="mf-page" style={{ width: '100%', maxWidth: '400px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', marginBottom: '24px' }}>
-          <span style={{ width: 32, height: 32, borderRadius: '8px', background: '#FFFFFF', border: '1px solid var(--border)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-            <img src={appMark} alt="" style={{ width: 24, height: 24, objectFit: 'contain' }} />
-          </span>
-          <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-main)' }}>
-            MediFind <span style={{ color: 'var(--text-muted)', fontWeight: 500 }}>Admin</span>
-          </span>
+    <div className="mf-auth">
+      <aside className="mf-auth-brand" aria-label="MediFind admin console">
+        <HeroBackdrop />
+        <div>
+          <Link to="/" className="mf-auth-logo" aria-label="MediFind home">
+            <img src={appMark} alt="" width="34" height="34" /><span>Medi<b>Find</b></span>
+          </Link>
+          <div style={{ marginTop: 'clamp(28px, 7vh, 72px)' }}>
+            <span className="mf-auth-eyebrow"><LayoutDashboard size={14} aria-hidden="true" /> Admin console</span>
+            <p className="mf-auth-headline">Keep MediFind’s emergency network safe and moving.</p>
+            <p className="mf-auth-lead">
+              Verify responders, watch live SOS activity and keep every alert and call accountable.
+            </p>
+            <ul className="mf-auth-features">
+              {ADMIN_FEATURES.map(({ Icon, title, text }) => (
+                <li key={title}>
+                  <span className="mf-auth-ico" aria-hidden="true"><Icon size={18} /></span>
+                  <span><strong>{title}</strong><span className="mf-auth-desc">{text}</span></span>
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
+        <div className="mf-auth-foot">
+          <span>Deaf-first emergency response · Pakistan</span>
+          <span className="mf-auth-1122"><PhoneCall size={14} aria-hidden="true" /> Emergency? Call Rescue 1122</span>
+        </div>
+      </aside>
 
-        <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '28px 28px 24px' }}>
+      <main className="mf-auth-main">
+        <div className="mf-page mf-auth-card">
           {children}
         </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', marginTop: '16px', fontSize: '12.5px', color: 'var(--text-muted)' }}>
+        <div className="mf-auth-links">
           <Link to="/" className="mf-btn mf-btn--ghost mf-btn--sm" style={{ color: 'var(--text-muted)', paddingLeft: '6px' }}>
             <ArrowLeft size={14} aria-hidden="true" /> Back to MediFind
           </Link>
-          <span>Restricted access</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><Lock size={13} aria-hidden="true" /> Restricted access</span>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
@@ -72,10 +97,9 @@ const LoginPage = () => {
   if (isAuthenticated) {
     return (
       <AuthShell>
-        <h1 style={{ fontSize: '20px', lineHeight: '28px', fontWeight: 600, margin: '0 0 4px' }}>You’re already signed in</h1>
-        <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', margin: '0 0 20px' }}>
-          Your admin session is active. Where would you like to go?
-        </p>
+        <span className="mf-auth-card-icon" aria-hidden="true"><ShieldCheck size={22} /></span>
+        <h1>You’re already signed in</h1>
+        <p className="mf-auth-sub">Your admin session is active. Where would you like to go?</p>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', border: '1px solid var(--border)', borderRadius: '8px', marginBottom: '20px' }}>
           <Avatar name={user?.fullName ?? 'Administrator'} size={32} />
@@ -119,10 +143,9 @@ const LoginPage = () => {
 
   return (
     <AuthShell>
-      <h1 style={{ fontSize: '20px', lineHeight: '28px', fontWeight: 600, margin: '0 0 4px' }}>Sign in to the admin console</h1>
-      <p style={{ fontSize: '13.5px', color: 'var(--text-muted)', margin: '0 0 20px' }}>
-        Use your MediFind administrator credentials.
-      </p>
+      <span className="mf-auth-card-icon" aria-hidden="true"><ShieldCheck size={22} /></span>
+      <h1>Welcome back</h1>
+      <p className="mf-auth-sub">Sign in to the MediFind admin console with your administrator account.</p>
 
       {error && (
         <div id="login-error" style={{ marginBottom: '16px' }}>
@@ -147,7 +170,7 @@ const LoginPage = () => {
               placeholder="admin@medifind.com"
               required
               autoComplete="email"
-              style={{ height: '40px', paddingLeft: '34px' }}
+              style={{ height: '44px', paddingLeft: '36px' }}
             />
           </div>
         </div>
@@ -168,7 +191,7 @@ const LoginPage = () => {
               placeholder="Enter your password"
               required
               autoComplete="current-password"
-              style={{ height: '40px', paddingLeft: '34px', paddingRight: '42px' }}
+              style={{ height: '44px', paddingLeft: '36px', paddingRight: '44px' }}
             />
             <button
               type="button"
@@ -194,7 +217,8 @@ const LoginPage = () => {
         </Button>
       </form>
 
-      <p style={{ margin: '20px 0 0', paddingTop: '16px', borderTop: '1px solid var(--border)', fontSize: '12.5px', lineHeight: '18px', color: 'var(--text-muted)' }}>
+      <p className="mf-auth-note">
+        <ShieldCheck size={15} aria-hidden="true" />
         This console is for authorized MediFind administrators only. All sessions are logged and monitored.
       </p>
     </AuthShell>

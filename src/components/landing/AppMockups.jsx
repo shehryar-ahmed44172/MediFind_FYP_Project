@@ -4,6 +4,8 @@ import {
   Vibrate, MessageSquare, Sparkles, Signal, BatteryFull, Wifi, MapPin, Ear,
 } from 'lucide-react';
 import appMark from '../../assets/medifind_mark.png';
+import bikeFrame0 from '../../assets/mascot_bike_0.png';
+import bikeFrame1 from '../../assets/mascot_bike_1.png';
 
 /*
  * Lightweight HTML/CSS/SVG recreations of real MediFind mobile screens.
@@ -88,26 +90,6 @@ export function SosScreen() {
   );
 }
 
-/* Motorbike ambulance (side view) — drawn inline so it stays crisp and tiny */
-export function MotorbikeAmbulance({ size = 44 }) {
-  return (
-    <svg width={size} height={size * 0.7} viewBox="0 0 60 42" aria-hidden="true">
-      <circle cx="13" cy="32" r="8" fill="#1B2632" />
-      <circle cx="13" cy="32" r="3.2" fill="var(--text-muted)" />
-      <circle cx="47" cy="32" r="8" fill="#1B2632" />
-      <circle cx="47" cy="32" r="3.2" fill="var(--text-muted)" />
-      <path d="M13 32 L24 20 L40 20 L47 32" fill="none" stroke="#3D4F5F" strokeWidth="3" strokeLinecap="round" />
-      <rect x="4" y="11" width="18" height="13" rx="3" fill="#FFFFFF" stroke="var(--primary)" strokeWidth="1.5" />
-      <rect x="11.5" y="13.5" width="3" height="8" rx="0.8" fill="var(--sos)" />
-      <rect x="9" y="16" width="8" height="3" rx="0.8" fill="var(--sos)" />
-      <path d="M24 20 Q30 12 40 14 L44 20 Z" fill="#FFFFFF" stroke="var(--primary)" strokeWidth="1.5" />
-      <rect x="26" y="15" width="12" height="2.4" rx="1.2" fill="var(--primary-mid)" />
-      <rect x="7" y="7" width="10" height="4" rx="2" fill="var(--sos)" className="lp-siren" />
-      <path d="M42 14 L50 12" stroke="#3D4F5F" strokeWidth="2.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 /* 2 — Live tracking screen */
 export function TrackingScreen() {
   return (
@@ -131,7 +113,11 @@ export function TrackingScreen() {
           <path d="M20 150 H120 V96 H200 V52" fill="none" stroke="var(--primary-light)" strokeWidth="4" strokeDasharray="7 6" strokeLinecap="round" />
         </svg>
         {/* Moving motorbike follows the same route (see .lp-bike offset-path) */}
-        <div className="lp-bike"><MotorbikeAmbulance size={40} /></div>
+        <div className="lp-bike" role="img" aria-label="Motorbike ambulance">
+          {/* Same mascot as the app's live map; the second frame flashes the siren */}
+          <img src={bikeFrame0} alt="" />
+          <img src={bikeFrame1} alt="" className="lp-bike-siren" />
+        </div>
         <div className="lp-patient-pin">
           <MapPin size={26} fill="var(--sos)" color="#FFFFFF" strokeWidth={1.6} />
           <span className="lp-patient-pulse" />

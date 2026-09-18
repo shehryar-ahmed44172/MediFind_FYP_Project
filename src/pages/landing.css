@@ -73,7 +73,9 @@
 }
 .lp-header-inner { display: flex; align-items: center; gap: 24px; height: 64px; }
 .lp-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.01em; color: var(--primary-mid); }
-.lp-logo img { width: 34px; height: auto; border-radius: 8px; background: #fff; }
+.lp-logo img { width: 34px; height: auto; }
+/* On dark backgrounds (footer, dark theme) a soft light edge keeps the navy pin visible */
+.lp-footer .lp-logo img, [data-theme="dark"] .lp-logo img { filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.95)); }
 .lp-logo b { color: var(--primary-dark); }
 [data-theme="dark"] .lp-logo b { color: #fff; }
 .lp-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
@@ -259,12 +261,15 @@
 .lp-map { position: relative; width: 248px; height: 190px; border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
 .lp-map-svg { position: absolute; inset: 0; display: block; }
 .lp-bike {
-  position: absolute; top: 0; left: 0; width: 40px; height: 28px;
+  position: absolute; top: 0; left: 0; width: 46px; height: 46px;
   offset-path: path('M20 150 L120 150 L120 96 L200 96 L200 60');
-  offset-rotate: 0deg; offset-anchor: 50% 80%;
+  /* Top-down mascot faces up; turn it to face along the road */
+  offset-rotate: auto 90deg; offset-anchor: 50% 50%;
   animation: lp-ride 9s ease-in-out infinite;
-  filter: drop-shadow(0 3px 4px rgba(4, 54, 78, 0.35));
 }
+.lp-bike img { position: absolute; inset: 0; width: 100%; height: 100%; }
+.lp-bike-siren { animation: lp-siren-swap 0.9s steps(1, end) infinite; }
+@keyframes lp-siren-swap { 50% { opacity: 0; } }
 @keyframes lp-ride { 0% { offset-distance: 0%; } 85%, 100% { offset-distance: 100%; } }
 .lp-siren { animation: lp-blink 0.9s steps(2, jump-none) infinite; }
 @keyframes lp-blink { 50% { opacity: 0.25; } }
@@ -321,5 +326,6 @@
 @media (prefers-reduced-motion: reduce) {
   .lp-sos-ring-progress { animation: none; stroke-dashoffset: calc(var(--ring-c) * 0.13); }
   .lp-bike { animation: none; offset-distance: 62%; }
+  .lp-bike-siren { animation: none; opacity: 0; }
   .lp-sos-button, .lp-siren, .lp-patient-pulse, .lp-deaf-flash, .lp-deaf-alert svg { animation: none; }
 }

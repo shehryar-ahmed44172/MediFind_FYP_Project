@@ -4,6 +4,7 @@ import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/datasources/remote/medifind_api_client.dart';
 import '../../providers/auth_provider.dart';
+import '../../../services/payments/stripe_init.dart';
 import '../../widgets/design_system/design_system.dart';
 
 class CheckoutScreen extends ConsumerStatefulWidget {
@@ -73,13 +74,18 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   Future<PaymentIntentInfo> _preparePayment() async {
     final appearance = _sheetAppearance();
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final priceLabel = 'PKR ${_getPlanDetails()['price'].toStringAsFixed(0)}';
-    final intent = await ref.read(apiClientProvider).createPaymentIntent(widget.planId);
+    final results = await Future.wait([
+      ref.read(apiClientProvider).createPaymentIntent(widget.planId),
+      StripeInit.ensure(),
+    ]);
+    final intent = results.first as PaymentIntentInfo;
     await Stripe.instance.initPaymentSheet(
       paymentSheetParameters: SetupPaymentSheetParameters(
         paymentIntentClientSecret: intent.clientSecret,
         merchantDisplayName: 'MediFind',
-        style: Theme.of(context).brightness == Brightness.dark ? ThemeMode.dark : ThemeMode.light,
+        style: dark ? ThemeMode.dark : ThemeMode.light,
         appearance: appearance,
         primaryButtonLabel: 'Pay $priceLabel',
         // FlowController mode: Stripe loads the sheet's data here, while the user is

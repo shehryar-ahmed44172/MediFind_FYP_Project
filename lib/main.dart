@@ -16,8 +16,7 @@ import 'presentation/providers/accessibility_provider.dart';
 import 'services/notification/medifind_push_service.dart';
 import 'core/dev/demo_session_loader.dart';
 import 'services/notification/battery_optimization_prompt.dart';
-import 'package:flutter_stripe/flutter_stripe.dart';
-import 'core/constants/app_constants.dart';
+import 'services/payments/stripe_init.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
@@ -37,15 +36,14 @@ void main() async {
   // screens into a landscape strip (the Android manifest and iOS plist match).
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  // Initialize Stripe
-  Stripe.publishableKey = AppConstants.stripePublishableKey;
-  await Stripe.instance.applySettings();
-
   // Initialize Hive for local storage (Database setup)
   await Hive.initFlutter();
 
   // Debug/profile builds only: optional pre-seeded session for emulator walkthroughs
   await DemoSessionLoader.loadIfPresent();
+
+  // Stripe is only needed at checkout: set it up after the first frame
+  WidgetsBinding.instance.addPostFrameCallback((_) => StripeInit.ensure().ignore());
 
   // Running the app wrapped in ProviderScope for Riverpod state management
   runApp(

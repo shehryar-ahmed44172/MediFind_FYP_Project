@@ -609,16 +609,25 @@ export function Modal({ onClose, title, description, children, footer, width = 5
   );
 }
 
-export function Drawer({ onClose, title, description, headerExtra, children, footer, width = 560, zIndex = 10400 }) {
+/* Side drawer; `centered` shows the same panel as a dialog in the middle of the screen */
+export function Drawer({ onClose, title, description, headerExtra, children, footer, width = 560, zIndex = 10400, centered = false }) {
   const titleId = useId();
   useEscape(onClose);
-  return createPortal(
-    <div style={{ position: 'fixed', inset: 0, zIndex }}>
-      <div className="mf-fade" style={OVERLAY_BACKDROP} onClick={onClose} />
-      <aside role="dialog" aria-modal="true" aria-labelledby={titleId} className="mf-drawer" style={{
-        position: 'absolute', top: 0, right: 0, bottom: 0, width: `min(${typeof width === 'number' ? `${width}px` : width}, 100vw)`,
+  const w = typeof width === 'number' ? `${width}px` : width;
+  const panelStyle = centered
+    ? {
+        position: 'relative', width: `min(${w}, calc(100vw - 32px))`, maxHeight: 'calc(100vh - 48px)',
+        display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-panel, 12px)', boxShadow: 'var(--shadow-lg)', overflow: 'hidden',
+      }
+    : {
+        position: 'absolute', top: 0, right: 0, bottom: 0, width: `min(${w}, 100vw)`,
         display: 'flex', flexDirection: 'column', background: 'var(--surface)', borderLeft: '1px solid var(--border)', boxShadow: 'var(--shadow-lg)',
-      }}>
+      };
+  return createPortal(
+    <div style={{ position: 'fixed', inset: 0, zIndex, ...(centered ? { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px 16px' } : null) }}>
+      <div className="mf-fade" style={OVERLAY_BACKDROP} onClick={onClose} />
+      <aside role="dialog" aria-modal="true" aria-labelledby={titleId} className={centered ? 'mf-pop' : 'mf-drawer'} style={panelStyle}>
         <OverlayHeader title={title} description={description} onClose={onClose} titleId={titleId} extra={headerExtra} />
         <div style={{ flex: 1, overflowY: 'auto' }}>{children}</div>
         {footer && (

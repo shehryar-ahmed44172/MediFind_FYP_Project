@@ -104,7 +104,8 @@ export default function UserDetailDrawer({ userId, onClose, onUserUpdated }) {
   return (
     <Drawer
       onClose={onClose}
-      width={540}
+      centered
+      width={680}
       title={user ? (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: '10px', maxWidth: '100%' }}>
           <Avatar name={user.fullName} src={user.profileImageUrl ? resolveFileUrl(user.profileImageUrl) : undefined} size={32} />

@@ -26,7 +26,6 @@ export function PhoneFrame({ label, children, className = '' }) {
           {children}
         </div>
       </div>
-      <figcaption className="lp-caption">App preview</figcaption>
     </figure>
   );
 }

@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import appMark from '../assets/medifind_mark.png';
 import { PhoneFrame, SosScreen, TrackingScreen, DeafAlertScreen } from '../components/landing/AppMockups';
+import { HeroBackdrop } from '../components/landing/Backdrop';
 import './landing.css';
 
 /* Update when the app is published on Google Play */
@@ -84,6 +85,7 @@ function SiteHeader() {
 function Hero() {
   return (
     <section className="lp-hero" aria-labelledby="hero-title">
+      <HeroBackdrop />
       <div className="lp-container lp-hero-grid">
         <motion.div {...fadeUp}>
           <span className="lp-eyebrow"><Ear size={14} /> Deaf-first medical emergency app · Pakistan</span>
@@ -451,7 +453,7 @@ function SiteFooter() {
       <div className="lp-container">
         <div className="lp-footer-grid">
           <div>
-            <span className="lp-logo" style={{ color: '#fff' }}><img src={appMark} alt="" width="34" height="34" /><span>Medi<b style={{ color: '#fff' }}>Find</b></span></span>
+            <span className="lp-logo" style={{ color: 'var(--primary-light)' }}><img src={appMark} alt="" width="34" height="34" /><span>Medi<b style={{ color: '#fff' }}>Find</b></span></span>
             <p style={{ marginTop: 10, maxWidth: 360 }}>Deaf-first medical emergency response for Pakistan — verified motorbike ambulances, live tracking and text-based help.</p>
           </div>
           <nav aria-label="Footer">

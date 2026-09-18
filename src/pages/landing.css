@@ -75,7 +75,11 @@
 .lp-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.01em; color: var(--primary-mid); }
 .lp-logo img { width: 34px; height: auto; }
 /* On dark backgrounds (footer, dark theme) a soft light edge keeps the navy pin visible */
-.lp-footer .lp-logo img, [data-theme="dark"] .lp-logo img { filter: drop-shadow(0 0 0.6px rgba(255, 255, 255, 0.95)); }
+/* On dark backgrounds (footer, dark theme) the logo sits on a white app-icon style tile */
+.lp-footer .lp-logo img, [data-theme="dark"] .lp-logo img {
+  width: 40px; height: 40px; padding: 4px; border-radius: 11px; background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
 .lp-logo b { color: var(--primary-dark); }
 [data-theme="dark"] .lp-logo b { color: #fff; }
 .lp-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
@@ -212,7 +216,6 @@
 
 /* ─────────────────────────── App mockups ─────────────────────────── */
 .lp-phone-figure { margin: 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-.lp-caption { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
 .lp-phone {
   position: relative; width: 288px; padding: 8px; border-radius: 40px;
   background: #1B2632; box-shadow: 0 30px 60px rgba(4, 54, 78, 0.28), inset 0 0 0 2px #3D4F5F;
@@ -322,10 +325,133 @@
   .lp-phone { transform: scale(0.92); transform-origin: top center; }
 }
 
+/* ───────────────────── Background effects (MediFind motifs) ───────────────────── */
+.lp-hero { position: relative; overflow: hidden; isolation: isolate; }
+.lp-hero > .lp-container { position: relative; z-index: 1; }
+.lp-backdrop {
+  position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  /* Keep the headline side calm: effects fade in towards the phones */
+  mask-image: linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.18) 38%, #000 62%);
+}
+@media (max-width: 960px) { .lp-backdrop { mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.2) 45%, #000 70%); } }
+.lp-backdrop-svg { width: 100%; height: 100%; display: block; }
+.lp-bd-grid { stroke: var(--primary); stroke-opacity: 0.07; stroke-width: 1; }
+.lp-bd-road { fill: none; stroke: var(--primary); stroke-opacity: 0.06; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+.lp-bd-route {
+  fill: none; stroke: var(--primary-light); stroke-opacity: 0.45; stroke-width: 3;
+  stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 10 12;
+  animation: lp-bd-march 1.6s linear infinite;
+}
+@keyframes lp-bd-march { to { stroke-dashoffset: -44; } }
+.lp-bd-rider { fill: var(--sos); fill-opacity: 0.75; }
+.lp-bd-rider-glow { fill: var(--sos); fill-opacity: 0.14; }
+.lp-bd-pulse {
+  fill: none; stroke: var(--primary-mid); stroke-width: 2;
+  transform-box: fill-box; transform-origin: center;
+  animation: lp-bd-pulse 2.8s ease-out infinite; opacity: 0;
+}
+@keyframes lp-bd-pulse { 0% { transform: scale(0.15); opacity: 0.55; } 100% { transform: scale(1); opacity: 0; } }
+.lp-bd-dot { fill: var(--primary-mid); fill-opacity: 0.7; }
+.lp-bd-ecg {
+  fill: none; stroke: var(--sos); stroke-opacity: 0.35; stroke-width: 2.5;
+  stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1800; stroke-dashoffset: 1800;
+  animation: lp-bd-ecg 6s ease-in-out infinite;
+}
+@keyframes lp-bd-ecg { 0% { stroke-dashoffset: 1800; } 55% { stroke-dashoffset: 0; } 80%, 100% { stroke-dashoffset: -1800; } }
+[data-theme="dark"] .lp-bd-grid { stroke: #fff; stroke-opacity: 0.05; }
+
+/* Soft drifting glows behind the alternate sections */
+.lp-section-alt { position: relative; overflow: hidden; isolation: isolate; }
+.lp-section-alt::before, .lp-section-alt::after {
+  content: ''; position: absolute; z-index: -1; border-radius: 50%; pointer-events: none;
+  width: 520px; height: 520px; filter: blur(60px); opacity: 0.55;
+  animation: lp-drift 22s ease-in-out infinite alternate;
+}
+.lp-section-alt::before { background: var(--primary-pale); top: -180px; left: -160px; }
+.lp-section-alt::after { background: rgba(36, 150, 167, 0.12); bottom: -200px; right: -140px; animation-delay: -11s; }
+@keyframes lp-drift { 0% { translate: 0 0; } 50% { translate: 80px 40px; } 100% { translate: -40px 90px; } }
+
+/* Trust band: map-dot texture and a slow light sweep */
+.lp-trust { position: relative; overflow: hidden; isolation: isolate; }
+.lp-trust::before {
+  content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.12) 1.2px, transparent 1.4px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at 70% 40%, #000 20%, transparent 75%);
+}
+.lp-trust::after {
+  content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -50%; z-index: -1; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+  animation: lp-sweep 9s ease-in-out infinite;
+}
+@keyframes lp-sweep { 0% { left: -50%; } 60%, 100% { left: 120%; } }
+
+/* ───────────────────────────── Hover effects ───────────────────────────── */
+.lp-card, .lp-step, .lp-faq-item, .lp-phone, .lp-icon {
+  transition: translate 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease,
+    background-color 0.25s ease, color 0.25s ease, scale 0.25s ease, rotate 0.25s ease;
+}
+.lp-card:not(.lp-form):hover {
+  translate: 0 -4px;
+  border-color: var(--primary-light);
+  box-shadow: 0 14px 30px rgba(4, 54, 78, 0.12);
+}
+.lp-card:not(.lp-form):hover .lp-icon { background: var(--primary); color: #fff; scale: 1.08; rotate: -6deg; }
+.lp-card:not(.lp-form):hover .lp-icon.sos { background: var(--sos); }
+.lp-trust .lp-card:hover { background: rgba(255, 255, 255, 0.13); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18); }
+.lp-trust .lp-card:hover .lp-icon { background: #fff; color: var(--primary); }
+.lp-role-card li { transition: translate 0.2s ease, color 0.2s ease; }
+.lp-role-card li:hover { translate: 3px 0; color: var(--text-main); }
+
+.lp-step:hover { translate: 6px 0; border-color: var(--primary-light); box-shadow: 0 10px 24px rgba(4, 54, 78, 0.1); }
+.lp-step-num { transition: box-shadow 0.25s ease, scale 0.25s ease; }
+.lp-step:hover .lp-step-num { scale: 1.08; box-shadow: 0 0 0 6px var(--primary-pale); }
+
+.lp-mini-feature:hover .lp-icon { background: var(--primary); color: #fff; scale: 1.1; }
+.lp-mini-feature h3 { transition: color 0.2s ease; }
+.lp-mini-feature:hover h3 { color: var(--primary); }
+
+.lp-faq-item:hover { border-color: var(--primary-light); box-shadow: 0 8px 20px rgba(4, 54, 78, 0.08); }
+.lp-faq-q { cursor: pointer; transition: color 0.2s ease; }
+.lp-faq-q:hover { color: var(--primary); }
+
+.lp-phone-figure:hover .lp-phone { translate: 0 -6px; box-shadow: 0 40px 70px rgba(4, 54, 78, 0.32), inset 0 0 0 2px #3D4F5F; }
+
+/* Buttons: tinted secondary, shine sweep on primary */
+.lp-btn-secondary:hover { background: var(--primary-pale); color: var(--primary); translate: 0 -1px; }
+.lp-btn-primary { position: relative; overflow: hidden; }
+.lp-btn-primary:not([aria-disabled="true"])::after {
+  content: ''; position: absolute; top: 0; bottom: 0; left: -60%; width: 45%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transition: left 0.6s ease;
+}
+.lp-btn-primary:not([aria-disabled="true"]):hover::after { left: 120%; }
+.lp-btn-primary:not([aria-disabled="true"]):hover { box-shadow: 0 10px 24px rgba(12, 99, 126, 0.35); }
+
+.lp-nav a { transition: background 0.2s ease, color 0.2s ease; }
+.lp-logo img { transition: rotate 0.4s ease; }
+.lp-logo:hover img { rotate: -10deg; }
+
+/* Form fields */
+.lp-field input, .lp-field textarea, .lp-field select { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.lp-field input:hover, .lp-field textarea:hover, .lp-field select:hover { border-color: var(--primary-light); }
+.lp-field input:focus-visible, .lp-field textarea:focus-visible, .lp-field select:focus-visible {
+  outline: none; border-color: var(--primary); box-shadow: 0 0 0 4px var(--primary-pale);
+}
+
+/* Footer links: underline grows in */
+.lp-footer a:not(.lp-logo) { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size 0.25s ease, color 0.2s ease; }
+.lp-footer a:not(.lp-logo):hover { text-decoration: none; background-size: 100% 1px; }
+
 /* Respect reduced-motion for every landing animation */
 @media (prefers-reduced-motion: reduce) {
   .lp-sos-ring-progress { animation: none; stroke-dashoffset: calc(var(--ring-c) * 0.13); }
   .lp-bike { animation: none; offset-distance: 62%; }
   .lp-bike-siren { animation: none; opacity: 0; }
+  .lp-bd-route, .lp-bd-pulse, .lp-bd-ecg, .lp-section-alt::before, .lp-section-alt::after, .lp-trust::after { animation: none; }
+  .lp-bd-ecg { stroke-dashoffset: 0; }
+  .lp-bd-rider, .lp-bd-rider-glow { display: none; }
+  .lp-card, .lp-step, .lp-phone, .lp-icon, .lp-btn, .lp-role-card li, .lp-logo img { transition: none !important; translate: none !important; rotate: none !important; scale: none !important; }
   .lp-sos-button, .lp-siren, .lp-patient-pulse, .lp-deaf-flash, .lp-deaf-alert svg { animation: none; }
 }

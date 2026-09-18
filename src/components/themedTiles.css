@@ -1,0 +1,7 @@
+/* Dark map: invert OSM tiles, rotate hues back so water stays blue-ish, soften contrast */
+.mf-tiles-dark { filter: invert(1) hue-rotate(195deg) brightness(0.88) contrast(0.9) saturate(0.35); }
+[data-theme="dark"] .leaflet-container { background: #1b2430; }
+[data-theme="dark"] .leaflet-control-attribution { background: rgba(15, 23, 32, 0.8); color: #9aa7b5; }
+[data-theme="dark"] .leaflet-control-attribution a { color: #7fc8d4; }
+[data-theme="dark"] .leaflet-bar a { background: #1f2a37; color: #e2e8f0; border-color: #334155; }
+[data-theme="dark"] .leaflet-bar a:hover { background: #273444; }

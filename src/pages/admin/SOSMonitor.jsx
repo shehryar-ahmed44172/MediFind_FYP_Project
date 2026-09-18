@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapPin, Phone, ShieldCheck, Navigation, Wifi, WifiOff, X, Play, Square, ExternalLink } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Popup, Circle, useMap } from 'react-leaflet';
+import ThemedTileLayer from '../../components/ThemedTileLayer';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from '../../services/api';
@@ -688,10 +689,7 @@ const SOSMonitor = () => {
                   key={activeFilter}
                   scrollWheelZoom={false}
                 >
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
+                  <ThemedTileLayer />
                   <CtrlScrollHint />
                   <InvalidateOnResize />
 

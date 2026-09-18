@@ -12,7 +12,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as ChartTooltip,
   BarChart, Bar, ResponsiveContainer,
 } from 'recharts';
-import { MapContainer, TileLayer, Marker, Popup, Circle as MapCircle } from 'react-leaflet';
+import { MapContainer, Marker, Popup, Circle as MapCircle } from 'react-leaflet';
+import ThemedTileLayer from '../components/ThemedTileLayer';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import UserManagement from './UserManagement';
@@ -1042,7 +1043,7 @@ function Overview({ health, healthError }) {
                   zoomControl
                   attributionControl={false}
                 >
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <ThemedTileLayer />
 
                   {mapEmergencies.map(e => e.latitude && e.longitude && (
                     <React.Fragment key={e.id}>

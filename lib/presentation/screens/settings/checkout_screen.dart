@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_stripe/flutter_stripe.dart';
 import 'package:go_router/go_router.dart';
+import '../../../data/datasources/remote/medifind_api_client.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/design_system/design_system.dart';
 
@@ -16,6 +17,37 @@ class CheckoutScreen extends ConsumerStatefulWidget {
 class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   String _selectedMethod = 'CARD';
   bool _isProcessing = false;
+
+  /// The payment is prepared (PaymentIntent + payment sheet) as soon as the
+  /// screen opens, so tapping Pay shows Stripe's sheet without waiting.
+  Future<PaymentIntentInfo>? _prepared;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.planId == 'PROFESSIONAL' || widget.planId == 'EXECUTIVE') _startPreparing();
+  }
+
+  void _startPreparing() {
+    _prepared = _preparePayment();
+    // An early failure is retried when Pay is tapped
+    _prepared!.ignore();
+  }
+
+  Future<PaymentIntentInfo> _preparePayment() async {
+    final intent = await ref.read(apiClientProvider).createPaymentIntent(widget.planId);
+    await Stripe.instance.initPaymentSheet(
+      paymentSheetParameters: SetupPaymentSheetParameters(
+        paymentIntentClientSecret: intent.clientSecret,
+        merchantDisplayName: 'MediFind',
+        style: ThemeMode.light,
+        // FlowController mode: Stripe loads the sheet's data here, while the user is
+        // still reading the checkout screen, instead of after Pay is tapped.
+        customFlow: true,
+      ),
+    );
+    return intent;
+  }
 
   Map<String, dynamic> _getPlanDetails() {
     switch (widget.planId) {
@@ -178,6 +210,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
       // Only card payments (Stripe) are supported; wallet options are disabled.
       await _handleStripePayment(plan);
     } on StripeException catch (e) {
+      if (mounted && _prepared == null) _startPreparing();
       if (mounted) {
         final cancelled = e.error.code == FailureCode.Canceled;
         final reason = e.error.localizedMessage ?? e.error.message ?? 'Unknown error';
@@ -200,21 +233,24 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
   /// Real Stripe payment sheet flow (CARD only).
   Future<void> _handleStripePayment(Map<String, dynamic> plan) async {
-    // 1. Create PaymentIntent on the backend
-    final apiClient = ref.read(apiClientProvider);
-    final intent = await apiClient.createPaymentIntent(widget.planId);
+    // 1–2. PaymentIntent + sheet, prepared when the screen opened (retried if that failed)
+    PaymentIntentInfo intent;
+    try {
+      intent = await (_prepared ?? _preparePayment());
+    } catch (_) {
+      _prepared = _preparePayment();
+      intent = await _prepared!;
+    }
+    // A PaymentIntent is used once; prepare a fresh one if this attempt is cancelled
+    _prepared = null;
 
-    // 2. Initialise the Payment Sheet
-    await Stripe.instance.initPaymentSheet(
-      paymentSheetParameters: SetupPaymentSheetParameters(
-        paymentIntentClientSecret: intent.clientSecret,
-        merchantDisplayName: 'MediFind',
-        style: ThemeMode.light,
-      ),
-    );
-
-    // 3. Present the Payment Sheet — throws StripeException if user cancels
-    await Stripe.instance.presentPaymentSheet();
+    // 3. Present the (already loaded) sheet for card entry — throws StripeException
+    //    if the user cancels — then confirm the payment with Stripe.
+    final option = await Stripe.instance.presentPaymentSheet();
+    if (option == null) {
+      throw const StripeException(error: LocalizedErrorMessage(code: FailureCode.Canceled));
+    }
+    await Stripe.instance.confirmPaymentSheetPayment();
 
     // 4. Payment confirmed by Stripe — ask the server to apply the upgrade.
     //    The server verifies the PaymentIntent succeeded for this user + plan.

@@ -119,6 +119,30 @@
 .mf-auth-note svg { flex-shrink: 0; margin-top: 1px; color: var(--primary-mid); }
 .mf-auth-links { width: 100%; max-width: 420px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 16px; font-size: 12.5px; color: var(--text-muted); }
 
+/* Light side: the same map motifs in soft teal, behind the sign-in card */
+.mf-auth-main { position: relative; overflow: hidden; isolation: isolate; }
+.mf-auth-main > :not(.lp-backdrop) { position: relative; z-index: 1; }
+.mf-auth-main .lp-backdrop { position: absolute; inset: 0; z-index: 0; pointer-events: none; mask-image: radial-gradient(ellipse at 50% 50%, rgba(0,0,0,0.35) 20%, #000 75%); }
+.mf-auth-main .lp-backdrop-svg { width: 100%; height: 100%; display: block; }
+.mf-auth-main .lp-bd-grid { stroke: var(--primary); stroke-opacity: 0.07; stroke-width: 1; }
+.mf-auth-main .lp-bd-road { fill: none; stroke: var(--primary); stroke-opacity: 0.05; stroke-width: 10; stroke-linecap: round; stroke-linejoin: round; }
+.mf-auth-main .lp-bd-route {
+  fill: none; stroke: var(--primary-light); stroke-opacity: 0.4; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 10 12; animation: mf-auth-march 1.6s linear infinite;
+}
+.mf-auth-main .lp-bd-rider { fill: var(--sos); fill-opacity: 0.7; }
+.mf-auth-main .lp-bd-rider-glow { fill: var(--sos); fill-opacity: 0.12; }
+.mf-auth-main .lp-bd-pulse {
+  fill: none; stroke: var(--primary-mid); stroke-width: 2; opacity: 0;
+  transform-box: fill-box; transform-origin: center; animation: mf-auth-pulse 2.8s ease-out infinite;
+}
+.mf-auth-main .lp-bd-dot { fill: var(--primary-mid); fill-opacity: 0.6; }
+.mf-auth-main .lp-bd-ecg {
+  fill: none; stroke: var(--sos); stroke-opacity: 0.3; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 1800; stroke-dashoffset: 1800; animation: mf-auth-ecg 6s ease-in-out infinite;
+}
+[data-theme="dark"] .mf-auth-main .lp-bd-grid { stroke: #fff; stroke-opacity: 0.05; }
+
 /* ── Small screens: the brand panel becomes a compact header ── */
 @media (max-width: 900px) {
   .mf-auth { grid-template-columns: minmax(0, 1fr); }
@@ -129,9 +153,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mf-auth-brand .lp-bd-route, .mf-auth-brand .lp-bd-pulse, .mf-auth-brand .lp-bd-ecg { animation: none; }
-  .mf-auth-brand .lp-bd-ecg { stroke-dashoffset: 0; }
-  .mf-auth-brand .lp-bd-rider, .mf-auth-brand .lp-bd-rider-glow { display: none; }
+  .mf-auth .lp-bd-route, .mf-auth .lp-bd-pulse, .mf-auth .lp-bd-ecg { animation: none; }
+  .mf-auth .lp-bd-ecg { stroke-dashoffset: 0; }
+  .mf-auth .lp-bd-rider, .mf-auth .lp-bd-rider-glow { display: none; }
   .mf-auth-logo, .mf-auth-features li { transition: none; }
   .mf-auth-logo:hover, .mf-auth-features li:hover { translate: none; }
 }

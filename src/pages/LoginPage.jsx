@@ -64,6 +64,7 @@ function AuthShell({ children }) {
       </aside>
 
       <main className="mf-auth-main">
+        <HeroBackdrop />
         <div className="mf-page mf-auth-card">
           {children}
         </div>

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useSyncExternalStore }
 import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Siren, UserCheck, ClipboardList, Users, CreditCard, Receipt,
-  Megaphone, MailCheck, Inbox, ScrollText, Settings, LogOut, Search, Sun, Moon,
+  Megaphone, MailCheck, PhoneCall, Inbox, ScrollText, Settings, LogOut, Search, Sun, Moon,
   Menu, X, ChevronDown, PanelLeftClose, PanelLeftOpen, ArrowLeft, ArrowRight, Bell,
 } from 'lucide-react';
 import { useAuth, useAlert, useTheme } from '../context/hooks';
@@ -22,6 +22,7 @@ import ResponderRecords from './admin/ResponderRecords';
 import SOSMonitor from './admin/SOSMonitor';
 import SystemLogs from './admin/SystemLogs';
 import CommunicationAudit from './admin/CommunicationAudit';
+import CallRecords from './admin/CallRecords';
 import SubscriptionManagement from './admin/SubscriptionManagement';
 import AllSubscriptions from './admin/AllSubscriptions';
 import PlatformSettings from './admin/PlatformSettings';
@@ -82,6 +83,7 @@ const NAV_GROUPS = [
   { label: 'Communication', items: [
     { label: 'Notifications', to: '/admin/notifications', Icon: Megaphone, keywords: 'broadcast push announce send message' },
     { label: 'Comm Audit', to: '/admin/emails', Icon: MailCheck, keywords: 'communication emails sms push delivery' },
+    { label: 'Call Records', to: '/admin/calls', Icon: PhoneCall, keywords: 'calls voice video phone responder' },
     { label: 'Admin Inbox', to: '/admin/inbox', Icon: Inbox, keywords: 'messages contact support' },
   ] },
   { label: 'System', items: [
@@ -696,6 +698,7 @@ export default function Dashboard() {
               <Route path="/subscriptions/all" element={<AllSubscriptions />} />
               <Route path="/logs" element={<SystemLogs />} />
               <Route path="/emails" element={<CommunicationAudit />} />
+              <Route path="/calls" element={<CallRecords />} />
               <Route path="/notifications" element={<SystemNotifications />} />
               <Route path="/inbox" element={<AdminInbox />} />
               <Route path="/settings" element={<PlatformSettings />} />

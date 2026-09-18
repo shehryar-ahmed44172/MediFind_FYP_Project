@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }) => {
 
       setUser(null);
 
-      // Hard reload to /login to ensure all in-memory state (sockets, caches) is wiped
-      window.location.href = '/login';
+      // Hard reload to the admin sign-in page to ensure all in-memory state (sockets, caches) is wiped
+      window.location.href = '/admin/login';
     }
   }, []);
 

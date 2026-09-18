@@ -17,7 +17,7 @@ const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000; // 30 min
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated } = useAuth();
-  return isAuthenticated ? children : <Navigate to="/login" replace />;
+  return isAuthenticated ? children : <Navigate to="/admin/login" replace />;
 };
 
 const SessionTimeoutHandler = ({ children }) => {
@@ -69,7 +69,9 @@ function AppRoutes() {
       <NavigationLoader />
       <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        {/* The website is for awareness; only administrators sign in, at /admin/login */}
+        <Route path="/admin/login" element={<LoginPage />} />
+        <Route path="/login" element={<Navigate to="/admin/login" replace />} />
         <Route path="/terms" element={<LegalPage type="terms" />} />
         <Route path="/privacy" element={<LegalPage type="privacy" />} />
         <Route

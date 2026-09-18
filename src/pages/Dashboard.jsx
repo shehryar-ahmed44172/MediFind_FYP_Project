@@ -377,7 +377,7 @@ export default function Dashboard() {
     };
   }, [showAlert]);
 
-  const handleLogout = async () => { await logout(); navigate('/login', { replace: true }); };
+  const handleLogout = async () => { await logout(); navigate('/admin/login', { replace: true }); };
 
   const adminName = user?.fullName ?? 'System Administrator';
   const currentNav = NAV.find(n => isActiveItem(n, location.pathname));

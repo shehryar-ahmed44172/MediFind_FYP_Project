@@ -66,7 +66,8 @@ function SiteHeader() {
         <nav className="lp-nav" aria-label="Primary">
           {NAV_LINKS.map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
         </nav>
-        <Link to="/login" className="lp-btn lp-btn-secondary lp-btn-sm lp-header-cta">Admin login</Link>
+        {/* Visitors reach out here; admins sign in from the Admin section, the footer or /admin/login */}
+        <a href="#contact" className="lp-btn lp-btn-primary lp-btn-sm lp-header-cta"><Mail size={16} /> Contact us</a>
         <button
           type="button"
           className="lp-menu-btn"
@@ -80,7 +81,7 @@ function SiteHeader() {
       </div>
       <nav id="lp-mobile-nav" className={`lp-mobile-nav${open ? ' is-open' : ''}`} aria-label="Mobile">
         {NAV_LINKS.map(l => <a key={l.href} href={l.href} onClick={() => setOpen(false)}>{l.label}</a>)}
-        <Link to="/login" className="lp-btn lp-btn-secondary lp-btn-sm">Admin login</Link>
+        <a href="#contact" className="lp-btn lp-btn-primary lp-btn-sm" onClick={() => setOpen(false)}><Mail size={16} /> Contact us</a>
       </nav>
     </header>
   );
@@ -363,7 +364,7 @@ function AdminSection() {
             ))}
           </div>
           <div className="lp-admin-cta">
-            <Link to="/login" className="lp-btn lp-btn-secondary">Open admin console <ArrowRight size={18} /></Link>
+            <Link to="/admin/login" className="lp-btn lp-btn-secondary">Open admin console <ArrowRight size={18} /></Link>
             <small><Lock size={13} aria-hidden="true" /> For MediFind administrators only</small>
           </div>
         </motion.div>
@@ -561,7 +562,7 @@ const FOOTER_COLUMNS = [
     links: [
       { href: '#contact', label: 'Contact us' },
       { href: `mailto:${SUPPORT_EMAIL}`, label: SUPPORT_EMAIL, Icon: Mail },
-      { to: '/login', label: 'Admin login' },
+      { to: '/admin/login', label: 'Admin login' },
     ],
   },
 ];

@@ -46,7 +46,7 @@ api.interceptors.response.use(
     // No refresh token at all — go straight to login
     if (!refreshToken) {
       clearSession();
-      window.location.href = '/login';
+      window.location.href = '/admin/login';
       return Promise.reject(error);
     }
 
@@ -91,7 +91,7 @@ api.interceptors.response.use(
       // Refresh failed — reject all queued requests, clear session, redirect
       processQueue(refreshErr, null);
       clearSession();
-      window.location.href = '/login';
+      window.location.href = '/admin/login';
       return Promise.reject(refreshErr);
 
     } finally {

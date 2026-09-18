@@ -65,28 +65,28 @@ const RESPONDER_LABELS = {
 /* ─── Navigation (grouped) ──────────────────────────────────────────────── */
 const NAV_GROUPS = [
   { label: null, items: [
-    { label: 'Overview', to: '/admin', Icon: LayoutDashboard, exact: true },
+    { label: 'Overview', to: '/admin', Icon: LayoutDashboard, exact: true, keywords: 'dashboard home stats health' },
   ] },
   { label: 'Operations', items: [
-    { label: 'SOS Logistics', to: '/admin/sos', Icon: Siren },
-    { label: 'Verification Queue', to: '/admin/verify', Icon: UserCheck },
-    { label: 'Responder Records', to: '/admin/records', Icon: ClipboardList },
+    { label: 'SOS Logistics', to: '/admin/sos', Icon: Siren, keywords: 'emergency emergencies map live tracking ambulance' },
+    { label: 'Verification Queue', to: '/admin/verify', Icon: UserCheck, keywords: 'verify approve reject cnic license applications' },
+    { label: 'Responder Records', to: '/admin/records', Icon: ClipboardList, keywords: 'responders history ratings paramedic' },
   ] },
   { label: 'People', items: [
-    { label: 'User Management', to: '/admin/users', Icon: Users },
+    { label: 'User Management', to: '/admin/users', Icon: Users, keywords: 'patients caregivers accounts people deaf' },
   ] },
   { label: 'Subscriptions', items: [
-    { label: 'Subscriptions', to: '/admin/subscriptions', Icon: CreditCard, exact: true },
-    { label: 'All Subscriptions', to: '/admin/subscriptions/all', Icon: Receipt },
+    { label: 'Subscriptions', to: '/admin/subscriptions', Icon: CreditCard, exact: true, keywords: 'plans pricing revenue payments stripe' },
+    { label: 'All Subscriptions', to: '/admin/subscriptions/all', Icon: Receipt, keywords: 'plans payments transactions invoices' },
   ] },
   { label: 'Communication', items: [
-    { label: 'Notifications', to: '/admin/notifications', Icon: Megaphone },
-    { label: 'Comm Audit', to: '/admin/emails', Icon: MailCheck },
-    { label: 'Admin Inbox', to: '/admin/inbox', Icon: Inbox },
+    { label: 'Notifications', to: '/admin/notifications', Icon: Megaphone, keywords: 'broadcast push announce send message' },
+    { label: 'Comm Audit', to: '/admin/emails', Icon: MailCheck, keywords: 'communication emails sms push delivery' },
+    { label: 'Admin Inbox', to: '/admin/inbox', Icon: Inbox, keywords: 'messages contact support' },
   ] },
   { label: 'System', items: [
-    { label: 'System Logs', to: '/admin/logs', Icon: ScrollText },
-    { label: 'Platform Settings', to: '/admin/settings', Icon: Settings },
+    { label: 'System Logs', to: '/admin/logs', Icon: ScrollText, keywords: 'audit activity events history' },
+    { label: 'Platform Settings', to: '/admin/settings', Icon: Settings, keywords: 'config configuration preferences' },
   ] },
 ];
 const NAV = NAV_GROUPS.flatMap(g => g.items.map(item => ({ ...item, group: g.label })));
@@ -259,6 +259,7 @@ export default function Dashboard() {
   const [showProfile, setShowProfile] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [activeResult, setActiveResult] = useState(0);
   const [users, setUsers] = useState([]);
 
   const notifRef = useRef(null);
@@ -382,7 +383,8 @@ export default function Dashboard() {
 
   /* ── Global search ── */
   const q = searchQuery.trim().toLowerCase();
-  const navMatches = NAV.filter(item => item.label.toLowerCase().includes(q));
+  const navMatches = NAV.filter(item =>
+    item.label.toLowerCase().includes(q) || (q.length >= 3 && item.keywords?.split(' ').some(k => k.startsWith(q))));
   const userMatches = q
     ? users.filter(u =>
         u.fullName?.toLowerCase().includes(q) ||
@@ -390,18 +392,36 @@ export default function Dashboard() {
         u.phoneNumber?.toLowerCase().includes(q))
     : [];
 
-  const closeSearch = () => { setSearchFocused(false); setSearchQuery(''); };
+  const closeSearch = () => { setSearchFocused(false); setSearchQuery(''); setActiveResult(0); };
+
+  // Results in the order shown in the dropdown; ↑/↓ move, Enter opens the highlighted one
+  const pageResults = (q ? navMatches : NAV).slice(0, 5);
+  const userResults = userMatches.slice(0, 5);
+  const searchResults = [
+    ...pageResults.map(item => ({ key: `p:${item.to}`, to: item.to })),
+    ...userResults.map(u => ({ key: `u:${u.id}`, to: `/admin/users?search=${encodeURIComponent(u.email || u.fullName)}` })),
+  ];
+  const activeIndex = Math.min(activeResult, Math.max(searchResults.length - 1, 0));
 
   const submitSearch = () => {
-    if (!q) return;
-    // A page-name match with no user match jumps to that page; everything else
-    // (including no match at all) opens User Management filtered by the query.
-    const target = navMatches.length > 0 && userMatches.length === 0
-      ? navMatches[0].to
-      : `/admin/users?search=${encodeURIComponent(searchQuery.trim())}`;
+    // Nothing matches: stay here — the dropdown says so — instead of guessing a page
+    if (!q || searchResults.length === 0) return;
+    const target = searchResults[activeIndex].to;
     closeSearch();
     searchInputRef.current?.blur();
     navigate(target);
+  };
+
+  const onSearchKeyDown = (e) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (searchResults.length === 0) return;
+      e.preventDefault();
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      setActiveResult((activeIndex + step + searchResults.length) % searchResults.length);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      submitSearch();
+    }
   };
 
   const toggleSidebar = () => (narrow ? setMobileOpen(o => !o) : setDesktopOpen(o => !o));
@@ -460,9 +480,13 @@ export default function Dashboard() {
               placeholder="Search users or pages…"
               aria-label="Search users or pages"
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => { setSearchQuery(e.target.value); setActiveResult(0); }}
               onFocus={() => setSearchFocused(true)}
-              onKeyDown={e => { if (e.key === 'Enter') submitSearch(); }}
+              onKeyDown={onSearchKeyDown}
+              role="combobox"
+              aria-expanded={searchFocused}
+              aria-controls="mf-search-results"
+              aria-autocomplete="list"
               style={{ height: '34px', paddingRight: narrow ? '10px' : '56px', background: 'var(--surface-alt)' }}
             />
             {!narrow && !searchFocused && (
@@ -472,37 +496,49 @@ export default function Dashboard() {
             )}
 
             {searchFocused && (
-              <div className="mf-menu mf-pop" style={{ position: 'absolute', top: '40px', left: 0, width: 'min(400px, calc(100vw - 24px))', zIndex: 1000, padding: '4px 0' }}>
-                <div className="mf-menu-label">Pages</div>
-                {navMatches.length === 0 ? (
-                  <div style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>No matching pages</div>
-                ) : navMatches.slice(0, 5).map(item => (
-                  <Link key={item.to} to={item.to} onClick={closeSearch} className="mf-menu-item">
-                    <item.Icon size={15} strokeWidth={1.75} aria-hidden="true" />
-                    <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.group && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.group}</span>}
-                  </Link>
-                ))}
-
-                {q && (
+              <div id="mf-search-results" role="listbox" aria-label="Search results" className="mf-menu mf-pop" style={{ position: 'absolute', top: '40px', left: 0, width: 'min(400px, calc(100vw - 24px))', zIndex: 1000, padding: '4px 0' }}>
+                {q && searchResults.length === 0 ? (
+                  <div style={{ padding: '14px 12px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    No pages or users match “{searchQuery.trim()}”.
+                    <div style={{ fontSize: '12px', marginTop: '4px' }}>Try a name, email, phone number or page name.</div>
+                  </div>
+                ) : (
                   <>
-                    <div className="mf-menu-label" style={{ borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '10px' }}>
-                      Users &amp; responders
-                    </div>
-                    {userMatches.length === 0 ? (
-                      <div style={{ padding: '6px 12px', fontSize: '13px', color: 'var(--text-muted)' }}>No users match “{searchQuery.trim()}”</div>
-                    ) : userMatches.slice(0, 5).map(u => (
-                      <Link key={u.id} to={`/admin/users?search=${encodeURIComponent(u.email || u.fullName)}`} onClick={closeSearch} className="mf-menu-item">
-                        <Avatar name={u.fullName} size={24} />
-                        <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-                          <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{u.fullName}</span>
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email} · {u.role}</span>
-                        </span>
+                    {pageResults.length > 0 && <div className="mf-menu-label">Pages</div>}
+                    {pageResults.map((item, i) => (
+                      <Link key={item.to} to={item.to} onClick={closeSearch} className="mf-menu-item"
+                        role="option" aria-selected={activeIndex === i} data-active={activeIndex === i}
+                        onMouseEnter={() => setActiveResult(i)}>
+                        <item.Icon size={15} strokeWidth={1.75} aria-hidden="true" />
+                        <span style={{ flex: 1 }}>{item.label}</span>
+                        {item.group && <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{item.group}</span>}
                       </Link>
                     ))}
-                    <div style={{ padding: '6px 12px 4px', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      Press <kbd className="mf-kbd">Enter</kbd> to search all users
-                    </div>
+
+                    {userResults.length > 0 && (
+                      <div className="mf-menu-label" style={pageResults.length > 0 ? { borderTop: '1px solid var(--border)', marginTop: '4px', paddingTop: '10px' } : undefined}>
+                        Users &amp; responders
+                      </div>
+                    )}
+                    {userResults.map((u, j) => {
+                      const i = pageResults.length + j;
+                      return (
+                        <Link key={u.id} to={`/admin/users?search=${encodeURIComponent(u.email || u.fullName)}`} onClick={closeSearch} className="mf-menu-item"
+                          role="option" aria-selected={activeIndex === i} data-active={activeIndex === i}
+                          onMouseEnter={() => setActiveResult(i)}>
+                          <Avatar name={u.fullName} size={24} />
+                          <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                            <span style={{ color: 'var(--text-main)', fontWeight: 500 }}>{u.fullName}</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.email} · {u.role}</span>
+                          </span>
+                        </Link>
+                      );
+                    })}
+                    {q && (
+                      <div style={{ padding: '6px 12px 4px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                        <kbd className="mf-kbd">↑</kbd> <kbd className="mf-kbd">↓</kbd> to move · <kbd className="mf-kbd">Enter</kbd> to open
+                      </div>
+                    )}
                   </>
                 )}
               </div>

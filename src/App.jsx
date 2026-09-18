@@ -5,6 +5,9 @@ import { AlertProvider } from './context/AlertContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/hooks';
 import LandingPage from './pages/LandingPage';
+import {
+  FeaturesPage, DeafUsersPage, HowItWorksPage, RespondersPage, AdminConsolePage, FaqPage, ContactPage,
+} from './pages/SitePages';
 import LoginPage from './pages/LoginPage';
 import Dashboard from './pages/Dashboard';
 import LegalPage from './pages/LegalPage';
@@ -69,6 +72,13 @@ function AppRoutes() {
       <NavigationLoader />
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/features" element={<FeaturesPage />} />
+        <Route path="/deaf-users" element={<DeafUsersPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
+        <Route path="/responders" element={<RespondersPage />} />
+        <Route path="/admin-console" element={<AdminConsolePage />} />
+        <Route path="/faq" element={<FaqPage />} />
+        <Route path="/contact" element={<ContactPage />} />
         {/* The website is for awareness; only administrators sign in, at /admin/login */}
         <Route path="/admin/login" element={<LoginPage />} />
         <Route path="/login" element={<Navigate to="/admin/login" replace />} />

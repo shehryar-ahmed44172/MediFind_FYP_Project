@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { AnimatePresence, MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion';
 import {
   Ambulance, ArrowRight, BellRing, BookmarkCheck, Check, ChevronDown, ClipboardPlus, Download,
@@ -21,12 +21,12 @@ const PLAY_STORE_LIVE = PLAY_STORE_URL !== '#';
 const SUPPORT_EMAIL = 'support@medifind.pk';
 
 const NAV_LINKS = [
-  { href: '#features',   label: 'Features' },
-  { href: '#deaf',       label: 'For Deaf Users' },
-  { href: '#how',        label: 'How it works' },
-  { href: '#responders', label: 'Responders' },
-  { href: '#admin',      label: 'Admin' },
-  { href: '#faq',        label: 'FAQ' },
+  { to: '/features',      label: 'Features' },
+  { to: '/deaf-users',    label: 'For Deaf Users' },
+  { to: '/how-it-works',  label: 'How it works' },
+  { to: '/responders',    label: 'Responders' },
+  { to: '/admin-console', label: 'Admin' },
+  { to: '/faq',           label: 'FAQ' },
 ];
 
 const fadeUp = {
@@ -64,10 +64,10 @@ function SiteHeader() {
           <span>Medi<b>Find</b></span>
         </Link>
         <nav className="lp-nav" aria-label="Primary">
-          {NAV_LINKS.map(l => <a key={l.href} href={l.href}>{l.label}</a>)}
+          {NAV_LINKS.map(l => <NavLink key={l.to} to={l.to}>{l.label}</NavLink>)}
         </nav>
         {/* Visitors reach out here; admins sign in from the Admin section, the footer or /admin/login */}
-        <a href="#contact" className="lp-btn lp-btn-primary lp-btn-sm lp-header-cta"><Mail size={16} /> Contact us</a>
+        <Link to="/contact" className="lp-btn lp-btn-primary lp-btn-sm lp-header-cta"><Mail size={16} /> Contact us</Link>
         <button
           type="button"
           className="lp-menu-btn"
@@ -80,8 +80,8 @@ function SiteHeader() {
         </button>
       </div>
       <nav id="lp-mobile-nav" className={`lp-mobile-nav${open ? ' is-open' : ''}`} aria-label="Mobile">
-        {NAV_LINKS.map(l => <a key={l.href} href={l.href} onClick={() => setOpen(false)}>{l.label}</a>)}
-        <a href="#contact" className="lp-btn lp-btn-primary lp-btn-sm" onClick={() => setOpen(false)}><Mail size={16} /> Contact us</a>
+        {NAV_LINKS.map(l => <NavLink key={l.to} to={l.to} onClick={() => setOpen(false)}>{l.label}</NavLink>)}
+        <Link to="/contact" className="lp-btn lp-btn-primary lp-btn-sm" onClick={() => setOpen(false)}><Mail size={16} /> Contact us</Link>
       </nav>
     </header>
   );
@@ -102,7 +102,7 @@ function Hero() {
           </p>
           <div className="lp-hero-cta">
             <DownloadButton />
-            <a className="lp-btn lp-btn-secondary" href="#how">See how it works <ArrowRight size={18} /></a>
+            <Link className="lp-btn lp-btn-secondary" to="/how-it-works">See how it works <ArrowRight size={18} /></Link>
           </div>
           {!PLAY_STORE_LIVE && (
             <p className="lp-store-note">The Android app is in final testing. iOS is planned later.</p>
@@ -542,25 +542,25 @@ const FOOTER_COLUMNS = [
   {
     title: 'Product',
     links: [
-      { href: '#features', label: 'Features' },
-      { href: '#deaf', label: 'For Deaf users' },
-      { href: '#how', label: 'How it works' },
-      { href: '#admin', label: 'Admin console' },
-      { href: '#faq', label: 'FAQ' },
+      { to: '/features', label: 'Features' },
+      { to: '/deaf-users', label: 'For Deaf users' },
+      { to: '/how-it-works', label: 'How it works' },
+      { to: '/admin-console', label: 'Admin console' },
+      { to: '/faq', label: 'FAQ' },
     ],
   },
   {
     title: 'Who it’s for',
     links: [
-      { href: '#patients', label: 'Patients' },
-      { href: '#caregivers', label: 'Caregivers' },
-      { href: '#responders', label: 'Responders' },
+      { to: '/responders#patients', label: 'Patients' },
+      { to: '/responders#caregivers', label: 'Caregivers' },
+      { to: '/responders#responders', label: 'Responders' },
     ],
   },
   {
     title: 'Support',
     links: [
-      { href: '#contact', label: 'Contact us' },
+      { to: '/contact', label: 'Contact us' },
       { href: `mailto:${SUPPORT_EMAIL}`, label: SUPPORT_EMAIL, Icon: Mail },
       { to: '/admin/login', label: 'Admin login' },
     ],
@@ -607,26 +607,67 @@ function SiteFooter() {
   );
 }
 
-export default function LandingPage() {
+/* Scroll to the top on page change, or to #section when the link has a hash */
+function ScrollManager() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    if (!hash) return undefined;
+    // Wait for the page to render, then bring the section into view below the sticky header
+    const t = setTimeout(() => document.getElementById(hash.slice(1))?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 150);
+    return () => clearTimeout(t);
+  }, [pathname, hash]);
+  return null;
+}
+
+/* Header + footer shell shared by the home page and every site page */
+export function SiteLayout({ children, subpage = false }) {
   return (
     <MotionConfig reducedMotion="user">
-      <div className="lp">
+      <div className={`lp${subpage ? ' lp-subpage' : ''}`}>
+        <ScrollManager />
         <a className="lp-skip" href="#main">Skip to content</a>
         <SiteHeader />
-        <main id="main">
-          <Hero />
-          <DeafSection />
-          <HowItWorks />
-          <Features />
-          <Roles />
-          <AdminSection />
-          <Trust />
-          <Faq />
-          <Contact />
-          <FinalCta />
-        </main>
+        <main id="main">{children}</main>
         <SiteFooter />
       </div>
     </MotionConfig>
+  );
+}
+
+/* Title band at the top of a site page */
+export function PageIntro({ eyebrow, Icon, title, children }) {
+  return (
+    <section className="lp-page-intro" aria-labelledby="page-title">
+      <div className="lp-container">
+        <nav className="lp-crumbs" aria-label="Breadcrumb"><Link to="/">Home</Link><span aria-hidden="true">/</span><span aria-current="page">{eyebrow}</span></nav>
+        <motion.div {...fadeUp}>
+          <span className="lp-eyebrow">{Icon && <Icon size={14} />} {eyebrow}</span>
+          <h1 id="page-title">{title}</h1>
+          {children && <p className="lp-lead">{children}</p>}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+export {
+  Hero, DeafSection, HowItWorks, Features, Roles, AdminSection, Trust, Faq, Contact, FinalCta,
+};
+
+export default function LandingPage() {
+  return (
+    <SiteLayout>
+      <Hero />
+      <DeafSection />
+      <HowItWorks />
+      <Features />
+      <Roles />
+      <AdminSection />
+      <Trust />
+      <Faq />
+      <Contact />
+      <FinalCta />
+    </SiteLayout>
   );
 }

@@ -221,6 +221,7 @@ class _CallScreenState extends State<CallScreen> with SingleTickerProviderStateM
         return 'No answer';
       case 'CANCELLED':
       case 'CALLER_OFFLINE':
+      case 'MISSED':
         return 'Missed call';
       case 'ANSWERED_ELSEWHERE':
         return 'Answered on another device';

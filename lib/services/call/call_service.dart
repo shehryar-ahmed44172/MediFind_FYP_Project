@@ -313,7 +313,7 @@ class CallService {
         if (callId == _s.callId) _finish(data['reason']?.toString() == 'ANSWERED_ELSEWHERE' ? 'ANSWERED_ELSEWHERE' : 'CANCELLED');
         break;
       case 'call:missed':
-        if (callId == _s.callId) _finish('NO_ANSWER');
+        if (callId == _s.callId) _finish(_s.phase == CallPhase.incoming ? 'MISSED' : 'NO_ANSWER');
         break;
       case 'call:ended':
         if (callId == _s.callId) _finish(data['reason']?.toString() ?? 'HANGUP');
@@ -343,7 +343,6 @@ class CallService {
           await _flushCandidates();
           break;
         case 'candidate':
-          debugPrint('[Call] remote candidate: ${signal['candidate']}');
           final candidate = RTCIceCandidate(
             signal['candidate'] as String?,
             signal['sdpMid'] as String?,
@@ -431,7 +430,6 @@ class CallService {
 
     pc.onIceCandidate = (candidate) {
       if (candidate.candidate == null) return;
-      debugPrint('[Call] local candidate: ${candidate.candidate}');
       _sendSignal({
         'type': 'candidate',
         'candidate': candidate.candidate,
@@ -445,11 +443,6 @@ class CallService {
       remoteRenderer.srcObject = event.streams.first;
       if (event.track.kind == 'video') _set(_s.copyWith(hasRemoteVideo: true));
     };
-    for (final signal in List.of(_earlySignals)) {
-      await _handleSignal(signal);
-    }
-    _earlySignals.clear();
-
     // Some Android builds report the connection through the ICE state only
     pc.onIceConnectionState = (iceState) {
       debugPrint('[Call] ice state: $iceState');
@@ -473,6 +466,13 @@ class CallService {
           break;
       }
     };
+
+    // Signals that arrived while the camera was starting, now that every listener is attached
+    final early = List.of(_earlySignals);
+    _earlySignals.clear();
+    for (final signal in early) {
+      await _handleSignal(signal);
+    }
   }
 
   void _markConnected() {
@@ -483,7 +483,27 @@ class CallService {
     }
   }
 
+  Timer? _statePoll;
+
   void _startConnectTimeout() {
+    // Some devices do not deliver the connection-state event: poll it as a fallback
+    _statePoll?.cancel();
+    _statePoll = Timer.periodic(const Duration(seconds: 1), (t) async {
+      final pc = _pc;
+      if (pc == null || _s.phase != CallPhase.connecting) {
+        t.cancel();
+        return;
+      }
+      final ice = await pc.getIceConnectionState();
+      final conn = await pc.getConnectionState();
+      if (ice == RTCIceConnectionState.RTCIceConnectionStateConnected ||
+          ice == RTCIceConnectionState.RTCIceConnectionStateCompleted ||
+          conn == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        debugPrint('[Call] connected (polled: ice=$ice conn=$conn)');
+        _markConnected();
+        t.cancel();
+      }
+    });
     _connectTimeout?.cancel();
     _connectTimeout = Timer(const Duration(seconds: 30), () {
       if (_s.phase == CallPhase.connecting) {
@@ -524,6 +544,7 @@ class CallService {
   void _finish(String reason, {String? message}) {
     _stopAlerting();
     _connectTimeout?.cancel();
+    _statePoll?.cancel();
     final pc = _pc;
     _pc = null;
     pc?.close();

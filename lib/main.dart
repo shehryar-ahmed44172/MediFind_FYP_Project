@@ -1,6 +1,7 @@
 // Importing core Flutter material design package
 import 'services/call/call_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 // Importing Riverpod for state management across the app
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Importing Hive for efficient local database storage
@@ -32,6 +33,10 @@ void main() async {
   // Ensures that widget binding is initialized before running the app
   WidgetsFlutterBinding.ensureInitialized();
 
+  // MediFind is a portrait app: rotating the phone must not squeeze the
+  // screens into a landscape strip (the Android manifest and iOS plist match).
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
   // Initialize Stripe
   Stripe.publishableKey = AppConstants.stripePublishableKey;
   await Stripe.instance.applySettings();
@@ -49,6 +54,9 @@ void main() async {
     ),
   );
 }
+
+/// Widest the app column gets on tablets, web and desktop.
+const double _maxAppWidth = 600;
 
 // Root widget of the MediFind application
 class MediFindApp extends ConsumerStatefulWidget {
@@ -137,9 +145,6 @@ class _MediFindAppState extends ConsumerState<MediFindApp> with WidgetsBindingOb
 
   @override
   Widget build(BuildContext context) {
-    // Initialize responsiveness engine
-    SizeConfig().init(context);
-    
     final accessibilitySettings = ref.watch(accessibilityProvider);
 
     // Returning MaterialApp with routing capabilities configured
@@ -157,12 +162,33 @@ class _MediFindAppState extends ConsumerState<MediFindApp> with WidgetsBindingOb
         final mediaQuery = MediaQuery.of(context);
         final systemScale = mediaQuery.textScaler.scale(1.0);
         final scale = (systemScale * accessibilitySettings.fontSizeMultiplier).clamp(1.0, 2.0);
-        return MediaQuery(
-          data: mediaQuery.copyWith(textScaler: TextScaler.linear(scale)),
-          // Non-blocking offline banner + global deaf visual alerts (rendered
-          // above the navigator so they show on full-screen emergency routes).
-          child: ConnectivityOverlay(
-            child: DeafVisualAlertLayer(child: child ?? const SizedBox.shrink()),
+
+        // Wide screens (tablet, web, desktop): the app is a centred column of
+        // phone-like width instead of stretching edge to edge or sitting on one side.
+        final width = mediaQuery.size.width;
+        final appWidth = width > _maxAppWidth ? _maxAppWidth : width;
+        final data = mediaQuery.copyWith(
+          textScaler: TextScaler.linear(scale),
+          size: Size(appWidth, mediaQuery.size.height),
+        );
+        return ColoredBox(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          child: Center(
+            child: SizedBox(
+              width: appWidth,
+              child: MediaQuery(
+                data: data,
+                child: Builder(builder: (context) {
+                  // Responsive helpers (wp/hp/sp) measure the app column
+                  SizeConfig().init(context);
+                  // Non-blocking offline banner + global deaf visual alerts (rendered
+                  // above the navigator so they show on full-screen emergency routes).
+                  return ConnectivityOverlay(
+                    child: DeafVisualAlertLayer(child: child ?? const SizedBox.shrink()),
+                  );
+                }),
+              ),
+            ),
           ),
         );
       },

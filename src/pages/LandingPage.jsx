@@ -454,7 +454,7 @@ function SiteFooter() {
       <div className="lp-container">
         <div className="lp-footer-grid">
           <div>
-            <span className="lp-logo" style={{ color: 'var(--primary-light)' }}><img src={appMark} alt="" width="34" height="34" /><span>Medi<b style={{ color: '#fff' }}>Find</b></span></span>
+            <span className="lp-logo lp-logo-badge"><img src={appMark} alt="" width="34" height="34" /><span>Medi<b>Find</b></span></span>
             <p style={{ marginTop: 10, maxWidth: 360 }}>Deaf-first medical emergency response for Pakistan — verified motorbike ambulances, live tracking and text-based help.</p>
           </div>
           <nav aria-label="Footer">

@@ -75,11 +75,12 @@
 .lp-logo { display: flex; align-items: center; gap: 8px; font-weight: 800; font-size: 1.2rem; letter-spacing: -0.01em; color: var(--primary-mid); }
 .lp-logo img { width: 34px; height: auto; }
 /* On dark backgrounds (footer, dark theme) a soft light edge keeps the navy pin visible */
-/* On dark backgrounds (footer, dark theme) the logo sits on a white app-icon style tile */
-.lp-footer .lp-logo img, [data-theme="dark"] .lp-logo img {
-  width: 40px; height: 40px; padding: 4px; border-radius: 11px; background: #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
+/* Footer: the full header logo on a white badge, same colours as the header */
+.lp-logo-badge { display: inline-flex; background: #fff; padding: 8px 16px 8px 10px; border-radius: 14px; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
+.lp-logo-badge, [data-theme="dark"] .lp-logo-badge { color: var(--primary-mid); }
+.lp-logo-badge b, [data-theme="dark"] .lp-logo-badge b { color: var(--primary-dark); }
+/* Dark theme header: the navy pin needs a light tile to stay visible */
+[data-theme="dark"] .lp-header .lp-logo img { padding: 3px; border-radius: 9px; background: #fff; }
 .lp-logo b { color: var(--primary-dark); }
 [data-theme="dark"] .lp-logo b { color: #fff; }
 .lp-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }

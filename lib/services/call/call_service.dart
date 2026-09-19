@@ -124,9 +124,29 @@ class CallService {
     _dio = dio;
     _navigatorKey = navigatorKey;
     _eventsSub ??= SocketService.instance.callEvents.listen(_onEvent);
+    _initWebRtc();
   }
 
+  Future<void>? _webRtcReady;
+
+  /// Audio settings that WebRTC only reads when it first starts, so they must be
+  /// applied before any call or renderer: voice-call audio path, and WebRTC's own
+  /// (software) echo cancellation + noise suppression instead of the phone's
+  /// hardware ones, which distort voice on many budget phones (e.g. Infinix).
+  Future<void> _initWebRtc() => _webRtcReady ??= () async {
+        if (kIsWeb) return;
+        try {
+          await WebRTC.initialize(options: {
+            if (Platform.isAndroid) 'androidAudioConfiguration': AndroidAudioConfiguration.communication.toMap(),
+            'androidUseHardwareAudioProcessing': false,
+          });
+        } catch (e) {
+          debugPrint('[Call] WebRTC initialize failed: $e');
+        }
+      }();
+
   Future<void> _ensureRenderers() async {
+    await _initWebRtc();
     if (_renderersReady) return;
     await localRenderer.initialize();
     await remoteRenderer.initialize();
@@ -396,6 +416,7 @@ class CallService {
 
   Future<void> _startLocalMedia(CallMedia media) async {
     if (_localStream != null) return;
+    await _initWebRtc();
     try {
       // Voice-call audio mode: turns on the phone's hardware echo canceller and
       // noise suppressor and routes audio like a normal phone call.
@@ -435,6 +456,7 @@ class CallService {
 
   Future<void> _createPeerConnection() async {
     if (_pc != null) return;
+    await _initWebRtc();
     final pc = await createPeerConnection({
       'iceServers': await _loadIceServers(),
       'sdpSemantics': 'unified-plan',

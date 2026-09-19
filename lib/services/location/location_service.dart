@@ -256,6 +256,15 @@ class LocationService {
     return await Geolocator.openAppSettings();
   }
 
+  static final RegExp _plusCode = RegExp(r'^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX]{0,3}$', caseSensitive: false);
+
+  /// A short value with a digit that is not a Plus Code, e.g. "12", "12-B", "Flat 4", "House 23".
+  static bool _looksLikeHouseNumber(String value) {
+    final v = value.trim();
+    if (v.isEmpty || v.length > 20 || _plusCode.hasMatch(v)) return false;
+    return RegExp(r'\d').hasMatch(v);
+  }
+
   /// Get City and Area from coordinates
   Future<Map<String, String>> getPlaceFromCoordinates(double lat, double lng) async {
     try {
@@ -264,13 +273,15 @@ class LocationService {
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
         
-        // Greedily try to find a house/flat number
-        String houseNo = place.subThoroughfare ?? '';
         String street = place.thoroughfare ?? '';
-        String name = place.name ?? '';
-        
-        // Fallback: If subThoroughfare is empty, check if 'name' looks like a number or building name
-        if (houseNo.isEmpty && name.isNotEmpty && name != street) {
+        String name = (place.name ?? '').trim();
+
+        // Only use a value that really looks like a house/flat number. In Pakistan
+        // geocoders usually have none, and `name` is often a Plus Code
+        // (e.g. "G9C5+5F5"), a street or a shop name — never fill those in.
+        String houseNo = (place.subThoroughfare ?? '').trim();
+        if (!_looksLikeHouseNumber(houseNo)) houseNo = '';
+        if (houseNo.isEmpty && name != street && name != place.subLocality && _looksLikeHouseNumber(name)) {
           houseNo = name;
         }
 

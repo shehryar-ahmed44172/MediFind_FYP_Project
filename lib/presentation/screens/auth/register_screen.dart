@@ -63,6 +63,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _confirmPasswordController = TextEditingController();
   final _cityController            = TextEditingController();
   final _houseNoController         = TextEditingController();
+  final _houseNoFocus              = FocusNode();
   final _addressController         = TextEditingController();
   final _additionalAddressController = TextEditingController();
   final _dobController             = TextEditingController();
@@ -142,6 +143,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _motorbikeNumberController.dispose();
     _cityController.dispose();
     _houseNoController.dispose();
+    _houseNoFocus.dispose();
     _addressController.dispose();
     _additionalAddressController.dispose();
     _dobController.dispose();
@@ -274,7 +276,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           _houseNoController.text = place['houseNumber'] ?? '';
           _locationAttempts = 0;
         });
-        showMfSnackBar(context, 'Address filled from your location.', tone: MfTone.success);
+        // Maps rarely know house numbers here: ask the user to type it instead of guessing
+        if (_houseNoController.text.isEmpty) {
+          _houseNoFocus.requestFocus();
+          showMfSnackBar(context, 'City and area filled from your location. Please add your house or flat number.', tone: MfTone.success);
+        } else {
+          showMfSnackBar(context, 'Address filled from your location. Please check the house number.', tone: MfTone.success);
+        }
       }
     } on LocationException catch (e) {
       if (!mounted) return;
@@ -734,6 +742,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                       gap,
                       TextFormField(
                         controller: _houseNoController,
+                        focusNode: _houseNoFocus,
                         maxLength: 20,
                         decoration: const InputDecoration(
                           labelText: 'House / flat',

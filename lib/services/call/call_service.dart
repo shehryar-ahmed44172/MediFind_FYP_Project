@@ -130,15 +130,13 @@ class CallService {
   Future<void>? _webRtcReady;
 
   /// Audio settings that WebRTC only reads when it first starts, so they must be
-  /// applied before any call or renderer: voice-call audio path, and WebRTC's own
-  /// (software) echo cancellation + noise suppression instead of the phone's
-  /// hardware ones, which distort voice on many budget phones (e.g. Infinix).
+  /// applied before any call or renderer: the voice-call audio path, with the
+  /// phone's hardware echo canceller and noise suppressor (the default).
   Future<void> _initWebRtc() => _webRtcReady ??= () async {
         if (kIsWeb) return;
         try {
           await WebRTC.initialize(options: {
             if (Platform.isAndroid) 'androidAudioConfiguration': AndroidAudioConfiguration.communication.toMap(),
-            'androidUseHardwareAudioProcessing': false,
           });
         } catch (e) {
           debugPrint('[Call] WebRTC initialize failed: $e');
@@ -446,9 +444,10 @@ class CallService {
       });
       _localStream = stream;
       localRenderer.srcObject = stream;
-      if (media == CallMedia.video) {
-        await Helper.setSpeakerphoneOn(true);
-      }
+      // Voice calls on the earpiece like a phone call (the plugin's default route is
+      // the loudspeaker, which fed the other phone's voice back into the mic);
+      // video calls on the speaker. The speaker button still switches.
+      await Helper.setSpeakerphoneOn(media == CallMedia.video);
     } catch (e) {
       debugPrint('[Call] getUserMedia failed: $e');
     }

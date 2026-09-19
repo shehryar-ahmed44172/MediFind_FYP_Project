@@ -1358,7 +1358,10 @@ class MediFindApiClient {
       });
       final response = await _dio.post('chat/upload', data: formData);
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return response.data['data'] as Map<String, dynamic>;
+        // Accept both {data: {url}} and a bare {url} (the server used to send the latter)
+        final body = response.data;
+        final data = body is Map && body['data'] is Map ? body['data'] : body;
+        if (data is Map && data['url'] is String) return Map<String, dynamic>.from(data);
       }
       throw NetworkException(message: 'Failed to upload chat file');
     } on DioException catch (e) {

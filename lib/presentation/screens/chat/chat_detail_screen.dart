@@ -346,7 +346,7 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
       case MessageType.DOCUMENT:
         semanticsContent = 'Document ${message.content}';
         content = InkWell(
-          onTap: message.mediaUrl == null ? null : () => _openLink(message.mediaUrl!),
+          onTap: message.mediaUrl == null ? null : () => _openLink(mfResolveImageUrl(message.mediaUrl) ?? message.mediaUrl!),
           borderRadius: MfRadius.smAll,
           child: ConstrainedBox(
             constraints: const BoxConstraints(minHeight: MfSize.minTouch),
@@ -381,11 +381,11 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
         content = message.mediaUrl == null
             ? Text('Photo unavailable', style: text.bodyMedium?.copyWith(color: fg))
             : InkWell(
-                onTap: () => _openLink(message.mediaUrl!),
+                onTap: () => _openLink(mfResolveImageUrl(message.mediaUrl) ?? message.mediaUrl!),
                 child: ClipRRect(
                   borderRadius: MfRadius.smAll,
                   child: Image.network(
-                    message.mediaUrl!,
+                    mfResolveImageUrl(message.mediaUrl) ?? message.mediaUrl!,
                     width: 220,
                     height: 220,
                     fit: BoxFit.cover,
@@ -994,7 +994,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
     try {
       setState(() => _playingMessageId = messageId);
       await _audioPlayer.stop();
-      await _audioPlayer.setUrl(url);
+      // Server uploads are re-rooted on the current server (tunnel / LAN address may change)
+      await _audioPlayer.setUrl(mfResolveImageUrl(url) ?? url);
       // play() completes when playback finishes/pauses; don't block on it.
       unawaited(_audioPlayer.play());
     } catch (e) {

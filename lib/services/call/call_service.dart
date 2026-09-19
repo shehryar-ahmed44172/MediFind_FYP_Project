@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
@@ -395,8 +396,28 @@ class CallService {
   Future<void> _startLocalMedia(CallMedia media) async {
     if (_localStream != null) return;
     try {
+      // Voice-call audio mode: turns on the phone's hardware echo canceller and
+      // noise suppressor and routes audio like a normal phone call.
+      if (!kIsWeb && Platform.isAndroid) {
+        await Helper.setAndroidAudioConfiguration(AndroidAudioConfiguration.communication);
+      }
       final stream = await navigator.mediaDevices.getUserMedia({
-        'audio': {'echoCancellation': true, 'noiseSuppression': true},
+        // Android's WebRTC only reads 'mandatory'/'optional' audio constraints; plain
+        // keys like {'echoCancellation': true} were ignored, so calls had no echo
+        // cancellation or noise suppression at all.
+        'audio': {
+          'mandatory': {
+            'googEchoCancellation': 'true',
+            'googEchoCancellation2': 'true',
+            'googDAEchoCancellation': 'true',
+            'googNoiseSuppression': 'true',
+            'googNoiseSuppression2': 'true',
+            'googAutoGainControl': 'true',
+            'googHighpassFilter': 'true',
+            'googTypingNoiseDetection': 'true',
+          },
+          'optional': [],
+        },
         'video': media == CallMedia.video
             ? {'facingMode': 'user', 'width': 640, 'height': 480, 'frameRate': 24}
             : false,
@@ -559,6 +580,10 @@ class CallService {
     if (_renderersReady) {
       localRenderer.srcObject = null;
       remoteRenderer.srcObject = null;
+    }
+    // Back to normal media audio for the rest of the app (videos, alert sounds)
+    if (!kIsWeb && Platform.isAndroid) {
+      Helper.setAndroidAudioConfiguration(AndroidAudioConfiguration.media).catchError((_) {});
     }
     _pendingCandidates.clear();
     _earlySignals.clear();

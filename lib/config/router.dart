@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../presentation/theme/fade_through_transition.dart';
 import '../services/call/call_service.dart';
 import '../presentation/screens/call/call_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,14 +101,13 @@ class AppRouter {
       key: key,
       child: child,
       transitionsBuilder: (context, animation, secondaryAnimation, child) {
-        final curve = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
-        if (slideUp) {
-          return SlideTransition(
-            position: curve.drive(Tween(begin: const Offset(0, 0.1), end: Offset.zero)),
-            child: FadeTransition(opacity: curve, child: child),
-          );
-        }
-        return FadeTransition(opacity: curve, child: child);
+        final faded = fadeThrough(animation, secondaryAnimation, child);
+        if (!slideUp) return faded;
+        final curve = CurvedAnimation(parent: animation, curve: const Interval(0.3, 1, curve: Curves.easeOutCubic));
+        return SlideTransition(
+          position: curve.drive(Tween(begin: const Offset(0, 0.04), end: Offset.zero)),
+          child: faded,
+        );
       },
     );
   }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../providers/accessibility_provider.dart';
+import 'fade_through_transition.dart';
 
 class AppColors {
   // Primary colors — brand palette from the logo (#0C637E, #2496A7, #2891C2)
@@ -468,11 +469,13 @@ class AppTheme {
 
       inputDecorationTheme: _buildInputDecorationTheme(scheme, hc: hc, isDark: isDark),
 
+      // Fade-through: the old screen fades out before the new one fades in, so
+      // two screens are never half visible on top of each other
       pageTransitionsTheme: const PageTransitionsTheme(
         builders: {
-          TargetPlatform.android: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.android: FadeThroughPageTransitionsBuilder(),
           TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
-          TargetPlatform.windows: FadeForwardsPageTransitionsBuilder(),
+          TargetPlatform.windows: FadeThroughPageTransitionsBuilder(),
         },
       ),
     );

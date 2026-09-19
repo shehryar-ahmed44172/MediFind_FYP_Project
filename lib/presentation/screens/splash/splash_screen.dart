@@ -1,10 +1,15 @@
-import 'dart:math' as math;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import '../../widgets/design_system/design_system.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 
+/// Continues the native Android splash without a jump: same white background
+/// and the same 288 dp mark in the exact centre of the screen, then the mark
+/// settles upward while the wordmark and tagline fade in. The session check
+/// runs at the same time, so the splash only stays as long as it has to.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -12,133 +17,187 @@ class SplashScreen extends ConsumerStatefulWidget {
   ConsumerState<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends ConsumerState<SplashScreen> {
-  bool _visible = false;
+class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerProviderStateMixin {
+  /// Size of the Android 12+ splash icon box; the native splash draws the mark at this size.
+  static const double _nativeIconBox = 288;
+  static const double _settledBox = 200;
+  static const double _rise = 64;
+  static const Color _navy = Color(0xFF04364E);
+  static const Color _teal = Color(0xFF2496A7);
+
+  late final AnimationController _intro = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+  late final Animation<double> _settle = CurvedAnimation(parent: _intro, curve: const Interval(0, 0.7, curve: Curves.easeOutCubic));
+  late final Animation<double> _reveal = CurvedAnimation(parent: _intro, curve: const Interval(0.35, 1, curve: Curves.easeOut));
+  bool _leaving = false;
 
   @override
   void initState() {
     super.initState();
-
-    // Short, restrained fade-in of the logo and loader.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) setState(() => _visible = true);
+      if (!mounted) return;
+      if (MediaQuery.of(context).disableAnimations) {
+        _intro.value = 1;
+      } else {
+        _intro.forward();
+      }
     });
-
-    _handleNavigation();
+    _start();
   }
 
-  Future<void> _handleNavigation() async {
-    // Wait for splash animation minimum duration
-    await Future.delayed(const Duration(milliseconds: 3500));
-    
+  @override
+  void dispose() {
+    _intro.dispose();
+    super.dispose();
+  }
+
+  Future<void> _start() async {
+    // Resolve where to go while the intro plays; show the splash at least ~1.2 s
+    final results = await Future.wait<Object?>([
+      _resolveDestination(),
+      Future<void>.delayed(const Duration(milliseconds: 1200)),
+    ]);
     if (!mounted) return;
+    final destination = results.first! as ({String path, Object? extra});
+    setState(() => _leaving = true);
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (mounted) context.go(destination.path, extra: destination.extra);
+  }
 
+  /// Waits until the stored session has been read (the auth state stops loading).
+  Future<bool> _loggedIn() {
+    final current = ref.read(authStateProvider);
+    if (!current.isLoading) return Future.value(current.value == true);
+    final done = Completer<bool>();
+    final sub = ref.listenManual<AsyncValue<bool>>(authStateProvider, (_, next) {
+      if (!next.isLoading && !done.isCompleted) done.complete(next.value == true);
+    });
+    return done.future.timeout(const Duration(seconds: 5), onTimeout: () => false).whenComplete(sub.close);
+  }
+
+  Future<({String path, Object? extra})> _resolveDestination() async {
     try {
-      // Check if user is logged in
-      final authState = ref.read(authStateProvider);
-      
-      if (authState.value == true) {
+      if (await _loggedIn()) {
         // Fetch current user details with a timeout to prevent hanging on splash
-        final user = await ref.read(currentUserProvider.future).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () => null,
-        );
-        if (!mounted) return;
-
+        final user = await ref.read(currentUserProvider.future).timeout(const Duration(seconds: 10), onTimeout: () => null);
         if (user != null) {
-          // Check if email is verified
-          if (!user.isEmailVerified) {
-            context.go('/verify-email', extra: {'email': user.email});
-            return;
-          }
-
-          // Navigate based on role if verified
-          if (user.role == 'CAREGIVER') {
-            context.go('/caregiver');
-          } else if (user.role == 'RESPONDER') {
-            context.go('/responder');
-          } else {
-            context.go('/home');
-          }
-          return;
-        } else {
-          // If user is null but authState is true, wipe the stale session directly.
-          // We call the repo rather than logoutProvider to avoid any provider caching
-          // or lifecycle issues that could silently skip the actual token clearing.
-          debugPrint('⚠️ Splash: User profile is null but authState is true. Clearing stale session.');
-          try {
-            final authRepo = await ref.read(authRepositoryProvider.future);
-            await authRepo.logout();
-          } catch (_) {}
+          if (!user.isEmailVerified) return (path: '/verify-email', extra: {'email': user.email});
+          if (user.role == 'CAREGIVER') return (path: '/caregiver', extra: null);
+          if (user.role == 'RESPONDER') return (path: '/responder', extra: null);
+          return (path: '/home', extra: null);
         }
+        // Logged in but no profile: the session is stale, clear it directly.
+        debugPrint('⚠️ Splash: User profile is null but authState is true. Clearing stale session.');
+        await _clearSession();
       }
-
-      // Default fallback to login
-      if (mounted) context.go('/login');
     } catch (e) {
       debugPrint('⚠️ Splash: Initial profile fetch failed. Forcing logout to clear stale session.');
-      // Clear tokens directly via the repository to guarantee a clean state.
-      try {
-        final authRepo = await ref.read(authRepositoryProvider.future);
-        await authRepo.logout();
-      } catch (_) {}
-      if (mounted) context.go('/login');
+      await _clearSession();
     }
+    return (path: '/login', extra: null);
+  }
+
+  Future<void> _clearSession() async {
+    try {
+      final authRepo = await ref.read(authRepositoryProvider.future);
+      await authRepo.logout();
+    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final text = Theme.of(context).textTheme;
-    final duration = MfMotion.of(context);
+    final size = MediaQuery.sizeOf(context);
+    final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
 
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final logoWidth = math.min(constraints.maxWidth * 0.5, 220.0);
-            return AnimatedOpacity(
-              opacity: _visible ? 1 : 0,
-              duration: duration,
-              curve: Curves.easeOut,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: MfSpace.gutter),
-                child: Column(
-                  children: [
-                    const Spacer(flex: 3),
-                    Semantics(
+    // Brand splash: always white with dark status bar icons, like the native splash
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark.copyWith(statusBarColor: Colors.transparent, systemNavigationBarColor: Colors.white),
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: AnimatedOpacity(
+          opacity: _leaving ? 0 : 1,
+          duration: const Duration(milliseconds: 180),
+          child: AnimatedBuilder(
+            animation: _intro,
+            builder: (context, _) {
+              // Mark: starts exactly where the native splash drew it, then shrinks and rises
+              final box = _nativeIconBox - (_nativeIconBox - _settledBox) * _settle.value;
+              final markTop = (size.height - box) / 2 - _rise * _settle.value;
+              // The mark image has ~23% empty margin at the bottom; the wordmark sits just under the rings
+              final settledMarkBottom = (size.height + _settledBox) / 2 - _rise - _settledBox * 0.2;
+              return Stack(
+                children: [
+                  Positioned(
+                    left: (size.width - box) / 2,
+                    top: markTop,
+                    width: box,
+                    height: box,
+                    child: Semantics(
                       label: 'MediFind',
                       image: true,
-                      child: Image.asset(
-                        'assets/logos/medifind_logo_full.png',
-                        width: logoWidth,
-                        fit: BoxFit.contain,
-                        excludeFromSemantics: true,
+                      child: Image.asset('assets/logos/medifind_splash_mark.png', excludeFromSemantics: true),
+                    ),
+                  ),
+                  // Wordmark + tagline appear below the mark
+                  Positioned(
+                    left: 24,
+                    right: 24,
+                    top: settledMarkBottom,
+                    child: Opacity(
+                      opacity: _reveal.value,
+                      child: Transform.translate(
+                        offset: Offset(0, 12 * (1 - _reveal.value)),
+                        child: Column(
+                          children: [
+                            Text.rich(
+                              const TextSpan(children: [
+                                TextSpan(text: 'MEDI', style: TextStyle(color: _teal)),
+                                TextSpan(text: 'FIND', style: TextStyle(color: _navy)),
+                              ]),
+                              textScaler: TextScaler.linear(textScale),
+                              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 2),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              'Emergency help, without hearing or speaking',
+                              textAlign: TextAlign.center,
+                              textScaler: TextScaler.linear(textScale),
+                              style: TextStyle(fontSize: 14, color: _navy.withValues(alpha: 0.65), fontWeight: FontWeight.w500),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const Spacer(flex: 2),
-                    Semantics(
-                      liveRegion: true,
-                      label: 'Loading MediFind',
-                      child: SizedBox(
-                        width: 28,
-                        height: 28,
-                        child: CircularProgressIndicator(strokeWidth: 2.5, color: cs.primary),
+                  ),
+                  // Slim progress bar near the bottom
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: MediaQuery.paddingOf(context).bottom + 56,
+                    child: Opacity(
+                      opacity: _reveal.value,
+                      child: Center(
+                        child: Semantics(
+                          liveRegion: true,
+                          label: 'Loading MediFind',
+                          child: SizedBox(
+                            width: 96,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(2),
+                              child: LinearProgressIndicator(
+                                minHeight: 3,
+                                color: _teal,
+                                backgroundColor: _teal.withValues(alpha: 0.15),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: MfSpace.md),
-                    Text(
-                      'Secure. Reliable. Immediate.',
-                      textAlign: TextAlign.center,
-                      style: text.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: MfSpace.xxl),
-                  ],
-                ),
-              ),
-            );
-          },
+                  ),
+                ],
+              );
+            },
+          ),
         ),
       ),
     );

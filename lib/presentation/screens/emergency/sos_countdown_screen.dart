@@ -809,7 +809,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                           MfSpace.sm, MfSpace.xs, MfSpace.sm, 0),
                       child: Align(
                         alignment: Alignment.topLeft,
-                        child: _LiveSosChip(sent: _sent),
+                        child: _LiveSosChip(sent: _sent, ended: _noResponder),
                       ),
                     ),
                   ),
@@ -1224,7 +1224,10 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
 /// Small "SOS active" label on top of the map.
 class _LiveSosChip extends StatelessWidget {
   final bool sent;
-  const _LiveSosChip({required this.sent});
+
+  /// The search finished with no responder — the SOS is no longer live.
+  final bool ended;
+  const _LiveSosChip({required this.sent, this.ended = false});
 
   @override
   Widget build(BuildContext context) {
@@ -1238,15 +1241,20 @@ class _LiveSosChip extends StatelessWidget {
       ),
       child: Padding(
         padding: const EdgeInsets.all(MfSpace.xxs),
-        child: sent
+        child: ended
             ? const MfStatusChip(
-                label: 'SOS active',
-                tone: MfTone.danger,
-                icon: Icons.sos_rounded)
-            : const MfStatusChip(
-                label: 'Not sent yet',
+                label: 'Search ended',
                 tone: MfTone.warning,
-                icon: Icons.timer_outlined),
+                icon: Icons.search_off_rounded)
+            : sent
+                ? const MfStatusChip(
+                    label: 'SOS active',
+                    tone: MfTone.danger,
+                    icon: Icons.sos_rounded)
+                : const MfStatusChip(
+                    label: 'Not sent yet',
+                    tone: MfTone.warning,
+                    icon: Icons.timer_outlined),
       ),
     );
   }

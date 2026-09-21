@@ -65,6 +65,9 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
   bool _isCreating = false;
   bool _createFailed = false;
   bool _navigated = false;
+  /// The search ended without anyone accepting — the screen switches to a
+  /// final state with what to do next instead of navigating away.
+  bool _noResponder = false;
   String? _emergencyId;
   StreamSubscription<SocketMessage>? _socketSub;
 
@@ -499,13 +502,20 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         _isCreating = false;
         _createFailed = true;
       });
+      // A deaf patient cannot act on "call 1122" — offer the card instead.
+      final deaf = (ref.read(currentUserProvider).valueOrNull?.patientType?.toUpperCase() ==
+              'DEAF') ||
+          ref.read(accessibilityProvider).textOnlyMode;
       showMfSnackBar(
         context,
         'Could not send SOS: $e',
         tone: MfTone.danger,
         duration: const Duration(seconds: 6),
-        actionLabel: 'Call 1122',
-        onAction: _call1122,
+        actionLabel: deaf ? 'Show card' : 'Call 1122',
+        onAction: deaf
+            ? () => _showHelpCard(
+                'I am deaf and I need an ambulance. Please call 1122 for me.')
+            : _call1122,
       );
     }
   }
@@ -522,17 +532,22 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     }
   }
 
+  /// Shows the bystander card with a message asking for help, so a deaf patient
+  /// never has to speak to get someone nearby to call 1122.
+  void _showHelpCard([String? message]) {
+    HapticFeedback.mediumImpact();
+    context.push('/home/show-card', extra: message);
+  }
+
+  /// No responder took the emergency. The patient stays on this screen with
+  /// clear options instead of being dropped on the home screen with a message
+  /// that a deaf patient cannot act on.
   void _finishNoResponder() {
-    if (_navigated || !mounted) return;
-    showMfSnackBar(
-      context,
-      'No responder was available. If you still need help, call 1122.',
-      tone: MfTone.danger,
-      duration: const Duration(seconds: 8),
-      actionLabel: 'Call 1122',
-      onAction: _call1122,
-    );
-    _navigateAway('/home');
+    if (_navigated || !mounted || _noResponder) return;
+    _timer?.cancel();
+    _bikeTimer?.cancel();
+    HapticFeedback.heavyImpact();
+    setState(() => _noResponder = true);
   }
 
   // ── Cancel ────────────────────────────────────────────────────────────────
@@ -643,13 +658,15 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         ? 'Your SOS will be sent in $_preSendLeft ${_preSendLeft == 1 ? 'second' : 'seconds'}'
         : _responderFound
             ? 'Responder found. Opening live tracking…'
-            : _createFailed
-                ? 'Could not reach the server'
-                : _isCreating
-                    ? 'Sending your alert…'
-                    : canCancel
-                        ? 'Responders nearby are being notified'
-                        : 'Still searching for a responder…';
+            : _noResponder
+                ? 'No responder accepted your SOS'
+                : _createFailed
+                    ? 'Could not reach the server'
+                    : _isCreating
+                        ? 'Sending your alert…'
+                        : canCancel
+                            ? 'Responders nearby are being notified'
+                            : 'Still searching for a responder…';
     final mapHeight = MediaQuery.sizeOf(context).height * 0.38;
 
     return PopScope(
@@ -659,6 +676,8 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         if (didPop) return;
         if (!_sent) {
           _cancelBeforeSend();
+        } else if (_noResponder) {
+          _navigateAway('/home');
         } else if (canCancel) {
           _confirmCancel();
         }
@@ -709,7 +728,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         ),
                       ),
                     ),
-                  if (_sent && !reducedMotion && !_responderFound)
+                  if (_sent && !reducedMotion && !_responderFound && !_noResponder)
                     ...[_radar1Controller, _radar2Controller, _radar3Controller]
                         .map(
                       (ctrl) => IgnorePointer(
@@ -839,7 +858,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                             ?.copyWith(color: cs.onSurfaceVariant),
                       ),
                     ],
-                    if (isDeaf) ...[
+                    if (isDeaf && !_noResponder) ...[
                       const SizedBox(height: MfSpace.lg),
                       const MfInfoBanner(
                         icon: Icons.hearing_disabled_outlined,
@@ -849,6 +868,10 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                             'You will get a flashing screen and vibration — no sound needed.',
                       ),
                     ],
+                    // Waiting is the moment people feel lost: say plainly what
+                    // is happening and what to do meanwhile.
+                    if (_sent && !_responderFound && !_createFailed)
+                      _buildWaitingGuidance(context, isDeaf: isDeaf),
                   ],
                 ),
               ),
@@ -873,7 +896,43 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   icon: Icons.close_rounded,
                   onPressed: _cancelBeforeSend,
                 ),
-              ] else if (canCancel)
+              ] else if (_noResponder) ...[
+                // Nobody accepted. A deaf patient cannot use a phone call, so
+                // the card they can show to someone nearby comes first.
+                if (isDeaf)
+                  MfPrimaryButton(
+                    label: 'Show card asking for help',
+                    icon: Icons.badge_outlined,
+                    onPressed: () => _showHelpCard(
+                        'I am deaf and I need an ambulance. Please call 1122 for me.'),
+                  )
+                else
+                  MfPrimaryButton(
+                    label: 'Call 1122 now',
+                    icon: Icons.phone_rounded,
+                    tone: MfTone.danger,
+                    onPressed: _call1122,
+                  ),
+                const SizedBox(height: MfSpace.xs),
+                MfSecondaryButton(
+                  label: 'Send a new SOS',
+                  icon: Icons.refresh_rounded,
+                  tone: MfTone.danger,
+                  onPressed: _retryAfterNoResponder,
+                ),
+                const SizedBox(height: MfSpace.xxs),
+                MfTextButton(
+                  label: isDeaf ? 'Call 1122' : 'Back to home',
+                  icon: isDeaf ? Icons.phone_rounded : Icons.home_outlined,
+                  onPressed: isDeaf ? _call1122 : () => _navigateAway('/home'),
+                ),
+                if (isDeaf)
+                  MfTextButton(
+                    label: 'Back to home',
+                    icon: Icons.home_outlined,
+                    onPressed: () => _navigateAway('/home'),
+                  ),
+              ] else if (canCancel) ...[
                 MfSecondaryButton(
                   label: _isCancelling ? 'Cancelling…' : 'Cancel SOS',
                   icon: Icons.close_rounded,
@@ -881,14 +940,38 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                   large: true,
                   loading: _isCancelling,
                   onPressed: _isCancelling ? null : _confirmCancel,
-                )
-              else if (!_responderFound)
-                MfPrimaryButton(
-                  label: 'Call 1122 while you wait',
-                  icon: Icons.phone_rounded,
-                  tone: MfTone.danger,
-                  onPressed: _call1122,
                 ),
+                if (isDeaf) ...[
+                  const SizedBox(height: MfSpace.xxs),
+                  MfTextButton(
+                    label: 'Show card to people nearby',
+                    icon: Icons.badge_outlined,
+                    onPressed: () => _showHelpCard(
+                        'I am deaf. An ambulance is on the way to me.'),
+                  ),
+                ],
+              ] else if (!_responderFound) ...[
+                if (isDeaf) ...[
+                  MfPrimaryButton(
+                    label: 'Show card to people nearby',
+                    icon: Icons.badge_outlined,
+                    onPressed: () => _showHelpCard(
+                        'I am deaf and I need help. An ambulance has been called.'),
+                  ),
+                  const SizedBox(height: MfSpace.xxs),
+                  MfTextButton(
+                    label: 'Ask someone to call 1122',
+                    icon: Icons.phone_rounded,
+                    onPressed: _call1122,
+                  ),
+                ] else
+                  MfPrimaryButton(
+                    label: 'Call 1122 while you wait',
+                    icon: Icons.phone_rounded,
+                    tone: MfTone.danger,
+                    onPressed: _call1122,
+                  ),
+              ],
               if (_createFailed) ...[
                 const SizedBox(height: MfSpace.xs),
                 MfTextButton(
@@ -904,6 +987,102 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
         ),
       ),
     );
+  }
+
+  /// Plain-language guidance for the wait — and, when the search ended with
+  /// nobody accepting, what to do instead. Written so it works with no sound.
+  Widget _buildWaitingGuidance(BuildContext context, {required bool isDeaf}) {
+    final text = Theme.of(context).textTheme;
+    final cs = Theme.of(context).colorScheme;
+
+    final (String title, List<(IconData, String)> steps) = _noResponder
+        ? (
+            'What to do now',
+            [
+              (
+                Icons.badge_outlined,
+                isDeaf
+                    ? 'Show the card below to anyone nearby and ask them to call 1122.'
+                    : 'Call 1122 — they dispatch government ambulances.',
+              ),
+              (Icons.refresh_rounded, 'Or send a new SOS: other responders may be online now.'),
+              (Icons.people_outline_rounded, 'Your linked caregivers were already alerted and can help.'),
+            ],
+          )
+        : (
+            'While you wait',
+            [
+              (Icons.place_outlined, 'Stay where you are if you can. The responder is coming to this exact spot.'),
+              (
+                Icons.lock_open_rounded,
+                'If you are indoors, unlock the door or ask someone to wait at the gate.',
+              ),
+              if (isDeaf)
+                (
+                  Icons.badge_outlined,
+                  'You can show the card to people nearby — it explains that you are deaf and need help.',
+                )
+              else
+                (Icons.volume_up_outlined, 'Keep your phone with you. You will be told the moment someone accepts.'),
+              (
+                Icons.people_outline_rounded,
+                'Your linked caregivers have already been alerted with your location.',
+              ),
+            ],
+          );
+
+    return Padding(
+      padding: const EdgeInsets.only(top: MfSpace.lg),
+      child: MfCard(
+        tone: _noResponder ? MfTone.warning : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Semantics(header: true, child: Text(title, style: text.titleMedium)),
+            if (!_noResponder) ...[
+              const SizedBox(height: MfSpace.xxs),
+              Text(
+                'Responders near you are being alerted one by one. Most accept within two minutes.',
+                style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ] else ...[
+              const SizedBox(height: MfSpace.xxs),
+              Text(
+                'Nobody was available to take this emergency. You are not being searched for any more.',
+                style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              ),
+            ],
+            const SizedBox(height: MfSpace.sm),
+            for (final (icon, line) in steps)
+              Padding(
+                padding: const EdgeInsets.only(bottom: MfSpace.xs),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(icon, size: 20, color: cs.onSurfaceVariant),
+                    const SizedBox(width: MfSpace.sm),
+                    Expanded(child: Text(line, style: text.bodyMedium)),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Sends a fresh SOS after nobody accepted the previous one.
+  void _retryAfterNoResponder() {
+    if (!mounted) return;
+    setState(() {
+      _noResponder = false;
+      _emergencyId = null;
+      _createFailed = false;
+      _elapsedSeconds = 0;
+      _secondsLeft = _cancelWindowSeconds;
+    });
+    _startTimer();
+    _sendSOS();
   }
 
   /// 60-second ring shown before anything is sent.
@@ -971,9 +1150,11 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
     const ringSize = 200.0;
 
     return Semantics(
-      label: canCancel
-          ? '$_secondsLeft seconds left to cancel'
-          : 'Searching for responders',
+      label: _noResponder
+          ? 'Search ended, no responder available'
+          : canCancel
+              ? '$_secondsLeft seconds left to cancel'
+              : 'Searching for responders',
       excludeSemantics: true,
       child: SizedBox.square(
         dimension: ringSize,
@@ -983,12 +1164,14 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
             CircularProgressIndicator(
               value: canCancel
                   ? _secondsLeft / _cancelWindowSeconds
-                  : (_responderFound ? 1 : null),
+                  : (_responderFound || _noResponder ? 1 : null),
               strokeWidth: 8,
               backgroundColor: cs.surfaceContainerHighest,
               color: _responderFound
                   ? MfColors.tone(context, MfTone.success).solid
-                  : sos,
+                  : _noResponder
+                      ? MfColors.tone(context, MfTone.warning).solid
+                      : sos,
               strokeCap: StrokeCap.round,
             ),
             Padding(
@@ -1010,6 +1193,12 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                       Text('left to cancel',
                           style: text.labelLarge
                               ?.copyWith(color: cs.onSurfaceVariant)),
+                    ] else if (_noResponder) ...[
+                      Icon(Icons.search_off_rounded,
+                          size: 48,
+                          color: MfColors.tone(context, MfTone.warning).foreground),
+                      const SizedBox(height: MfSpace.xxs),
+                      Text('Search ended', style: text.titleMedium),
                     ] else if (_responderFound) ...[
                       Icon(Icons.check_rounded,
                           size: 56,

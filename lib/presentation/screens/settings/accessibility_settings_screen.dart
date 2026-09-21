@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/design_system/design_system.dart';
+import '../../../services/notification/push_core.dart';
 
 class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
   const AccessibilitySettingsScreen({super.key});
@@ -15,6 +16,50 @@ class AccessibilitySettingsScreen extends ConsumerStatefulWidget {
 
 class _AccessibilitySettingsScreenState
     extends ConsumerState<AccessibilitySettingsScreen> {
+  bool _savingHearingMode = false;
+
+  /// For a patient the text-only switch *is* deaf mode: it is stored on the
+  /// server as patientType, so responders, the dispatch summary and the
+  /// video-only call rule follow it. For other roles it stays a local display
+  /// preference.
+  Future<void> _setTextOnlyMode(bool enable, bool isPatient) async {
+    final notifier = ref.read(accessibilityProvider.notifier);
+
+    if (!isPatient) {
+      notifier.toggleTextOnlyMode();
+      return;
+    }
+    if (_savingHearingMode) return;
+
+    setState(() => _savingHearingMode = true);
+    notifier.toggleTextOnlyMode(); // optimistic — reverted if the call fails
+    try {
+      final saved = await ref
+          .read(apiClientProvider)
+          .updatePatientType(enable ? 'DEAF' : 'NORMAL');
+      await PushSessionStore.savePatientType(saved);
+      ref.invalidate(currentUserProvider);
+      if (!mounted) return;
+      showMfSnackBar(
+        context,
+        enable
+            ? 'Deaf mode on. Responders are told you cannot hear or speak, and calls become video only.'
+            : 'Deaf mode off. Voice calls are available again.',
+        tone: MfTone.success,
+      );
+    } catch (_) {
+      notifier.toggleTextOnlyMode(); // revert
+      if (!mounted) return;
+      showMfSnackBar(
+        context,
+        'Could not save your hearing mode. Check your connection and try again.',
+        tone: MfTone.danger,
+      );
+    } finally {
+      if (mounted) setState(() => _savingHearingMode = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(accessibilityProvider);
@@ -73,10 +118,13 @@ class _AccessibilitySettingsScreenState
                 ),
                 _SwitchRow(
                   icon: Icons.text_fields_rounded,
-                  title: 'Text-only mode',
-                  subtitle: 'Removes voice and mic elements and shows quick phrases in chat',
+                  title: isPatient ? 'Deaf mode (text only)' : 'Text-only mode',
+                  subtitle: isPatient
+                      ? 'Alerts become visual, calls become video only, and responders are told you cannot hear or speak'
+                      : 'Removes voice and mic elements and shows quick phrases in chat',
                   value: settings.textOnlyMode,
-                  onChanged: (_) => notifier.toggleTextOnlyMode(),
+                  busy: _savingHearingMode,
+                  onChanged: (value) => _setTextOnlyMode(value, isPatient),
                 ),
                 const Divider(height: 1, indent: MfSpace.md, endIndent: MfSpace.md),
                 _SwitchRow(
@@ -268,6 +316,7 @@ class _SwitchRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final bool value;
+  final bool busy;
   final ValueChanged<bool> onChanged;
 
   const _SwitchRow({
@@ -276,6 +325,7 @@ class _SwitchRow extends StatelessWidget {
     required this.subtitle,
     required this.value,
     required this.onChanged,
+    this.busy = false,
   });
 
   @override
@@ -287,9 +337,9 @@ class _SwitchRow extends StatelessWidget {
       label: title,
       hint: subtitle,
       excludeSemantics: true,
-      onTap: () => onChanged(!value),
+      onTap: busy ? null : () => onChanged(!value),
       child: InkWell(
-        onTap: () => onChanged(!value),
+        onTap: busy ? null : () => onChanged(!value),
         child: ConstrainedBox(
           constraints: const BoxConstraints(minHeight: 56),
           child: Padding(
@@ -309,7 +359,17 @@ class _SwitchRow extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: MfSpace.xs),
-                Switch(value: value, onChanged: onChanged),
+                if (busy)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: MfSpace.sm),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                else
+                  Switch(value: value, onChanged: onChanged),
               ],
             ),
           ),

@@ -886,6 +886,26 @@ class MediFindApiClient {
     }
   }
 
+  /// Switches the signed-in patient between 'NORMAL' and 'DEAF'.
+  /// Returns the value stored on the server.
+  Future<String> updatePatientType(String patientType) async {
+    try {
+      final response = await _dio.put(
+        'medical-profile/patient-type',
+        data: {'patientType': patientType},
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data['data'] as Map<String, dynamic>?;
+        return (data?['patientType'] as String?) ?? patientType;
+      }
+
+      throw NetworkException(message: 'Failed to update hearing mode');
+    } on DioException catch (e) {
+      throw _handleDioException(e);
+    }
+  }
+
   // USER ENDPOINTS
   Future<void> cancelResponderAssignment(String emergencyId) async {
     try {

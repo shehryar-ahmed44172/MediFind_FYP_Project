@@ -72,24 +72,24 @@ class PatientTypeInfoScreen extends ConsumerWidget {
             icon: Icons.info_outline_rounded,
             tone: MfTone.primary,
             title: 'Changing your mode',
-            message: 'Your mode is set during registration and can be updated in your medical profile. '
-                'Text-only mode in Accessibility settings hides voice controls at any time.',
+            message: 'Your mode is chosen during registration, and you can switch it any time with '
+                'the Deaf mode switch in Accessibility settings. Responders always see your current mode.',
           ),
           if (isPatient) ...[
             const SizedBox(height: MfSpace.md),
             MfListGroup(
               children: [
                 MfIconTile(
-                  icon: Icons.edit_note_rounded,
-                  label: 'Edit medical profile',
-                  subtitle: 'Update your hearing mode',
-                  onTap: () => context.push('/home/medical-profile/edit'),
-                ),
-                MfIconTile(
                   icon: Icons.settings_accessibility_rounded,
                   label: 'Accessibility settings',
-                  subtitle: 'Text-only mode, vibration, contrast and text size',
+                  subtitle: 'Switch Deaf mode, vibration, contrast and text size',
                   onTap: () => context.push('/accessibility-settings'),
+                ),
+                MfIconTile(
+                  icon: Icons.edit_note_rounded,
+                  label: 'Edit medical profile',
+                  subtitle: 'Blood group, allergies, medications and contacts',
+                  onTap: () => context.push('/home/medical-profile/edit'),
                 ),
               ],
             ),

@@ -135,7 +135,8 @@ class _PredefinedMessagesScreenState extends ConsumerState<PredefinedMessagesScr
         'medications':       current['medications']        ?? [],
         'emergencyContacts': current['emergencyContacts']  ?? [],
         'medicalHistory':    current['medicalHistory'],
-        'patientType':       current['patientType']        ?? 'DEAF',
+        // patientType is never sent here — it only changes through the
+        // deaf-mode switch in Accessibility settings.
         'predefinedMessages': messages,
       });
 

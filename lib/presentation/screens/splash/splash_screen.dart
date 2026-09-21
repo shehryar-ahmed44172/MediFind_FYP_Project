@@ -7,9 +7,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
 
 /// Continues the native Android splash without a jump: same white background
-/// and the same 288 dp mark in the exact centre of the screen, then the mark
-/// settles upward while the wordmark and tagline fade in. The session check
-/// runs at the same time, so the splash only stays as long as it has to.
+/// and the same mark in the exact centre of the screen. The mark then shrinks
+/// while the wordmark and tagline fade in below it — and because mark and text
+/// are one centred column, the group stays centred on the screen the whole
+/// time. The session check runs at the same time, so the splash only stays as
+/// long as it has to.
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
 
@@ -21,7 +23,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
   /// Size of the Android 12+ splash icon box; the native splash draws the mark at this size.
   static const double _nativeIconBox = 288;
   static const double _settledBox = 200;
-  static const double _rise = 64;
   static const Color _navy = Color(0xFF04364E);
   static const Color _teal = Color(0xFF2496A7);
 
@@ -105,7 +106,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
     final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 1.3);
 
     // Brand splash: always white with dark status bar icons, like the native splash
@@ -119,52 +119,57 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
           child: AnimatedBuilder(
             animation: _intro,
             builder: (context, _) {
-              // Mark: starts exactly where the native splash drew it, then shrinks and rises
+              // Mark: starts at the size the native splash drew it, then shrinks.
               final box = _nativeIconBox - (_nativeIconBox - _settledBox) * _settle.value;
-              final markTop = (size.height - box) / 2 - _rise * _settle.value;
-              // The mark image has ~23% empty margin at the bottom; the wordmark sits just under the rings
-              final settledMarkBottom = (size.height + _settledBox) / 2 - _rise - _settledBox * 0.2;
               return Stack(
                 children: [
-                  Positioned(
-                    left: (size.width - box) / 2,
-                    top: markTop,
-                    width: box,
-                    height: box,
-                    child: Semantics(
-                      label: 'MediFind',
-                      image: true,
-                      child: Image.asset('assets/logos/medifind_splash_mark.png', excludeFromSemantics: true),
-                    ),
-                  ),
-                  // Wordmark + tagline appear below the mark
-                  Positioned(
-                    left: 24,
-                    right: 24,
-                    top: settledMarkBottom,
-                    child: Opacity(
-                      opacity: _reveal.value,
-                      child: Transform.translate(
-                        offset: Offset(0, 12 * (1 - _reveal.value)),
-                        child: Column(
-                          children: [
-                            Text.rich(
-                              const TextSpan(children: [
-                                TextSpan(text: 'MEDI', style: TextStyle(color: _teal)),
-                                TextSpan(text: 'FIND', style: TextStyle(color: _navy)),
-                              ]),
-                              textScaler: TextScaler.linear(textScale),
-                              style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 2),
+                  // Mark + wordmark as ONE centred column, so the group never
+                  // drifts off centre while the text appears.
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: box,
+                            height: box,
+                            child: Semantics(
+                              label: 'MediFind',
+                              image: true,
+                              child: Image.asset('assets/logos/medifind_splash_mark.png', excludeFromSemantics: true),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'Emergency help, without hearing or speaking',
-                              textAlign: TextAlign.center,
-                              textScaler: TextScaler.linear(textScale),
-                              style: TextStyle(fontSize: 14, color: _navy.withValues(alpha: 0.65), fontWeight: FontWeight.w500),
+                          ),
+                          // Grows with the reveal so the column stays balanced
+                          ClipRect(
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              heightFactor: _reveal.value,
+                              child: Opacity(
+                                opacity: _reveal.value,
+                                child: Column(
+                                  children: [
+                                    Text.rich(
+                                      const TextSpan(children: [
+                                        TextSpan(text: 'MEDI', style: TextStyle(color: _teal)),
+                                        TextSpan(text: 'FIND', style: TextStyle(color: _navy)),
+                                      ]),
+                                      textScaler: TextScaler.linear(textScale),
+                                      style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, letterSpacing: 2),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      'Emergency help, without hearing or speaking',
+                                      textAlign: TextAlign.center,
+                                      textScaler: TextScaler.linear(textScale),
+                                      style: TextStyle(fontSize: 14, color: _navy.withValues(alpha: 0.65), fontWeight: FontWeight.w500),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),

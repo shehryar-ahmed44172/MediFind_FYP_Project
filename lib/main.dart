@@ -23,6 +23,7 @@ import 'services/socket/socket_service.dart';
 import 'core/utils/responsive.dart';
 import 'presentation/widgets/connectivity_overlay.dart';
 import 'presentation/widgets/emergency/deaf_visual_alert_layer.dart';
+import 'presentation/screens/guide/guide_gate.dart';
 import 'core/utils/app_messenger.dart';
 // Added for AppRouter.navigatorKey
 
@@ -182,7 +183,11 @@ class _MediFindAppState extends ConsumerState<MediFindApp> with WidgetsBindingOb
                   // Non-blocking offline banner + global deaf visual alerts (rendered
                   // above the navigator so they show on full-screen emergency routes).
                   return ConnectivityOverlay(
-                    child: DeafVisualAlertLayer(child: child ?? const SizedBox.shrink()),
+                    child: DeafVisualAlertLayer(
+                      // Opens the welcome tour once per account, from the home
+                      // screen only, so it never covers an emergency.
+                      child: GuideGate(child: child ?? const SizedBox.shrink()),
+                    ),
                   );
                 }),
               ),

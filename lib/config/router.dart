@@ -55,6 +55,8 @@ import '../presentation/screens/auth/pending_approval_screen.dart';
 import '../presentation/screens/auth/reset_password_otp_screen.dart';
 import '../presentation/screens/auth/reset_new_password_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
+import '../presentation/screens/guide/app_guide_screen.dart';
+import '../presentation/screens/guide/guide_walkthrough_screen.dart';
 import '../presentation/widgets/design_system/design_system.dart';
 
 // AppRouter class manages all the navigation paths within the app
@@ -490,6 +492,18 @@ class AppRouter {
         name: 'accessibility-settings',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const AccessibilitySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/guide',
+        name: 'guide',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const AppGuideScreen(),
+      ),
+      GoRoute(
+        path: '/welcome-guide',
+        name: 'welcome-guide',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const GuideWalkthroughScreen(),
       ),
       GoRoute(
         path: '/emergency/:emergencyId/tracking',

@@ -31,6 +31,21 @@ class _AccessibilitySettingsScreenState
     }
     if (_savingHearingMode) return;
 
+    // Switching mode changes what responders are told, so it is never a
+    // one-tap change for a patient.
+    final confirmed = await showMfConfirmDialog(
+      context,
+      title: enable ? 'Turn Deaf mode on?' : 'Turn Deaf mode off?',
+      message: enable
+          ? 'Responders will be told that you cannot hear or speak. Alerts become '
+              'visual and vibrating, and calls with you become video only.'
+          : 'Responders will treat you as a hearing patient again. Alerts use sound '
+              'and voice calls become possible.',
+      confirmLabel: enable ? 'Turn on' : 'Turn off',
+      icon: enable ? Icons.hearing_disabled_rounded : Icons.hearing_rounded,
+    );
+    if (!confirmed || !mounted) return;
+
     setState(() => _savingHearingMode = true);
     notifier.toggleTextOnlyMode(); // optimistic — reverted if the call fails
     try {

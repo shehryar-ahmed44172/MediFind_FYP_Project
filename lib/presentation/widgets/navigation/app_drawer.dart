@@ -71,6 +71,7 @@ class AppDrawer extends ConsumerWidget {
   }
 
   static const _common = [
+    _DrawerItem(Icons.help_outline_rounded, 'How MediFind works', '/guide'),
     _DrawerItem(Icons.settings_accessibility_rounded, 'Accessibility', '/accessibility-settings'),
     _DrawerItem(Icons.workspace_premium_outlined, 'Subscription plans', '/subscription-plans'),
     _DrawerItem(Icons.settings_outlined, 'Settings', '/settings'),

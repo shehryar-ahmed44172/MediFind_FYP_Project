@@ -39,6 +39,10 @@ mixin _$User {
   bool get isEmailVerified => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
+
+  /// How many patients have actually rated this responder. 0 means the
+  /// rating is only the 5.0 default, so screens show "New" instead.
+  int? get totalRatings => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
   bool get voiceAlertGenerated => throw _privateConstructorUsedError;
   String? get additionalInfo => throw _privateConstructorUsedError;
@@ -77,6 +81,7 @@ abstract class $UserCopyWith<$Res> {
       bool isEmailVerified,
       String? verificationStatus,
       double? rating,
+      int? totalRatings,
       int? totalResponsesHandled,
       bool voiceAlertGenerated,
       String? additionalInfo,
@@ -118,6 +123,7 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
     Object? isEmailVerified = null,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
+    Object? totalRatings = freezed,
     Object? totalResponsesHandled = freezed,
     Object? voiceAlertGenerated = null,
     Object? additionalInfo = freezed,
@@ -191,6 +197,10 @@ class _$UserCopyWithImpl<$Res, $Val extends User>
           ? _value.rating
           : rating // ignore: cast_nullable_to_non_nullable
               as double?,
+      totalRatings: freezed == totalRatings
+          ? _value.totalRatings
+          : totalRatings // ignore: cast_nullable_to_non_nullable
+              as int?,
       totalResponsesHandled: freezed == totalResponsesHandled
           ? _value.totalResponsesHandled
           : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
@@ -262,6 +272,7 @@ abstract class _$$UserImplCopyWith<$Res> implements $UserCopyWith<$Res> {
       bool isEmailVerified,
       String? verificationStatus,
       double? rating,
+      int? totalRatings,
       int? totalResponsesHandled,
       bool voiceAlertGenerated,
       String? additionalInfo,
@@ -300,6 +311,7 @@ class __$$UserImplCopyWithImpl<$Res>
     Object? isEmailVerified = null,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
+    Object? totalRatings = freezed,
     Object? totalResponsesHandled = freezed,
     Object? voiceAlertGenerated = null,
     Object? additionalInfo = freezed,
@@ -373,6 +385,10 @@ class __$$UserImplCopyWithImpl<$Res>
           ? _value.rating
           : rating // ignore: cast_nullable_to_non_nullable
               as double?,
+      totalRatings: freezed == totalRatings
+          ? _value.totalRatings
+          : totalRatings // ignore: cast_nullable_to_non_nullable
+              as int?,
       totalResponsesHandled: freezed == totalResponsesHandled
           ? _value.totalResponsesHandled
           : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
@@ -440,6 +456,7 @@ class _$UserImpl implements _User {
       this.isEmailVerified = false,
       this.verificationStatus,
       this.rating,
+      this.totalRatings,
       this.totalResponsesHandled,
       this.voiceAlertGenerated = false,
       this.additionalInfo,
@@ -491,6 +508,11 @@ class _$UserImpl implements _User {
   final String? verificationStatus;
   @override
   final double? rating;
+
+  /// How many patients have actually rated this responder. 0 means the
+  /// rating is only the 5.0 default, so screens show "New" instead.
+  @override
+  final int? totalRatings;
   @override
   final int? totalResponsesHandled;
   @override
@@ -520,7 +542,7 @@ class _$UserImpl implements _User {
 
   @override
   String toString() {
-    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, subscriptionPlan: $subscriptionPlan, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
+    return 'User(id: $id, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalRatings: $totalRatings, totalResponsesHandled: $totalResponsesHandled, voiceAlertGenerated: $voiceAlertGenerated, additionalInfo: $additionalInfo, completedAt: $completedAt, priority: $priority, expiresAt: $expiresAt, profileImageUrl: $profileImageUrl, subscriptionPlan: $subscriptionPlan, isActive: $isActive, createdAt: $createdAt, updatedAt: $updatedAt)';
   }
 
   @override
@@ -553,6 +575,8 @@ class _$UserImpl implements _User {
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
+            (identical(other.totalRatings, totalRatings) ||
+                other.totalRatings == totalRatings) &&
             (identical(other.totalResponsesHandled, totalResponsesHandled) ||
                 other.totalResponsesHandled == totalResponsesHandled) &&
             (identical(other.voiceAlertGenerated, voiceAlertGenerated) ||
@@ -596,6 +620,7 @@ class _$UserImpl implements _User {
         isEmailVerified,
         verificationStatus,
         rating,
+        totalRatings,
         totalResponsesHandled,
         voiceAlertGenerated,
         additionalInfo,
@@ -640,6 +665,7 @@ abstract class _User implements User {
       final bool isEmailVerified,
       final String? verificationStatus,
       final double? rating,
+      final int? totalRatings,
       final int? totalResponsesHandled,
       final bool voiceAlertGenerated,
       final String? additionalInfo,
@@ -684,6 +710,11 @@ abstract class _User implements User {
   String? get verificationStatus;
   @override
   double? get rating;
+  @override
+
+  /// How many patients have actually rated this responder. 0 means the
+  /// rating is only the 5.0 default, so screens show "New" instead.
+  int? get totalRatings;
   @override
   int? get totalResponsesHandled;
   @override
@@ -733,6 +764,7 @@ mixin _$UserProfile {
   bool? get isEmailVerified => throw _privateConstructorUsedError;
   String? get verificationStatus => throw _privateConstructorUsedError;
   double? get rating => throw _privateConstructorUsedError;
+  int? get totalRatings => throw _privateConstructorUsedError;
   int? get totalResponsesHandled => throw _privateConstructorUsedError;
   String? get profileImageUrl => throw _privateConstructorUsedError;
   String? get bio => throw _privateConstructorUsedError;
@@ -773,6 +805,7 @@ abstract class $UserProfileCopyWith<$Res> {
       bool? isEmailVerified,
       String? verificationStatus,
       double? rating,
+      int? totalRatings,
       int? totalResponsesHandled,
       String? profileImageUrl,
       String? bio,
@@ -814,6 +847,7 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
     Object? isEmailVerified = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
+    Object? totalRatings = freezed,
     Object? totalResponsesHandled = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
@@ -887,6 +921,10 @@ class _$UserProfileCopyWithImpl<$Res, $Val extends UserProfile>
           ? _value.rating
           : rating // ignore: cast_nullable_to_non_nullable
               as double?,
+      totalRatings: freezed == totalRatings
+          ? _value.totalRatings
+          : totalRatings // ignore: cast_nullable_to_non_nullable
+              as int?,
       totalResponsesHandled: freezed == totalResponsesHandled
           ? _value.totalResponsesHandled
           : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
@@ -959,6 +997,7 @@ abstract class _$$UserProfileImplCopyWith<$Res>
       bool? isEmailVerified,
       String? verificationStatus,
       double? rating,
+      int? totalRatings,
       int? totalResponsesHandled,
       String? profileImageUrl,
       String? bio,
@@ -998,6 +1037,7 @@ class __$$UserProfileImplCopyWithImpl<$Res>
     Object? isEmailVerified = freezed,
     Object? verificationStatus = freezed,
     Object? rating = freezed,
+    Object? totalRatings = freezed,
     Object? totalResponsesHandled = freezed,
     Object? profileImageUrl = freezed,
     Object? bio = freezed,
@@ -1071,6 +1111,10 @@ class __$$UserProfileImplCopyWithImpl<$Res>
           ? _value.rating
           : rating // ignore: cast_nullable_to_non_nullable
               as double?,
+      totalRatings: freezed == totalRatings
+          ? _value.totalRatings
+          : totalRatings // ignore: cast_nullable_to_non_nullable
+              as int?,
       totalResponsesHandled: freezed == totalResponsesHandled
           ? _value.totalResponsesHandled
           : totalResponsesHandled // ignore: cast_nullable_to_non_nullable
@@ -1138,6 +1182,7 @@ class _$UserProfileImpl implements _UserProfile {
       this.isEmailVerified,
       this.verificationStatus,
       this.rating,
+      this.totalRatings,
       this.totalResponsesHandled,
       this.profileImageUrl,
       this.bio,
@@ -1184,6 +1229,8 @@ class _$UserProfileImpl implements _UserProfile {
   @override
   final double? rating;
   @override
+  final int? totalRatings;
+  @override
   final int? totalResponsesHandled;
   @override
   final String? profileImageUrl;
@@ -1208,7 +1255,7 @@ class _$UserProfileImpl implements _UserProfile {
 
   @override
   String toString() {
-    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, subscriptionPlan: $subscriptionPlan, isActive: $isActive, lastUpdated: $lastUpdated)';
+    return 'UserProfile(userId: $userId, fullName: $fullName, email: $email, phoneNumber: $phoneNumber, role: $role, patientType: $patientType, organization: $organization, licenseNumber: $licenseNumber, responderType: $responderType, vehicleType: $vehicleType, cnic: $cnic, dateOfBirth: $dateOfBirth, isEmailVerified: $isEmailVerified, verificationStatus: $verificationStatus, rating: $rating, totalRatings: $totalRatings, totalResponsesHandled: $totalResponsesHandled, profileImageUrl: $profileImageUrl, bio: $bio, address: $address, city: $city, state: $state, country: $country, zipCode: $zipCode, subscriptionPlan: $subscriptionPlan, isActive: $isActive, lastUpdated: $lastUpdated)';
   }
 
   @override
@@ -1241,6 +1288,8 @@ class _$UserProfileImpl implements _UserProfile {
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rating, rating) || other.rating == rating) &&
+            (identical(other.totalRatings, totalRatings) ||
+                other.totalRatings == totalRatings) &&
             (identical(other.totalResponsesHandled, totalResponsesHandled) ||
                 other.totalResponsesHandled == totalResponsesHandled) &&
             (identical(other.profileImageUrl, profileImageUrl) ||
@@ -1278,6 +1327,7 @@ class _$UserProfileImpl implements _UserProfile {
         isEmailVerified,
         verificationStatus,
         rating,
+        totalRatings,
         totalResponsesHandled,
         profileImageUrl,
         bio,
@@ -1322,6 +1372,7 @@ abstract class _UserProfile implements UserProfile {
       final bool? isEmailVerified,
       final String? verificationStatus,
       final double? rating,
+      final int? totalRatings,
       final int? totalResponsesHandled,
       final String? profileImageUrl,
       final String? bio,
@@ -1367,6 +1418,8 @@ abstract class _UserProfile implements UserProfile {
   String? get verificationStatus;
   @override
   double? get rating;
+  @override
+  int? get totalRatings;
   @override
   int? get totalResponsesHandled;
   @override

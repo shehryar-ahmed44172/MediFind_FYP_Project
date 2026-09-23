@@ -24,6 +24,7 @@ import '../../widgets/map/tracking_camera.dart';
 import '../../widgets/map/route_line.dart';
 import '../../widgets/map/map_loading_cover.dart';
 import '../../../core/utils/emergency_status.dart';
+import '../../widgets/responder/responder_rating.dart';
 
 class EmergencyTrackingScreen extends ConsumerStatefulWidget {
   final String emergencyId;
@@ -43,6 +44,8 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   String? _responderPhone;
   String? _responderProfileImage;
   double?  _responderRating;
+  /// 0 = nobody has rated this responder yet, so the card says "New".
+  int?     _responderTotalRatings;
   String? _responderType;
   String? _motorbikeNumber;
   String? _vehicleType;
@@ -186,6 +189,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         if (profile.phoneNumber.isNotEmpty) _responderPhone ??= profile.phoneNumber;
         _responderProfileImage ??= profile.profileImageUrl;
         _responderRating ??= profile.rating;
+        _responderTotalRatings ??= profile.totalRatings;
         _responderType ??= profile.responderType;
         _vehicleType ??= profile.vehicleType;
         _organization ??= profile.organization;
@@ -287,6 +291,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           _responderPhone = null;
           _responderProfileImage = null;
           _responderRating = null;
+          _responderTotalRatings = null;
           _responderLat = null;
           _responderLong = null;
           _eta = 'Waiting for responder';
@@ -322,6 +327,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
         if (data['responderPhone']        != null) _responderPhone        = data['responderPhone'].toString();
         if (data['responderProfileImage'] != null) _responderProfileImage = data['responderProfileImage'].toString();
         if (data['responderRating']       != null) _responderRating       = double.tryParse(data['responderRating'].toString());
+        if (data['responderTotalRatings'] != null) _responderTotalRatings = int.tryParse(data['responderTotalRatings'].toString());
         if (data['responderType']         != null) _responderType         = data['responderType'].toString();
         if (data['motorbikeNumber']       != null) _motorbikeNumber       = data['motorbikeNumber'].toString();
         if (data['vehicleType']           != null) _vehicleType           = data['vehicleType'].toString();
@@ -494,6 +500,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
           _eta              = '4 min';
           _responderName    = 'Ali Hassan';
           _responderRating  = 4.8;
+          _responderTotalRatings = 37; // simulation only
           _responderType    = 'PARAMEDIC';
           _vehicleType      = 'MOTORBIKE_AMBULANCE';
           _motorbikeNumber  = 'LHR-2847';
@@ -969,17 +976,10 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
                                   style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                 ),
                               if (_responderRating != null)
-                                Semantics(
-                                  label: 'Rating ${_responderRating!.toStringAsFixed(1)} out of 5',
-                                  excludeSemantics: true,
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(Icons.star_rounded, size: 16, color: MfColors.warning(context)),
-                                      const SizedBox(width: 2),
-                                      Text(_responderRating!.toStringAsFixed(1), style: text.labelLarge),
-                                    ],
-                                  ),
+                                ResponderRatingChip(
+                                  rating: _responderRating,
+                                  totalRatings: _responderTotalRatings,
+                                  style: text.labelLarge,
                                 ),
                             ],
                           ),

@@ -122,6 +122,7 @@ class AuthRepositoryImpl implements AuthRepository {
       isEmailVerified: profile.isEmailVerified ?? false,
       verificationStatus: profile.verificationStatus,
       rating: profile.rating,
+      totalRatings: profile.totalRatings,
       totalResponsesHandled: profile.totalResponsesHandled,
       profileImageUrl: profile.profileImageUrl,
       subscriptionPlan: profile.subscriptionPlan ?? 'FREE',

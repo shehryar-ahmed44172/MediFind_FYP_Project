@@ -13,6 +13,7 @@ import '../../widgets/design_system/design_system.dart';
 import 'widgets/responder_widgets.dart';
 import 'dart:async';
 import '../../../services/location/responder_location_tracker.dart';
+import '../../widgets/responder/responder_rating.dart';
 
 
 class ResponderHomeScreen extends ConsumerStatefulWidget {
@@ -291,19 +292,23 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
       error: (_, __) => const SizedBox.shrink(),
       data: (user) {
         final rating = (user?.rating as double?) ?? 5.0;
+        final ratings = (user?.totalRatings as int?) ?? 0;
         final total = (user?.totalResponsesHandled as int?) ?? 0;
         final verified = user?.verificationStatus == 'VERIFIED';
         return MfCard(
           onTap: () => _showPerformanceSheet(context),
-          semanticLabel: 'My rating ${rating.toStringAsFixed(1)} out of 5, $total responses. Open details.',
+          semanticLabel:
+              'My rating ${ResponderRating.description(rating, ratings)}, $total responses. Open details.',
           padding: const EdgeInsets.all(MfSpace.sm),
           child: Row(
             children: [
               Expanded(
                 child: _InlineStat(
-                  icon: Icons.star_rounded,
-                  tone: MfTone.warning,
-                  value: rating.toStringAsFixed(1),
+                  icon: ResponderRating.hasRatings(ratings)
+                      ? Icons.star_rounded
+                      : Icons.fiber_new_rounded,
+                  tone: ResponderRating.hasRatings(ratings) ? MfTone.warning : MfTone.neutral,
+                  value: ResponderRating.label(rating, ratings),
                   label: 'Rating',
                 ),
               ),
@@ -351,9 +356,11 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
             );
           }
 
-          final user   = userAsync.valueOrNull;
-          final rating = user?.rating ?? 5.0;
-          final total  = user?.totalResponsesHandled ?? 0;
+          final user    = userAsync.valueOrNull;
+          final rating  = user?.rating ?? 5.0;
+          final ratings = user?.totalRatings ?? 0;
+          final rated   = ResponderRating.hasRatings(ratings);
+          final total   = user?.totalResponsesHandled ?? 0;
           final type   = user?.responderType ?? 'Responder';
           final org    = user?.organization;
 
@@ -362,7 +369,10 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
           String performanceLabel;
           MfTone performanceTone;
-          if (rating >= 4.5) {
+          if (!rated) {
+            performanceLabel = 'Not rated yet';
+            performanceTone = MfTone.neutral;
+          } else if (rating >= 4.5) {
             performanceLabel = 'Excellent';
             performanceTone = MfTone.success;
           } else if (rating >= 4.0) {
@@ -393,14 +403,25 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
 
               // Star row
               Semantics(
-                label: 'Rating ${rating.toStringAsFixed(1)} out of 5',
+                label: ResponderRating.description(rating, ratings),
                 excludeSemantics: true,
                 child: Column(
                   children: [
+                    if (!rated)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: MfSpace.xs),
+                        child: Text(
+                          'Patients rate you after each emergency. Your first rating will show here.',
+                          textAlign: TextAlign.center,
+                          style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                        ),
+                      ),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(5, (i) {
-                        if (i < fullStars) {
+                        if (!rated) {
+                          return Icon(Icons.star_outline_rounded, color: cs.outline, size: 32);
+                        } else if (i < fullStars) {
                           return Icon(Icons.star_rounded, color: starColor, size: 32);
                         } else if (i == fullStars && halfStar) {
                           return Icon(Icons.star_half_rounded, color: starColor, size: 32);
@@ -415,8 +436,10 @@ class _ResponderHomeScreenState extends ConsumerState<ResponderHomeScreen> {
                       crossAxisAlignment: CrossAxisAlignment.baseline,
                       textBaseline: TextBaseline.alphabetic,
                       children: [
-                        Text(rating.toStringAsFixed(1), style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
-                        Text(' / 5.0', style: text.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
+                        Text(ResponderRating.label(rating, ratings),
+                            style: text.headlineMedium?.copyWith(fontWeight: FontWeight.w600)),
+                        Text(rated ? ' / 5.0' : '',
+                            style: text.bodyLarge?.copyWith(color: cs.onSurfaceVariant)),
                       ],
                     ),
                   ],

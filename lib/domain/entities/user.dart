@@ -22,6 +22,9 @@ class User with _$User {
     @Default(false) bool isEmailVerified,
     String? verificationStatus,
     double? rating,
+    /// How many patients have actually rated this responder. 0 means the
+    /// rating is only the 5.0 default, so screens show "New" instead.
+    int? totalRatings,
     int? totalResponsesHandled,
     @Default(false) bool voiceAlertGenerated,
     String? additionalInfo,
@@ -56,6 +59,7 @@ class UserProfile with _$UserProfile {
     bool? isEmailVerified,
     String? verificationStatus,
     double? rating,
+    int? totalRatings,
     int? totalResponsesHandled,
     String? profileImageUrl,
     String? bio,

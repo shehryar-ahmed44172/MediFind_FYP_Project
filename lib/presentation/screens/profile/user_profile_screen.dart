@@ -9,6 +9,7 @@ import '../../widgets/design_system/design_system.dart';
 import '../../../domain/entities/user.dart';
 import '../../../services/location/responder_location_tracker.dart';
 import '../../../config/router.dart';
+import '../../widgets/responder/responder_rating.dart';
 
 const _kResponderTypeLabels = {
   'PARAMEDIC': 'Paramedic',
@@ -823,10 +824,15 @@ class _ResponderStatsRow extends StatelessWidget {
         children: [
           Expanded(
             child: MfStatTile(
-              icon: Icons.star_outline_rounded,
+              icon: ResponderRating.hasRatings(user.totalRatings)
+                  ? Icons.star_outline_rounded
+                  : Icons.fiber_new_rounded,
               label: 'Rating',
-              value: (user.rating ?? 5.0).toStringAsFixed(1),
-              tone: MfTone.warning,
+              // A responder nobody has rated shows "New", not the 5.0 default.
+              value: ResponderRating.label(user.rating, user.totalRatings),
+              tone: ResponderRating.hasRatings(user.totalRatings)
+                  ? MfTone.warning
+                  : MfTone.neutral,
             ),
           ),
           const SizedBox(width: MfSpace.xs),

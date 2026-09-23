@@ -17,6 +17,7 @@ import 'services/notification/medifind_push_service.dart';
 import 'core/dev/demo_session_loader.dart';
 import 'services/notification/battery_optimization_prompt.dart';
 import 'services/payments/stripe_init.dart';
+import 'services/config/server_config.dart';
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/emergency_provider.dart';
 import 'services/socket/socket_service.dart';
@@ -39,6 +40,10 @@ void main() async {
 
   // Initialize Hive for local storage (Database setup)
   await Hive.initFlutter();
+
+  // A server address typed in the app wins over the build-time one, so a test
+  // build can be pointed at a new laptop or tunnel without a new APK.
+  await ServerConfig.load();
 
   // Debug/profile builds only: optional pre-seeded session for emulator walkthroughs
   await DemoSessionLoader.loadIfPresent();

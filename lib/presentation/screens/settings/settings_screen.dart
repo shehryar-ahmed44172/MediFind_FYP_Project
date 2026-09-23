@@ -6,6 +6,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/accessibility_provider.dart';
 import '../../widgets/design_system/design_system.dart';
 import '../../../services/location/location_service.dart';
+import '../../../core/constants/app_constants.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   final bool showHeader;
@@ -173,6 +174,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             subtitle: LocationService.debugLatOffset == 0 ? 'Disabled' : 'Active (500 m offset)',
             tone: MfTone.neutral,
             onTap: _toggleSimulatedDistance,
+          ),
+        ]),
+
+      // Test builds only: the address this APK talks to can be changed here.
+      if (AppConstants.isDevelopment)
+        _section('Connection', [
+          MfIconTile(
+            icon: Icons.dns_outlined,
+            label: 'Server address',
+            subtitle: AppConstants.activeHost,
+            tone: MfTone.neutral,
+            onTap: () => context.push('/server-address'),
           ),
         ]),
 

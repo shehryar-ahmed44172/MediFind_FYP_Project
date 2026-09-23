@@ -5,6 +5,7 @@ import '../../../core/extensions/extensions.dart';
 import '../../../core/utils/utils.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/design_system/design_system.dart';
+import '../../../core/constants/app_constants.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -303,6 +304,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           ),
                         ],
                       ),
+                      // Test builds move between a laptop and a tunnel: a
+                      // tester who cannot reach the server fixes it here.
+                      if (AppConstants.isDevelopment) ...[
+                        const SizedBox(height: MfSpace.xs),
+                        Center(
+                          child: MfTextButton(
+                            label: 'Cannot connect? Server address',
+                            icon: Icons.dns_outlined,
+                            onPressed: () => context.push('/server-address'),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),

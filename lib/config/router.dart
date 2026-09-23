@@ -56,6 +56,7 @@ import '../presentation/screens/auth/reset_password_otp_screen.dart';
 import '../presentation/screens/auth/reset_new_password_screen.dart';
 import '../presentation/screens/settings/accessibility_settings_screen.dart';
 import '../presentation/screens/guide/app_guide_screen.dart';
+import '../presentation/screens/settings/server_address_screen.dart';
 import '../presentation/screens/guide/guide_walkthrough_screen.dart';
 import '../presentation/widgets/design_system/design_system.dart';
 
@@ -141,7 +142,10 @@ class AppRouter {
                              state.uri.path == '/reset-password-otp' ||
                              state.uri.path == '/reset-new-password' ||
                              state.uri.path == '/verify-email' ||
-                             state.uri.path == '/pending-approval';
+                             state.uri.path == '/pending-approval' ||
+                             // A tester whose server address is wrong cannot
+                             // log in, so this screen must open without auth.
+                             state.uri.path == '/server-address';
       final isGoingToSplash = state.uri.path == '/splash';
 
       if (isGoingToSplash) return null;
@@ -492,6 +496,12 @@ class AppRouter {
         name: 'accessibility-settings',
         parentNavigatorKey: _navigatorKey,
         builder: (context, state) => const AccessibilitySettingsScreen(),
+      ),
+      GoRoute(
+        path: '/server-address',
+        name: 'server-address',
+        parentNavigatorKey: _navigatorKey,
+        builder: (context, state) => const ServerAddressScreen(),
       ),
       GoRoute(
         path: '/guide',

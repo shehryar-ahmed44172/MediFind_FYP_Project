@@ -41,21 +41,52 @@ class AppConstants {
   // (Android emulator → backend on this PC). Empty = use the settings above.
   static const String _apiHostOverride = String.fromEnvironment('MEDIFIND_API_HOST');
 
-  static String get baseUrl   => _apiHostOverride.isNotEmpty
-      ? '$_apiHostOverride/api/'
+  // ── Server address set inside the app ─────────────────────────────────────
+  // Testing builds move between a laptop on Wi-Fi and a tunnel whose address
+  // changes; a tester can type the new address in Settings instead of waiting
+  // for a new APK. Loaded once at start-up by ServerConfig and kept here so
+  // every URL below follows it. Empty = use the build-time settings.
+  static String _runtimeApiHost = '';
+
+  /// The address typed in the app, or empty when the build default is used.
+  static String get runtimeApiHost => _runtimeApiHost;
+
+  /// [host] is an origin like `https://example.com` or `http://192.168.1.5:3000`.
+  /// Pass null or empty to go back to the build default.
+  static void setRuntimeApiHost(String? host) {
+    final trimmed = (host ?? '').trim();
+    _runtimeApiHost = trimmed.endsWith('/')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+  }
+
+  /// The address every URL below is built from.
+  static String get _host => _runtimeApiHost.isNotEmpty
+      ? _runtimeApiHost
+      : _apiHostOverride;
+
+  static String get baseUrl   => _host.isNotEmpty
+      ? '$_host/api/'
       : isDevelopment
           ? (_useNgrok ? _ngrokBaseUrl   : _lanBaseUrl)
           : _prodBaseUrl;
-  static String get wsUrl     => _apiHostOverride.isNotEmpty
-      ? _apiHostOverride.replaceFirst('http', 'ws')
+  static String get wsUrl     => _host.isNotEmpty
+      ? _host.replaceFirst('http', 'ws')
       : isDevelopment
           ? (_useNgrok ? _ngrokWsUrl     : _lanWsUrl)
           : _prodWsUrl;
-  static String get socketUrl => _apiHostOverride.isNotEmpty
-      ? _apiHostOverride
+  static String get socketUrl => _host.isNotEmpty
+      ? _host
       : isDevelopment
           ? (_useNgrok ? _ngrokSocketUrl : _lanSocketUrl)
           : _prodSocketUrl;
+
+  /// The address currently in use, without the /api/ suffix — for the
+  /// Server address screen and for support questions.
+  static String get activeHost {
+    final base = baseUrl;
+    return base.endsWith('/api/') ? base.substring(0, base.length - 5) : base;
+  }
 
   static const String apiVersion = 'v1';
   static const int apiTimeout = 60000; // Increased to 60 seconds for local dev

@@ -46,6 +46,11 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
   /// Stripe's sheet in MediFind colours. On Android the sheet ignores `style`
   /// and follows the phone's dark mode, so the colours are set explicitly to
   /// match the app's current theme.
+  /// FlowController (customFlow) opens Stripe's PaymentOptionsActivity; the
+  /// standard sheet opens PaymentSheetActivity. Kept as a switch while we work
+  /// out which one behaves on the devices we test with.
+  static const bool _useFlowController = false;
+
   PaymentSheetAppearance _sheetAppearance() {
     final cs = Theme.of(context).colorScheme;
     return PaymentSheetAppearance(
@@ -90,7 +95,7 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
         primaryButtonLabel: 'Pay $priceLabel',
         // FlowController mode: Stripe loads the sheet's data here, while the user is
         // still reading the checkout screen, instead of after Pay is tapped.
-        customFlow: true,
+        customFlow: _useFlowController,
       ),
     );
     return intent;
@@ -296,12 +301,17 @@ class _CheckoutScreenState extends ConsumerState<CheckoutScreen> {
 
     // 3. Present the (already loaded) sheet for card entry — throws StripeException
     //    if the user cancels — then confirm the payment with Stripe.
-    final option = await Stripe.instance.presentPaymentSheet();
-    if (option == null) {
-      throw const StripeException(error: LocalizedErrorMessage(code: FailureCode.Canceled));
+    if (_useFlowController) {
+      final option = await Stripe.instance.presentPaymentSheet();
+      if (option == null) {
+        throw const StripeException(error: LocalizedErrorMessage(code: FailureCode.Canceled));
+      }
+      if (mounted) setState(() => _busyLabel = 'Confirming payment…');
+      await Stripe.instance.confirmPaymentSheetPayment();
+    } else {
+      // The standard sheet collects the card and confirms in one step.
+      await Stripe.instance.presentPaymentSheet();
     }
-    if (mounted) setState(() => _busyLabel = 'Confirming payment…');
-    await Stripe.instance.confirmPaymentSheetPayment();
 
     // 4. Payment confirmed by Stripe — ask the server to apply the upgrade.
     //    The server verifies the PaymentIntent succeeded for this user + plan.

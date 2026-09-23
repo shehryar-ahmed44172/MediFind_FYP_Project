@@ -52,4 +52,13 @@ dependencies {
 
     // Required by flutter_stripe for Theme.MaterialComponents
     implementation("com.google.android.material:material:1.12.0")
+
+    // Keep the whole Compose stack on one version. Transitive dependencies
+    // pulled compose-ui/runtime up to 1.9.x while foundation and animation
+    // stayed on 1.7.0, and a split stack breaks pointer input: Stripe's
+    // payment sheet rendered correctly but ignored every tap.
+    implementation("androidx.compose.foundation:foundation:1.9.2")
+    implementation("androidx.compose.animation:animation:1.9.2")
+    implementation("androidx.compose.ui:ui:1.9.2")
+    implementation("androidx.compose.runtime:runtime:1.9.2")
 }

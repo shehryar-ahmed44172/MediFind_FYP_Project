@@ -111,6 +111,15 @@ class MediFindApiClient {
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
+          // The server address can change while the app is running (a tester
+          // pastes a new one in Settings), so every request re-reads it
+          // instead of using the address captured when Dio was created.
+          final current = AppConstants.baseUrl;
+          if (options.baseUrl != current) {
+            options.baseUrl = current;
+            _dio.options.baseUrl = current;
+            _refreshDio.options.baseUrl = current;
+          }
           if (_authToken != null) {
             options.headers['Authorization'] = 'Bearer $_authToken';
           }

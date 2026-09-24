@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/constants/app_constants.dart';
 import '../../../services/config/server_config.dart';
 import '../../widgets/design_system/design_system.dart';
+import '../../../services/socket/socket_service.dart';
 
 /// Lets a tester point the app at a different MediFind server.
 ///
@@ -76,6 +77,9 @@ class _ServerAddressScreenState extends ConsumerState<ServerAddressScreen> {
 
     setState(() => _saving = true);
     await ServerConfig.save(typed);
+    // API calls pick the new address up on the next request; the socket has to
+    // be dropped so it reconnects to the new server instead of the old one.
+    SocketService.instance.disconnect();
     if (!mounted) return;
     setState(() {
       _saving = false;
@@ -84,13 +88,14 @@ class _ServerAddressScreenState extends ConsumerState<ServerAddressScreen> {
 
     await showMfConfirmDialog(
       context,
-      title: 'Restart the app',
+      title: 'Address saved',
       message: reset
-          ? 'The app is back to its built-in server address. Close MediFind completely and open it again for the change to take effect.'
-          : 'The app will use $typed. Close MediFind completely and open it again for the change to take effect.',
+          ? 'The app is back to its built-in server address. Sign in again if you were signed in.'
+          : 'The app now talks to $typed. Sign in again if you were signed in — and if anything still '
+              'fails, close MediFind completely and open it again.',
       confirmLabel: 'Got it',
       cancelLabel: 'Close',
-      icon: Icons.restart_alt_rounded,
+      icon: Icons.check_circle_outline_rounded,
     );
   }
 

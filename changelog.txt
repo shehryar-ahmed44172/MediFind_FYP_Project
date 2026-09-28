@@ -33,3 +33,4 @@ Add caregiver registration and authentication
 Add unit tests for application services
 Implement password reset functionality
 Implement emergency request rejection
+Refactor repository implementation

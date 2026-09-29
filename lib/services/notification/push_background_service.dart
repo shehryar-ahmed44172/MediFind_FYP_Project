@@ -6,6 +6,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 
 import '../../core/constants/app_constants.dart';
@@ -48,7 +49,13 @@ class PushBackgroundService {
           initialNotificationTitle: 'MediFind',
           initialNotificationContent: ongoingText,
           foregroundServiceNotificationId: _notificationId,
-          foregroundServiceTypes: [AndroidForegroundType.remoteMessaging],
+          // location is required as well: while a responder is on a case this
+          // service reports their position, and Android 14+ blocks GPS from a
+          // foreground service that has not declared the location type.
+          foregroundServiceTypes: [
+            AndroidForegroundType.remoteMessaging,
+            AndroidForegroundType.location,
+          ],
         ),
         iosConfiguration: IosConfiguration(autoStart: false),
       );
@@ -90,6 +97,34 @@ class PushBackgroundService {
     FlutterBackgroundService().invoke('sessionChanged');
   }
 
+  /// Starts (or updates) live location reporting for an accepted emergency.
+  ///
+  /// The responder's phone goes in a pocket while they ride, so the screen is
+  /// no longer in the foreground — the app isolate is frozen and location
+  /// updates stop. This service keeps running, so it does the reporting.
+  static Future<void> trackEmergency(String emergencyId, String status) async {
+    if (!_supported) return;
+    await start();
+    try {
+      FlutterBackgroundService().invoke('trackEmergency', {
+        'emergencyId': emergencyId,
+        'status': status,
+      });
+    } catch (e) {
+      debugPrint('[PushService] trackEmergency failed: $e');
+    }
+  }
+
+  /// Stops live location reporting (emergency resolved, cancelled or dropped).
+  static Future<void> stopTrackingEmergency() async {
+    if (!_supported || !await isRunning()) return;
+    try {
+      FlutterBackgroundService().invoke('stopTrackingEmergency');
+    } catch (e) {
+      debugPrint('[PushService] stopTrackingEmergency failed: $e');
+    }
+  }
+
   /// Stop on logout / account deletion.
   static Future<void> stop() async {
     if (!_supported) return;
@@ -116,6 +151,12 @@ class _BackgroundPushRunner {
 
   io.Socket? _socket;
   PushSession? _session;
+
+  /// Set while this responder is on an accepted emergency: their position is
+  /// reported until the case ends, even with the screen off.
+  String? _trackedEmergencyId;
+  String _trackedStatus = 'EN_ROUTE';
+  StreamSubscription<Position>? _positionSub;
   bool _stopping = false;
   bool _refreshing = false;
   DateTime? _lastRefreshAt;
@@ -147,6 +188,15 @@ class _BackgroundPushRunner {
 
     _subscriptions.add(service.on('stop').listen((_) => _stop()));
     _subscriptions.add(service.on('sessionChanged').listen((_) => _reloadSession()));
+    _subscriptions.add(service.on('trackEmergency').listen((data) {
+      final id = data?['emergencyId']?.toString();
+      if (id == null || id.isEmpty) return;
+      _trackedStatus = data?['status']?.toString() ?? 'EN_ROUTE';
+      if (_trackedEmergencyId == id) return; // only the status changed
+      _trackedEmergencyId = id;
+      _startLocationReporting();
+    }));
+    _subscriptions.add(service.on('stopTrackingEmergency').listen((_) => _stopLocationReporting()));
 
     // Periodically confirm we are still logged in and connected; ask the
     // server to replay anything we might have missed.
@@ -332,9 +382,69 @@ class _BackgroundPushRunner {
     }
   }
 
+  // ── Live location while a responder is on a case ───────────────────────────
+
+  /// Streams the responder's position to the server until the case ends.
+  ///
+  /// 10 m of movement (or the 8 s timeout) is enough resolution for a map and
+  /// keeps the battery cost sane; the patient's screen also polls the server,
+  /// so a dropped socket frame is not a lost position.
+  Future<void> _startLocationReporting() async {
+    await _positionSub?.cancel();
+    _positionSub = null;
+
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      debugPrint('[PushService] location services off — cannot report position');
+      return;
+    }
+    final permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied ||
+        permission == LocationPermission.deniedForever) {
+      debugPrint('[PushService] no location permission — cannot report position');
+      return;
+    }
+
+    _positionSub = Geolocator.getPositionStream(
+      locationSettings: AndroidSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+        intervalDuration: const Duration(seconds: 8),
+      ),
+    ).listen(
+      _reportPosition,
+      onError: (Object e) => debugPrint('[PushService] location stream failed: $e'),
+    );
+    debugPrint('[PushService] reporting location for $_trackedEmergencyId');
+  }
+
+  void _reportPosition(Position position) {
+    final id = _trackedEmergencyId;
+    final socket = _socket;
+    if (id == null) return;
+    if (socket == null || socket.disconnected) {
+      _connect(); // the next fix goes out once the socket is back
+      return;
+    }
+    socket.emit('update_location', {
+      'emergencyId': id,
+      'latitude': position.latitude,
+      'longitude': position.longitude,
+      'status': _trackedStatus,
+      'timestamp': DateTime.now().toIso8601String(),
+    });
+  }
+
+  Future<void> _stopLocationReporting() async {
+    await _positionSub?.cancel();
+    _positionSub = null;
+    _trackedEmergencyId = null;
+    debugPrint('[PushService] stopped reporting location');
+  }
+
   Future<void> _stop() async {
     if (_stopping) return;
     _stopping = true;
+    await _stopLocationReporting();
     _watchdog?.cancel();
     for (final sub in _subscriptions) {
       await sub.cancel();

@@ -26,6 +26,7 @@ import '../../../core/utils/map_utils.dart';
 import '../../widgets/map/route_line.dart';
 import '../../widgets/map/map_loading_cover.dart';
 import 'widgets/responder_widgets.dart';
+import '../../../services/notification/push_background_service.dart';
 
 /// How a responder closed an emergency (sent to the resolve API).
 class _ResolveOutcome {
@@ -132,6 +133,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       _mapController!.animateCamera(CameraUpdate.newLatLng(target), duration: const Duration(milliseconds: 1000)).catchError((_) {});
     });
     _loadInitialStatus();
+    _syncBackgroundTracking();
     Future.microtask(() async {
       final voiceEnabled = ref.read(accessibilityProvider).voiceGuidanceEnabled;
       if (!voiceEnabled) return; // Responder has disabled voice alerts
@@ -222,8 +224,10 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     if (ui == 'CANCELLED' && _currentStatus != 'CANCELLED') {
       setState(() => _currentStatus = 'CANCELLED');
       showMfSnackBar(context, 'The patient cancelled this emergency.', tone: MfTone.warning);
+      _syncBackgroundTracking();
     } else if (ui != 'CANCELLED' && _rank(ui) > _rank(_currentStatus)) {
       setState(() => _currentStatus = ui);
+      _syncBackgroundTracking();
     }
   }
 
@@ -231,6 +235,20 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
     MapUtils.getPatientMarker().then((_) {
       if (mounted) setState(() {});
     });
+  }
+
+  /// Keeps the background service reporting this responder's position.
+  ///
+  /// The screen's own stream stops the moment the phone sleeps or the app goes
+  /// to the background — which is exactly when a responder is riding. The
+  /// foreground service keeps going, so it owns the reporting while the case
+  /// is open and is told to stop once the case ends.
+  void _syncBackgroundTracking() {
+    if (EmergencyStatus.isTerminal(_currentStatus)) {
+      PushBackgroundService.stopTrackingEmergency();
+    } else {
+      PushBackgroundService.trackEmergency(widget.emergencyId, _currentStatus);
+    }
   }
 
   void _startLiveTracking() {
@@ -353,6 +371,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       _currentStatus = newStatus; // optimistic
       _isUpdatingStatus = true;
     });
+    _syncBackgroundTracking();
     try {
       if (newStatus == 'RESOLVED') {
         final repo = await ref.read(emergencyRepositoryProvider.future);
@@ -379,6 +398,7 @@ class _ActiveEmergencyScreenState extends ConsumerState<ActiveEmergencyScreen> {
       debugPrint('Status update failed: $e');
       if (mounted) {
         setState(() => _currentStatus = previous); // revert
+        _syncBackgroundTracking();
         showMfSnackBar(
           context,
           'Could not update status. ${e.toString().replaceAll('Exception:', '').trim()}',

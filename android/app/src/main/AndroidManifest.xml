@@ -77,7 +77,7 @@
              Android 14+ requires the foreground service type to be declared. -->
         <service
             android:name="id.flutter.flutter_background_service.BackgroundService"
-            android:foregroundServiceType="remoteMessaging"
+            android:foregroundServiceType="remoteMessaging|location"
             android:exported="false"
             tools:replace="android:exported" />
 

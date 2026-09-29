@@ -44,6 +44,11 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
   String? _responderPhone;
   String? _responderProfileImage;
   double?  _responderRating;
+  /// When the last responder position arrived. A distance computed from a
+  /// stale fix is worse than no distance at all — it once read "0 m" while
+  /// the responder was walking away.
+  DateTime? _lastFixAt;
+  Timer? _positionPollTimer;
   /// 0 = nobody has rated this responder yet, so the card says "New".
   int?     _responderTotalRatings;
   String? _responderType;
@@ -95,6 +100,15 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     _socketSub = socketService.messageStream.listen(_onSocketMessage);
     _route.route.addListener(_onRouteChanged);
 
+    // Socket events can be missed (background, weak signal, reconnect), and a
+    // missed event used to leave a stale position on screen. Asking the server
+    // for the latest fix every 12 s makes the map self-correct.
+    _positionPollTimer = Timer.periodic(const Duration(seconds: 12), (_) {
+      if (!mounted || _responderId == null) return;
+      if (EmergencyStatus.isTerminal(_currentStatus)) return;
+      _loadLatestResponderPosition();
+    });
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(socketStreamProvider);
@@ -119,6 +133,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     _mapCover.dispose();
     _simTimer?.cancel();
     _simTimer = null;
+    _positionPollTimer?.cancel();
     _socketSub?.cancel();
     _responderMarker.dispose();
     _route.dispose();
@@ -205,8 +220,15 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       if (!mounted || latest is! Map) return;
       final lat = double.tryParse(latest['latitude']?.toString() ?? '');
       final lng = double.tryParse(latest['longitude']?.toString() ?? '');
-      if (lat != null && lng != null && _responderLat == null) {
-        _applyResponderPosition(lat, lng, null);
+      if (lat != null && lng != null) {
+        final moved = _responderLat == null ||
+            GeoUtils.haversineKm(lat, lng, _responderLat!, _responderLong!) > 0.005;
+        // A repeated identical fix still proves the responder is reporting.
+        if (moved) {
+          _applyResponderPosition(lat, lng, latest['estimatedArrivalMinutes']);
+        } else {
+          setState(() => _lastFixAt = DateTime.now());
+        }
       }
     } catch (_) {
       // No tracking yet (404) — the socket will deliver positions.
@@ -232,6 +254,7 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
       _responderLat = lat;
       _responderLong = lng;
       _eta = eta;
+      _lastFixAt = DateTime.now();
     });
     _responderMarker.moveTo(LatLng(lat, lng));
     _route.update(LatLng(lat, lng), patient);
@@ -914,12 +937,30 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
     final cs = Theme.of(context).colorScheme;
     final hasResponder = _responderName != null;
 
+    // A distance is only honest while the responder keeps reporting. Once the
+    // last fix goes stale the number is replaced by how old it is, instead of
+    // showing a confident "0 m" for a responder who may be far away.
     String? distance;
+    String? fixAge;
     final patient = _patientLatLng;
+    const staleAfter = Duration(seconds: 75);
+    final lastFix = _lastFixAt;
+    final isStale = lastFix == null || DateTime.now().difference(lastFix) > staleAfter;
+
     if (_responderLat != null && _responderLong != null && patient != null) {
-      distance = GeoUtils.formatDistance(
-        GeoUtils.haversineKm(_responderLat!, _responderLong!, patient.latitude, patient.longitude),
-      );
+      final km = GeoUtils.haversineKm(
+          _responderLat!, _responderLong!, patient.latitude, patient.longitude);
+      if (isStale) {
+        distance = 'Updating…';
+      } else if (km < 0.03) {
+        distance = 'Arriving now';
+      } else {
+        distance = GeoUtils.formatDistance(km);
+      }
+    }
+    if (lastFix != null && isStale) {
+      final mins = DateTime.now().difference(lastFix).inMinutes;
+      fixAge = mins < 1 ? 'Last update just now' : 'Last update $mins min ago';
     }
 
     final vehicleLabel = (_vehicleType == 'MOTORBIKE_AMBULANCE' || _vehicleType == null)
@@ -1063,6 +1104,22 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               ],
             ),
           ),
+          if (fixAge != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(MfSpace.md, 0, MfSpace.md, MfSpace.sm),
+              child: Row(
+                children: [
+                  Icon(Icons.sync_problem_rounded, size: 15, color: cs.onSurfaceVariant),
+                  const SizedBox(width: MfSpace.xxs),
+                  Expanded(
+                    child: Text(
+                      '$fixAge — the responder may have moved since.',
+                      style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              ),
+            ),
         ],
       ),
     );

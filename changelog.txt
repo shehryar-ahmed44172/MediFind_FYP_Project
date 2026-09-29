@@ -38,3 +38,4 @@ Implement emergency request rejection
 Add role-based authentication for users
 Add unit tests for application services
 Add emergency request history
+Implement medical profile editing

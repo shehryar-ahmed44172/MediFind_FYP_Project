@@ -35,3 +35,4 @@ Implement password reset functionality
 Implement emergency request rejection
 Refactor repository implementation
 Implement emergency request rejection
+Add role-based authentication for users

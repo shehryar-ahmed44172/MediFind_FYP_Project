@@ -41,3 +41,4 @@ Add emergency request history
 Implement medical profile editing
 Integrate Google Maps for live tracking
 Implement ETA calculation for responders
+Add caregiver registration and authentication

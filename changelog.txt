@@ -44,3 +44,4 @@ Implement ETA calculation for responders
 Add caregiver registration and authentication
 Implement medical profile editing
 Add large button accessibility options
+Add patient and caregiver linking

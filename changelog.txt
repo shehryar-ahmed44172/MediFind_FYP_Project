@@ -45,3 +45,4 @@ Add caregiver registration and authentication
 Implement medical profile editing
 Add large button accessibility options
 Add patient and caregiver linking
+Add large button accessibility options

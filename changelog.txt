@@ -48,3 +48,4 @@ Add patient and caregiver linking
 Add large button accessibility options
 Add unit tests for application services
 Refactor Riverpod providers
+Add input validation to registration forms

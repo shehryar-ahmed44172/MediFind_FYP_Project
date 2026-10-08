@@ -22,3 +22,4 @@ Implement emergency category selection
 Add patient medical profile screen
 Add role-based authentication for users
 Add large button accessibility options
+Add Dio HTTP client configuration

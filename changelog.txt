@@ -19,3 +19,4 @@ Add Freezed models for medical profiles
 Add active emergency tracking screen
 Configure GoRouter navigation
 Implement emergency category selection
+Add patient medical profile screen

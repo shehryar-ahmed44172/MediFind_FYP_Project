@@ -24,3 +24,4 @@ Add role-based authentication for users
 Add large button accessibility options
 Add Dio HTTP client configuration
 Add patient medical profile screen
+Add GPS location capture for SOS requests

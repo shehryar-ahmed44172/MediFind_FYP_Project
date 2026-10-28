@@ -9,6 +9,7 @@ import {
   FeaturesPage, DeafUsersPage, HowItWorksPage, RespondersPage, AdminConsolePage, FaqPage, ContactPage,
 } from './pages/SitePages';
 import LoginPage from './pages/LoginPage';
+import { ForgotPasswordPage, ResetPasswordPage } from './pages/PasswordResetPages';
 import Dashboard from './pages/Dashboard';
 import LegalPage from './pages/LegalPage';
 import NotFound from './pages/NotFound';
@@ -81,6 +82,8 @@ function AppRoutes() {
         <Route path="/contact" element={<ContactPage />} />
         {/* The website is for awareness; only administrators sign in, at /admin/login */}
         <Route path="/admin/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/login" element={<Navigate to="/admin/login" replace />} />
         <Route path="/terms" element={<LegalPage type="terms" />} />
         <Route path="/privacy" element={<LegalPage type="privacy" />} />

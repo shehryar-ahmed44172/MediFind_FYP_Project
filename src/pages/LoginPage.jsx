@@ -32,7 +32,7 @@ const ADMIN_FEATURES = [
   { Icon: ScrollText, title: 'Full audit trail',   text: 'Alerts, calls and admin actions are logged and reviewable.' },
 ];
 
-function AuthShell({ children }) {
+export function AuthShell({ children }) {
   return (
     <div className="mf-auth">
       <aside className="mf-auth-brand" aria-label="MediFind admin console">
@@ -177,7 +177,10 @@ const LoginPage = () => {
         </div>
 
         <div>
-          <label style={labelStyle} htmlFor="admin-password">Password</label>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '12px' }}>
+            <label style={labelStyle} htmlFor="admin-password">Password</label>
+            <Link to="/forgot-password" style={{ fontSize: '12.5px', marginBottom: '6px' }}>Forgot password?</Link>
+          </div>
           <div style={{ position: 'relative' }}>
             <Lock size={15} aria-hidden="true" style={inputIcon} />
             <input

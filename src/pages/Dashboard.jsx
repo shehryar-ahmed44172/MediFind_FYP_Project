@@ -3,7 +3,7 @@ import { Routes, Route, Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Siren, UserCheck, ClipboardList, Users, CreditCard, Receipt,
   Megaphone, MailCheck, PhoneCall, Inbox, ScrollText, Settings, LogOut, Search, Sun, Moon,
-  Menu, X, ChevronDown, PanelLeftClose, PanelLeftOpen, ArrowLeft, ArrowRight, Bell,
+  Menu, X, ChevronDown, PanelLeftClose, PanelLeftOpen, ArrowLeft, ArrowRight, Bell, KeyRound,
 } from 'lucide-react';
 import { useAuth, useAlert, useTheme } from '../context/hooks';
 import api from '../services/api';
@@ -28,6 +28,7 @@ import AllSubscriptions from './admin/AllSubscriptions';
 import PlatformSettings from './admin/PlatformSettings';
 import SystemNotifications from './admin/SystemNotifications';
 import AdminInbox from './admin/AdminInbox';
+import AccountSecurity from './admin/AccountSecurity';
 import {
   Avatar, Button, DataTable, EmptyState, IconButton, LiveIndicator, Notice, PageHeader,
   Panel, RefreshButton, Skeleton, StatCard, StatusBadge,
@@ -89,6 +90,7 @@ const NAV_GROUPS = [
   { label: 'System', items: [
     { label: 'System Logs', to: '/admin/logs', Icon: ScrollText, keywords: 'audit activity events history' },
     { label: 'Platform Settings', to: '/admin/settings', Icon: Settings, keywords: 'config configuration preferences' },
+    { label: 'Account Security', to: '/admin/account', Icon: KeyRound, keywords: 'password change my account sign-in credentials security' },
   ] },
 ];
 const NAV = NAV_GROUPS.flatMap(g => g.items.map(item => ({ ...item, group: g.label })));
@@ -663,6 +665,7 @@ export default function Dashboard() {
                   </div>
                   <div style={{ padding: '4px 0' }}>
                     {[
+                      { to: '/admin/account', label: 'Change password', Icon: KeyRound },
                       { to: '/admin/settings', label: 'Platform Settings', Icon: Settings },
                       { to: '/admin/logs', label: 'System Logs', Icon: ScrollText },
                       { to: '/admin/inbox', label: 'Admin Inbox', Icon: Inbox },
@@ -702,6 +705,7 @@ export default function Dashboard() {
               <Route path="/notifications" element={<SystemNotifications />} />
               <Route path="/inbox" element={<AdminInbox />} />
               <Route path="/settings" element={<PlatformSettings />} />
+              <Route path="/account" element={<AccountSecurity />} />
               <Route path="*" element={<AdminNotFound />} />
             </Routes>
           </div>

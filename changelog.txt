@@ -51,3 +51,4 @@ Refactor Riverpod providers
 Add input validation to registration forms
 Implement responder availability status
 Improve error handling in API requests
+Implement ETA calculation for responders

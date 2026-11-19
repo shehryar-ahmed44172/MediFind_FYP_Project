@@ -409,6 +409,8 @@ class _BackgroundPushRunner {
         accuracy: LocationAccuracy.high,
         distanceFilter: 10,
         intervalDuration: const Duration(seconds: 8),
+        // No Google "Location Accuracy" dialog from a background service
+        forceLocationManager: true,
       ),
     ).listen(
       _reportPosition,

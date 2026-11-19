@@ -73,10 +73,14 @@ class LocationService {
       // Define location settings based on platform
       late LocationSettings locationSettings;
       if (defaultTargetPlatform == TargetPlatform.android) {
+        // Android's own location manager: a stream asks for a new fix every few
+        // seconds, and the fused provider would open Google's "Location Accuracy"
+        // dialog for each one, stacking dozens of dialogs mid-emergency.
         locationSettings = AndroidSettings(
           accuracy: accuracy,
           distanceFilter: 0,
           intervalDuration: Duration(seconds: intervalInSeconds),
+          forceLocationManager: true,
         );
       } else if (defaultTargetPlatform == TargetPlatform.iOS ||
           defaultTargetPlatform == TargetPlatform.macOS) {
@@ -119,8 +123,13 @@ class LocationService {
   /// returns made-up coordinates: if neither is available a
   /// [LocationException] with a user-facing message is thrown, so an SOS is
   /// never sent with a fake location.
+  ///
+  /// [interactive] is false for fixes nobody asked for (prewarm, the responder's
+  /// periodic sync). Those use Android's own location manager, which never opens
+  /// Google's "Location Accuracy" dialog over whatever the user is doing.
   Future<Position> getCurrentLocation({
     Duration timeLimit = const Duration(seconds: 10),
+    bool interactive = true,
   }) async {
     try {
       // Step 1: Check if location service (GPS) is enabled at the OS level
@@ -153,10 +162,16 @@ class LocationService {
       // Step 3: fresh fix with a timeout
       try {
         final pos = await Geolocator.getCurrentPosition(
-          locationSettings: LocationSettings(
-            accuracy: LocationAccuracy.high,
-            timeLimit: timeLimit,
-          ),
+          locationSettings: !interactive && defaultTargetPlatform == TargetPlatform.android
+              ? AndroidSettings(
+                  accuracy: LocationAccuracy.high,
+                  timeLimit: timeLimit,
+                  forceLocationManager: true,
+                )
+              : LocationSettings(
+                  accuracy: LocationAccuracy.high,
+                  timeLimit: timeLimit,
+                ),
         );
         _lastFix = _applyDebugOffset(pos);
         return _lastFix!;
@@ -215,7 +230,7 @@ class LocationService {
       final permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) return;
       if (!await Geolocator.isLocationServiceEnabled()) return;
-      await getCurrentLocation(timeLimit: const Duration(seconds: 20));
+      await getCurrentLocation(timeLimit: const Duration(seconds: 20), interactive: false);
     } catch (_) {
       // The SOS button still fetches a fix itself
     }

@@ -106,9 +106,11 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
         _details = details;
         // Keep a finer-grained live status (EN_ROUTE/ARRIVED from tracking
         // events) unless the server reports a different phase.
+        // Only while the server still says ASSIGNED: a server ARRIVED must win
+        // over a live EN_ROUTE, or a missed socket event leaves "On the way".
         const liveOnly = {'EN_ROUTE', 'ARRIVED', 'TREATING', 'TRANSPORTED'};
         final keepLive = !details.isTerminal &&
-            details.status != 'ACTIVE' &&
+            details.status == 'ASSIGNED' &&
             liveOnly.contains(_liveStatus);
         if (!keepLive) _liveStatus = details.status;
         _loading = false;
@@ -163,13 +165,26 @@ class _CaregiverTrackingScreenState extends ConsumerState<CaregiverTrackingScree
     if (raw is! Map || !mounted) return;
     final data = Map<String, dynamic>.from(raw);
 
-    // In-app notifications (RESPONDER_ASSIGNED, EMERGENCY_RESOLVED, PATIENT_SAFE,
-    // PATIENT_EMERGENCY updates) carry the emergency id in a nested `data` map.
-    if (message.event == SocketEvent.notification) {
+    // Status events sent while the socket was down are lost: resync on reconnect.
+    if (message.event == SocketEvent.connectionStatus) {
+      if (data['status'] == 'connected') _load(silent: true);
+      return;
+    }
+
+    // In-app notifications and pushes (RESPONDER_ASSIGNED, RESPONDER_ARRIVING,
+    // EMERGENCY_RESOLVED, PATIENT_SAFE, PATIENT_EMERGENCY updates) carry the
+    // emergency id in a nested `data` map.
+    if (message.event == SocketEvent.notification || message.event == SocketEvent.push) {
       final inner = data['data'];
       if (inner is! Map) return;
       if (inner['emergencyId']?.toString() != widget.emergencyId) return;
-      const refreshTypes = {'RESPONDER_ASSIGNED', 'PATIENT_SAFE', 'EMERGENCY_RESOLVED', 'PATIENT_EMERGENCY'};
+      const refreshTypes = {
+        'RESPONDER_ASSIGNED',
+        'RESPONDER_ARRIVING',
+        'PATIENT_SAFE',
+        'EMERGENCY_RESOLVED',
+        'PATIENT_EMERGENCY',
+      };
       if (!refreshTypes.contains(data['type']?.toString())) return;
       _load(silent: true);
       return;

@@ -51,7 +51,7 @@ class ResponderLocationTracker {
     }
 
     try {
-      final position = await LocationService().getCurrentLocation();
+      final position = await LocationService().getCurrentLocation(interactive: false);
       await _ref.read(updateResponderLocationProvider(position).future);
       debugPrint('📍 Auto-Synced Responder Location: ${position.latitude}, ${position.longitude}');
     } catch (e) {

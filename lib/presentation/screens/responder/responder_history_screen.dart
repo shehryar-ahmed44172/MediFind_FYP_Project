@@ -90,6 +90,11 @@ class _HistoryItemCard extends StatelessWidget {
     // parent emergency ended, show the emergency's status.
     final emergencyStatus = (item['emergency'] as Map<String, dynamic>?)?['status'] as String? ?? '';
     if (status == 'REJECTED' && item['rejectionReason'] == 'ASSIGNED_TO_ANOTHER_RESPONDER') return 'TAKEN';
+    // The system closes pending requests (no rejectedAt) when the patient cancels
+    // or the SOS times out: that is not the responder declining.
+    if (status == 'REJECTED' && item['rejectedAt'] == null && emergencyStatus == 'CANCELLED') {
+      return 'CANCELLED';
+    }
     return (status == 'PENDING' &&
             (emergencyStatus == 'CANCELLED' || emergencyStatus == 'RESOLVED' || emergencyStatus == 'COMPLETED'))
         ? emergencyStatus

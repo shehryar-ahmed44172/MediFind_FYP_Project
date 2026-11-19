@@ -1129,7 +1129,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    Text('Sending SOS',
+                    Text('until SOS is sent',
                         style: text.labelLarge
                             ?.copyWith(color: cs.onSurfaceVariant)),
                   ],

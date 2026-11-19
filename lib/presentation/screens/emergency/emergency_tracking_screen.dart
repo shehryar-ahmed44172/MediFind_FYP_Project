@@ -756,7 +756,9 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
               right: 0,
               child: MfFloatingHeader(
                 title: EmergencyStatus.label(_currentStatus),
-                subtitle: _responderId != null || _responderName != null ? 'ETA: $_eta' : 'Live emergency tracking',
+                subtitle: _currentStatus == 'ARRIVED'
+                    ? 'Responder is here'
+                    : (_responderId != null || _responderName != null ? 'ETA: $_eta' : 'Live emergency tracking'),
                 onBack: () => context.go('/home'),
                 titleTrailing: const MfStatusChip(
                   label: 'Live',
@@ -1093,11 +1095,17 @@ class _EmergencyTrackingScreenState extends ConsumerState<EmergencyTrackingScree
             padding: const EdgeInsets.symmetric(vertical: MfSpace.xxs),
             child: Row(
               children: [
-                Expanded(child: MfKeyValueRow(label: 'ETA', value: _eta, icon: Icons.schedule_rounded)),
+                Expanded(
+                  child: MfKeyValueRow(
+                    label: 'ETA',
+                    value: _currentStatus == 'ARRIVED' ? 'Here' : _eta,
+                    icon: Icons.schedule_rounded,
+                  ),
+                ),
                 Expanded(
                   child: MfKeyValueRow(
                     label: 'Distance',
-                    value: distance ?? '—',
+                    value: _currentStatus == 'ARRIVED' ? 'Here' : (distance ?? '—'),
                     icon: Icons.place_outlined,
                   ),
                 ),

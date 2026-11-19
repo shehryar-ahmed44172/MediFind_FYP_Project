@@ -620,12 +620,27 @@ class MediFindApiClient {
     }
   }
 
+  /// The server nests the patient type under patient.medicalProfile; the
+  /// Emergency entity reads it from the top level (Deaf patients get a
+  /// text-only screen, so a missing value is not harmless).
+  Emergency _emergencyFromJson(Map<String, dynamic> json) {
+    if (json['patientType'] == null) {
+      final patient = json['patient'];
+      final med = patient is Map ? patient['medicalProfile'] : null;
+      final type = med is Map ? med['patientType'] : null;
+      if (type is String && type.isNotEmpty) {
+        return Emergency.fromJson({...json, 'patientType': type});
+      }
+    }
+    return Emergency.fromJson(json);
+  }
+
   Future<Emergency> getEmergency(String emergencyId) async {
     try {
       final response = await _dio.get('emergencies/$emergencyId');
 
       if (response.statusCode == 200) {
-        return Emergency.fromJson(response.data['data'] as Map<String, dynamic>);
+        return _emergencyFromJson(response.data['data'] as Map<String, dynamic>);
       }
 
       throw NetworkException(message: 'Failed to fetch emergency');
@@ -642,7 +657,7 @@ class MediFindApiClient {
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
         return data
-            .map((json) => Emergency.fromJson(json as Map<String, dynamic>))
+            .map((json) => _emergencyFromJson(json as Map<String, dynamic>))
             .toList();
       }
 
@@ -660,7 +675,7 @@ class MediFindApiClient {
       if (response.statusCode == 200) {
         final data = response.data['data'] as List;
         return data
-            .map((json) => Emergency.fromJson(json as Map<String, dynamic>))
+            .map((json) => _emergencyFromJson(json as Map<String, dynamic>))
             .toList();
       }
 
@@ -725,7 +740,7 @@ class MediFindApiClient {
     try {
       final response = await _dio.get('responders/emergencies');
       return (response.data['data'] as List)
-          .map((e) => Emergency.fromJson(e))
+          .map((e) => _emergencyFromJson(e as Map<String, dynamic>))
           .toList();
     } on DioException catch (e) {
       throw _handleDioException(e);

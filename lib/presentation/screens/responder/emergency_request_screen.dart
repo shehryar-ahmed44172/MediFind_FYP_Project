@@ -38,7 +38,8 @@ class _EmergencyRequestScreenState
   Future<String> _distanceTo(double lat, double lng) {
     return _distanceFuture ??= () async {
       try {
-        final position = await LocationService().getCurrentLocation();
+        // Display only: never interrupt the responder with Google's accuracy dialog here
+        final position = await LocationService().getCurrentLocation(interactive: false);
         final km = GeoUtils.haversineKm(position.latitude, position.longitude, lat, lng);
         if (!GeoUtils.isPlausible(km)) {
           _etaText = null;
@@ -191,6 +192,13 @@ class _EmergencyRequestScreenState
         loading: () => 'Loading...',
         error: (_, __) => 'Patient',
       );
+      // The summary is one sentence, so the fields are filled from the live
+      // profile when the server answers, and from the summary text otherwise.
+      final profile = ref.watch(getMedicalProfileProvider(emergency.userId)).valueOrNull;
+      final summary = emergency.voiceSummary!;
+      final liveBlood = profile?.bloodType;
+      final liveAllergies = profile?.allergies ?? const <String>[];
+      final liveConditions = profile?.chronicDiseases ?? const <String>[];
       return FutureBuilder<String>(
         future: distanceFuture,
         builder: (context, distanceSnapshot) {
@@ -200,9 +208,15 @@ class _EmergencyRequestScreenState
             emergencyType: emergency.emergencyType,
             patientName: patientName,
             distance: distanceSnapshot.data ?? 'Calculating...',
-            bloodGroup: _extractFromSummary(emergency.voiceSummary!, 'Blood Type') ?? 'See summary below',
-            allergies: _extractFromSummary(emergency.voiceSummary!, 'Allergies') ?? 'See summary below',
-            conditions: _extractFromSummary(emergency.voiceSummary!, 'Conditions') ?? 'See summary below',
+            bloodGroup: (liveBlood != null && liveBlood.isNotEmpty)
+                ? liveBlood
+                : _extractFromSummary(summary, r'Blood (?:Type|Group)') ?? 'Not recorded',
+            allergies: liveAllergies.isNotEmpty
+                ? liveAllergies.join(', ')
+                : _extractFromSummary(summary, 'allergies') ?? 'None listed',
+            conditions: liveConditions.isNotEmpty
+                ? liveConditions.join(', ')
+                : _extractFromSummary(summary, r'(?:Chronic )?conditions') ?? 'None listed',
             priority: priority,
             isDeaf: emergency.patientType.toUpperCase() == 'DEAF',
             voiceSummary: emergency.voiceSummary,
@@ -260,17 +274,14 @@ class _EmergencyRequestScreenState
     );
   }
 
-  /// Extracts a labelled value from the pre-captured voiceSummary text.
-  /// e.g. "Blood Type: O+" → "O+"
-  String? _extractFromSummary(String summary, String label) {
-    final lines = summary.split('\n');
-    for (final line in lines) {
-      if (line.toLowerCase().startsWith(label.toLowerCase())) {
-        final parts = line.split(':');
-        if (parts.length > 1) return parts.sublist(1).join(':').trim();
-      }
-    }
-    return null;
+  /// Extracts a labelled value from the pre-captured voiceSummary text, which is
+  /// one or more sentences such as "Patient has allergies: Peanuts. Chronic
+  /// conditions: Asthma." [labelPattern] is a regular expression for the label.
+  String? _extractFromSummary(String summary, String labelPattern) {
+    final match = RegExp('(?:$labelPattern)\\s*:\\s*([^.\\n]+)', caseSensitive: false)
+        .firstMatch(summary);
+    final value = match?.group(1)?.trim();
+    return (value == null || value.isEmpty) ? null : value;
   }
 
   void _toggleVoiceAlert({

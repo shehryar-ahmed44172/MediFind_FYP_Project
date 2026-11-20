@@ -102,6 +102,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
       final authRepo = await ref.read(authRepositoryProvider.future);
       await authRepo.logout();
     } catch (_) {}
+    // The repository only clears storage; the router still reads "logged in"
+    // from authStateProvider and would bounce /login back to /splash, leaving a
+    // blank white screen. Mark the session logged out so /login can open.
+    ref.read(authStateProvider.notifier).forceLoggedOut();
+    ref.invalidate(currentUserIdProvider);
+    ref.invalidate(currentUserRoleProvider);
+    ref.invalidate(currentUserProvider);
   }
 
   @override

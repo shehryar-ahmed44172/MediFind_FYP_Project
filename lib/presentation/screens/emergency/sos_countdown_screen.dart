@@ -1042,7 +1042,7 @@ class _SosCountdownScreenState extends ConsumerState<SosCountdownScreen>
             if (!_noResponder) ...[
               const SizedBox(height: MfSpace.xxs),
               Text(
-                'Responders near you are being alerted one by one. Most accept within two minutes.',
+                'All verified responders near you are alerted at once. If no one accepts within a minute, the search widens.',
                 style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant),
               ),
             ] else ...[

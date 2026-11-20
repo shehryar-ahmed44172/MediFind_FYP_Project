@@ -97,15 +97,20 @@ class PaymentSuccessScreen extends ConsumerWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: MfSpace.md, vertical: MfSpace.sm),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-          const SizedBox(height: 2),
-          selectable
-              ? SelectableText(value, style: text.titleSmall)
-              : Text(value, style: text.titleSmall),
-        ],
+      // Full width so the label and value line up on the left like the Status row;
+      // without it the list group centred each shrink-wrapped column.
+      child: SizedBox(
+        width: double.infinity,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label, style: text.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: 2),
+            selectable
+                ? SelectableText(value, style: text.titleSmall)
+                : Text(value, style: text.titleSmall),
+          ],
+        ),
       ),
     );
   }

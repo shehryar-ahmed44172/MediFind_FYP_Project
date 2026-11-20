@@ -124,9 +124,9 @@ class LocationService {
   /// [LocationException] with a user-facing message is thrown, so an SOS is
   /// never sent with a fake location.
   ///
-  /// [interactive] is false for fixes nobody asked for (prewarm, the responder's
-  /// periodic sync). Those use Android's own location manager, which never opens
+  /// On Android every fix uses Android's own location manager, which never opens
   /// Google's "Location Accuracy" dialog over whatever the user is doing.
+  /// [interactive] is kept so callers can still say whether the user asked for it.
   Future<Position> getCurrentLocation({
     Duration timeLimit = const Duration(seconds: 10),
     bool interactive = true,
@@ -161,8 +161,11 @@ class LocationService {
 
       // Step 3: fresh fix with a timeout
       try {
+        // Android always uses its own location manager here. The fused provider
+        // opens Google's "Location Accuracy" dialog when that setting is off,
+        // and on the SOS screen that dialog covered the countdown mid-emergency.
         final pos = await Geolocator.getCurrentPosition(
-          locationSettings: !interactive && defaultTargetPlatform == TargetPlatform.android
+          locationSettings: defaultTargetPlatform == TargetPlatform.android
               ? AndroidSettings(
                   accuracy: LocationAccuracy.high,
                   timeLimit: timeLimit,

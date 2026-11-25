@@ -81,6 +81,9 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
     final picked = await _picker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 85,
+      // Large enough to read a printed report, small enough for mobile data
+      maxWidth: 2400,
+      maxHeight: 2400,
     );
     if (picked == null) return;
 
@@ -126,6 +129,9 @@ class _MedicalReportsScreenState extends ConsumerState<MedicalReportsScreen> {
     final picked = await _picker.pickImage(
       source: ImageSource.camera,
       imageQuality: 85,
+      // Large enough to read a printed report, small enough for mobile data
+      maxWidth: 2400,
+      maxHeight: 2400,
     );
     if (picked == null) return;
 

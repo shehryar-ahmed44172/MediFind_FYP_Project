@@ -181,10 +181,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     final picked = await _imagePicker.pickImage(
       source: ImageSource.gallery,
       imageQuality: 80,
+      // A phone photo is often 4000 px wide and several MB; 1600 px keeps a CNIC
+      // readable and uploads fast on mobile data.
+      maxWidth: 1600,
+      maxHeight: 1600,
     );
     if (picked != null) {
       setState(() {
         _uploadStates.remove(docType);
+        _uploadedUrls.remove(docType);
         switch (docType) {
           case 'CNIC_FRONT':     _cnicFront         = picked; break;
           case 'CNIC_BACK':      _cnicBack          = picked; break;
@@ -317,19 +322,36 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
   int get _requiredDocsAdded => _requiredDocs.where((d) => _fileFor(d) != null).length;
 
+  /// Server URL of each document already uploaded in this form, so pressing
+  /// Register again (say after "email already exists") does not re-upload it.
+  final Map<String, String> _uploadedUrls = {};
+
+  static const _docLabels = {
+    'CNIC_FRONT': 'CNIC (front)',
+    'CNIC_BACK': 'CNIC (back)',
+    'EMP_FRONT': 'Employee Card (front)',
+    'EMP_BACK': 'Employee Card (back)',
+    'DRIVING_LICENSE': 'Driving License',
+    'BIKE_DOC': 'Motorbike Documents',
+  };
+
   /// Uploads one document and tracks its state for the card indicator.
   Future<String?> _uploadDoc(dynamic authRepo, String docType) async {
     final file = _fileFor(docType);
     if (file == null) return null;
+    final cached = _uploadedUrls[docType];
+    if (cached != null) return cached;
     debugPrint('   Uploading $docType...');
     setState(() => _uploadStates[docType] = _DocUploadState.uploading);
     try {
       final String url = await authRepo.uploadDocument(File(file.path));
+      _uploadedUrls[docType] = url;
       if (mounted) setState(() => _uploadStates[docType] = _DocUploadState.uploaded);
       return url;
-    } catch (_) {
+    } catch (e) {
       if (mounted) setState(() => _uploadStates[docType] = _DocUploadState.failed);
-      rethrow;
+      final reason = e.toString().replaceAll('Exception:', '').trim();
+      throw Exception('Could not upload ${_docLabels[docType] ?? docType}: $reason');
     }
   }
 
@@ -455,6 +477,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           setState(() => _duplicateEmail = _emailController.text.trim());
           _formKey.currentState?.validate();
           showMfSnackBar(context, 'An account with this email already exists.', tone: MfTone.danger);
+        } else if (lower.contains('phone') && (lower.contains('already') || lower.contains('exist'))) {
+          showMfSnackBar(context, 'An account with this phone number already exists.', tone: MfTone.danger);
+        } else if (lower.startsWith('could not upload')) {
+          showMfSnackBar(context, '$raw. Check your internet and press Register again.', tone: MfTone.danger);
         } else {
           showMfSnackBar(context, 'Registration failed: $raw', tone: MfTone.danger);
         }

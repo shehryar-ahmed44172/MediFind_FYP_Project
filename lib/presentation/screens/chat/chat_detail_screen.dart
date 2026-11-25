@@ -787,7 +787,8 @@ class _ChatDetailScreenState extends ConsumerState<ChatDetailScreen> {
   Future<void> _pickImage() async {
     Navigator.pop(context);
     final picker = ImagePicker();
-    final image = await picker.pickImage(source: ImageSource.gallery);
+    final image = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 80, maxWidth: 1600, maxHeight: 1600);
     if (image != null && mounted) {
       setState(() => _isSending = true);
       try {

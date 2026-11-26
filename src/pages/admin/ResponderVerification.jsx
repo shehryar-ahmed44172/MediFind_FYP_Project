@@ -680,7 +680,7 @@ const ResponderVerification = () => {
                   <td className="mf-num" style={{ whiteSpace: 'nowrap' }}>{r.licenseNumber || '—'}</td>
                   <td>
                     {missing === 0
-                      ? <StatusBadge tone="success">Complete</StatusBadge>
+                      ? <StatusBadge tone="success">All uploaded</StatusBadge>
                       : <StatusBadge tone="warning">{missing} missing</StatusBadge>}
                   </td>
                   <td className="mf-num" style={{ whiteSpace: 'nowrap', color: waitColor(r.user?.createdAt) }}>
